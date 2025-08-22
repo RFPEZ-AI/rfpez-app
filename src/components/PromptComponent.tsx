@@ -72,7 +72,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
           <IonTextarea
             value={message}
             placeholder={placeholder}
-            onIonInput={(e) => setMessage(e.detail.value!)}
+            onIonInput={(e) => setMessage(e.detail.value || '')}
             rows={1}
             autoGrow
             style={{
