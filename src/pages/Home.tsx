@@ -1,30 +1,28 @@
 import React from 'react';
-import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar } from '@ionic/react';
-const logo = process.env.PUBLIC_URL + '/logo.svg';
+import { IonContent, IonHeader, IonPage, IonTitle, IonToolbar, IonButtons } from '@ionic/react';
 import AuthButtons from '../components/AuthButtons';
-import ChatHistory from '../components/ChatHistory';
-import './Home.css';
 
 const Home: React.FC = () => {
   return (
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <img src={logo} alt="RFP EZ Logo" style={{ height: 40, marginRight: 12, verticalAlign: 'middle' }} />
-          <IonTitle style={{ display: 'inline', verticalAlign: 'middle' }}>RFP EZ</IonTitle>
-          <div style={{ float: 'right' }}>
+          <IonTitle>Home</IonTitle>
+          <IonButtons slot="end">
             <AuthButtons />
-          </div>
+          </IonButtons>
         </IonToolbar>
       </IonHeader>
       <IonContent fullscreen>
         <IonHeader collapse="condense">
           <IonToolbar>
-            <img src={logo} alt="RFP EZ Logo" style={{ height: 32, marginRight: 10, verticalAlign: 'middle' }} />
-            <IonTitle size="large" style={{ display: 'inline', verticalAlign: 'middle' }}>RFP EZ</IonTitle>
+            <IonTitle size="large">Home</IonTitle>
           </IonToolbar>
         </IonHeader>
-  <ChatHistory />
+        <div style={{ padding: '20px' }}>
+          <h1>Welcome to RFPEZ.AI</h1>
+          <p>Your AI-powered RFP assistant</p>
+        </div>
       </IonContent>
     </IonPage>
   );

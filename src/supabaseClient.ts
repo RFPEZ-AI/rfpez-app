@@ -1,16 +1,35 @@
 import { createClient } from '@supabase/supabase-js';
 
-const url = process.env.REACT_APP_SUPABASE_URL as string | undefined;
-const anon = process.env.REACT_APP_SUPABASE_ANON_KEY as string | undefined;
+const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+const supabaseAnonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
 
-if (!url) {
-  throw new Error('REACT_APP_SUPABASE_URL is missing. Define it in .env.local and restart the dev server.');
-}
-if (!anon) {
-  throw new Error('REACT_APP_SUPABASE_ANON_KEY is missing. Define it in .env.local and restart the dev server.');
+if (!supabaseUrl) {
+  throw new Error('Missing REACT_APP_SUPABASE_URL in .env.local');
 }
 
-export const supabase = createClient(url, anon);
+if (!supabaseAnonKey) {
+  throw new Error('Missing REACT_APP_SUPABASE_ANON_KEY in .env.local');
+}
+
+// Validate URL format
+try {
+  new URL(supabaseUrl);
+} catch {
+  throw new Error('REACT_APP_SUPABASE_URL must be a valid URL');
+}
+
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+  },
+  // Disable telemetry if causing issues
+  global: {
+    headers: {
+      'X-Client-Info': 'supabase-js-web'
+    }
+  }
+});
 
 
 

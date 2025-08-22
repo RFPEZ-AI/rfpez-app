@@ -14,7 +14,8 @@
     "@types/react": "^18.0.17",
     "@types/react-dom": "^18.0.6",
     "@types/react-router": "^5.1.11",
-    "@types/react-router-dom": "^5.1.7",
+    "@types/react-router-dom": "^5.3.3",
+    "cross-env": "^7.0.3",
     "history": "^4.9.0",
     "ionicons": "^7.0.0",
     "react": "18.3.1",
@@ -44,7 +45,7 @@
     "eslint-plugin-react": "^7.32.2"
   },
   "scripts": {
-    "start": "react-scripts start",
+    "start": "cross-env GENERATE_SOURCEMAP=false WDS_SOCKET_HOST=0.0.0.0 WDS_SOCKET_PORT=0 react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test"
   },

@@ -1,11 +1,58 @@
 import React from 'react';
-import { useAuth0 } from '@auth0/auth0-react';
 import { IonButton, IonButtons } from '@ionic/react';
+import { useAuth0 } from '@auth0/auth0-react';
 
 const AuthButtons: React.FC = () => {
-  const { isAuthenticated, loginWithRedirect, logout, isLoading, user } = useAuth0();
+  const { isAuthenticated, loginWithRedirect, logout, isLoading, user, error } = useAuth0();
+  const [loadingTimeout, setLoadingTimeout] = React.useState(false);
 
-  if (isLoading) return <span>Loading...</span>;
+  // Debug logging
+  React.useEffect(() => {
+    console.log('Auth0 State:', {
+      isLoading,
+      isAuthenticated,
+      user: user ? { name: user.name, email: user.email } : null,
+      error: error?.message
+    });
+  }, [isLoading, isAuthenticated, user, error]);
+
+  // Set a timeout to show error if loading takes too long
+  React.useEffect(() => {
+    if (isLoading) {
+      const timer = setTimeout(() => {
+        setLoadingTimeout(true);
+        console.error('Auth0 loading timeout - check your configuration');
+      }, 10000); // 10 second timeout
+      
+      return () => clearTimeout(timer);
+    } else {
+      setLoadingTimeout(false);
+    }
+  }, [isLoading]);
+
+  // Show error if authentication failed
+  if (error) {
+    console.error('Auth0 Error:', error);
+    return <span style={{ color: 'red' }}>Auth Error: {error.message}</span>;
+  }
+
+  if (loadingTimeout) {
+    return (
+      <IonButtons>
+        <IonButton color="danger" onClick={() => window.location.reload()}>
+          Auth Timeout - Retry
+        </IonButton>
+        <IonButton color="medium" onClick={() => window.location.reload()}>
+          Continue as Guest
+        </IonButton>
+      </IonButtons>
+    );
+  }
+
+  if (isLoading) {
+    console.log('Auth0 is still loading...');
+    return <span>Loading...</span>;
+  }
 
   return (
     <IonButtons>
