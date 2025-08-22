@@ -31,7 +31,7 @@ interface Artifact {
 
 const Home: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
+  const [sessions] = useState<Session[]>([]); // Remove setSessions to fix ESLint warning
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedSessionId, setSelectedSessionId] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
