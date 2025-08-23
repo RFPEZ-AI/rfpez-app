@@ -9,7 +9,7 @@ import type {
 
 export class AgentService {
   /**
-   * Get all active agents
+   * Get all active agents (includes both restricted and unrestricted)
    */
   static async getActiveAgents(): Promise<Agent[]> {
     console.log('AgentService.getActiveAgents called');
@@ -27,6 +27,56 @@ export class AgentService {
 
     console.log('Active agents fetched:', data);
     return data || [];
+  }
+
+  /**
+   * Get agents available to user (filters out restricted agents based on account setup)
+   */
+  static async getAvailableAgents(hasProperAccountSetup = false): Promise<Agent[]> {
+    console.log('AgentService.getAvailableAgents called with hasProperAccountSetup:', hasProperAccountSetup);
+    
+    const { data, error } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching available agents:', error);
+      return [];
+    }
+
+    // Filter out restricted agents if user doesn't have proper account setup
+    const availableAgents = hasProperAccountSetup 
+      ? data || []
+      : (data || []).filter(agent => !agent.is_restricted);
+
+    console.log('Available agents filtered:', availableAgents);
+    return availableAgents;
+  }
+
+  /**
+   * Get the default agent
+   */
+  static async getDefaultAgent(): Promise<Agent | null> {
+    console.log('AgentService.getDefaultAgent called');
+    
+    const { data, error } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_default', true)
+      .single();
+
+    if (error) {
+      console.error('Error fetching default agent:', error);
+      // Fallback to first active agent if no default is set
+      const agents = await this.getActiveAgents();
+      return agents.length > 0 ? agents[0] : null;
+    }
+
+    console.log('Default agent fetched:', data);
+    return data;
   }
 
   /**
@@ -107,7 +157,7 @@ export class AgentService {
   }
 
   /**
-   * Initialize a session with a default agent (Solutions)
+   * Initialize a session with the default agent
    */
   static async initializeSessionWithDefaultAgent(
     sessionId: string, 
@@ -115,14 +165,13 @@ export class AgentService {
   ): Promise<boolean> {
     console.log('AgentService.initializeSessionWithDefaultAgent called');
     
-    // Get the default agent (Solutions - first by sort order)
-    const agents = await this.getActiveAgents();
-    if (agents.length === 0) {
-      console.error('No active agents found');
+    // Get the default agent
+    const defaultAgent = await this.getDefaultAgent();
+    if (!defaultAgent) {
+      console.error('No default agent found');
       return false;
     }
 
-    const defaultAgent = agents[0]; // First agent by sort order
     return await this.setSessionAgent(sessionId, defaultAgent.id, auth0UserId);
   }
 

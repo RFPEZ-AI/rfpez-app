@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS public.agents (
   initial_prompt TEXT NOT NULL, -- Initial greeting/prompt for users
   avatar_url TEXT,
   is_active BOOLEAN DEFAULT TRUE,
+  is_default BOOLEAN DEFAULT FALSE, -- Identifies the default agent
+  is_restricted BOOLEAN DEFAULT FALSE, -- Requires proper account setup to use
   sort_order INTEGER DEFAULT 0,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -43,8 +45,22 @@ CREATE TABLE IF NOT EXISTS public.session_agents (
 ALTER TABLE public.messages 
 ADD COLUMN IF NOT EXISTS agent_id UUID REFERENCES public.agents(id) ON DELETE SET NULL;
 
+-- Add agent_name column for easier identification
+ALTER TABLE public.messages 
+ADD COLUMN IF NOT EXISTS agent_name TEXT;
+
+-- Add new columns to existing agents table
+ALTER TABLE public.agents 
+ADD COLUMN IF NOT EXISTS is_default BOOLEAN DEFAULT FALSE;
+
+ALTER TABLE public.agents 
+ADD COLUMN IF NOT EXISTS is_restricted BOOLEAN DEFAULT FALSE;
+
 -- Indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_agents_active ON public.agents(is_active, sort_order);
+CREATE INDEX IF NOT EXISTS idx_agents_default ON public.agents(is_default) WHERE is_default = TRUE;
+CREATE INDEX IF NOT EXISTS idx_agents_restricted ON public.agents(is_restricted);
+CREATE INDEX IF NOT EXISTS idx_agents_access ON public.agents(is_active, is_restricted, sort_order);
 CREATE INDEX IF NOT EXISTS idx_session_agents_session_id ON public.session_agents(session_id);
 CREATE INDEX IF NOT EXISTS idx_session_agents_agent_id ON public.session_agents(agent_id);
 CREATE INDEX IF NOT EXISTS idx_session_agents_active ON public.session_agents(session_id, is_active);
@@ -139,26 +155,44 @@ END;
 $$ LANGUAGE plpgsql SECURITY DEFINER;
 
 -- Insert default agents (safe for re-running)
-INSERT INTO public.agents (name, description, instructions, initial_prompt, sort_order) VALUES
+-- First, clean up any existing agents and reset their properties
+DELETE FROM public.agents WHERE name IN ('Onboarding', 'Solutions', 'Technical Support', 'RFP Assistant');
+
+-- Insert agents with proper access controls
+INSERT INTO public.agents (name, description, instructions, initial_prompt, sort_order, is_default, is_restricted) VALUES
 (
   'Solutions',
   'Sales agent for EZRFP.APP to help with product questions and competitive sourcing',
   'You are a sales agent for EZRFP.APP. Answer questions about the product and help users understand how our platform can assist with their procurement and RFP needs. Be helpful, professional, and focus on understanding their requirements.',
   'Hi, I''m your EZ RFP AI agent. I''m here to see if I can help you. Are you looking to competitively source a product?',
-  1
+  0,
+  TRUE,  -- This is the default agent
+  FALSE  -- Not restricted - available to all users
+),
+(
+  'Onboarding',
+  'Onboarding agent to help new users get started with the platform',
+  'You are an onboarding specialist for EZRFP.APP. Help new users understand the platform, guide them through initial setup, and answer basic questions about getting started. Be welcoming, patient, and provide clear step-by-step guidance.',
+  'Welcome to EZRFP.APP! I''m here to help you get started. Would you like a quick tour of the platform or do you have specific questions about how to begin?',
+  1,
+  FALSE, -- Not the default agent
+  FALSE  -- Not restricted - available to all users
 ),
 (
   'Technical Support',
   'Technical assistance agent for platform usage and troubleshooting',
   'You are a technical support agent for EZRFP.APP. Help users with platform usage, troubleshooting, and technical questions. Provide clear, step-by-step guidance and escalate complex issues when needed.',
   'Hello! I''m the technical support agent. I''m here to help you with any technical questions or issues you might have with the platform. How can I assist you today?',
-  2
+  2,
+  FALSE, -- Not the default agent
+  TRUE   -- Restricted - requires proper account setup
 ),
 (
   'RFP Assistant',
   'Specialized agent for RFP creation and management guidance',
   'You are an RFP (Request for Proposal) specialist. Help users create, manage, and optimize their RFP processes. Provide guidance on best practices, requirements gathering, vendor evaluation, and procurement strategies.',
   'Welcome! I''m your RFP Assistant. I specialize in helping you create effective RFPs and manage your procurement process. What type of project or procurement are you working on?',
-  3
-)
-ON CONFLICT (name) DO NOTHING;
+  3,
+  FALSE, -- Not the default agent
+  TRUE   -- Restricted - requires proper account setup
+);
