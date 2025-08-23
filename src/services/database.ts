@@ -221,7 +221,7 @@ export class DatabaseService {
       .from('messages')
       .select('*')
       .eq('session_id', sessionId)
-      .order('message_order', { ascending: true });
+      .order('created_at', { ascending: true });
 
     console.log('Database query result:', { data, error });
     if (error) {

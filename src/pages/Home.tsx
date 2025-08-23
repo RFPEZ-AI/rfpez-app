@@ -84,12 +84,14 @@ const Home: React.FC = () => {
       console.log('Loading messages for session:', sessionId);
       const messagesData = await DatabaseService.getSessionMessages(sessionId);
       console.log('Raw messages data:', messagesData);
-      const formattedMessages: Message[] = messagesData.map(msg => ({
-        id: msg.id,
-        content: msg.content,
-        isUser: msg.role === 'user',
-        timestamp: new Date(msg.created_at)
-      }));
+      const formattedMessages: Message[] = messagesData
+        .map(msg => ({
+          id: msg.id,
+          content: msg.content,
+          isUser: msg.role === 'user',
+          timestamp: new Date(msg.created_at)
+        }))
+        .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()); // Ensure chronological order
       console.log('Formatted messages:', formattedMessages);
       setMessages(formattedMessages);
       
