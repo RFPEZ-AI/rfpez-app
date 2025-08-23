@@ -28,6 +28,7 @@ interface Session {
   id: string;
   title: string;
   timestamp: Date;
+  agent_name?: string; // Name of the active agent for this session
 }
 
 interface Artifact {
@@ -152,7 +153,8 @@ const Home: React.FC = () => {
       const formattedSessions: Session[] = sessionsData.map(session => ({
         id: session.id,
         title: session.title,
-        timestamp: new Date(session.updated_at)
+        timestamp: new Date(session.updated_at),
+        agent_name: session.agent_name
       }));
       setSessions(formattedSessions);
     } catch (error) {

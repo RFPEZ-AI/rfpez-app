@@ -114,14 +114,23 @@ export class DatabaseService {
       return [];
     }
 
-    // Map to SessionWithStats format (simplified for now)
-    const sessionStats: SessionWithStats[] = (sessions || []).map(session => ({
-      ...session,
-      message_count: 0,
-      last_message: 'No messages yet',
-      last_message_at: session.created_at,
-      artifact_count: 0
-    } as SessionWithStats));
+    // Get active agent for each session
+    const sessionStats: SessionWithStats[] = await Promise.all(
+      (sessions || []).map(async (session) => {
+        // Get the active agent for this session
+        const { AgentService } = await import('./agentService');
+        const activeAgent = await AgentService.getSessionActiveAgent(session.id);
+        
+        return {
+          ...session,
+          message_count: 0,
+          last_message: 'No messages yet',
+          last_message_at: session.created_at,
+          artifact_count: 0,
+          agent_name: activeAgent?.agent_name || 'No Agent'
+        } as SessionWithStats;
+      })
+    );
 
     return sessionStats;
   }

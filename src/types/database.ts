@@ -25,6 +25,7 @@ export interface SessionWithStats extends Session {
   last_message?: string;
   last_message_at?: string;
   artifact_count: number;
+  agent_name?: string; // Name of the active agent for this session
 }
 
 export interface Message {
