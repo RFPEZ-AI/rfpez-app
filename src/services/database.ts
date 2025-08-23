@@ -175,6 +175,7 @@ export class DatabaseService {
     content: string, 
     role: 'user' | 'assistant' | 'system',
     agentId?: string,
+    agentName?: string,
     metadata?: Record<string, unknown>,
     aiMetadata?: Record<string, unknown>
   ): Promise<Message | null> {
@@ -184,6 +185,7 @@ export class DatabaseService {
       content,
       role,
       agentId,
+      agentName,
       metadata,
       aiMetadata
     });
@@ -224,6 +226,7 @@ export class DatabaseService {
         role,
         message_order: nextOrder,
         agent_id: agentId,
+        agent_name: agentName,
         metadata: metadata || {},
         ai_metadata: aiMetadata || {}
       })
@@ -457,15 +460,18 @@ async function exampleUsage() {
     }
 
     // Add user message
-    await DatabaseService.addMessage(session.id, 'Analyze this RFP document', 'user');
+    await DatabaseService.addMessage(session.id, auth0UserId, 'Analyze this RFP document', 'user');
 
     // Add AI response with metadata
     await DatabaseService.addMessage(
       session.id,
+      auth0UserId,
       'I\'ve analyzed the document...',
       'assistant',
-      {},
-      { model: 'gpt-4', tokens_used: 150, response_time: 2.3 }
+      undefined, // agentId
+      undefined, // agentName
+      {}, // metadata
+      { model: 'gpt-4', tokens_used: 150, response_time: 2.3 } // aiMetadata
     );
 
     // Upload and link artifact (example)

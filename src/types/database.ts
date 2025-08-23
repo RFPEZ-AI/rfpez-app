@@ -36,6 +36,7 @@ export interface Message {
   created_at: string;
   message_order: number;
   agent_id?: string; // UUID - which agent handled this message
+  agent_name?: string; // Name of the agent that handled this message
   metadata?: Record<string, any>;
   ai_metadata?: {
     model?: string;
@@ -76,6 +77,8 @@ export interface Agent {
   initial_prompt: string; // Initial greeting/prompt for users
   avatar_url?: string;
   is_active: boolean;
+  is_default: boolean; // Identifies the default agent
+  is_restricted: boolean; // Requires proper account setup to use
   sort_order: number;
   created_at: string;
   updated_at: string;

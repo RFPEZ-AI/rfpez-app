@@ -6,6 +6,7 @@ interface Message {
   content: string;
   isUser: boolean;
   timestamp: Date;
+  agentName?: string; // Agent name for assistant messages
 }
 
 interface SessionDialogProps {
@@ -50,6 +51,16 @@ const SessionDialog: React.FC<SessionDialogProps> = ({ messages, isLoading }) =>
               <IonCardContent style={{
                 color: message.isUser ? 'var(--ion-color-primary-contrast)' : 'var(--ion-text-color)'
               }}>
+                {!message.isUser && message.agentName && (
+                  <div style={{ 
+                    fontSize: '0.9em', 
+                    fontWeight: 'bold',
+                    color: 'var(--ion-color-primary)',
+                    marginBottom: '8px'
+                  }}>
+                    {message.agentName}
+                  </div>
+                )}
                 <div style={{ 
                   whiteSpace: 'pre-wrap'
                 }}>

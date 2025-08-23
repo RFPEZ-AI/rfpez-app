@@ -21,6 +21,7 @@ interface Message {
   content: string;
   isUser: boolean;
   timestamp: Date;
+  agentName?: string; // Agent name for assistant messages
 }
 
 interface Session {
@@ -78,9 +79,8 @@ const Home: React.FC = () => {
   // Agent-related functions
   const loadDefaultAgentWithPrompt = async () => {
     try {
-      const agents = await AgentService.getActiveAgents();
-      if (agents.length > 0) {
-        const defaultAgent = agents[0]; // First agent by sort order (Solutions)
+      const defaultAgent = await AgentService.getDefaultAgent();
+      if (defaultAgent) {
         const sessionActiveAgent: SessionActiveAgent = {
           agent_id: defaultAgent.id,
           agent_name: defaultAgent.name,
@@ -96,7 +96,8 @@ const Home: React.FC = () => {
           id: 'initial-prompt',
           content: defaultAgent.initial_prompt,
           isUser: false,
-          timestamp: new Date()
+          timestamp: new Date(),
+          agentName: defaultAgent.name
         };
         setMessages([initialMessage]);
         console.log('Displayed initial prompt:', defaultAgent.initial_prompt);
@@ -126,7 +127,8 @@ const Home: React.FC = () => {
         id: 'initial-prompt',
         content: newAgent.agent_initial_prompt,
         isUser: false,
-        timestamp: new Date()
+        timestamp: new Date(),
+        agentName: newAgent.agent_name
       };
       setMessages([initialMessage]);
     }
@@ -169,7 +171,8 @@ const Home: React.FC = () => {
           id: msg.id,
           content: msg.content,
           isUser: msg.role === 'user',
-          timestamp: new Date(msg.created_at)
+          timestamp: new Date(msg.created_at),
+          agentName: msg.agent_name // Include agent name from database
         }))
         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime()); // Ensure chronological order
       console.log('Formatted messages:', formattedMessages);
@@ -189,7 +192,7 @@ const Home: React.FC = () => {
     }
   };
 
-  // Create a new session in Supabase with default agent
+  // Create a new session in Supabase with current agent
   const createNewSession = async (): Promise<string | null> => {
     console.log('Creating new session, auth state:', { isAuthenticated, user: !!user, userProfile: !!userProfile });
     if (!isAuthenticated || !user?.sub || !userProfile) {
@@ -198,8 +201,12 @@ const Home: React.FC = () => {
     }
     
     try {
-      console.log('Attempting to create session in Supabase...');
-      const session = await DatabaseService.createSessionWithAgent(user.sub, 'New Chat Session');
+      console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id);
+      const session = await DatabaseService.createSessionWithAgent(
+        user.sub, 
+        'New Chat Session',
+        currentAgent?.agent_id // Use current agent if available
+      );
       console.log('Session created:', session);
       if (session) {
         await loadUserSessions(); // Refresh sessions list
@@ -248,7 +255,8 @@ const Home: React.FC = () => {
             user.sub, 
             content, 
             'user',
-            currentAgent?.agent_id // Include agent ID
+            currentAgent?.agent_id, // Include agent ID
+            currentAgent?.agent_name // Include agent name
           );
           console.log('User message saved:', savedMessage);
           
@@ -287,7 +295,8 @@ const Home: React.FC = () => {
           id: (Date.now() + 1).toString(),
           content: aiResponse,
           isUser: false,
-          timestamp: new Date()
+          timestamp: new Date(),
+          agentName: currentAgent?.agent_name
         };
         
         setMessages(prev => [...prev, aiMessage]);
@@ -302,7 +311,8 @@ const Home: React.FC = () => {
               user.sub, 
               aiResponse, 
               'assistant',
-              currentAgent?.agent_id // Include agent ID
+              currentAgent?.agent_id, // Include agent ID
+              currentAgent?.agent_name // Include agent name
             );
             console.log('AI message saved:', savedAiMessage);
             await loadUserSessions(); // Refresh to update last message
@@ -326,9 +336,23 @@ const Home: React.FC = () => {
     setSelectedSessionId(undefined);
     setCurrentSessionId(undefined);
     
-    // Load default agent with initial prompt for new conversation
+    // Use the currently selected agent, or default if none selected
     if (isAuthenticated && user?.sub) {
-      await loadDefaultAgentWithPrompt();
+      if (currentAgent) {
+        // Use the currently selected agent for the new session
+        const initialMessage: Message = {
+          id: 'initial-prompt',
+          content: currentAgent.agent_initial_prompt,
+          isUser: false,
+          timestamp: new Date(),
+          agentName: currentAgent.agent_name
+        };
+        setMessages([initialMessage]);
+        console.log('New session started with current agent:', currentAgent.agent_name);
+      } else {
+        // Fallback to default agent if no current agent is selected
+        await loadDefaultAgentWithPrompt();
+      }
     }
     
     console.log('New session started with initial prompt displayed');
@@ -521,6 +545,7 @@ const Home: React.FC = () => {
             auth0UserId={user.sub}
             currentAgent={currentAgent}
             onAgentChanged={handleAgentChanged}
+            hasProperAccountSetup={false} // TODO: Implement proper account setup check
           />
         )}
       </IonContent>

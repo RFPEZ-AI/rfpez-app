@@ -27,7 +27,9 @@ import {
   personOutline, 
   chatbubbleOutline,
   checkmarkCircle,
-  informationCircleOutline
+  informationCircleOutline,
+  starOutline,
+  lockClosedOutline
 } from 'ionicons/icons';
 import { AgentService } from '../services/agentService';
 import type { Agent, SessionActiveAgent } from '../types/database';
@@ -40,6 +42,7 @@ interface AgentSelectorProps {
   auth0UserId: string;
   currentAgent?: SessionActiveAgent | null;
   onAgentChanged: (agent: SessionActiveAgent) => void;
+  hasProperAccountSetup?: boolean; // Whether user has access to restricted agents
 }
 
 const AgentSelector: React.FC<AgentSelectorProps> = ({
@@ -48,7 +51,8 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
   sessionId,
   auth0UserId,
   currentAgent,
-  onAgentChanged
+  onAgentChanged,
+  hasProperAccountSetup = false // Default to false (restricted agents not available)
 }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -65,8 +69,8 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
   const loadAgents = async () => {
     try {
       setLoading(true);
-      const activeAgents = await AgentService.getActiveAgents();
-      setAgents(activeAgents);
+      const availableAgents = await AgentService.getAvailableAgents(hasProperAccountSetup);
+      setAgents(availableAgents);
     } catch (error) {
       console.error('Error loading agents:', error);
       setToastMessage('Failed to load agents');
@@ -196,6 +200,22 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                               </IonAvatar>
                               <IonCardTitle className="agent-name">
                                 {agent.name}
+                                {agent.is_default && (
+                                  <IonIcon 
+                                    icon={starOutline} 
+                                    color="warning" 
+                                    className="default-indicator"
+                                    title="Default Agent"
+                                  />
+                                )}
+                                {agent.is_restricted && (
+                                  <IonIcon 
+                                    icon={lockClosedOutline} 
+                                    color="medium" 
+                                    className="restricted-indicator"
+                                    title="Restricted Agent"
+                                  />
+                                )}
                                 {isCurrentAgent && (
                                   <IonIcon 
                                     icon={checkmarkCircle} 
