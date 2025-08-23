@@ -141,18 +141,20 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         </div>
 
         {/* Send button */}
-        <IonButton
-          onClick={handleSend}
-          disabled={!message.trim() || isLoading}
-          size="default"
-          color="primary"
-          style={{
-            '--border-radius': '12px',
-            '--box-shadow': '0 2px 4px rgba(var(--ion-color-primary-rgb), 0.3)'
-          }}
-        >
-          <IonIcon icon={sendOutline} />
-        </IonButton>
+        <div title="Submit">
+          <IonButton
+            onClick={handleSend}
+            disabled={!message.trim() || isLoading}
+            size="default"
+            color="primary"
+            style={{
+              '--border-radius': '12px',
+              '--box-shadow': '0 2px 4px rgba(var(--ion-color-primary-rgb), 0.3)'
+            }}
+          >
+            <IonIcon icon={sendOutline} />
+          </IonButton>
+        </div>
       </div>
     </div>
   );
