@@ -24,6 +24,14 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
     }
   };
 
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent default line break
+      handleSend();
+    }
+    // If Shift+Enter, allow default behavior (line break)
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file && onAttachFile) {
@@ -73,6 +81,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             value={message}
             placeholder={placeholder}
             onIonInput={(e) => setMessage(e.detail.value || '')}
+            onKeyDown={handleKeyDown}
             rows={1}
             autoGrow
             style={{
