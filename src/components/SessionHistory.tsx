@@ -7,6 +7,7 @@ interface Session {
   id: string;
   title: string;
   timestamp: Date;
+  agent_name?: string; // Name of the active agent for this session
 }
 
 interface SessionHistoryProps {
@@ -137,7 +138,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
                 <IonIcon icon={chatbubbleOutline} slot="start" />
                 <IonLabel>
                   <h3>{session.title}</h3>
-                  <p>{session.timestamp.toLocaleDateString()} at {session.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
+                  <p>{session.agent_name || 'No Agent'}</p>
                 </IonLabel>
               </IonItem>
             ))}
