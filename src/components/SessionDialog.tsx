@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { IonCard, IonCardContent } from '@ionic/react';
 
 interface Message {
@@ -14,6 +14,16 @@ interface SessionDialogProps {
 }
 
 const SessionDialog: React.FC<SessionDialogProps> = ({ messages, isLoading }) => {
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isLoading]);
+
   return (
     <div style={{ 
       height: '100%', 
@@ -62,6 +72,7 @@ const SessionDialog: React.FC<SessionDialogProps> = ({ messages, isLoading }) =>
               </IonCardContent>
             </IonCard>
           )}
+          <div ref={messagesEndRef} />
         </div>
     </div>
   );
