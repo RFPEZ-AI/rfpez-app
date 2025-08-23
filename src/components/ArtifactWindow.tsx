@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonButton, IonIcon } from '@ionic/react';
 import { downloadOutline, documentTextOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/icons';
 
@@ -26,16 +26,9 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
   isCollapsed = false,
   onToggleCollapse
 }) => {
-  const [internalCollapsed, setInternalCollapsed] = useState(artifacts.length === 0);
+  const [internalCollapsed, setInternalCollapsed] = useState(true); // Start collapsed initially
 
-  // Auto-collapse when no artifacts, auto-expand when artifacts are added
-  useEffect(() => {
-    if (artifacts.length === 0) {
-      setInternalCollapsed(true);
-    } else if (artifacts.length > 0 && internalCollapsed) {
-      setInternalCollapsed(false);
-    }
-  }, [artifacts.length, internalCollapsed]);
+  // Allow manual toggle without auto-collapsing when empty
 
   const collapsed = onToggleCollapse ? isCollapsed : internalCollapsed;
   const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
@@ -68,11 +61,12 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
         alignItems: 'center',
         justifyContent: collapsed ? 'center' : 'space-between'
       }}>
-        {!collapsed && <h3 style={{ margin: '0' }}>Artifacts</h3>}
+        {!collapsed && <h3 style={{ margin: '0' }}>Documents</h3>}
         <IonButton
           fill="clear"
           size="small"
           onClick={toggleCollapse}
+          title="Expand/collapse documents"
           style={{ 
             '--padding-start': '8px',
             '--padding-end': '8px'
@@ -103,7 +97,7 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
               padding: '16px'
             }}>
               <IonIcon icon={documentTextOutline} size="large" />
-              <p>No artifacts yet</p>
+              <p>No documents yet</p>
               <p style={{ fontSize: '0.9em' }}>
                 Documents and files will appear here during your conversation
               </p>

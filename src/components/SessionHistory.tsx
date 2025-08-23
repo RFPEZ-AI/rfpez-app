@@ -71,6 +71,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
           fill="clear" 
           size="small"
           onClick={toggleExpanded}
+          title="Expand/collapse history"
           style={{ 
             '--padding-start': '8px', 
             '--padding-end': '8px',
@@ -86,6 +87,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
             expand="block" 
             fill="outline" 
             onClick={onNewSession}
+            title="Create new session"
             style={{ flex: 1, order: 2 }}
           >
             <IonIcon icon={add} slot="start" />
@@ -95,12 +97,12 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
           <IonButton 
             fill="solid" 
             onClick={onNewSession}
+            title="Create new session"
             style={{ 
               '--padding-start': '8px', 
               '--padding-end': '8px',
               order: 1
             }}
-            title="New Session"
           >
             <IonIcon icon={add} />
           </IonButton>
