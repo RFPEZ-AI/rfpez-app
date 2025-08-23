@@ -54,7 +54,7 @@ az staticwebapp create \
   --location "East US" \
   --branch master \
   --app-location "/" \
-  --output-location "dist" \
+  --output-location "build" \
   --login-with-github
 ```
 
@@ -68,7 +68,7 @@ az staticwebapp create \
 ### Build Configuration
 - **Node.js 18**: Latest LTS version
 - **npm ci**: Fast, reliable installs
-- **Build output**: `dist` directory (Vite default)
+- **Build output**: `build` directory (Create React App default)
 - **Environment variables**: Injected during build
 
 ### Preview Deployments
