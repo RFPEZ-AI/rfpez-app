@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonActionSheet } from '@ionic/react';
 import { add, chatbubbleOutline, chevronForward, chevronDown, trash } from 'ionicons/icons';
+import { useIsMobile } from '../utils/useMediaQuery';
 
 interface Session {
   id: string;
@@ -23,9 +24,16 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   onDeleteSession,
   selectedSessionId
 }) => {
+  const isMobile = useIsMobile();
   const [isExpanded, setIsExpanded] = useState(true);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedSessionForAction, setSelectedSessionForAction] = useState<string | null>(null);
+
+  // Set initial collapsed state based on screen size
+  // On mobile/narrow screens (≤768px), start collapsed for better space utilization
+  useEffect(() => {
+    setIsExpanded(!isMobile);
+  }, [isMobile]);
 
   const toggleExpanded = () => {
     setIsExpanded(!isExpanded);
