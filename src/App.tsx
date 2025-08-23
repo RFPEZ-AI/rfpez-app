@@ -5,6 +5,9 @@ import { IonReactRouter } from '@ionic/react-router';
 import { Auth0Provider } from '@auth0/auth0-react';
 import Home from './pages/Home';
 import { SupabaseProvider } from './context/SupabaseContext';
+import PWAInstallPrompt from './components/PWAInstallPrompt';
+import OfflineNotification from './components/OfflineNotification';
+import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -87,6 +90,9 @@ const App: React.FC = () => (
             <Route exact path="/" render={() => <Redirect to="/home" />} />
           </IonRouterOutlet>
         </IonReactRouter>
+        <PWAInstallPrompt />
+        <OfflineNotification />
+        <PWAUpdatePrompt />
       </IonApp>
     </SupabaseProvider>
   </Auth0Provider>

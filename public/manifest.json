@@ -1,21 +1,32 @@
 {
-  "short_name": "Ionic App",
-  "name": "My Ionic App",
+  "short_name": "RFPEZ.AI",
+  "name": "RFPEZ.AI - AI-Powered RFP Assistant",
+  "description": "AI-powered assistant for Request for Proposal (RFP) management and analysis",
   "icons": [
     {
       "src": "assets/icon/favicon.png",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "type": "image/png"
+    },
+    {
+      "src": "assets/icon/icon.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "any"
     },
     {
       "src": "assets/icon/icon.png",
       "type": "image/png",
       "sizes": "512x512",
-      "purpose": "maskable"
+      "purpose": "maskable any"
     }
   ],
-  "start_url": ".",
+  "start_url": "/",
   "display": "standalone",
-  "theme_color": "#ffffff",
-  "background_color": "#ffffff"
+  "orientation": "portrait-primary",
+  "theme_color": "#3880ff",
+  "background_color": "#ffffff",
+  "scope": "/",
+  "lang": "en",
+  "dir": "ltr"
 }
