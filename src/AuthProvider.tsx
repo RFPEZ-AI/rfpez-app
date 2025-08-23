@@ -5,12 +5,17 @@ import App from './App';
 
 const domain = process.env.REACT_APP_AUTH0_DOMAIN || '';
 const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID || '';
+const redirectUri = window.location.origin;
 
-// Debug environment variables
-console.log('Auth0 Config:', {
-  domain: domain ? `${domain.substring(0, 10)}...` : 'MISSING',
-  clientId: clientId ? `${clientId.substring(0, 10)}...` : 'MISSING',
-  redirectUri: window.location.origin
+// Enhanced debugging
+console.log('Auth0 Configuration Debug:', {
+  domain: domain,
+  clientId: clientId,
+  redirectUri: redirectUri,
+  currentUrl: window.location.href,
+  protocol: window.location.protocol,
+  hostname: window.location.hostname,
+  port: window.location.port
 });
 
 if (!domain || !clientId) {
@@ -26,10 +31,11 @@ createRoot(container).render(
       domain={domain}
       clientId={clientId}
       authorizationParams={{
-        redirect_uri: window.location.origin
+        redirect_uri: redirectUri
       }}
       onRedirectCallback={(appState) => {
         console.log('Auth0 redirect callback:', appState);
+        console.log('Callback redirect URI:', redirectUri);
       }}
     >
       <App />
