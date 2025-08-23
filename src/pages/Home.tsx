@@ -213,19 +213,12 @@ const Home: React.FC = () => {
   };
 
   const handleNewSession = async () => {
+    // Just clear the UI state - don't create a session in the database yet
     setMessages([]);
     setArtifacts([]);
     setSelectedSessionId(undefined);
     setCurrentSessionId(undefined);
-
-    // Create new session in Supabase if authenticated
-    if (isAuthenticated && user && userProfile) {
-      const sessionId = await createNewSession();
-      if (sessionId) {
-        setCurrentSessionId(sessionId);
-        setSelectedSessionId(sessionId);
-      }
-    }
+    console.log('New session started (not yet saved to database)');
   };
 
   const handleSelectSession = async (sessionId: string) => {
@@ -233,6 +226,35 @@ const Home: React.FC = () => {
     setSelectedSessionId(sessionId);
     setCurrentSessionId(sessionId);
     await loadSessionMessages(sessionId);
+  };
+
+  const handleDeleteSession = async (sessionId: string) => {
+    if (!isAuthenticated || !user?.sub) {
+      console.log('Not authenticated, cannot delete session');
+      return;
+    }
+
+    try {
+      const success = await DatabaseService.deleteSession(sessionId);
+      if (success) {
+        console.log('Session deleted successfully:', sessionId);
+        
+        // If the deleted session was the current one, clear the UI
+        if (currentSessionId === sessionId) {
+          setMessages([]);
+          setArtifacts([]);
+          setSelectedSessionId(undefined);
+          setCurrentSessionId(undefined);
+        }
+        
+        // Refresh the sessions list
+        await loadUserSessions();
+      } else {
+        console.error('Failed to delete session');
+      }
+    } catch (error) {
+      console.error('Error deleting session:', error);
+    }
   };
 
   const handleAttachFile = async (file: File) => {
@@ -308,14 +330,13 @@ const Home: React.FC = () => {
             overflow: 'hidden'
           }}>
             {/* Left Panel - Session History */}
-            <div style={{ width: '300px', minWidth: '300px' }}>
-              <SessionHistory
-                sessions={sessions}
-                onNewSession={handleNewSession}
-                onSelectSession={handleSelectSession}
-                selectedSessionId={selectedSessionId}
-              />
-            </div>
+            <SessionHistory
+              sessions={sessions}
+              onNewSession={handleNewSession}
+              onSelectSession={handleSelectSession}
+              onDeleteSession={handleDeleteSession}
+              selectedSessionId={selectedSessionId}
+            />
 
             {/* Center Panel - Dialog */}
             <div style={{ flex: 1, overflow: 'hidden' }}>
