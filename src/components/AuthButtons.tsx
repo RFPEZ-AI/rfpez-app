@@ -55,11 +55,21 @@ const AuthButtons: React.FC = () => {
     return <span>Loading...</span>;
   }
 
+  const handleLogin = () => {
+    const redirectUri = window.location.origin;
+    console.log('Attempting login with redirect URI:', redirectUri);
+    loginWithRedirect({
+      authorizationParams: {
+        redirect_uri: redirectUri
+      }
+    });
+  };
+
   return (
     <IonButtons>
       {!isAuthenticated ? (
         <>
-          <IonButton onClick={() => loginWithRedirect()}>Login / Signup</IonButton>
+          <IonButton onClick={handleLogin}>Login / Signup</IonButton>
           <IonButton color="medium" onClick={() => window.location.reload()}>Continue as Guest</IonButton>
         </>
       ) : (
