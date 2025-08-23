@@ -24,7 +24,7 @@ module.exports = {
     }
   },
   rules: {
-    'no-console': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
+    'no-console': 'off', // Allow console statements for development and debugging
     'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
   }
 }

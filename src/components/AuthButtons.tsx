@@ -1,6 +1,7 @@
 import React from 'react';
 import { IonButton, IonButtons } from '@ionic/react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { devLog } from '../utils/devLog';
 
 const AuthButtons: React.FC = () => {
   const { isAuthenticated, loginWithRedirect, logout, isLoading, user, error } = useAuth0();
@@ -8,7 +9,7 @@ const AuthButtons: React.FC = () => {
 
   // Debug logging
   React.useEffect(() => {
-    console.log('Auth0 State:', {
+    devLog.log('Auth0 State:', {
       isLoading,
       isAuthenticated,
       user: user ? { name: user.name, email: user.email } : null,
@@ -21,7 +22,7 @@ const AuthButtons: React.FC = () => {
     if (isLoading) {
       const timer = setTimeout(() => {
         setLoadingTimeout(true);
-        console.error('Auth0 loading timeout - check your configuration');
+        devLog.error('Auth0 loading timeout - check your configuration');
       }, 10000); // 10 second timeout
       
       return () => clearTimeout(timer);
@@ -32,7 +33,7 @@ const AuthButtons: React.FC = () => {
 
   // Show error if authentication failed
   if (error) {
-    console.error('Auth0 Error:', error);
+    devLog.error('Auth0 Error:', error);
     return <span style={{ color: 'red' }}>Auth Error: {error.message}</span>;
   }
 
@@ -50,7 +51,7 @@ const AuthButtons: React.FC = () => {
   }
 
   if (isLoading) {
-    console.log('Auth0 is still loading...');
+    devLog.log('Auth0 is still loading...');
     return <span>Loading...</span>;
   }
 

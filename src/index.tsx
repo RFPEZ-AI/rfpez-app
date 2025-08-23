@@ -5,11 +5,13 @@ import App from './App';
 import * as serviceWorkerRegistration from './serviceWorkerRegistration';
 import reportWebVitals from './reportWebVitals';
 
+import { devLog } from './utils/devLog';
+
 const domain = process.env.REACT_APP_AUTH0_DOMAIN || '';
 const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID || '';
 
 // Debug environment variables
-console.log('Auth0 Config:', {
+devLog.log('Auth0 Config:', {
   domain: domain || 'MISSING',
   clientId: clientId || 'MISSING',
   redirectUri: window.location.origin,
@@ -17,8 +19,8 @@ console.log('Auth0 Config:', {
 });
 
 if (!domain || !clientId) {
-  console.error('Missing Auth0 env vars. Please check your .env.local file');
-  console.error('Available env vars:', Object.keys(process.env).filter(key => key.startsWith('REACT_APP_')));
+  devLog.error('Missing Auth0 env vars. Please check your .env.local file');
+  devLog.error('Available env vars:', Object.keys(process.env).filter(key => key.startsWith('REACT_APP_')));
 }
 
 const container = document.getElementById('root');
