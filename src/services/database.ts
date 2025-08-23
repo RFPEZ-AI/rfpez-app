@@ -47,6 +47,33 @@ export class DatabaseService {
     return data;
   }
 
+  static async createSessionWithAgent(
+    auth0UserId: string, 
+    title: string, 
+    agentId?: string,
+    description?: string
+  ): Promise<Session | null> {
+    console.log('DatabaseService.createSessionWithAgent called with:', { 
+      auth0UserId, title, agentId, description 
+    });
+
+    // Create the session first
+    const session = await this.createSession(auth0UserId, title, description);
+    if (!session) {
+      return null;
+    }
+
+    // Initialize with agent (use default if none specified)
+    const { AgentService } = await import('./agentService');
+    if (agentId) {
+      await AgentService.setSessionAgent(session.id, agentId, auth0UserId);
+    } else {
+      await AgentService.initializeSessionWithDefaultAgent(session.id, auth0UserId);
+    }
+
+    return session;
+  }
+
   static async getUserSessions(auth0UserId: string): Promise<SessionWithStats[]> {
     console.log('DatabaseService.getUserSessions called for auth0UserId:', auth0UserId);
     
@@ -147,6 +174,7 @@ export class DatabaseService {
     auth0UserId: string,
     content: string, 
     role: 'user' | 'assistant' | 'system',
+    agentId?: string,
     metadata?: Record<string, unknown>,
     aiMetadata?: Record<string, unknown>
   ): Promise<Message | null> {
@@ -155,6 +183,7 @@ export class DatabaseService {
       auth0UserId,
       content,
       role,
+      agentId,
       metadata,
       aiMetadata
     });
@@ -194,6 +223,7 @@ export class DatabaseService {
         content,
         role,
         message_order: nextOrder,
+        agent_id: agentId,
         metadata: metadata || {},
         ai_metadata: aiMetadata || {}
       })
