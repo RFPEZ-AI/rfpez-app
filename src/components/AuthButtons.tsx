@@ -1,11 +1,14 @@
-import React from 'react';
-import { IonButton, IonButtons } from '@ionic/react';
+import React, { useState, useRef } from 'react';
+import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon } from '@ionic/react';
 import { useAuth0 } from '@auth0/auth0-react';
+import { logOutOutline, chevronDownOutline } from 'ionicons/icons';
 import { devLog } from '../utils/devLog';
 
 const AuthButtons: React.FC = () => {
   const { isAuthenticated, loginWithRedirect, logout, isLoading, user, error } = useAuth0();
   const [loadingTimeout, setLoadingTimeout] = React.useState(false);
+  const [showUserMenu, setShowUserMenu] = useState(false);
+  const userMenuRef = useRef<HTMLIonButtonElement>(null);
 
   // Debug logging
   React.useEffect(() => {
@@ -65,6 +68,11 @@ const AuthButtons: React.FC = () => {
     });
   };
 
+  const handleLogout = () => {
+    setShowUserMenu(false);
+    logout({ logoutParams: { returnTo: window.location.origin } });
+  };
+
   return (
     <IonButtons>
       {!isAuthenticated ? (
@@ -74,11 +82,48 @@ const AuthButtons: React.FC = () => {
         </>
       ) : (
         <>
-          <span style={{ marginRight: 12 }}>
-            {user?.picture && <img src={user.picture} alt="avatar" style={{ height: 28, borderRadius: '50%', verticalAlign: 'middle', marginRight: 6 }} />}
-            {user?.name || user?.email}
-          </span>
-          <IonButton color="danger" onClick={() => logout({ logoutParams: { returnTo: window.location.origin } })}>Logout</IonButton>
+          <IonButton 
+            ref={userMenuRef}
+            id="user-menu-trigger"
+            fill="clear"
+            onClick={() => setShowUserMenu(true)}
+            style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              textTransform: 'none',
+              fontSize: '14px'
+            }}
+          >
+            {user?.picture && (
+              <img 
+                src={user.picture} 
+                alt="avatar" 
+                style={{ 
+                  height: 28, 
+                  width: 28,
+                  borderRadius: '50%', 
+                  marginRight: 8 
+                }} 
+              />
+            )}
+            <span style={{ marginRight: 4 }}>
+              {user?.name || user?.email}
+            </span>
+            <IonIcon icon={chevronDownOutline} size="small" />
+          </IonButton>
+          
+          <IonPopover
+            trigger="user-menu-trigger"
+            isOpen={showUserMenu}
+            onDidDismiss={() => setShowUserMenu(false)}
+          >
+            <IonList>
+              <IonItem button onClick={handleLogout}>
+                <IonIcon icon={logOutOutline} slot="start" />
+                <IonLabel>Logout</IonLabel>
+              </IonItem>
+            </IonList>
+          </IonPopover>
         </>
       )}
     </IonButtons>

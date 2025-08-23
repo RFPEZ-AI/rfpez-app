@@ -7,6 +7,7 @@ import SessionDialog from '../components/SessionDialog';
 import ArtifactWindow from '../components/ArtifactWindow';
 import PromptComponent from '../components/PromptComponent';
 import { useSupabase } from '../context/SupabaseContext';
+import { useIsMobile } from '../utils/useMediaQuery';
 import DatabaseService from '../services/database';
 
 // Local interfaces for UI compatibility
@@ -35,6 +36,7 @@ interface Artifact {
 const Home: React.FC = () => {
   const { user, isAuthenticated } = useAuth0();
   const { loading: supabaseLoading, userProfile } = useSupabase();
+  const isMobile = useIsMobile();
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -298,11 +300,13 @@ const Home: React.FC = () => {
               alt="RFPEZ.AI" 
               style={{ height: '32px', marginRight: '12px' }}
             />
-            <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
+            {!isMobile && (
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
+            )}
             {isAuthenticated && user && userProfile && (
               <span style={{ 
                 fontSize: '12px', 
-                marginLeft: '12px', 
+                marginLeft: isMobile ? '0' : '12px', 
                 padding: '4px 8px',
                 backgroundColor: 'var(--ion-color-success)',
                 color: 'white',
