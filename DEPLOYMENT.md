@@ -134,19 +134,74 @@ az staticwebapp hostname set \
 
 ### Environment Variable Errors
 
-**Error**: `Uncaught Error: Missing REACT_APP_SUPABASE_URL in .env.local`
+**Error**: `Uncaught Error: Missing REACT_APP_SUPABASE_URL environment variable`
 
-**Cause**: Environment variables are not configured in Azure Static Web Apps
+**Cause**: Environment variables are not properly configured in Azure Static Web Apps. Azure requires environment variables to be set in **both** GitHub Secrets (build-time) and Azure Configuration (runtime).
 
-**Solution**:
-1. Go to Azure Portal → Your Static Web App → Configuration
-2. Add all required environment variables as Application Settings
-3. Make sure they're prefixed with `REACT_APP_`
-4. Click Save to restart the app
+**Complete Solution**:
+
+1. **Verify GitHub Secrets** (Required for build process):
+   ```
+   Go to: GitHub Repository → Settings → Secrets and variables → Actions
+   
+   Ensure these Repository Secrets exist:
+   - REACT_APP_AUTH0_DOMAIN = dev-jt6bdlf3wlirw8fj.us.auth0.com
+   - REACT_APP_AUTH0_CLIENT_ID = xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM  
+   - REACT_APP_SUPABASE_URL = https://jxlutaztoukwbbgtoulc.supabase.co
+   - REACT_APP_SUPABASE_ANON_KEY = your-supabase-anon-key
+   ```
+
+2. **Configure Azure Application Settings** (Required for runtime):
+   ```
+   Go to: Azure Portal → Your Static Web App → Configuration → Application Settings
+   
+   Click "Add" for each environment variable:
+   - Name: REACT_APP_AUTH0_DOMAIN, Value: dev-jt6bdlf3wlirw8fj.us.auth0.com
+   - Name: REACT_APP_AUTH0_CLIENT_ID, Value: xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM
+   - Name: REACT_APP_SUPABASE_URL, Value: https://jxlutaztoukwbbgtoulc.supabase.co  
+   - Name: REACT_APP_SUPABASE_ANON_KEY, Value: your-supabase-anon-key
+   
+   Click "Save" - this will restart your app automatically
+   ```
+
+3. **Alternative: Use Azure CLI**:
+   ```bash
+   az staticwebapp appsettings set \
+     --name your-static-web-app-name \
+     --setting-names \
+     REACT_APP_AUTH0_DOMAIN=dev-jt6bdlf3wlirw8fj.us.auth0.com \
+     REACT_APP_AUTH0_CLIENT_ID=xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM \
+     REACT_APP_SUPABASE_URL=https://jxlutaztoukwbbgtoulc.supabase.co \
+     REACT_APP_SUPABASE_ANON_KEY=your-supabase-anon-key
+   ```
+
+4. **Verify the Fix**:
+   - Wait 1-2 minutes for the app to restart
+   - Refresh your deployed app
+   - Check Azure Portal → Monitoring → Log stream for any remaining errors
+   - The error should be resolved once both sets of variables are configured
+
+**Important**: Azure Static Web Apps requires environment variables in **TWO** locations:
+- GitHub Secrets (for build process) ✓
+- Azure Application Settings (for runtime) ← This is usually the missing piece
 
 **Important**: Environment variables must be configured in **both** places:
 - GitHub Secrets (for build process)
 - Azure Static Web App Configuration (for runtime)
+
+### Manifest.json Syntax Error
+
+**Error**: `Manifest: Line: 1, column: 1, Syntax error.`
+
+**Cause**: Usually a browser caching issue or build artifact problem that occurs alongside environment variable errors.
+
+**Solution**:
+1. **Clear browser cache** and hard refresh (Ctrl+Shift+R)
+2. **Wait for app restart** after configuring environment variables in Azure
+3. **Check build logs** in GitHub Actions for any build warnings
+4. If persistent, **redeploy** by pushing a new commit
+
+This error often resolves automatically once environment variables are properly configured.
 
 ### Build Failures
 - Check GitHub Actions logs
