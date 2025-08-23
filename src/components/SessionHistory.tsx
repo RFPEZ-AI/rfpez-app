@@ -5,7 +5,6 @@ import { add, chatbubbleOutline } from 'ionicons/icons';
 interface Session {
   id: string;
   title: string;
-  lastMessage: string;
   timestamp: Date;
 }
 
@@ -54,7 +53,6 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
               <IonIcon icon={chatbubbleOutline} slot="start" />
               <IonLabel>
                 <h3>{session.title}</h3>
-                <p>{session.lastMessage}</p>
                 <p>{session.timestamp.toLocaleDateString()}</p>
               </IonLabel>
             </IonItem>
