@@ -1,0 +1,136 @@
+.agent-indicator {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.agent-indicator.compact {
+  --background: rgba(var(--ion-color-primary-rgb), 0.1);
+  --color: var(--ion-color-primary);
+  border: 1px solid rgba(var(--ion-color-primary-rgb), 0.3);
+  transition: all 0.2s ease;
+}
+
+.agent-indicator.compact:hover {
+  --background: rgba(var(--ion-color-primary-rgb), 0.15);
+  transform: translateY(-1px);
+}
+
+.agent-indicator.no-agent {
+  --background: rgba(var(--ion-color-warning-rgb), 0.1);
+  --color: var(--ion-color-warning);
+  border: 1px solid rgba(var(--ion-color-warning-rgb), 0.3);
+}
+
+.agent-indicator.full {
+  padding: 12px;
+  background: var(--ion-color-light);
+  border-radius: 12px;
+  border: 1px solid var(--ion-color-medium-tint);
+  width: 100%;
+}
+
+.agent-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  flex: 1;
+}
+
+.agent-avatar {
+  width: 40px;
+  height: 40px;
+  --border-radius: 50%;
+  border: 2px solid var(--ion-color-primary);
+  background: var(--ion-color-primary-tint);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.agent-avatar ion-icon {
+  font-size: 20px;
+  color: var(--ion-color-primary);
+}
+
+.agent-details {
+  flex: 1;
+  min-width: 0; /* Allows text truncation */
+}
+
+.agent-name {
+  margin: 0 0 4px 0;
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.agent-initial-prompt {
+  margin: 0;
+  font-size: 0.85rem;
+  font-style: italic;
+  line-height: 1.3;
+  opacity: 0.8;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+.switch-button {
+  --padding-start: 12px;
+  --padding-end: 12px;
+  --padding-top: 6px;
+  --padding-bottom: 6px;
+  margin: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .agent-indicator.full {
+    padding: 8px;
+  }
+  
+  .agent-info {
+    gap: 8px;
+  }
+  
+  .agent-avatar {
+    width: 32px;
+    height: 32px;
+  }
+  
+  .agent-avatar ion-icon {
+    font-size: 16px;
+  }
+  
+  .agent-name {
+    font-size: 0.9rem;
+  }
+  
+  .agent-initial-prompt {
+    font-size: 0.8rem;
+  }
+  
+  .switch-button {
+    --padding-start: 8px;
+    --padding-end: 8px;
+    --padding-top: 4px;
+    --padding-bottom: 4px;
+    font-size: 0.8rem;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .agent-indicator.full {
+    background: var(--ion-color-dark);
+    border-color: var(--ion-color-medium);
+  }
+  
+  .agent-avatar {
+    background: var(--ion-color-primary-shade);
+  }
+}

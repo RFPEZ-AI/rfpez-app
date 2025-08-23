@@ -30,10 +30,12 @@ export interface SessionWithStats extends Session {
 export interface Message {
   id: string; // UUID
   session_id: string; // UUID
+  user_id: string; // UUID
   content: string;
   role: 'user' | 'assistant' | 'system';
   created_at: string;
   message_order: number;
+  agent_id?: string; // UUID - which agent handled this message
   metadata?: Record<string, any>;
   ai_metadata?: {
     model?: string;
@@ -63,6 +65,43 @@ export interface SessionArtifact {
   session_id: string;
   artifact_id: string;
   created_at: string;
+}
+
+// Multi-Agent System Types
+export interface Agent {
+  id: string; // UUID
+  name: string;
+  description?: string;
+  instructions: string; // System instructions for the agent
+  initial_prompt: string; // Initial greeting/prompt for users
+  avatar_url?: string;
+  is_active: boolean;
+  sort_order: number;
+  created_at: string;
+  updated_at: string;
+  metadata?: Record<string, any>;
+}
+
+export interface SessionAgent {
+  id: string; // UUID
+  session_id: string; // UUID
+  agent_id: string; // UUID
+  started_at: string;
+  ended_at?: string;
+  is_active: boolean;
+}
+
+export interface AgentWithActivity extends Agent {
+  session_count?: number;
+  last_used?: string;
+}
+
+export interface SessionActiveAgent {
+  agent_id: string;
+  agent_name: string;
+  agent_instructions: string;
+  agent_initial_prompt: string;
+  agent_avatar_url?: string;
 }
 
 // Database function return types
@@ -126,11 +165,42 @@ export interface Database {
         };
         Update: never; // Junction table, no updates
       };
+      agents: {
+        Row: Agent;
+        Insert: Omit<Agent, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<Agent, 'id' | 'created_at'>> & {
+          updated_at?: string;
+        };
+      };
+      session_agents: {
+        Row: SessionAgent;
+        Insert: Omit<SessionAgent, 'id' | 'started_at'> & {
+          id?: string;
+          started_at?: string;
+        };
+        Update: Partial<Omit<SessionAgent, 'id' | 'session_id' | 'agent_id' | 'started_at'>>;
+      };
     };
     Functions: {
       get_sessions_with_stats: {
         Args: { user_uuid: string };
         Returns: SessionStats[];
+      };
+      get_session_active_agent: {
+        Args: { session_uuid: string };
+        Returns: SessionActiveAgent[];
+      };
+      switch_session_agent: {
+        Args: { 
+          session_uuid: string; 
+          new_agent_uuid: string; 
+          user_uuid: string;
+        };
+        Returns: boolean;
       };
     };
   };

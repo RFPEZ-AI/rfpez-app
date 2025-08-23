@@ -1,14 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { IonContent, IonHeader, IonPage, IonToolbar, IonButtons } from '@ionic/react';
+import { IonContent, IonHeader, IonPage, IonToolbar, IonButtons, IonButton, IonIcon } from '@ionic/react';
+import { swapHorizontalOutline } from 'ionicons/icons';
 import { useAuth0 } from '@auth0/auth0-react';
 import AuthButtons from '../components/AuthButtons';
 import SessionHistory from '../components/SessionHistory';
 import SessionDialog from '../components/SessionDialog';
 import ArtifactWindow from '../components/ArtifactWindow';
 import PromptComponent from '../components/PromptComponent';
+import AgentSelector from '../components/AgentSelector';
+import AgentIndicator from '../components/AgentIndicator';
 import { useSupabase } from '../context/SupabaseContext';
 import { useIsMobile } from '../utils/useMediaQuery';
 import DatabaseService from '../services/database';
+import { AgentService } from '../services/agentService';
+import type { SessionActiveAgent } from '../types/database';
 
 // Local interfaces for UI compatibility
 interface Message {
@@ -44,6 +49,10 @@ const Home: React.FC = () => {
   const [selectedSessionId, setSelectedSessionId] = useState<string>();
   const [currentSessionId, setCurrentSessionId] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
+  
+  // Agent-related state
+  const [currentAgent, setCurrentAgent] = useState<SessionActiveAgent | null>(null);
+  const [showAgentSelector, setShowAgentSelector] = useState(false);
 
   // Load user sessions on mount if authenticated
   useEffect(() => {
@@ -51,8 +60,81 @@ const Home: React.FC = () => {
     if (isAuthenticated && !supabaseLoading && user && userProfile) {
       console.log('Loading user sessions...');
       loadUserSessions();
+      // Load default agent and show initial prompt to start conversation
+      loadDefaultAgentWithPrompt();
     }
   }, [isAuthenticated, supabaseLoading, user, userProfile]);
+
+  // Load active agent when session changes
+  useEffect(() => {
+    if (currentSessionId && user?.sub) {
+      loadSessionAgent(currentSessionId);
+    } else if (!currentSessionId && isAuthenticated && user?.sub && messages.length === 0) {
+      // Load default agent with initial prompt only if no messages yet
+      loadDefaultAgentWithPrompt();
+    }
+  }, [currentSessionId, user?.sub, isAuthenticated]);
+
+  // Agent-related functions
+  const loadDefaultAgentWithPrompt = async () => {
+    try {
+      const agents = await AgentService.getActiveAgents();
+      if (agents.length > 0) {
+        const defaultAgent = agents[0]; // First agent by sort order (Solutions)
+        const sessionActiveAgent: SessionActiveAgent = {
+          agent_id: defaultAgent.id,
+          agent_name: defaultAgent.name,
+          agent_instructions: defaultAgent.instructions,
+          agent_initial_prompt: defaultAgent.initial_prompt,
+          agent_avatar_url: defaultAgent.avatar_url
+        };
+        setCurrentAgent(sessionActiveAgent);
+        console.log('Loaded default agent with prompt:', sessionActiveAgent);
+
+        // Display the initial prompt to start the conversation
+        const initialMessage: Message = {
+          id: 'initial-prompt',
+          content: defaultAgent.initial_prompt,
+          isUser: false,
+          timestamp: new Date()
+        };
+        setMessages([initialMessage]);
+        console.log('Displayed initial prompt:', defaultAgent.initial_prompt);
+      }
+    } catch (error) {
+      console.error('Failed to load default agent with prompt:', error);
+    }
+  };
+
+  const loadSessionAgent = async (sessionId: string) => {
+    try {
+      const agent = await AgentService.getSessionActiveAgent(sessionId);
+      setCurrentAgent(agent);
+      console.log('Loaded session agent:', agent);
+    } catch (error) {
+      console.error('Failed to load session agent:', error);
+    }
+  };
+
+  const handleAgentChanged = (newAgent: SessionActiveAgent) => {
+    setCurrentAgent(newAgent);
+    console.log('Agent changed to:', newAgent);
+    
+    // If we're not in an active session (preview mode), update the initial message
+    if (!currentSessionId && messages.length <= 1) {
+      const initialMessage: Message = {
+        id: 'initial-prompt',
+        content: newAgent.agent_initial_prompt,
+        isUser: false,
+        timestamp: new Date()
+      };
+      setMessages([initialMessage]);
+    }
+  };
+
+  const handleShowAgentSelector = () => {
+    setShowAgentSelector(true);
+  };
 
   // Load sessions from Supabase
   const loadUserSessions = async () => {
@@ -107,7 +189,7 @@ const Home: React.FC = () => {
     }
   };
 
-  // Create a new session in Supabase
+  // Create a new session in Supabase with default agent
   const createNewSession = async (): Promise<string | null> => {
     console.log('Creating new session, auth state:', { isAuthenticated, user: !!user, userProfile: !!userProfile });
     if (!isAuthenticated || !user?.sub || !userProfile) {
@@ -117,7 +199,7 @@ const Home: React.FC = () => {
     
     try {
       console.log('Attempting to create session in Supabase...');
-      const session = await DatabaseService.createSession(user.sub, 'New Chat Session');
+      const session = await DatabaseService.createSessionWithAgent(user.sub, 'New Chat Session');
       console.log('Session created:', session);
       if (session) {
         await loadUserSessions(); // Refresh sessions list
@@ -161,7 +243,13 @@ const Home: React.FC = () => {
         // Save user message to database
         if (activeSessionId && user?.sub) {
           console.log('Saving user message to session:', activeSessionId);
-          const savedMessage = await DatabaseService.addMessage(activeSessionId, user.sub, content, 'user');
+          const savedMessage = await DatabaseService.addMessage(
+            activeSessionId, 
+            user.sub, 
+            content, 
+            'user',
+            currentAgent?.agent_id // Include agent ID
+          );
           console.log('User message saved:', savedMessage);
           
           // Check if this is the first message in the session and update title
@@ -183,7 +271,18 @@ const Home: React.FC = () => {
 
       // Simulate AI response
       setTimeout(async () => {
-        const aiResponse = "I'm RFPEZ.AI, your RFP assistant. I can help you with proposal creation, document analysis, and RFP management. How can I assist you today?";
+        // Provide a contextual response based on whether this is a follow-up to the initial prompt
+        const isFirstUserMessage = messages.length <= 2; // Initial prompt + user's first message
+        
+        let aiResponse: string;
+        if (isFirstUserMessage && currentAgent?.agent_name === 'Solutions') {
+          // First response from Solutions agent - acknowledge and ask follow-up
+          aiResponse = "Great! I'd be happy to help you with competitive sourcing. Could you tell me more about what type of product or service you're looking to source? This will help me provide you with the most relevant guidance.";
+        } else {
+          // Default response for other situations
+          aiResponse = "I understand your request. Let me help you with that. Could you provide more details so I can assist you better?";
+        }
+        
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           content: aiResponse,
@@ -198,7 +297,13 @@ const Home: React.FC = () => {
         if (isAuthenticated && user?.sub && userProfile && activeSessionId) {
           try {
             console.log('Saving AI response to session:', activeSessionId);
-            const savedAiMessage = await DatabaseService.addMessage(activeSessionId, user.sub, aiResponse, 'assistant');
+            const savedAiMessage = await DatabaseService.addMessage(
+              activeSessionId, 
+              user.sub, 
+              aiResponse, 
+              'assistant',
+              currentAgent?.agent_id // Include agent ID
+            );
             console.log('AI message saved:', savedAiMessage);
             await loadUserSessions(); // Refresh to update last message
           } catch (error) {
@@ -215,12 +320,18 @@ const Home: React.FC = () => {
   };
 
   const handleNewSession = async () => {
-    // Just clear the UI state - don't create a session in the database yet
+    // Clear the UI state
     setMessages([]);
     setArtifacts([]);
     setSelectedSessionId(undefined);
     setCurrentSessionId(undefined);
-    console.log('New session started (not yet saved to database)');
+    
+    // Load default agent with initial prompt for new conversation
+    if (isAuthenticated && user?.sub) {
+      await loadDefaultAgentWithPrompt();
+    }
+    
+    console.log('New session started with initial prompt displayed');
   };
 
   const handleSelectSession = async (sessionId: string) => {
@@ -294,7 +405,8 @@ const Home: React.FC = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <div style={{ display: 'flex', alignItems: 'center', padding: '0 16px' }}>
+          {/* Left section - Logo and title */}
+          <div slot="start" style={{ display: 'flex', alignItems: 'center', padding: '0 16px' }}>
             <img 
               src="/logo.svg" 
               alt="RFPEZ.AI" 
@@ -316,6 +428,39 @@ const Home: React.FC = () => {
               </span>
             )}
           </div>
+          
+          {/* Center section - Agent Indicator */}
+          <div style={{ 
+            position: 'absolute', 
+            left: '50%', 
+            top: '50%',
+            transform: 'translate(-50%, -50%)',
+            display: 'flex',
+            alignItems: 'center',
+            minWidth: isMobile ? '160px' : '200px',
+            height: '100%'
+          }}>
+            {isAuthenticated && user?.sub ? (
+              <AgentIndicator
+                agent={currentAgent}
+                onSwitchAgent={handleShowAgentSelector}
+                compact={true}
+                showSwitchButton={true}
+              />
+            ) : (
+              <IonButton 
+                fill="outline" 
+                size="small"
+                onClick={handleShowAgentSelector}
+                disabled={true}
+              >
+                <IonIcon icon={swapHorizontalOutline} slot="start" />
+                {isMobile ? 'Agent' : 'Sign in for Agents'}
+              </IonButton>
+            )}
+          </div>
+          
+          {/* Right section - Auth buttons */}
           <IonButtons slot="end">
             <AuthButtons />
           </IonButtons>
@@ -366,6 +511,18 @@ const Home: React.FC = () => {
             placeholder="Ask RFPEZ.AI about RFPs, proposals, or document analysis..."
           />
         </div>
+
+        {/* Agent Selector Modal */}
+        {user?.sub && (
+          <AgentSelector
+            isOpen={showAgentSelector}
+            onClose={() => setShowAgentSelector(false)}
+            sessionId={currentSessionId || 'preview'} // Use 'preview' when no session
+            auth0UserId={user.sub}
+            currentAgent={currentAgent}
+            onAgentChanged={handleAgentChanged}
+          />
+        )}
       </IonContent>
     </IonPage>
   );
