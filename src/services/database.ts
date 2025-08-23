@@ -5,8 +5,7 @@ import type {
   Message, 
   Artifact, 
   SessionWithStats,
-  UserProfile,
-  Database 
+  UserProfile
 } from '../types/database';
 
 export class DatabaseService {
@@ -148,8 +147,8 @@ export class DatabaseService {
     auth0UserId: string,
     content: string, 
     role: 'user' | 'assistant' | 'system',
-    metadata?: Record<string, any>,
-    aiMetadata?: Record<string, any>
+    metadata?: Record<string, unknown>,
+    aiMetadata?: Record<string, unknown>
   ): Promise<Message | null> {
     console.log('DatabaseService.addMessage called with:', {
       sessionId,
@@ -254,7 +253,7 @@ export class DatabaseService {
     fileSize?: number,
     storagePath?: string,
     mimeType?: string,
-    metadata?: Record<string, any>
+    metadata?: Record<string, unknown>
   ): Promise<Artifact | null> {
     const { data, error } = await supabase
       .from('artifacts')
@@ -307,7 +306,7 @@ export class DatabaseService {
     status: 'pending' | 'processing' | 'completed' | 'failed',
     processedContent?: string
   ): Promise<Artifact | null> {
-    const updates: any = { processing_status: status };
+    const updates: Record<string, unknown> = { processing_status: status };
     if (processedContent !== undefined) {
       updates.processed_content = processedContent;
     }
