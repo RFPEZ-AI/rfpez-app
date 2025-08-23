@@ -115,7 +115,7 @@ const Home: React.FC = () => {
     
     try {
       console.log('Attempting to create session in Supabase...');
-      const session = await DatabaseService.createSession(user.sub, 'New RFP Session');
+      const session = await DatabaseService.createSession(user.sub, 'New Chat Session');
       console.log('Session created:', session);
       if (session) {
         await loadUserSessions(); // Refresh sessions list
@@ -161,6 +161,17 @@ const Home: React.FC = () => {
           console.log('Saving user message to session:', activeSessionId);
           const savedMessage = await DatabaseService.addMessage(activeSessionId, user.sub, content, 'user');
           console.log('User message saved:', savedMessage);
+          
+          // Check if this is the first message in the session and update title
+          const sessionMessages = await DatabaseService.getSessionMessages(activeSessionId);
+          if (sessionMessages.length === 1) {
+            // This is the first message, use it to generate a session title
+            const sessionTitle = content.length > 50 ? content.substring(0, 47) + '...' : content;
+            await DatabaseService.updateSession(activeSessionId, { title: sessionTitle });
+            console.log('Updated session title to:', sessionTitle);
+            // Refresh sessions list to show updated title
+            await loadUserSessions();
+          }
         } else {
           console.log('No session ID or user ID available, message not saved');
         }
