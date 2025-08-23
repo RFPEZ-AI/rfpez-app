@@ -42,7 +42,7 @@
     "eslint-plugin-react": "^7.32.2"
   },
   "scripts": {
-    "start": "cross-env GENERATE_SOURCEMAP=false WDS_SOCKET_HOST=0.0.0.0 WDS_SOCKET_PORT=0 react-scripts start",
+    "start": "cross-env GENERATE_SOURCEMAP=false react-scripts start",
     "build": "react-scripts build",
     "test": "react-scripts test"
   },

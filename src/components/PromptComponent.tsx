@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { IonButton, IonIcon, IonTextarea } from '@ionic/react';
 import { sendOutline, attachOutline } from 'ionicons/icons';
 
@@ -16,6 +16,19 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
   placeholder = "Type your message here..."
 }) => {
   const [message, setMessage] = useState('');
+  const textareaRef = useRef<HTMLIonTextareaElement>(null);
+
+  // Set initial focus when component mounts
+  useEffect(() => {
+    // Small delay to ensure the component is fully mounted
+    const timer = setTimeout(() => {
+      if (textareaRef.current) {
+        textareaRef.current.setFocus();
+      }
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleSend = () => {
     if (message.trim() && !isLoading) {
@@ -41,15 +54,44 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
 
   return (
     <div style={{ 
-      borderTop: '1px solid var(--ion-color-light-shade)',
-      padding: '16px',
-      backgroundColor: 'var(--ion-color-light)'
+      borderTop: '2px solid var(--ion-color-primary)',
+      padding: '20px',
+      backgroundColor: 'var(--ion-color-light)',
+      boxShadow: '0 -4px 12px rgba(var(--ion-color-primary-rgb), 0.15)',
+      position: 'relative'
     }}>
+      {/* Highlight border animation */}
+      <div style={{
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: '2px',
+        background: 'linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary), var(--ion-color-primary))',
+        backgroundSize: '200% 100%',
+        animation: 'shimmer 3s ease-in-out infinite'
+      }} />
+      
+      <style>
+        {`
+          @keyframes shimmer {
+            0% { background-position: -200% 0; }
+            50% { background-position: 200% 0; }
+            100% { background-position: -200% 0; }
+          }
+        `}
+      </style>
+
       <div style={{ 
         display: 'flex', 
         alignItems: 'flex-end', 
         gap: '12px',
-        maxWidth: '100%'
+        maxWidth: '100%',
+        padding: '8px',
+        borderRadius: '16px',
+        backgroundColor: 'white',
+        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--ion-color-primary-tint)',
+        border: '1px solid var(--ion-color-primary-tint)'
       }}>
         {/* File attachment button */}
         {onAttachFile && (
@@ -69,6 +111,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
                 fileInput?.click();
               }}
               disabled={isLoading}
+              title="Attach file to session"
             >
               <IonIcon icon={attachOutline} />
             </IonButton>
@@ -78,6 +121,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         {/* Message input */}
         <div style={{ flex: 1 }}>
           <IonTextarea
+            ref={textareaRef}
             value={message}
             placeholder={placeholder}
             onIonInput={(e) => setMessage(e.detail.value || '')}
@@ -85,9 +129,13 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             rows={1}
             autoGrow
             style={{
-              '--background': 'white',
-              '--border-radius': '12px',
-              '--padding': '12px'
+              '--background': 'transparent',
+              '--border-radius': '8px',
+              '--padding': '12px',
+              '--color': 'var(--ion-text-color)',
+              '--placeholder-color': 'var(--ion-color-medium)',
+              border: 'none',
+              outline: 'none'
             }}
           />
         </div>
@@ -97,6 +145,11 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
           onClick={handleSend}
           disabled={!message.trim() || isLoading}
           size="default"
+          color="primary"
+          style={{
+            '--border-radius': '12px',
+            '--box-shadow': '0 2px 4px rgba(var(--ion-color-primary-rgb), 0.3)'
+          }}
         >
           <IonIcon icon={sendOutline} />
         </IonButton>
