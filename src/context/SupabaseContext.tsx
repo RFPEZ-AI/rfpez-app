@@ -3,21 +3,37 @@ import { useAuth0 } from '@auth0/auth0-react';
 import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
 
+type Auth0User = {
+  sub?: string;
+  name?: string;
+  email?: string;
+  picture?: string;
+  [key: string]: unknown;
+};
+
+type UserProfile = {
+  id?: string;
+  auth0_id?: string;
+  email?: string;
+  name?: string;
+  [key: string]: unknown;
+} | null;
+
 export type SupabaseCtx = {
   supabase: SupabaseClient;
   session: Session | null;
   user: User | null;
   loading: boolean;
-  auth0User: any; // Add Auth0 user to context
-  userProfile: any; // User profile from our custom table
+  auth0User: Auth0User | null;
+  userProfile: UserProfile;
 };
 
 const SupabaseContext = createContext<SupabaseCtx | undefined>(undefined);
 
 export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
+  const [, ] = useState<Session | null>(null); // Remove unused session state
   const [loading, setLoading] = useState<boolean>(true);
-  const [userProfile, setUserProfile] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile>(null);
   const { user: auth0User, isAuthenticated, isLoading: auth0Loading } = useAuth0();
 
   useEffect(() => {
@@ -113,15 +129,14 @@ export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }
     };
   }, [isAuthenticated, auth0User, auth0Loading]);
 
-  const user: User | null = useMemo(() => null, []); // We don't use Supabase auth
-
+  // We don't use Supabase auth, only Auth0
   const value = useMemo<SupabaseCtx>(
     () => ({ 
       supabase: supabase as unknown as SupabaseClient, 
       session: null, // We don't use Supabase sessions
       user: null, // We don't use Supabase users
       loading: loading || auth0Loading,
-      auth0User,
+      auth0User: auth0User as Auth0User | null,
       userProfile
     }),
     [loading, auth0Loading, auth0User, userProfile]

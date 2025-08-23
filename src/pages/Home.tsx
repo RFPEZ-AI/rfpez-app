@@ -8,10 +8,6 @@ import ArtifactWindow from '../components/ArtifactWindow';
 import PromptComponent from '../components/PromptComponent';
 import { useSupabase } from '../context/SupabaseContext';
 import DatabaseService from '../services/database';
-import type { 
-  SessionWithStats,
-  UserProfile
-} from '../types/database';
 
 // Local interfaces for UI compatibility
 interface Message {
