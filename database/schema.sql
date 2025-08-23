@@ -4,12 +4,14 @@
 -- Enable Row Level Security
 ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated;
 
--- 1. USERS table (extends Supabase auth.users)
+-- 1. USERS table (modified to work with Auth0)
 CREATE TABLE IF NOT EXISTS public.user_profiles (
-  id UUID REFERENCES auth.users(id) ON DELETE CASCADE PRIMARY KEY,
+  id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  auth0_id TEXT UNIQUE NOT NULL, -- Auth0 user ID (sub claim)
   email TEXT,
   full_name TEXT,
   avatar_url TEXT,
+  last_login TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -17,7 +19,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
 -- 2. SESSIONS table - stores chat sessions
 CREATE TABLE IF NOT EXISTS public.sessions (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  user_id UUID REFERENCES auth.users(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.user_profiles(id) ON DELETE CASCADE NOT NULL,
   title TEXT NOT NULL DEFAULT 'New Session',
   description TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
@@ -30,12 +32,15 @@ CREATE TABLE IF NOT EXISTS public.sessions (
 CREATE TABLE IF NOT EXISTS public.messages (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
   session_id UUID REFERENCES public.sessions(id) ON DELETE CASCADE NOT NULL,
+  user_id UUID REFERENCES public.user_profiles(id) ON DELETE CASCADE NOT NULL,
   content TEXT NOT NULL,
   role TEXT NOT NULL CHECK (role IN ('user', 'assistant', 'system')),
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   message_order INTEGER NOT NULL DEFAULT 0,
   metadata JSONB DEFAULT '{}'::jsonb,
   -- For storing additional data like model used, tokens, etc.
+  ai_metadata JSONB DEFAULT '{}'::jsonb
+);
   ai_metadata JSONB DEFAULT '{}'::jsonb
 );
 

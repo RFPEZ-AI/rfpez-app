@@ -11,20 +11,36 @@ import type {
 
 export class DatabaseService {
   // Session operations
-  static async createSession(title: string, description?: string): Promise<Session | null> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) throw new Error('User not authenticated');
+  static async createSession(auth0UserId: string, title: string, description?: string): Promise<Session | null> {
+    console.log('DatabaseService.createSession called with:', { auth0UserId, title, description });
+    
+    // First get the user profile to get the internal ID
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('auth0_id', auth0UserId)
+      .single();
 
+    console.log('User profile lookup:', { userProfile, profileError });
+
+    if (profileError || !userProfile) {
+      console.error('User profile not found for Auth0 ID:', auth0UserId);
+      return null;
+    }
+
+    console.log('Attempting to insert session into database...');
     const { data, error } = await supabase
       .from('sessions')
       .insert({
-        user_id: user.id,
+        user_id: userProfile.id,
         title,
         description
       })
       .select()
       .single();
 
+    console.log('Insert session result:', { data, error });
+    
     if (error) {
       console.error('Error creating session:', error);
       return null;
@@ -32,18 +48,56 @@ export class DatabaseService {
     return data;
   }
 
-  static async getUserSessions(): Promise<SessionWithStats[]> {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (!user) return [];
+  static async getUserSessions(auth0UserId: string): Promise<SessionWithStats[]> {
+    console.log('DatabaseService.getUserSessions called for auth0UserId:', auth0UserId);
+    
+    // First get the user profile to get the internal ID
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('auth0_id', auth0UserId)
+      .single();
 
-    const { data, error } = await supabase
-      .rpc('get_sessions_with_stats', { user_uuid: user.id });
+    console.log('User profile lookup:', { userProfile, profileError });
+
+    if (profileError || !userProfile) {
+      console.error('User profile not found for Auth0 ID:', auth0UserId);
+      return [];
+    }
+
+    console.log('Fetching sessions directly from sessions table...');
+    // Use direct query instead of RPC for now to debug
+    const { data: sessions, error } = await supabase
+      .from('sessions')
+      .select(`
+        id,
+        user_id,
+        title,
+        description,
+        created_at,
+        updated_at,
+        is_archived
+      `)
+      .eq('user_id', userProfile.id)
+      .order('updated_at', { ascending: false });
+
+    console.log('getUserSessions result:', { sessions, error });
 
     if (error) {
       console.error('Error fetching sessions:', error);
       return [];
     }
-    return data || [];
+
+    // Map to SessionWithStats format (simplified for now)
+    const sessionStats: SessionWithStats[] = (sessions || []).map(session => ({
+      ...session,
+      message_count: 0,
+      last_message: 'No messages yet',
+      last_message_at: session.created_at,
+      artifact_count: 0
+    } as SessionWithStats));
+
+    return sessionStats;
   }
 
   static async getSession(sessionId: string): Promise<Session | null> {
@@ -91,26 +145,53 @@ export class DatabaseService {
   // Message operations
   static async addMessage(
     sessionId: string, 
+    auth0UserId: string,
     content: string, 
     role: 'user' | 'assistant' | 'system',
     metadata?: Record<string, any>,
     aiMetadata?: Record<string, any>
   ): Promise<Message | null> {
-    // Get the next message order
-    const { data: lastMessage } = await supabase
-      .from('messages')
-      .select('message_order')
-      .eq('session_id', sessionId)
-      .order('message_order', { ascending: false })
-      .limit(1)
+    console.log('DatabaseService.addMessage called with:', {
+      sessionId,
+      auth0UserId,
+      content,
+      role,
+      metadata,
+      aiMetadata
+    });
+
+    // First get the user profile to get the internal ID
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('auth0_id', auth0UserId)
       .single();
 
-    const nextOrder = (lastMessage?.message_order || 0) + 1;
+    console.log('User profile lookup:', { userProfile, profileError });
 
+    if (profileError || !userProfile) {
+      console.error('User profile not found for Auth0 ID:', auth0UserId);
+      return null;
+    }
+
+    // Get the next message order - simplified approach
+    console.log('Getting message count for session...');
+    const { count, error: countError } = await supabase
+      .from('messages')
+      .select('*', { count: 'exact', head: true })
+      .eq('session_id', sessionId);
+
+    console.log('Message count result:', { count, countError });
+
+    const nextOrder = (count || 0) + 1;
+    console.log('Next message order:', nextOrder);
+
+    console.log('Attempting to insert message into database...');
     const { data, error } = await supabase
       .from('messages')
       .insert({
         session_id: sessionId,
+        user_id: userProfile.id,
         content,
         role,
         message_order: nextOrder,
@@ -120,28 +201,34 @@ export class DatabaseService {
       .select()
       .single();
 
+    console.log('addMessage result:', { data, error });
+
     if (error) {
       console.error('Error adding message:', error);
       return null;
     }
 
     // Update session timestamp
+    console.log('Updating session timestamp...');
     await this.updateSession(sessionId, { updated_at: new Date().toISOString() });
 
     return data;
   }
 
   static async getSessionMessages(sessionId: string): Promise<Message[]> {
+    console.log('Fetching messages for session:', sessionId);
     const { data, error } = await supabase
       .from('messages')
       .select('*')
       .eq('session_id', sessionId)
       .order('message_order', { ascending: true });
 
+    console.log('Database query result:', { data, error });
     if (error) {
       console.error('Error fetching messages:', error);
       return [];
     }
+    console.log('Returning messages:', data || []);
     return data || [];
   }
 
@@ -327,6 +414,8 @@ export class DatabaseService {
     return data.publicUrl;
   }
 }
+
+export default DatabaseService;
 
 // Example usage (commented out to avoid compilation errors)
 /*

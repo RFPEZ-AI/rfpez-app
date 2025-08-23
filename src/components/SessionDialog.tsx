@@ -22,21 +22,8 @@ const SessionDialog: React.FC<SessionDialogProps> = ({ messages, isLoading }) =>
       padding: '16px',
       overflow: 'auto'
     }}>
-      {messages.length === 0 ? (
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
-          height: '100%',
-          flexDirection: 'column',
-          textAlign: 'center'
-        }}>
-          <h2>Welcome to RFPEZ.AI</h2>
-          <p>Your AI-powered RFP assistant. Start by typing a message below.</p>
-        </div>
-      ) : (
-        <div style={{ flex: 1 }}>
-          {messages.map((message) => (
+      <div style={{ flex: 1 }}>
+        {messages.map((message) => (
             <IonCard 
               key={message.id}
               style={{
@@ -76,7 +63,6 @@ const SessionDialog: React.FC<SessionDialogProps> = ({ messages, isLoading }) =>
             </IonCard>
           )}
         </div>
-      )}
     </div>
   );
 };

@@ -26,14 +26,6 @@ import '@ionic/react/css/display.css';
 
 setupIonicReact();
 
-const domain = process.env.REACT_APP_AUTH0_DOMAIN || '';
-const clientId = process.env.REACT_APP_AUTH0_CLIENT_ID || '';
-
-if (!domain || !clientId) {
-  // eslint-disable-next-line no-console
-  console.warn('Missing Auth0 env vars: REACT_APP_AUTH0_DOMAIN and/or REACT_APP_AUTH0_CLIENT_ID');
-}
-
 const App: React.FC = () => (
   <SupabaseProvider>
     <IonApp>

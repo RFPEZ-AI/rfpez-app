@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import { useAuth0 } from '@auth0/auth0-react';
 import type { Session, User, SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
 
@@ -7,6 +8,8 @@ export type SupabaseCtx = {
   session: Session | null;
   user: User | null;
   loading: boolean;
+  auth0User: any; // Add Auth0 user to context
+  userProfile: any; // User profile from our custom table
 };
 
 const SupabaseContext = createContext<SupabaseCtx | undefined>(undefined);
@@ -14,34 +17,114 @@ const SupabaseContext = createContext<SupabaseCtx | undefined>(undefined);
 export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const { user: auth0User, isAuthenticated, isLoading: auth0Loading } = useAuth0();
 
   useEffect(() => {
     let active = true;
 
-    supabase.auth.getSession().then(({ data, error }) => {
-      if (error) console.error('Supabase getSession error:', error);
+    const initializeAuth = async () => {
+      console.log('SupabaseProvider: Initializing auth');
+      console.log('Auth0 loading:', auth0Loading);
+      console.log('Auth0 authenticated:', isAuthenticated);
+      console.log('Auth0 user:', auth0User);
+
+      if (auth0Loading) {
+        console.log('Auth0 still loading, waiting...');
+        return;
+      }
+
+      if (isAuthenticated && auth0User) {
+        console.log('Auth0 authenticated, creating/updating user profile in Supabase');
+        
+        try {
+          // Create or update user profile in Supabase using Auth0 user data
+          const { data: existingProfile, error: fetchError } = await supabase
+            .from('user_profiles')
+            .select('*')
+            .eq('auth0_id', auth0User.sub)
+            .single();
+
+          console.log('Existing profile:', existingProfile);
+          console.log('Fetch error:', fetchError);
+
+          if (!existingProfile && fetchError?.code === 'PGRST116') {
+            // Create new profile
+            console.log('Creating new user profile');
+            const { data: newProfile, error: createError } = await supabase
+              .from('user_profiles')
+              .insert({
+                auth0_id: auth0User.sub,
+                email: auth0User.email,
+                full_name: auth0User.name,
+                avatar_url: auth0User.picture,
+                last_login: new Date().toISOString()
+              })
+              .select()
+              .single();
+
+            console.log('Created profile:', newProfile);
+            console.log('Create error:', createError);
+
+            if (createError) {
+              console.error('Error creating user profile:', createError);
+            } else {
+              setUserProfile(newProfile);
+            }
+          } else if (existingProfile) {
+            // Update existing profile
+            console.log('Updating existing user profile');
+            const { data: updatedProfile, error: updateError } = await supabase
+              .from('user_profiles')
+              .update({
+                email: auth0User.email,
+                full_name: auth0User.name,
+                avatar_url: auth0User.picture,
+                last_login: new Date().toISOString()
+              })
+              .eq('auth0_id', auth0User.sub)
+              .select()
+              .single();
+
+            console.log('Updated profile:', updatedProfile);
+            console.log('Update error:', updateError);
+            
+            if (!updateError) {
+              setUserProfile(updatedProfile);
+            }
+          }
+        } catch (error) {
+          console.error('Error managing user profile:', error);
+        }
+      } else {
+        setUserProfile(null);
+      }
+
       if (active) {
-        setSession(data.session ?? null);
         setLoading(false);
       }
-    });
+    };
 
-    const { data: sub } = supabase.auth.onAuthStateChange((_event, newSession) => {
-      setSession(newSession ?? null);
-      setLoading(false);
-    });
+    // Initialize authentication flow
+    initializeAuth();
 
     return () => {
       active = false;
-      sub?.subscription.unsubscribe();
     };
-  }, []);
+  }, [isAuthenticated, auth0User, auth0Loading]);
 
-  const user: User | null = useMemo(() => session?.user ?? null, [session]);
+  const user: User | null = useMemo(() => null, []); // We don't use Supabase auth
 
   const value = useMemo<SupabaseCtx>(
-    () => ({ supabase: supabase as unknown as SupabaseClient, session, user, loading }),
-    [session, user, loading]
+    () => ({ 
+      supabase: supabase as unknown as SupabaseClient, 
+      session: null, // We don't use Supabase sessions
+      user: null, // We don't use Supabase users
+      loading: loading || auth0Loading,
+      auth0User,
+      userProfile
+    }),
+    [loading, auth0Loading, auth0User, userProfile]
   );
 
   return <SupabaseContext.Provider value={value}>{children}</SupabaseContext.Provider>;
