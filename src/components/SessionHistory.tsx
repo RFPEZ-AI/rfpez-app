@@ -53,7 +53,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
               <IonIcon icon={chatbubbleOutline} slot="start" />
               <IonLabel>
                 <h3>{session.title}</h3>
-                <p>{session.timestamp.toLocaleDateString()}</p>
+                <p>{session.timestamp.toLocaleDateString()} at {session.timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</p>
               </IonLabel>
             </IonItem>
           ))}
