@@ -35,11 +35,14 @@ jobs:
         run: |
           echo "Checking environment variables..."
           echo "REACT_APP_AUTH0_DOMAIN is set: $(if [ -n "$REACT_APP_AUTH0_DOMAIN" ]; then echo "YES"; else echo "NO"; fi)"
+          echo "REACT_APP_AUTH0_CLIENT_ID is set: $(if [ -n "$REACT_APP_AUTH0_CLIENT_ID" ]; then echo "YES"; else echo "NO"; fi)"
+          echo "REACT_APP_AUTH0_AUDIENCE is set: $(if [ -n "$REACT_APP_AUTH0_AUDIENCE" ]; then echo "YES"; else echo "NO"; fi)"
           echo "REACT_APP_SUPABASE_URL is set: $(if [ -n "$REACT_APP_SUPABASE_URL" ]; then echo "YES"; else echo "NO"; fi)"
           echo "Node environment: $NODE_ENV"
         env:
           REACT_APP_AUTH0_DOMAIN: ${{ secrets.REACT_APP_AUTH0_DOMAIN }}
           REACT_APP_AUTH0_CLIENT_ID: ${{ secrets.REACT_APP_AUTH0_CLIENT_ID }}
+          REACT_APP_AUTH0_AUDIENCE: ${{ secrets.REACT_APP_AUTH0_AUDIENCE }}
           REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
           REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
       
@@ -48,6 +51,7 @@ jobs:
         env:
           REACT_APP_AUTH0_DOMAIN: ${{ secrets.REACT_APP_AUTH0_DOMAIN }}
           REACT_APP_AUTH0_CLIENT_ID: ${{ secrets.REACT_APP_AUTH0_CLIENT_ID }}
+          REACT_APP_AUTH0_AUDIENCE: ${{ secrets.REACT_APP_AUTH0_AUDIENCE }}
           REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
           REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
       
