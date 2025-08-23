@@ -1,7 +1,12 @@
 # GitHub Actions Deployment Guide for Azure Static Web Apps
 
 ## Overview
-This workflow file will automatically deploy your RFPEZ.AI app to Azure Static Web Apps whenever you push to the master branch or create a pull request.
+This workflow file wi### 2. Update Auth0 Callback URLs
+After deployment, add your Static Web App URLs to Auth0:
+- `https://your-app-name.azurestaticapps.net/callback`
+- `https://your-app-name.azurestaticapps.net` (logout URL)
+
+### 3. Configure Custom Domain (Optional)omatically deploy your RFPEZ.AI app to Azure Static Web Apps whenever you push to the master branch or create a pull request.
 
 ## Required GitHub Secrets
 
@@ -78,7 +83,36 @@ az staticwebapp create \
 
 ## Post-Deployment Setup
 
-### 1. Update Auth0 Callback URLs
+### 1. Configure Environment Variables in Azure Portal
+
+After your Static Web App is deployed, you **must** configure the environment variables in Azure Portal:
+
+1. Go to your Azure Static Web App resource in Azure Portal
+2. Navigate to **Configuration** in the left menu
+3. Click **+ Add** to add each environment variable:
+
+**Add these Application Settings:**
+- **Name**: `REACT_APP_AUTH0_DOMAIN`, **Value**: `dev-jt6bdlf3wlirw8fj.us.auth0.com`
+- **Name**: `REACT_APP_AUTH0_CLIENT_ID`, **Value**: `xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM`
+- **Name**: `REACT_APP_SUPABASE_URL`, **Value**: `https://jxlutaztoukwbbgtoulc.supabase.co`
+- **Name**: `REACT_APP_SUPABASE_ANON_KEY`, **Value**: `your-supabase-anon-key`
+
+4. Click **Save** to apply the configuration
+5. The app will automatically restart with the new environment variables
+
+**Alternative: Configure via Azure CLI**
+```bash
+# Set environment variables for your Static Web App
+az staticwebapp appsettings set \
+  --name swa-rfpez-ai \
+  --resource-group rg-rfpez-ai \
+  --setting-names REACT_APP_AUTH0_DOMAIN=dev-jt6bdlf3wlirw8fj.us.auth0.com \
+                  REACT_APP_AUTH0_CLIENT_ID=xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM \
+                  REACT_APP_SUPABASE_URL=https://jxlutaztoukwbbgtoulc.supabase.co \
+                  REACT_APP_SUPABASE_ANON_KEY=your-supabase-anon-key
+```
+
+### 2. Update Auth0 Callback URLs
 After deployment, add your Static Web App URLs to Auth0:
 - `https://your-app-name.azurestaticapps.net/callback`
 - `https://your-app-name.azurestaticapps.net` (logout URL)
@@ -97,6 +131,22 @@ az staticwebapp hostname set \
 - Use preview URLs for testing
 
 ## Troubleshooting
+
+### Environment Variable Errors
+
+**Error**: `Uncaught Error: Missing REACT_APP_SUPABASE_URL in .env.local`
+
+**Cause**: Environment variables are not configured in Azure Static Web Apps
+
+**Solution**:
+1. Go to Azure Portal → Your Static Web App → Configuration
+2. Add all required environment variables as Application Settings
+3. Make sure they're prefixed with `REACT_APP_`
+4. Click Save to restart the app
+
+**Important**: Environment variables must be configured in **both** places:
+- GitHub Secrets (for build process)
+- Azure Static Web App Configuration (for runtime)
 
 ### Build Failures
 - Check GitHub Actions logs
