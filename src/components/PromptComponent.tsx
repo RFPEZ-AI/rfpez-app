@@ -35,13 +35,37 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
     }
   }, [autoFocus]);
 
-  // Auto-scroll when textarea expands
+  // Auto-scroll when textarea expands to ensure prompt stays fully visible
   useEffect(() => {
     if (containerRef.current) {
+      // First, scroll to ensure the prompt is in view
       containerRef.current.scrollIntoView({ 
         behavior: 'smooth', 
-        block: 'nearest'
+        block: 'end' // Ensure the bottom of the prompt is visible
       });
+      
+      // Additional check to ensure full visibility after a brief delay
+      setTimeout(() => {
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const viewportHeight = window.innerHeight;
+          
+          // If any part of the prompt is below the viewport, scroll to show it fully
+          if (rect.bottom > viewportHeight) {
+            containerRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'end'
+            });
+          }
+          // If the prompt is too high up and not fully visible, center it
+          else if (rect.top < 0) {
+            containerRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'center'
+            });
+          }
+        }
+      }, 100);
     }
   }, [message]);
 
@@ -50,10 +74,23 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
       onSendMessage(message.trim());
       setMessage('');
       
-      // Refocus after sending
+      // Refocus after sending and ensure prompt stays visible
       setTimeout(() => {
         if (textareaRef.current) {
           textareaRef.current.setFocus();
+        }
+        
+        // Ensure prompt is still fully visible after sending
+        if (containerRef.current) {
+          const rect = containerRef.current.getBoundingClientRect();
+          const viewportHeight = window.innerHeight;
+          
+          if (rect.bottom > viewportHeight || rect.top < 0) {
+            containerRef.current.scrollIntoView({ 
+              behavior: 'smooth', 
+              block: 'end'
+            });
+          }
         }
       }, 100);
     }
@@ -112,15 +149,15 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
           }
           
           .prompt-input-container:hover {
-            border-color: var(--ion-color-primary-shade) !important;
-            box-shadow: 0 2px 12px rgba(var(--ion-color-primary-rgb), 0.2), 0 0 0 1px var(--ion-color-primary) !important;
-            transform: translateY(-1px);
+            border-color: var(--ion-color-medium) !important;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.15), 0 3px 12px rgba(0, 0, 0, 0.1), 0 1px 6px rgba(0, 0, 0, 0.08), 0 0 0 1px var(--ion-color-primary), inset 0 1px 0 rgba(255, 255, 255, 0.9) !important;
+            transform: translateY(-2px);
           }
           
           .prompt-input-container:focus-within {
-            border-color: var(--ion-color-primary-shade) !important;
-            box-shadow: 0 2px 16px rgba(var(--ion-color-primary-rgb), 0.3), 0 0 0 2px var(--ion-color-primary) !important;
-            transform: translateY(-2px);
+            border-color: var(--ion-color-primary) !important;
+            box-shadow: 0 8px 24px rgba(var(--ion-color-primary-rgb), 0.2), 0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08), 0 0 0 2px var(--ion-color-primary), inset 0 1px 0 rgba(255, 255, 255, 1) !important;
+            transform: translateY(-3px);
           }
 
           .expandable-textarea {
@@ -141,8 +178,8 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         padding: '8px',
         borderRadius: '16px',
         backgroundColor: 'white',
-        boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--ion-color-primary-tint)',
-        border: '2px solid var(--ion-color-primary)',
+        boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+        border: '3px solid var(--ion-color-light-shade)',
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
       }}>
         {/* File attachment button */}
