@@ -431,53 +431,54 @@ const Home: React.FC = () => {
       <IonHeader>
         <IonToolbar>
           {/* Left section - Logo and title */}
-          <div slot="start" style={{ display: 'flex', alignItems: 'center', padding: '0 16px' }}>
+          <div slot="start" style={{ display: 'flex', alignItems: 'center', padding: '0 8px' }}>
             <img 
               src="/logo.svg" 
               alt="RFPEZ.AI" 
-              style={{ height: '32px', marginRight: '12px' }}
+              style={{ height: '32px', marginRight: isMobile ? '6px' : '12px' }}
             />
             {!isMobile && (
               <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
             )}
-            {isAuthenticated && user && userProfile && (
+            {isAuthenticated && user && userProfile && !isMobile && (
               <span style={{ 
                 fontSize: '12px', 
-                marginLeft: isMobile ? '0' : '12px', 
+                marginLeft: '12px', 
                 padding: '4px 8px',
                 backgroundColor: 'var(--ion-color-success)',
                 color: 'white',
                 borderRadius: '12px'
               }}>
-                Sessions Saved
+                Saved
               </span>
             )}
           </div>
           
           {/* Center section - Agent Indicator */}
           <div style={{ 
-            position: 'absolute', 
-            left: '50%', 
-            top: '50%',
-            transform: 'translate(-50%, -50%)',
             display: 'flex',
+            justifyContent: 'center',
             alignItems: 'center',
-            minWidth: isMobile ? '160px' : '200px',
-            height: '100%'
+            flex: 1,
+            padding: '0 8px',
+            minWidth: 0 // Allow shrinking
           }}>
             {isAuthenticated && user?.sub ? (
-              <AgentIndicator
-                agent={currentAgent}
-                onSwitchAgent={handleShowAgentSelector}
-                compact={true}
-                showSwitchButton={true}
-              />
+              <div style={{ maxWidth: '100%' }}>
+                <AgentIndicator
+                  agent={currentAgent}
+                  onSwitchAgent={handleShowAgentSelector}
+                  compact={true}
+                  showSwitchButton={true}
+                />
+              </div>
             ) : (
               <IonButton 
                 fill="outline" 
                 size="small"
                 onClick={handleShowAgentSelector}
                 disabled={true}
+                style={{ whiteSpace: 'nowrap' }}
               >
                 <IonIcon icon={swapHorizontalOutline} slot="start" />
                 {isMobile ? 'Agent' : 'Sign in for Agents'}
