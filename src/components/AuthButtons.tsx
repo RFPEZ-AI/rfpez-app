@@ -46,9 +46,6 @@ const AuthButtons: React.FC = () => {
         <IonButton color="danger" onClick={() => window.location.reload()}>
           Auth Timeout - Retry
         </IonButton>
-        <IonButton color="medium" onClick={() => window.location.reload()}>
-          Continue as Guest
-        </IonButton>
       </IonButtons>
     );
   }
@@ -78,7 +75,6 @@ const AuthButtons: React.FC = () => {
       {!isAuthenticated ? (
         <>
           <IonButton onClick={handleLogin}>Login / Signup</IonButton>
-          <IonButton color="medium" onClick={() => window.location.reload()}>Continue as Guest</IonButton>
         </>
       ) : (
         <>
