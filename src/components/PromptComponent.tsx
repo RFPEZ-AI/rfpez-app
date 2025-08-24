@@ -161,9 +161,22 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
           }
 
           .expandable-textarea {
-            min-height: 44px;
+            min-height: 48px;
             max-height: 200px;
             transition: height 0.2s ease;
+          }
+          
+          .expandable-textarea .native-textarea {
+            font-size: 16px !important;
+            line-height: 1.4 !important;
+          }
+          
+          /* Improve placeholder visibility */
+          .expandable-textarea input::placeholder,
+          .expandable-textarea textarea::placeholder {
+            color: var(--ion-color-primary) !important;
+            opacity: 0.8 !important;
+            font-weight: 500 !important;
           }
         `}
       </style>
@@ -174,8 +187,9 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         display: 'flex', 
         alignItems: 'flex-end', 
         gap: '12px',
+        width: '100%',
         maxWidth: '100%',
-        padding: '8px',
+        padding: '12px 16px',
         borderRadius: '16px',
         backgroundColor: 'white',
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
@@ -208,7 +222,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         )}
 
         {/* Message input */}
-        <div style={{ flex: 1 }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
           <IonTextarea
             ref={textareaRef}
             value={message}
@@ -221,12 +235,15 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             style={{
               '--background': 'transparent',
               '--border-radius': '8px',
-              '--padding': '12px',
+              '--padding': '12px 16px',
               '--color': 'var(--ion-text-color)',
-              '--placeholder-color': 'var(--ion-color-medium)',
+              '--placeholder-color': 'var(--ion-color-primary)',
+              '--placeholder-opacity': '0.8',
               border: 'none',
               outline: 'none',
-              resize: 'none'
+              resize: 'none',
+              fontSize: '16px',
+              fontWeight: '400'
             }}
           />
         </div>
