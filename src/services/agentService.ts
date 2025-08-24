@@ -133,19 +133,19 @@ export class AgentService {
   static async setSessionAgent(
     sessionId: string, 
     agentId: string, 
-    auth0UserId: string
+    supabaseUserId: string
   ): Promise<boolean> {
-    console.log('AgentService.setSessionAgent called with:', { sessionId, agentId, auth0UserId });
+    console.log('AgentService.setSessionAgent called with:', { sessionId, agentId, supabaseUserId });
     
     // First get the user profile to get the internal ID
     const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
-      .eq('auth0_id', auth0UserId)
+      .eq('supabase_user_id', supabaseUserId)
       .single();
 
     if (profileError || !userProfile) {
-      console.error('User profile not found for Auth0 ID:', auth0UserId);
+      console.error('User profile not found for Supabase user ID:', supabaseUserId);
       return false;
     }
 
@@ -170,7 +170,7 @@ export class AgentService {
    */
   static async initializeSessionWithDefaultAgent(
     sessionId: string, 
-    auth0UserId: string
+    supabaseUserId: string
   ): Promise<boolean> {
     console.log('AgentService.initializeSessionWithDefaultAgent called');
     
@@ -181,7 +181,7 @@ export class AgentService {
       return false;
     }
 
-    return await this.setSessionAgent(sessionId, defaultAgent.id, auth0UserId);
+    return await this.setSessionAgent(sessionId, defaultAgent.id, supabaseUserId);
   }
 
   /**

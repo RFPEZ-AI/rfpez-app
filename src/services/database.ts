@@ -10,20 +10,20 @@ import type {
 
 export class DatabaseService {
   // Session operations
-  static async createSession(auth0UserId: string, title: string, description?: string): Promise<Session | null> {
-    console.log('DatabaseService.createSession called with:', { auth0UserId, title, description });
+  static async createSession(supabaseUserId: string, title: string, description?: string): Promise<Session | null> {
+    console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description });
     
     // First get the user profile to get the internal ID
     const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
-      .eq('auth0_id', auth0UserId)
+      .eq('supabase_user_id', supabaseUserId)
       .single();
 
     console.log('User profile lookup:', { userProfile, profileError });
 
     if (profileError || !userProfile) {
-      console.error('User profile not found for Auth0 ID:', auth0UserId);
+      console.error('User profile not found for Supabase user ID:', supabaseUserId);
       return null;
     }
 
@@ -48,17 +48,17 @@ export class DatabaseService {
   }
 
   static async createSessionWithAgent(
-    auth0UserId: string, 
+    supabaseUserId: string, 
     title: string, 
     agentId?: string,
     description?: string
   ): Promise<Session | null> {
     console.log('DatabaseService.createSessionWithAgent called with:', { 
-      auth0UserId, title, agentId, description 
+      supabaseUserId, title, agentId, description 
     });
 
     // Create the session first
-    const session = await this.createSession(auth0UserId, title, description);
+    const session = await this.createSession(supabaseUserId, title, description);
     if (!session) {
       return null;
     }
@@ -66,28 +66,28 @@ export class DatabaseService {
     // Initialize with agent (use default if none specified)
     const { AgentService } = await import('./agentService');
     if (agentId) {
-      await AgentService.setSessionAgent(session.id, agentId, auth0UserId);
+      await AgentService.setSessionAgent(session.id, agentId, supabaseUserId);
     } else {
-      await AgentService.initializeSessionWithDefaultAgent(session.id, auth0UserId);
+      await AgentService.initializeSessionWithDefaultAgent(session.id, supabaseUserId);
     }
 
     return session;
   }
 
-  static async getUserSessions(auth0UserId: string): Promise<SessionWithStats[]> {
-    console.log('DatabaseService.getUserSessions called for auth0UserId:', auth0UserId);
+  static async getUserSessions(supabaseUserId: string): Promise<SessionWithStats[]> {
+    console.log('DatabaseService.getUserSessions called for supabaseUserId:', supabaseUserId);
     
     // First get the user profile to get the internal ID
     const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
-      .eq('auth0_id', auth0UserId)
+      .eq('supabase_user_id', supabaseUserId)
       .single();
 
     console.log('User profile lookup:', { userProfile, profileError });
 
     if (profileError || !userProfile) {
-      console.error('User profile not found for Auth0 ID:', auth0UserId);
+      console.error('User profile not found for Supabase user ID:', supabaseUserId);
       return [];
     }
 

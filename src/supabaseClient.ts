@@ -5,18 +5,14 @@ if (process.env.NODE_ENV === 'development') {
   console.log('Environment variables:', {
     NODE_ENV: process.env.NODE_ENV,
     REACT_APP_SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL ? 'SET' : 'NOT SET',
-    REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET',
-    REACT_APP_AUTH0_DOMAIN: process.env.REACT_APP_AUTH0_DOMAIN ? 'SET' : 'NOT SET',
-    REACT_APP_AUTH0_CLIENT_ID: process.env.REACT_APP_AUTH0_CLIENT_ID ? 'SET' : 'NOT SET'
+    REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET'
   });
 } else {
   // Also log in production for debugging deployment issues
   console.log('Production environment variables check:', {
     NODE_ENV: process.env.NODE_ENV,
     REACT_APP_SUPABASE_URL: process.env.REACT_APP_SUPABASE_URL ? 'SET' : 'NOT SET',
-    REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET',
-    REACT_APP_AUTH0_DOMAIN: process.env.REACT_APP_AUTH0_DOMAIN ? 'SET' : 'NOT SET',
-    REACT_APP_AUTH0_CLIENT_ID: process.env.REACT_APP_AUTH0_CLIENT_ID ? 'SET' : 'NOT SET'
+    REACT_APP_SUPABASE_ANON_KEY: process.env.REACT_APP_SUPABASE_ANON_KEY ? 'SET' : 'NOT SET'
   });
 }
 
@@ -47,8 +43,10 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    debug: process.env.NODE_ENV === 'development'
   },
-  // Disable telemetry if causing issues
   global: {
     headers: {
       'X-Client-Info': 'supabase-js-web'
