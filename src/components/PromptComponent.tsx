@@ -116,7 +116,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
       ref={containerRef}
       style={{ 
         borderTop: '2px solid var(--ion-color-primary)',
-        padding: '20px',
+        padding: '16px 12px',
         backgroundColor: 'var(--ion-color-light)',
         boxShadow: '0 -4px 12px rgba(var(--ion-color-primary-rgb), 0.15)',
         position: 'relative',
@@ -171,12 +171,13 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             line-height: 1.4 !important;
           }
           
-          /* Improve placeholder visibility */
+          /* Improve placeholder visibility - lighter shade */
           .expandable-textarea input::placeholder,
           .expandable-textarea textarea::placeholder {
-            color: var(--ion-color-primary) !important;
-            opacity: 0.8 !important;
-            font-weight: 500 !important;
+            color: var(--ion-color-medium) !important;
+            opacity: 0.6 !important;
+            font-weight: 400 !important;
+            font-style: italic !important;
           }
         `}
       </style>
@@ -186,10 +187,10 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         style={{ 
         display: 'flex', 
         alignItems: 'flex-end', 
-        gap: '12px',
+        gap: '8px',
         width: '100%',
         maxWidth: '100%',
-        padding: '12px 16px',
+        padding: '10px 12px',
         borderRadius: '16px',
         backgroundColor: 'white',
         boxShadow: '0 4px 16px rgba(0, 0, 0, 0.12), 0 2px 8px rgba(0, 0, 0, 0.08), 0 1px 4px rgba(0, 0, 0, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
@@ -222,7 +223,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         )}
 
         {/* Message input */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div style={{ flex: 1, minWidth: 0, width: '100%' }}>
           <IonTextarea
             ref={textareaRef}
             value={message}
@@ -235,15 +236,16 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             style={{
               '--background': 'transparent',
               '--border-radius': '8px',
-              '--padding': '12px 16px',
+              '--padding': '12px 14px',
               '--color': 'var(--ion-text-color)',
-              '--placeholder-color': 'var(--ion-color-primary)',
-              '--placeholder-opacity': '0.8',
+              '--placeholder-color': 'var(--ion-color-medium)',
+              '--placeholder-opacity': '0.6',
               border: 'none',
               outline: 'none',
               resize: 'none',
               fontSize: '16px',
-              fontWeight: '400'
+              fontWeight: '400',
+              width: '100%'
             }}
           />
         </div>
