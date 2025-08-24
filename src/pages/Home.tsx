@@ -1,7 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { IonContent, IonHeader, IonPage, IonToolbar, IonButtons, IonButton, IonIcon } from '@ionic/react';
 import { swapHorizontalOutline } from 'ionicons/icons';
-import { useAuth0 } from '@auth0/auth0-react';
 import AuthButtons from '../components/AuthButtons';
 import SessionHistory from '../components/SessionHistory';
 import SessionDialog from '../components/SessionDialog';
@@ -40,9 +39,12 @@ interface Artifact {
 }
 
 const Home: React.FC = () => {
-  const { user, isAuthenticated } = useAuth0();
-  const { loading: supabaseLoading, userProfile } = useSupabase();
+  const { user, session, loading: supabaseLoading, userProfile } = useSupabase();
   const isMobile = useIsMobile();
+  
+  // Derived authentication state
+  const isAuthenticated = !!session;
+  const userId = user?.id;
   
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -58,23 +60,40 @@ const Home: React.FC = () => {
   // Load user sessions on mount if authenticated
   useEffect(() => {
     console.log('Auth state:', { isAuthenticated, supabaseLoading, user: !!user, userProfile: !!userProfile });
-    if (isAuthenticated && !supabaseLoading && user && userProfile) {
-      console.log('Loading user sessions...');
+    console.log('Session details:', session);
+    console.log('User details:', user);
+    console.log('UserProfile details:', userProfile);
+    
+    // Check if we have basic authentication (session and user)
+    if (isAuthenticated && !supabaseLoading && user) {
+      console.log('User is authenticated, loading sessions...');
       loadUserSessions();
       // Load default agent and show initial prompt to start conversation
       loadDefaultAgentWithPrompt();
+      
+      // If we don't have a user profile yet, that's OK - the profile loading might be in progress
+      if (!userProfile) {
+        console.log('User profile not loaded yet, but proceeding with authenticated state');
+      }
+    } else {
+      console.log('Not loading sessions because:', {
+        isAuthenticated,
+        supabaseLoading,
+        hasUser: !!user,
+        hasUserProfile: !!userProfile
+      });
     }
   }, [isAuthenticated, supabaseLoading, user, userProfile]);
 
   // Load active agent when session changes
   useEffect(() => {
-    if (currentSessionId && user?.sub) {
+    if (currentSessionId && userId) {
       loadSessionAgent(currentSessionId);
-    } else if (!currentSessionId && isAuthenticated && user?.sub && messages.length === 0) {
+    } else if (!currentSessionId && isAuthenticated && userId && messages.length === 0) {
       // Load default agent with initial prompt only if no messages yet
       loadDefaultAgentWithPrompt();
     }
-  }, [currentSessionId, user?.sub, isAuthenticated]);
+  }, [currentSessionId, userId, isAuthenticated]);
 
   // Agent-related functions
   const loadDefaultAgentWithPrompt = async () => {
@@ -140,14 +159,14 @@ const Home: React.FC = () => {
 
   // Load sessions from Supabase
   const loadUserSessions = async () => {
-    if (!isAuthenticated || !user?.sub || !userProfile) {
+    if (!isAuthenticated || !userId || !userProfile) {
       console.log('User not authenticated or profile not ready, skipping session load');
       return;
     }
     
     try {
-      console.log('Attempting to load sessions from Supabase for user:', user.sub);
-      const sessionsData = await DatabaseService.getUserSessions(user.sub);
+      console.log('Attempting to load sessions from Supabase for user:', userId);
+      const sessionsData = await DatabaseService.getUserSessions(userId);
       console.log('Sessions loaded:', sessionsData);
       const formattedSessions: Session[] = sessionsData.map(session => ({
         id: session.id,
@@ -196,7 +215,7 @@ const Home: React.FC = () => {
   // Create a new session in Supabase with current agent
   const createNewSession = async (): Promise<string | null> => {
     console.log('Creating new session, auth state:', { isAuthenticated, user: !!user, userProfile: !!userProfile });
-    if (!isAuthenticated || !user?.sub || !userProfile) {
+    if (!isAuthenticated || !userId || !userProfile) {
       console.log('Not authenticated or profile not ready, skipping session creation');
       return null;
     }
@@ -204,7 +223,7 @@ const Home: React.FC = () => {
     try {
       console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id);
       const session = await DatabaseService.createSessionWithAgent(
-        user.sub, 
+        userId, 
         'New Chat Session',
         currentAgent?.agent_id // Use current agent if available
       );
@@ -249,11 +268,11 @@ const Home: React.FC = () => {
         }
 
         // Save user message to database
-        if (activeSessionId && user?.sub) {
+        if (activeSessionId && userId) {
           console.log('Saving user message to session:', activeSessionId);
           const savedMessage = await DatabaseService.addMessage(
             activeSessionId, 
-            user.sub, 
+            userId, 
             content, 
             'user',
             currentAgent?.agent_id, // Include agent ID
@@ -304,12 +323,12 @@ const Home: React.FC = () => {
         setIsLoading(false);
 
         // Save AI response to database if authenticated - use activeSessionId instead of currentSessionId
-        if (isAuthenticated && user?.sub && userProfile && activeSessionId) {
+        if (isAuthenticated && userId && userProfile && activeSessionId) {
           try {
             console.log('Saving AI response to session:', activeSessionId);
             const savedAiMessage = await DatabaseService.addMessage(
               activeSessionId, 
-              user.sub, 
+              userId, 
               aiResponse, 
               'assistant',
               currentAgent?.agent_id, // Include agent ID
@@ -338,7 +357,7 @@ const Home: React.FC = () => {
     setCurrentSessionId(undefined);
     
     // Use the currently selected agent, or default if none selected
-    if (isAuthenticated && user?.sub) {
+    if (isAuthenticated && userId) {
       if (currentAgent) {
         // Use the currently selected agent for the new session
         const initialMessage: Message = {
@@ -367,7 +386,7 @@ const Home: React.FC = () => {
   };
 
   const handleDeleteSession = async (sessionId: string) => {
-    if (!isAuthenticated || !user?.sub) {
+    if (!isAuthenticated || !userId) {
       console.log('Not authenticated, cannot delete session');
       return;
     }
@@ -463,7 +482,7 @@ const Home: React.FC = () => {
             padding: '0 8px',
             minWidth: 0 // Allow shrinking
           }}>
-            {isAuthenticated && user?.sub ? (
+            {isAuthenticated && userId ? (
               <div style={{ maxWidth: '100%' }}>
                 <AgentIndicator
                   agent={currentAgent}
@@ -534,12 +553,12 @@ const Home: React.FC = () => {
         </div>
 
         {/* Agent Selector Modal */}
-        {user?.sub && (
+        {userId && (
           <AgentSelector
             isOpen={showAgentSelector}
             onClose={() => setShowAgentSelector(false)}
             sessionId={currentSessionId || 'preview'} // Use 'preview' when no session
-            auth0UserId={user.sub}
+            supabaseUserId={userId}
             currentAgent={currentAgent}
             onAgentChanged={handleAgentChanged}
             hasProperAccountSetup={false} // TODO: Implement proper account setup check

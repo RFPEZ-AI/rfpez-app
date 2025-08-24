@@ -39,7 +39,7 @@ interface AgentSelectorProps {
   isOpen: boolean;
   onClose: () => void;
   sessionId: string;
-  auth0UserId: string;
+  supabaseUserId: string;
   currentAgent?: SessionActiveAgent | null;
   onAgentChanged: (agent: SessionActiveAgent) => void;
   hasProperAccountSetup?: boolean; // Whether user has access to restricted agents
@@ -49,7 +49,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
   isOpen,
   onClose,
   sessionId,
-  auth0UserId,
+  supabaseUserId,
   currentAgent,
   onAgentChanged,
   hasProperAccountSetup = false // Default to false (restricted agents not available)
@@ -104,7 +104,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
         onClose();
       } else {
         // Normal mode with real session
-        const success = await AgentService.setSessionAgent(sessionId, agent.id, auth0UserId);
+        const success = await AgentService.setSessionAgent(sessionId, agent.id, supabaseUserId);
         
         if (success) {
           // Get the updated active agent
