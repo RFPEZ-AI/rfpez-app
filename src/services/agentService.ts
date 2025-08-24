@@ -14,19 +14,28 @@ export class AgentService {
   static async getActiveAgents(): Promise<Agent[]> {
     console.log('AgentService.getActiveAgents called');
     
-    const { data, error } = await supabase
-      .from('agents')
-      .select('*')
-      .eq('is_active', true)
-      .order('sort_order', { ascending: true });
+    try {
+      const { data, error } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
 
-    if (error) {
-      console.error('Error fetching active agents:', error);
+      if (error) {
+        console.error('Error fetching active agents:', error);
+        // Check if it's an API key issue
+        if (error.message.includes('API key') || error.message.includes('apikey')) {
+          console.error('Supabase API key issue detected. Check environment variables.');
+        }
+        return [];
+      }
+
+      console.log('Active agents fetched:', data);
+      return data || [];
+    } catch (err) {
+      console.error('Unexpected error in getActiveAgents:', err);
       return [];
     }
-
-    console.log('Active agents fetched:', data);
-    return data || [];
   }
 
   /**

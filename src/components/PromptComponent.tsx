@@ -79,10 +79,28 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             50% { background-position: 200% 0; }
             100% { background-position: -200% 0; }
           }
+          
+          .prompt-input-container {
+            transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.1s ease;
+          }
+          
+          .prompt-input-container:hover {
+            border-color: var(--ion-color-primary-shade) !important;
+            box-shadow: 0 2px 12px rgba(var(--ion-color-primary-rgb), 0.2), 0 0 0 1px var(--ion-color-primary) !important;
+            transform: translateY(-1px);
+          }
+          
+          .prompt-input-container:focus-within {
+            border-color: var(--ion-color-primary-shade) !important;
+            box-shadow: 0 2px 16px rgba(var(--ion-color-primary-rgb), 0.3), 0 0 0 2px var(--ion-color-primary) !important;
+            transform: translateY(-2px);
+          }
         `}
       </style>
 
-      <div style={{ 
+      <div 
+        className="prompt-input-container"
+        style={{ 
         display: 'flex', 
         alignItems: 'flex-end', 
         gap: '12px',
@@ -91,7 +109,8 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         borderRadius: '16px',
         backgroundColor: 'white',
         boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1), 0 0 0 1px var(--ion-color-primary-tint)',
-        border: '1px solid var(--ion-color-primary-tint)'
+        border: '2px solid var(--ion-color-primary)',
+        transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
       }}>
         {/* File attachment button */}
         {onAttachFile && (
