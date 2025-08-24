@@ -7,33 +7,55 @@ interface PromptComponentProps {
   onAttachFile?: (file: File) => void;
   isLoading?: boolean;
   placeholder?: string;
+  autoFocus?: boolean;
 }
 
 const PromptComponent: React.FC<PromptComponentProps> = ({
   onSendMessage,
   onAttachFile,
   isLoading = false,
-  placeholder = "Type your message here..."
+  placeholder = "Type your message here...",
+  autoFocus = true
 }) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLIonTextareaElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Set initial focus when component mounts
   useEffect(() => {
-    // Small delay to ensure the component is fully mounted
-    const timer = setTimeout(() => {
-      if (textareaRef.current) {
-        textareaRef.current.setFocus();
-      }
-    }, 100);
+    if (autoFocus) {
+      // Small delay to ensure the component is fully mounted
+      const timer = setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.setFocus();
+        }
+      }, 100);
 
-    return () => clearTimeout(timer);
-  }, []);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocus]);
+
+  // Auto-scroll when textarea expands
+  useEffect(() => {
+    if (containerRef.current) {
+      containerRef.current.scrollIntoView({ 
+        behavior: 'smooth', 
+        block: 'nearest'
+      });
+    }
+  }, [message]);
 
   const handleSend = () => {
     if (message.trim() && !isLoading) {
       onSendMessage(message.trim());
       setMessage('');
+      
+      // Refocus after sending
+      setTimeout(() => {
+        if (textareaRef.current) {
+          textareaRef.current.setFocus();
+        }
+      }, 100);
     }
   };
 
@@ -53,13 +75,17 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
   };
 
   return (
-    <div style={{ 
-      borderTop: '2px solid var(--ion-color-primary)',
-      padding: '20px',
-      backgroundColor: 'var(--ion-color-light)',
-      boxShadow: '0 -4px 12px rgba(var(--ion-color-primary-rgb), 0.15)',
-      position: 'relative'
-    }}>
+    <div 
+      ref={containerRef}
+      style={{ 
+        borderTop: '2px solid var(--ion-color-primary)',
+        padding: '20px',
+        backgroundColor: 'var(--ion-color-light)',
+        boxShadow: '0 -4px 12px rgba(var(--ion-color-primary-rgb), 0.15)',
+        position: 'relative',
+        marginTop: '16px', // Space from last message
+        borderRadius: '16px 16px 0 0' // Rounded top corners
+      }}>
       {/* Highlight border animation */}
       <div style={{
         position: 'absolute',
@@ -69,7 +95,8 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         height: '2px',
         background: 'linear-gradient(90deg, var(--ion-color-primary), var(--ion-color-secondary), var(--ion-color-primary))',
         backgroundSize: '200% 100%',
-        animation: 'shimmer 3s ease-in-out infinite'
+        animation: 'shimmer 3s ease-in-out infinite',
+        borderRadius: '16px 16px 0 0'
       }} />
       
       <style>
@@ -94,6 +121,12 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             border-color: var(--ion-color-primary-shade) !important;
             box-shadow: 0 2px 16px rgba(var(--ion-color-primary-rgb), 0.3), 0 0 0 2px var(--ion-color-primary) !important;
             transform: translateY(-2px);
+          }
+
+          .expandable-textarea {
+            min-height: 44px;
+            max-height: 200px;
+            transition: height 0.2s ease;
           }
         `}
       </style>
@@ -147,6 +180,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             onKeyDown={handleKeyDown}
             rows={1}
             autoGrow
+            className="expandable-textarea"
             style={{
               '--background': 'transparent',
               '--border-radius': '8px',
@@ -154,7 +188,8 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
               '--color': 'var(--ion-text-color)',
               '--placeholder-color': 'var(--ion-color-medium)',
               border: 'none',
-              outline: 'none'
+              outline: 'none',
+              resize: 'none'
             }}
           />
         </div>
@@ -168,7 +203,8 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             color="primary"
             style={{
               '--border-radius': '12px',
-              '--box-shadow': '0 2px 4px rgba(var(--ion-color-primary-rgb), 0.3)'
+              '--box-shadow': '0 2px 4px rgba(var(--ion-color-primary-rgb), 0.3)',
+              minHeight: '44px'
             }}
           >
             <IonIcon icon={sendOutline} />

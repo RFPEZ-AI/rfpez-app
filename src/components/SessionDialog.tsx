@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { IonCard, IonCardContent } from '@ionic/react';
+import PromptComponent from './PromptComponent';
 
 interface Message {
   id: string;
@@ -12,13 +13,28 @@ interface Message {
 interface SessionDialogProps {
   messages: Message[];
   isLoading?: boolean;
+  onSendMessage: (message: string) => void;
+  onAttachFile?: (file: File) => void;
+  promptPlaceholder?: string;
 }
 
-const SessionDialog: React.FC<SessionDialogProps> = ({ messages, isLoading }) => {
+const SessionDialog: React.FC<SessionDialogProps> = ({ 
+  messages, 
+  isLoading = false,
+  onSendMessage,
+  onAttachFile,
+  promptPlaceholder = "Type your message here..."
+}) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const promptRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    // Try to scroll to prompt first, then to messages end
+    if (promptRef.current) {
+      promptRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    } else {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   };
 
   useEffect(() => {
@@ -84,6 +100,17 @@ const SessionDialog: React.FC<SessionDialogProps> = ({ messages, isLoading }) =>
             </IonCard>
           )}
           <div ref={messagesEndRef} />
+          
+          {/* Prompt Component positioned after last message */}
+          <div ref={promptRef}>
+            <PromptComponent
+              onSendMessage={onSendMessage}
+              onAttachFile={onAttachFile}
+              isLoading={isLoading}
+              placeholder={promptPlaceholder}
+              autoFocus={messages.length === 0} // Only auto-focus if no messages yet
+            />
+          </div>
         </div>
     </div>
   );

@@ -6,7 +6,6 @@ import AuthButtons from '../components/AuthButtons';
 import SessionHistory from '../components/SessionHistory';
 import SessionDialog from '../components/SessionDialog';
 import ArtifactWindow from '../components/ArtifactWindow';
-import PromptComponent from '../components/PromptComponent';
 import AgentSelector from '../components/AgentSelector';
 import AgentIndicator from '../components/AgentIndicator';
 import { useSupabase } from '../context/SupabaseContext';
@@ -513,11 +512,14 @@ const Home: React.FC = () => {
               selectedSessionId={selectedSessionId}
             />
 
-            {/* Center Panel - Dialog */}
+            {/* Center Panel - Dialog with integrated prompt */}
             <div style={{ flex: 1, overflow: 'hidden' }}>
               <SessionDialog
                 messages={messages}
                 isLoading={isLoading}
+                onSendMessage={handleSendMessage}
+                onAttachFile={handleAttachFile}
+                promptPlaceholder="Ask RFPEZ.AI about RFPs, proposals, or document analysis..."
               />
             </div>
 
@@ -528,14 +530,6 @@ const Home: React.FC = () => {
               onView={(artifact) => console.log('View:', artifact)}
             />
           </div>
-
-          {/* Bottom Panel - Prompt */}
-          <PromptComponent
-            onSendMessage={handleSendMessage}
-            onAttachFile={handleAttachFile}
-            isLoading={isLoading}
-            placeholder="Ask RFPEZ.AI about RFPs, proposals, or document analysis..."
-          />
         </div>
 
         {/* Agent Selector Modal */}
