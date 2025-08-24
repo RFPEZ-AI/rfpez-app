@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonActionSheet } from '@ionic/react';
-import { add, chatbubbleOutline, chevronForward, chevronDown, trash } from 'ionicons/icons';
+import { create, chatbubbleOutline, chevronForward, chevronDown, trash } from 'ionicons/icons';
 import { useIsMobile } from '../utils/useMediaQuery';
 
 interface Session {
@@ -94,17 +94,17 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
         {isExpanded ? (
           <IonButton 
             expand="block" 
-            fill="outline" 
+            fill="clear" 
             onClick={onNewSession}
             title="Create new session"
             style={{ flex: 1, order: 2 }}
           >
-            <IonIcon icon={add} slot="start" />
+            <IonIcon icon={create} slot="start" />
             New Session
           </IonButton>
         ) : (
           <IonButton 
-            fill="solid" 
+            fill="clear" 
             onClick={onNewSession}
             title="Create new session"
             style={{ 
@@ -113,7 +113,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
               order: 1
             }}
           >
-            <IonIcon icon={add} />
+            <IonIcon icon={create} />
           </IonButton>
         )}
       </div>
