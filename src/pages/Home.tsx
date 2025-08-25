@@ -64,12 +64,16 @@ const Home: React.FC = () => {
     console.log('User details:', user);
     console.log('UserProfile details:', userProfile);
     
-    // Check if we have basic authentication (session and user)
+    // Always load default agent and show initial prompt, regardless of authentication
+    if (!supabaseLoading) {
+      console.log('Loading default agent for all users...');
+      loadDefaultAgentWithPrompt();
+    }
+    
+    // Check if we have basic authentication (session and user) for loading sessions
     if (isAuthenticated && !supabaseLoading && user) {
       console.log('User is authenticated, loading sessions...');
       loadUserSessions();
-      // Load default agent and show initial prompt to start conversation
-      loadDefaultAgentWithPrompt();
       
       // If we don't have a user profile yet, that's OK - the profile loading might be in progress
       if (!userProfile) {
@@ -482,27 +486,14 @@ const Home: React.FC = () => {
             padding: '0 8px',
             minWidth: 0 // Allow shrinking
           }}>
-            {isAuthenticated && userId ? (
-              <div style={{ maxWidth: '100%' }}>
-                <AgentIndicator
-                  agent={currentAgent}
-                  onSwitchAgent={handleShowAgentSelector}
-                  compact={true}
-                  showSwitchButton={true}
-                />
-              </div>
-            ) : (
-              <IonButton 
-                fill="outline" 
-                size="small"
-                onClick={handleShowAgentSelector}
-                disabled={true}
-                style={{ whiteSpace: 'nowrap' }}
-              >
-                <IonIcon icon={swapHorizontalOutline} slot="start" />
-                {isMobile ? 'Agent' : 'Sign in for Agents'}
-              </IonButton>
-            )}
+            <div style={{ maxWidth: '100%' }}>
+              <AgentIndicator
+                agent={currentAgent}
+                onSwitchAgent={handleShowAgentSelector}
+                compact={true}
+                showSwitchButton={true}
+              />
+            </div>
           </div>
           
           {/* Right section - Auth buttons */}
@@ -553,17 +544,16 @@ const Home: React.FC = () => {
         </div>
 
         {/* Agent Selector Modal */}
-        {userId && (
-          <AgentSelector
-            isOpen={showAgentSelector}
-            onClose={() => setShowAgentSelector(false)}
-            sessionId={currentSessionId || 'preview'} // Use 'preview' when no session
-            supabaseUserId={userId}
-            currentAgent={currentAgent}
-            onAgentChanged={handleAgentChanged}
-            hasProperAccountSetup={false} // TODO: Implement proper account setup check
-          />
-        )}
+        <AgentSelector
+          isOpen={showAgentSelector}
+          onClose={() => setShowAgentSelector(false)}
+          sessionId={currentSessionId || 'preview'} // Use 'preview' when no session
+          supabaseUserId={userId || ''} // Pass empty string for non-authenticated users
+          currentAgent={currentAgent}
+          onAgentChanged={handleAgentChanged}
+          hasProperAccountSetup={false} // TODO: Implement proper account setup check
+          isAuthenticated={isAuthenticated} // Pass authentication status
+        />
       </IonContent>
     </IonPage>
   );

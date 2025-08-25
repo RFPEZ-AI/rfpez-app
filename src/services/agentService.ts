@@ -39,10 +39,10 @@ export class AgentService {
   }
 
   /**
-   * Get agents available to user (filters out restricted agents based on account setup)
+   * Get agents available to user (filters based on authentication and account setup)
    */
-  static async getAvailableAgents(hasProperAccountSetup = false): Promise<Agent[]> {
-    console.log('AgentService.getAvailableAgents called with hasProperAccountSetup:', hasProperAccountSetup);
+  static async getAvailableAgents(hasProperAccountSetup = false, isAuthenticated = false): Promise<Agent[]> {
+    console.log('AgentService.getAvailableAgents called with hasProperAccountSetup:', hasProperAccountSetup, 'isAuthenticated:', isAuthenticated);
     
     const { data, error } = await supabase
       .from('agents')
@@ -55,10 +55,19 @@ export class AgentService {
       return [];
     }
 
+    let availableAgents = data || [];
+
+    // If user is not authenticated, they can only see the default agent
+    if (!isAuthenticated) {
+      availableAgents = availableAgents.filter(agent => agent.is_default);
+      console.log('Non-authenticated user - showing only default agent:', availableAgents);
+      return availableAgents;
+    }
+
     // Filter out restricted agents if user doesn't have proper account setup
-    const availableAgents = hasProperAccountSetup 
-      ? data || []
-      : (data || []).filter(agent => !agent.is_restricted);
+    if (!hasProperAccountSetup) {
+      availableAgents = availableAgents.filter(agent => !agent.is_restricted);
+    }
 
     console.log('Available agents filtered:', availableAgents);
     return availableAgents;
