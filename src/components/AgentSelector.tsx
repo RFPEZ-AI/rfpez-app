@@ -72,15 +72,10 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
     try {
       setLoading(true);
       
-      if (isAuthenticated) {
-        // For authenticated users, show agents based on account setup
-        const availableAgents = await AgentService.getAvailableAgents(hasProperAccountSetup, isAuthenticated);
-        setAgents(availableAgents);
-      } else {
-        // For non-authenticated users, show all agents but only allow selection of default
-        const allAgents = await AgentService.getActiveAgents();
-        setAgents(allAgents);
-      }
+      // Always load all active agents regardless of authentication status
+      // We'll handle visibility/interaction in the UI
+      const allAgents = await AgentService.getActiveAgents();
+      setAgents(allAgents);
     } catch (error) {
       console.error('Error loading agents:', error);
       setToastMessage('Failed to load agents');
@@ -95,9 +90,17 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
       return;
     }
 
-    // Check if user is authenticated or trying to select the default agent
-    if (!isAuthenticated && !agent.is_default) {
-      setToastMessage('Please sign in to access other agents');
+    // Check if user can access this agent
+    const canAccess = isAuthenticated ? 
+      (agent.is_restricted ? hasProperAccountSetup : true) : 
+      !agent.is_restricted; // Non-authenticated users can access any non-restricted agent
+
+    if (!canAccess) {
+      if (!isAuthenticated) {
+        setToastMessage('This agent requires account setup. Please sign in to access advanced features.');
+      } else if (agent.is_restricted && !hasProperAccountSetup) {
+        setToastMessage('This agent requires account setup and billing. Please complete onboarding first.');
+      }
       setShowToast(true);
       return;
     }
@@ -166,8 +169,8 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
             <IonText color="medium">
               <p style={{ padding: '16px', margin: 0, textAlign: 'center' }}>
                 {isAuthenticated 
-                  ? 'Choose the AI agent that best fits your needs. Each agent is specialized for different types of assistance.'
-                  : 'You can interact with the Solutions agent. Sign in to access additional specialized agents.'
+                  ? `Choose the AI agent that best fits your needs. ${hasProperAccountSetup ? 'All agents are available.' : 'Some premium agents require billing setup.'}`
+                  : 'Choose from our AI agents. Premium agents with advanced features require account setup.'
                 }
               </p>
             </IonText>
@@ -200,15 +203,19 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                   agents.map((agent) => {
                     const isCurrentAgent = agent.id === currentAgent?.agent_id;
                     const isSwitching = switching === agent.id;
-                    const isSelectable = isAuthenticated || agent.is_default;
+                    
+                    // Determine if user can access this agent
+                    const canAccess = isAuthenticated ? 
+                      (agent.is_restricted ? hasProperAccountSetup : true) : 
+                      !agent.is_restricted; // Non-authenticated users can access any non-restricted agent
                     
                     return (
                       <IonCol size="12" sizeMd="6" sizeLg="4" key={agent.id}>
                         <IonCard 
-                          className={`agent-card ${isCurrentAgent ? 'current-agent' : ''} ${!isSelectable ? 'disabled-agent' : ''}`}
-                          button={isSelectable}
-                          onClick={isSelectable ? () => handleAgentSelect(agent) : undefined}
-                          disabled={isSwitching || !isSelectable}
+                          className={`agent-card ${isCurrentAgent ? 'current-agent' : ''} ${!canAccess ? 'disabled-agent' : ''}`}
+                          button={canAccess}
+                          onClick={canAccess ? () => handleAgentSelect(agent) : undefined}
+                          disabled={isSwitching || !canAccess}
                         >
                           <IonCardHeader>
                             <div className="agent-card-header">
@@ -257,10 +264,14 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                                 <small>&quot;{agent.initial_prompt}&quot;</small>
                               </IonText>
                             </div>
-                            {!isSelectable && !isAuthenticated && (
-                              <div className="sign-in-notice">
+                            {!canAccess && (
+                              <div className="access-notice">
                                 <IonText color="medium">
-                                  <small>Sign in to access this agent</small>
+                                  <small>
+                                    {!isAuthenticated ? 'Requires account setup - Sign in to access' : 
+                                     agent.is_restricted ? 'Requires account setup and billing' : 
+                                     'Access restricted'}
+                                  </small>
                                 </IonText>
                               </div>
                             )}
