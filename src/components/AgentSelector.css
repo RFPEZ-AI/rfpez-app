@@ -25,11 +25,23 @@
 .agent-card.disabled-agent {
   opacity: 0.6;
   cursor: not-allowed;
+  position: relative;
 }
 
 .agent-card.disabled-agent:hover {
   transform: none;
   box-shadow: none;
+}
+
+.agent-card.disabled-agent::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(128, 128, 128, 0.1);
+  pointer-events: none;
 }
 
 .agent-card-header {
@@ -113,12 +125,22 @@
   z-index: 10;
 }
 
-.sign-in-notice {
+.sign-in-notice,
+.access-notice {
   margin-top: 8px;
   padding: 6px 8px;
   background: var(--ion-color-warning-tint);
   border-radius: 6px;
   text-align: center;
+}
+
+.access-notice {
+  background: var(--ion-color-medium-tint);
+}
+
+.default-indicator,
+.restricted-indicator {
+  font-size: 16px;
 }
 
 /* Responsive adjustments */
