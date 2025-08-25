@@ -155,7 +155,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
         <IonHeader>
           <IonToolbar>
             <IonTitle>
-              {sessionId === 'preview' ? 'Preview AI Agent' : 'Select AI Agent'}
+              {sessionId === 'preview' ? 'Preview AI Agents' : 'Select AI Agent'}
             </IonTitle>
             <IonButtons slot="end">
               <IonButton fill="clear" onClick={onClose}>
@@ -169,9 +169,13 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
             <IonText color="medium">
               <p style={{ padding: '16px', margin: 0, textAlign: 'center' }}>
                 {isAuthenticated 
-                  ? `Choose the AI agent that best fits your needs. ${hasProperAccountSetup ? 'All agents are available.' : 'Some premium agents require billing setup.'}`
-                  : 'Choose from our AI agents. Premium agents with advanced features require account setup.'
+                  ? `RFP EZ has a team of specialized agents to get your sourcing job done EZ.  
+                  We'll try to guide you to the right agent for each step in the process, 
+                  but you can always select an agent if the need arrises.  For exanple, the ''Support Agent'' can be very helpful. 
+                  ${hasProperAccountSetup ? 'All agents are available.' : 'Premium agents require billing setup.'}`
+                  : 'Choose from our AI agents. Premium agents with advanced features require billaccount setup.'
                 }
+
               </p>
             </IonText>
 
