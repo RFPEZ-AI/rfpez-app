@@ -1,12 +1,7 @@
 # GitHub Actions Deployment Guide for Azure Static Web Apps
 
 ## Overview
-This workflow file wi### 2. Update Auth0 Callback URLs
-After deployment, add your Static Web App URLs to Auth0:
-- `https://your-app-name.azurestaticapps.net/callback`
-- `https://your-app-name.azurestaticapps.net` (logout URL)
-
-### 3. Configure Custom Domain (Optional)omatically deploy your RFPEZ.AI app to Azure Static Web Apps whenever you push to the master branch or create a pull request.
+This workflow file automatically deploys your RFPEZ.AI app to Azure Static Web Apps whenever you push to the master branch or create a pull request.
 
 ## Required GitHub Secrets
 
@@ -21,13 +16,6 @@ You need to configure the following secrets in your GitHub repository:
 - **Value**: Get this from your Azure Static Web App resource
   - Go to Azure Portal → Your Static Web App → Manage deployment token
   - Copy the deployment token
-
-#### Auth0 Configuration
-- **Name**: `REACT_APP_AUTH0_DOMAIN`
-- **Value**: Your Auth0 domain (e.g., `your-tenant.us.auth0.com`)
-
-- **Name**: `REACT_APP_AUTH0_CLIENT_ID`
-- **Value**: Your Auth0 application client ID
 
 #### Supabase Configuration
 - **Name**: `REACT_APP_SUPABASE_URL`
@@ -106,18 +94,19 @@ After your Static Web App is deployed, you **must** configure the environment va
 az staticwebapp appsettings set \
   --name swa-rfpez-ai \
   --resource-group rg-rfpez-ai \
-  --setting-names REACT_APP_AUTH0_DOMAIN=dev-jt6bdlf3wlirw8fj.us.auth0.com \
-                  REACT_APP_AUTH0_CLIENT_ID=xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM \
-                  REACT_APP_SUPABASE_URL=https://jxlutaztoukwbbgtoulc.supabase.co \
+  --setting-names REACT_APP_SUPABASE_URL=https://jxlutaztoukwbbgtoulc.supabase.co \
                   REACT_APP_SUPABASE_ANON_KEY=your-supabase-anon-key
 ```
 
-### 2. Update Auth0 Callback URLs
-After deployment, add your Static Web App URLs to Auth0:
-- `https://your-app-name.azurestaticapps.net/callback`
-- `https://your-app-name.azurestaticapps.net` (logout URL)
+### 2. Configure Supabase Authentication
+After deployment, add your Static Web App URLs to Supabase:
+1. Go to Supabase Dashboard → Authentication → URL Configuration
+2. Add your site URL: `https://your-app-name.azurestaticapps.net`
+3. Add redirect URLs:
+   - `https://your-app-name.azurestaticapps.net`
+   - `https://your-app-name.azurestaticapps.net/**` (for OAuth callbacks)
 
-### 2. Configure Custom Domain (Optional)
+### 3. Configure Custom Domain (Optional)
 ```bash
 az staticwebapp hostname set \
   --name swa-rfpez-ai \
@@ -145,8 +134,6 @@ az staticwebapp hostname set \
    Go to: GitHub Repository → Settings → Secrets and variables → Actions
    
    Ensure these Repository Secrets exist:
-   - REACT_APP_AUTH0_DOMAIN = dev-jt6bdlf3wlirw8fj.us.auth0.com
-   - REACT_APP_AUTH0_CLIENT_ID = xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM  
    - REACT_APP_SUPABASE_URL = https://jxlutaztoukwbbgtoulc.supabase.co
    - REACT_APP_SUPABASE_ANON_KEY = your-supabase-anon-key
    ```
@@ -156,8 +143,6 @@ az staticwebapp hostname set \
    Go to: Azure Portal → Your Static Web App → Configuration → Application Settings
    
    Click "Add" for each environment variable:
-   - Name: REACT_APP_AUTH0_DOMAIN, Value: dev-jt6bdlf3wlirw8fj.us.auth0.com
-   - Name: REACT_APP_AUTH0_CLIENT_ID, Value: xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM
    - Name: REACT_APP_SUPABASE_URL, Value: https://jxlutaztoukwbbgtoulc.supabase.co  
    - Name: REACT_APP_SUPABASE_ANON_KEY, Value: your-supabase-anon-key
    
@@ -169,8 +154,6 @@ az staticwebapp hostname set \
    az staticwebapp appsettings set \
      --name your-static-web-app-name \
      --setting-names \
-     REACT_APP_AUTH0_DOMAIN=dev-jt6bdlf3wlirw8fj.us.auth0.com \
-     REACT_APP_AUTH0_CLIENT_ID=xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM \
      REACT_APP_SUPABASE_URL=https://jxlutaztoukwbbgtoulc.supabase.co \
      REACT_APP_SUPABASE_ANON_KEY=your-supabase-anon-key
    ```

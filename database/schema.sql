@@ -4,10 +4,10 @@
 -- Enable Row Level Security
 ALTER DEFAULT PRIVILEGES GRANT ALL ON TABLES TO anon, authenticated;
 
--- 1. USERS table (modified to work with Auth0)
+-- 1. USER PROFILES table (using Supabase Auth)
 CREATE TABLE IF NOT EXISTS public.user_profiles (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
-  auth0_id TEXT UNIQUE NOT NULL, -- Auth0 user ID (sub claim)
+  supabase_user_id UUID REFERENCES auth.users(id) UNIQUE NOT NULL, -- Supabase user ID
   email TEXT,
   full_name TEXT,
   avatar_url TEXT,
@@ -82,38 +82,74 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_message_id ON public.artifacts(message_
 
 -- User Profiles
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own profile" ON public.user_profiles FOR SELECT USING (auth.uid() = id);
-CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE USING (auth.uid() = id);
-CREATE POLICY "Users can insert own profile" ON public.user_profiles FOR INSERT WITH CHECK (auth.uid() = id);
+CREATE POLICY "Users can view own profile" ON public.user_profiles FOR SELECT USING (auth.uid() = supabase_user_id);
+CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE USING (auth.uid() = supabase_user_id);
+CREATE POLICY "Users can insert own profile" ON public.user_profiles FOR INSERT WITH CHECK (auth.uid() = supabase_user_id);
 
 -- Sessions
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own sessions" ON public.sessions FOR SELECT USING (auth.uid() = user_id);
-CREATE POLICY "Users can create own sessions" ON public.sessions FOR INSERT WITH CHECK (auth.uid() = user_id);
-CREATE POLICY "Users can update own sessions" ON public.sessions FOR UPDATE USING (auth.uid() = user_id);
-CREATE POLICY "Users can delete own sessions" ON public.sessions FOR DELETE USING (auth.uid() = user_id);
+CREATE POLICY "Users can view own sessions" ON public.sessions FOR SELECT 
+  USING (user_id IN (SELECT id FROM public.user_profiles WHERE supabase_user_id = auth.uid()));
+CREATE POLICY "Users can create own sessions" ON public.sessions FOR INSERT 
+  WITH CHECK (user_id IN (SELECT id FROM public.user_profiles WHERE supabase_user_id = auth.uid()));
+CREATE POLICY "Users can update own sessions" ON public.sessions FOR UPDATE 
+  USING (user_id IN (SELECT id FROM public.user_profiles WHERE supabase_user_id = auth.uid()));
+CREATE POLICY "Users can delete own sessions" ON public.sessions FOR DELETE 
+  USING (user_id IN (SELECT id FROM public.user_profiles WHERE supabase_user_id = auth.uid()));
 
 -- Messages
 ALTER TABLE public.messages ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view messages from own sessions" ON public.messages FOR SELECT 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 CREATE POLICY "Users can create messages in own sessions" ON public.messages FOR INSERT 
-  WITH CHECK (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  WITH CHECK (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 CREATE POLICY "Users can update messages in own sessions" ON public.messages FOR UPDATE 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 CREATE POLICY "Users can delete messages from own sessions" ON public.messages FOR DELETE 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 
 -- Artifacts
 ALTER TABLE public.artifacts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view artifacts from own sessions" ON public.artifacts FOR SELECT 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 CREATE POLICY "Users can create artifacts in own sessions" ON public.artifacts FOR INSERT 
-  WITH CHECK (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  WITH CHECK (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 CREATE POLICY "Users can update artifacts in own sessions" ON public.artifacts FOR UPDATE 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 CREATE POLICY "Users can delete artifacts from own sessions" ON public.artifacts FOR DELETE 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING (session_id IN (
+    SELECT s.id FROM public.sessions s 
+    JOIN public.user_profiles up ON s.user_id = up.id 
+    WHERE up.supabase_user_id = auth.uid()
+  ));
 
 -- Session Artifacts (junction table)
 ALTER TABLE public.session_artifacts ENABLE ROW LEVEL SECURITY;

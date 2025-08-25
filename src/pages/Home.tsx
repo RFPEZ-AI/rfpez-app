@@ -159,8 +159,8 @@ const Home: React.FC = () => {
 
   // Load sessions from Supabase
   const loadUserSessions = async () => {
-    if (!isAuthenticated || !userId || !userProfile) {
-      console.log('User not authenticated or profile not ready, skipping session load');
+    if (!isAuthenticated || !userId) {
+      console.log('User not authenticated or userId not available, skipping session load');
       return;
     }
     
@@ -215,8 +215,8 @@ const Home: React.FC = () => {
   // Create a new session in Supabase with current agent
   const createNewSession = async (): Promise<string | null> => {
     console.log('Creating new session, auth state:', { isAuthenticated, user: !!user, userProfile: !!userProfile });
-    if (!isAuthenticated || !userId || !userProfile) {
-      console.log('Not authenticated or profile not ready, skipping session creation');
+    if (!isAuthenticated || !userId) {
+      console.log('Not authenticated or userId not available, skipping session creation');
       return null;
     }
     
@@ -253,7 +253,7 @@ const Home: React.FC = () => {
 
     try {
       // For authenticated users, save to Supabase
-      if (isAuthenticated && user && userProfile) {
+      if (isAuthenticated && user) {
         console.log('Authenticated user sending message, currentSessionId:', activeSessionId);
         // Create session if none exists
         if (!activeSessionId) {
@@ -323,7 +323,7 @@ const Home: React.FC = () => {
         setIsLoading(false);
 
         // Save AI response to database if authenticated - use activeSessionId instead of currentSessionId
-        if (isAuthenticated && userId && userProfile && activeSessionId) {
+        if (isAuthenticated && userId && activeSessionId) {
           try {
             console.log('Saving AI response to session:', activeSessionId);
             const savedAiMessage = await DatabaseService.addMessage(
@@ -340,7 +340,7 @@ const Home: React.FC = () => {
             console.error('Failed to save AI message:', error);
           }
         } else {
-          console.log('AI response not saved - auth:', isAuthenticated, 'user:', !!user, 'userProfile:', !!userProfile, 'sessionId:', activeSessionId);
+          console.log('AI response not saved - auth:', isAuthenticated, 'user:', !!user, 'sessionId:', activeSessionId);
         }
       }, 1500);
     } catch (error) {
@@ -424,7 +424,7 @@ const Home: React.FC = () => {
     setArtifacts(prev => [...prev, newArtifact]);
 
     // Save to Supabase if authenticated and session exists
-    if (isAuthenticated && user && userProfile && currentSessionId) {
+    if (isAuthenticated && user && currentSessionId) {
       try {
         // Upload file to Supabase storage
         const storagePath = await DatabaseService.uploadFile(file, currentSessionId);

@@ -180,7 +180,7 @@ export class DatabaseService {
   // Message operations
   static async addMessage(
     sessionId: string, 
-    auth0UserId: string,
+    supabaseUserId: string,
     content: string, 
     role: 'user' | 'assistant' | 'system',
     agentId?: string,
@@ -190,7 +190,7 @@ export class DatabaseService {
   ): Promise<Message | null> {
     console.log('DatabaseService.addMessage called with:', {
       sessionId,
-      auth0UserId,
+      supabaseUserId,
       content,
       role,
       agentId,
@@ -203,13 +203,13 @@ export class DatabaseService {
     const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
-      .eq('auth0_id', auth0UserId)
+      .eq('supabase_user_id', supabaseUserId)
       .single();
 
     console.log('User profile lookup:', { userProfile, profileError });
 
     if (profileError || !userProfile) {
-      console.error('User profile not found for Auth0 ID:', auth0UserId);
+      console.error('User profile not found for Supabase user ID:', supabaseUserId);
       return null;
     }
 
@@ -469,12 +469,12 @@ async function exampleUsage() {
     }
 
     // Add user message
-    await DatabaseService.addMessage(session.id, auth0UserId, 'Analyze this RFP document', 'user');
+    await DatabaseService.addMessage(session.id, supabaseUserId, 'Analyze this RFP document', 'user');
 
     // Add AI response with metadata
     await DatabaseService.addMessage(
       session.id,
-      auth0UserId,
+      supabaseUserId,
       'I\'ve analyzed the document...',
       'assistant',
       undefined, // agentId

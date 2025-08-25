@@ -25,74 +25,87 @@ export type SupabaseCtx = {
 
 const SupabaseContext = createContext<SupabaseCtx | undefined>(undefined);
 
-export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }) => {
+export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+  const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile>(null);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
     console.log('SupabaseProvider useEffect: Starting initialization');
 
-    const loadUserProfile = async (userId: string) => {
+    const loadUserProfile = async (user: User) => {
       try {
-        console.log('Loading user profile for:', userId);
+        console.log('Loading user profile for:', user.id);
         
-        const { data: profile, error } = await supabase
+        // First try to find existing profile
+        const { data: existingProfile, error: fetchError } = await supabase
           .from('user_profiles')
           .select('*')
-          .eq('supabase_user_id', userId)
-          .single();
+          .eq('supabase_user_id', user.id)
+          .maybeSingle();
 
-        if (error && error.code === 'PGRST116') {
-          // Profile doesn't exist, create it
-          console.log('Creating new user profile');
-          const user = session?.user;
-          const { data: newProfile, error: createError } = await supabase
-            .from('user_profiles')
-            .insert({
-              supabase_user_id: userId,
-              email: user?.email,
-              full_name: user?.user_metadata?.full_name || user?.user_metadata?.name,
-              avatar_url: user?.user_metadata?.avatar_url || user?.user_metadata?.picture,
-              last_login: new Date().toISOString()
-            })
-            .select()
-            .single();
+        if (fetchError) {
+          console.error('Error fetching user profile:', fetchError);
+          // Don't return here, try to create profile instead
+        }
 
-          if (createError) {
-            console.error('Error creating user profile:', createError);
-            // If column doesn't exist, we need to run migration
-            if (createError.message?.includes('column "supabase_user_id" of relation "user_profiles" does not exist')) {
-              console.error('Migration required: supabase_user_id column does not exist. Please run the database migration script.');
-              setUserProfile(null);
-              return;
-            }
-          } else {
-            console.log('Successfully created user profile:', newProfile);
-            setUserProfile(newProfile);
-          }
-        } else if (!error) {
+        if (existingProfile) {
+          console.log('Found existing user profile:', existingProfile);
+          setUserProfile(existingProfile);
+          
           // Update last login
-          console.log('Found existing user profile, updating last login');
-          const { data: updatedProfile } = await supabase
+          const { error: updateError } = await supabase
             .from('user_profiles')
             .update({ last_login: new Date().toISOString() })
-            .eq('supabase_user_id', userId)
-            .select()
-            .single();
-          
-          setUserProfile(updatedProfile || profile);
-        } else {
-          console.error('Error loading user profile:', error);
-          if (error.message?.includes('column "supabase_user_id" of relation "user_profiles" does not exist')) {
-            console.error('Migration required: supabase_user_id column does not exist. Please run the database migration script.');
+            .eq('supabase_user_id', user.id);
+            
+          if (updateError) {
+            console.error('Error updating last login:', updateError);
           }
-          setUserProfile(null);
+          return;
+        }
+
+        // Create new profile if none exists
+        console.log('Creating new user profile for:', user.email);
+        const newProfile = {
+          supabase_user_id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
+          avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+          last_login: new Date().toISOString(),
+          created_at: new Date().toISOString()
+        };
+
+        const { data: newUserProfile, error: createError } = await supabase
+          .from('user_profiles')
+          .insert([newProfile])
+          .select()
+          .single();
+
+        if (createError) {
+          console.error('Error creating user profile:', createError);
+          // Set a minimal profile so the app can still function
+          setUserProfile({
+            supabase_user_id: user.id,
+            email: user.email,
+            full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
+            avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+          });
+        } else {
+          console.log('Successfully created user profile:', newUserProfile);
+          setUserProfile(newUserProfile);
         }
       } catch (error) {
-        console.error('Error in loadUserProfile:', error);
-        setUserProfile(null);
+        console.error('Unexpected error in loadUserProfile:', error);
+        // Set a minimal profile as fallback
+        setUserProfile({
+          supabase_user_id: user.id,
+          email: user.email,
+          full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
+          avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+        });
       }
     };
 
@@ -112,11 +125,16 @@ export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }
           
           // Try to exchange the code for a session
           try {
-            const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(urlParams.get('code')!);
-            if (exchangeError) {
-              console.error('❌ Error exchanging code for session:', exchangeError);
+            const authCode = urlParams.get('code');
+            if (authCode) {
+              const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
+              if (exchangeError) {
+                console.error('❌ Error exchanging code for session:', exchangeError);
+              } else {
+                console.log('✅ Successfully exchanged code for session:', data);
+              }
             } else {
-              console.log('✅ Successfully exchanged code for session:', data);
+              console.error('❌ No auth code found in URL parameters');
             }
           } catch (exchangeError) {
             console.error('❌ Exception during code exchange:', exchangeError);
@@ -155,15 +173,14 @@ export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }
         
         if (active) {
           setSession(session || null);
-          setLoading(false); // Set loading to false regardless
+          setUser(session?.user || null);
+          setLoading(false);
           console.log('Set loading to false, session set to:', session ? 'valid session' : 'null');
           
-          // Load user profile asynchronously (don't block the loading state)
+          // Load user profile if we have a user
           if (session?.user) {
             console.log('Loading user profile for user:', session.user.id);
-            loadUserProfile(session.user.id).catch(error => {
-              console.error('Error loading user profile during init:', error);
-            });
+            await loadUserProfile(session.user);
           } else {
             console.log('No session found, not loading user profile');
           }
@@ -172,6 +189,7 @@ export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }
         console.error('Error in auth initialization:', error);
         if (active) {
           setSession(null);
+          setUser(null);
           setLoading(false);
           console.log('Error occurred, set loading to false');
         }
@@ -205,13 +223,14 @@ export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }
         
         if (active) {
           setSession(session);
-          setLoading(false); // Always set loading to false when auth state changes
+          setUser(session?.user || null);
+          setLoading(false);
           console.log('Auth state updated - Loading set to false, Session:', session ? 'Present' : 'Null');
           
-          // Load user profile asynchronously (don't block the loading state)
+          // Load user profile asynchronously
           if (session?.user) {
             console.log('Loading user profile for authenticated user:', session.user.id);
-            loadUserProfile(session.user.id).catch(error => {
+            loadUserProfile(session.user).catch(error => {
               console.error('Error loading user profile during auth change:', error);
             });
           } else {
@@ -283,7 +302,7 @@ export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }
     () => ({ 
       supabase,
       session,
-      user: session?.user || null,
+      user,
       loading,
       userProfile,
       signIn,
@@ -293,6 +312,11 @@ export const SupabaseProvider: React.FC<React.PropsWithChildren> = ({ children }
     }),
     [session, loading, userProfile]
   );
+
+  // Don't render children until we've checked for existing sessions
+  if (loading) {
+    return <div>Loading...</div>;
+  }
 
   return <SupabaseContext.Provider value={value}>{children}</SupabaseContext.Provider>;
 };
