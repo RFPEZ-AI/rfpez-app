@@ -24,6 +24,11 @@ You need to configure the following secrets in your GitHub repository:
 - **Name**: `REACT_APP_SUPABASE_ANON_KEY`
 - **Value**: Your Supabase anonymous/public key
 
+#### Claude AI Configuration
+- **Name**: `REACT_APP_CLAUDE_API_KEY`
+- **Value**: Your Claude API key from Anthropic
+- **Note**: Required for AI responses. Get from https://console.anthropic.com/
+
 ## Deployment Steps
 
 ### Option 1: Create Azure Static Web App via Portal (Recommended)
@@ -80,10 +85,9 @@ After your Static Web App is deployed, you **must** configure the environment va
 3. Click **+ Add** to add each environment variable:
 
 **Add these Application Settings:**
-- **Name**: `REACT_APP_AUTH0_DOMAIN`, **Value**: `dev-jt6bdlf3wlirw8fj.us.auth0.com`
-- **Name**: `REACT_APP_AUTH0_CLIENT_ID`, **Value**: `xFkK50LJUeFSLwrbObCXi2mPnUW8aoWM`
 - **Name**: `REACT_APP_SUPABASE_URL`, **Value**: `https://jxlutaztoukwbbgtoulc.supabase.co`
 - **Name**: `REACT_APP_SUPABASE_ANON_KEY`, **Value**: `your-supabase-anon-key`
+- **Name**: `REACT_APP_CLAUDE_API_KEY`, **Value**: `your-claude-api-key`
 
 4. Click **Save** to apply the configuration
 5. The app will automatically restart with the new environment variables

@@ -6,10 +6,14 @@ import SessionDialog from '../components/SessionDialog';
 import ArtifactWindow from '../components/ArtifactWindow';
 import AgentSelector from '../components/AgentSelector';
 import AgentIndicator from '../components/AgentIndicator';
+// Only import in development mode to avoid unused import warnings
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+import ClaudeTestComponent from '../components/ClaudeTestComponent';
 import { useSupabase } from '../context/SupabaseContext';
 import { useIsMobile } from '../utils/useMediaQuery';
 import DatabaseService from '../services/database';
 import { AgentService } from '../services/agentService';
+import { ClaudeService } from '../services/claudeService';
 import type { SessionActiveAgent } from '../types/database';
 
 // Local interfaces for UI compatibility
@@ -300,42 +304,84 @@ const Home: React.FC = () => {
         console.log('User not authenticated, messages not saved to Supabase');
       }
 
-      // Simulate AI response
-      setTimeout(async () => {
-        // Provide a contextual response based on whether this is a follow-up to the initial prompt
-        const isFirstUserMessage = messages.length <= 2; // Initial prompt + user's first message
+      // Generate AI response using Claude API
+      try {
+        console.log('Generating AI response with Claude API...');
         
-        let aiResponse: string;
-        if (isFirstUserMessage && currentAgent?.agent_name === 'Solutions') {
-          // First response from Solutions agent - acknowledge and ask follow-up
-          aiResponse = "Great! I'd be happy to help you with competitive sourcing. Could you tell me more about what type of product or service you're looking to source? This will help me provide you with the most relevant guidance.";
-        } else {
-          // Default response for other situations
-          aiResponse = "I understand your request. Let me help you with that. Could you provide more details so I can assist you better?";
+        // Get conversation history for context
+        const conversationHistory = messages
+          .filter(msg => msg.id !== 'initial-prompt') // Skip initial prompts
+          .map(msg => ({
+            role: (msg.isUser ? 'user' : 'assistant') as 'user' | 'assistant',
+            content: msg.content
+          }))
+          .slice(-10); // Keep last 10 messages for context
+        
+        // Use current agent or get default agent if none selected
+        let agentForResponse = currentAgent;
+        if (!agentForResponse) {
+          const defaultAgent = await AgentService.getDefaultAgent();
+          if (defaultAgent) {
+            agentForResponse = {
+              agent_id: defaultAgent.id,
+              agent_name: defaultAgent.name,
+              agent_initial_prompt: defaultAgent.initial_prompt,
+              agent_instructions: defaultAgent.instructions
+            };
+          }
         }
+
+        if (!agentForResponse) {
+          throw new Error('No agent available for response generation');
+        }
+
+        // Convert SessionActiveAgent to Agent type for Claude service
+        const agentForClaude = {
+          id: agentForResponse.agent_id,
+          name: agentForResponse.agent_name,
+          instructions: agentForResponse.agent_instructions,
+          initial_prompt: agentForResponse.agent_initial_prompt,
+          description: '',
+          avatar_url: '',
+          is_active: true,
+          is_default: false,
+          is_restricted: false,
+          sort_order: 0,
+          created_at: '',
+          updated_at: '',
+          metadata: {}
+        };
+
+        const claudeResponse = await ClaudeService.generateResponse(
+          content,
+          agentForClaude,
+          conversationHistory
+        );
         
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: aiResponse,
+          content: claudeResponse.content,
           isUser: false,
           timestamp: new Date(),
-          agentName: currentAgent?.agent_name
+          agentName: agentForResponse.agent_name
         };
         
         setMessages(prev => [...prev, aiMessage]);
         setIsLoading(false);
 
-        // Save AI response to database if authenticated - use activeSessionId instead of currentSessionId
+        // Save AI response to database if authenticated
         if (isAuthenticated && userId && activeSessionId) {
           try {
             console.log('Saving AI response to session:', activeSessionId);
             const savedAiMessage = await DatabaseService.addMessage(
               activeSessionId, 
               userId, 
-              aiResponse, 
+              claudeResponse.content, 
               'assistant',
-              currentAgent?.agent_id, // Include agent ID
-              currentAgent?.agent_name // Include agent name
+              agentForResponse.agent_id,
+              agentForResponse.agent_name,
+              {}, // metadata
+              claudeResponse.metadata // ai_metadata
             );
             console.log('AI message saved:', savedAiMessage);
             await loadUserSessions(); // Refresh to update last message
@@ -345,7 +391,37 @@ const Home: React.FC = () => {
         } else {
           console.log('AI response not saved - auth:', isAuthenticated, 'user:', !!user, 'sessionId:', activeSessionId);
         }
-      }, 1500);
+      } catch (claudeError) {
+        console.error('Claude API Error:', claudeError);
+        setIsLoading(false);
+        
+        // Fallback to a simple error message
+        const errorMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          content: `I apologize, but I'm having trouble connecting to my AI service right now. ${claudeError instanceof Error ? claudeError.message : 'Please try again later.'} You can still use the platform - your messages are being saved.`,
+          isUser: false,
+          timestamp: new Date(),
+          agentName: currentAgent?.agent_name || 'System'
+        };
+        
+        setMessages(prev => [...prev, errorMessage]);
+
+        // Save error message to database if authenticated
+        if (isAuthenticated && userId && activeSessionId) {
+          try {
+            await DatabaseService.addMessage(
+              activeSessionId, 
+              userId, 
+              errorMessage.content, 
+              'assistant',
+              currentAgent?.agent_id,
+              currentAgent?.agent_name
+            );
+          } catch (error) {
+            console.error('Failed to save error message:', error);
+          }
+        }
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
       setIsLoading(false);
@@ -541,6 +617,13 @@ const Home: React.FC = () => {
             />
           </div>
         </div>
+
+        {/* Claude API Test Component (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <div style={{ padding: '16px' }}>
+            <ClaudeTestComponent />
+          </div>
+        )}
 
         {/* Agent Selector Modal */}
         <AgentSelector
