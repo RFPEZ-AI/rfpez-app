@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { IonContent, IonHeader, IonPage, IonToolbar, IonButtons, IonButton, IonIcon } from '@ionic/react';
-import { swapHorizontalOutline } from 'ionicons/icons';
+import { IonContent, IonHeader, IonPage, IonToolbar, IonButtons } from '@ionic/react';
 import AuthButtons from '../components/AuthButtons';
 import SessionHistory from '../components/SessionHistory';
 import SessionDialog from '../components/SessionDialog';
