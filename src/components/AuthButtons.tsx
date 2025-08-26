@@ -85,9 +85,23 @@ const AuthButtons: React.FC = () => {
 
   const handleLogout = async () => {
     setShowUserMenu(false);
-    const { error } = await signOut();
-    if (error) {
-      console.error('Logout error:', error);
+    
+    try {
+      console.log('AuthButtons: Starting logout process...');
+      const { error } = await signOut();
+      
+      if (error) {
+        console.error('Logout error:', error);
+        // Even if there's an error, the state should be cleared by the signOut function
+        // Let's provide user feedback but don't prevent the logout UI from updating
+        alert('There was an issue with logout, but you have been signed out locally. Please refresh the page if needed.');
+      } else {
+        console.log('Logout successful');
+      }
+    } catch (exception) {
+      console.error('Logout exception:', exception);
+      // Provide user feedback
+      alert('Logout completed. Please refresh the page if you still appear logged in.');
     }
   };
 

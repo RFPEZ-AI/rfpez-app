@@ -47,11 +47,43 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     detectSessionInUrl: true,
     flowType: 'pkce',
-    debug: process.env.NODE_ENV === 'development'
+    debug: process.env.NODE_ENV === 'development',
+    // Enhanced session storage options for better cross-platform compatibility
+    storageKey: 'supabase.auth.token',
+    storage: {
+      getItem: (key: string) => {
+        try {
+          // Try localStorage first, fallback to sessionStorage
+          return localStorage.getItem(key) || sessionStorage.getItem(key);
+        } catch (error) {
+          console.warn('Storage getItem failed:', error);
+          return null;
+        }
+      },
+      setItem: (key: string, value: string) => {
+        try {
+          // Set in both localStorage and sessionStorage for redundancy
+          localStorage.setItem(key, value);
+          sessionStorage.setItem(key, value);
+        } catch (error) {
+          console.warn('Storage setItem failed:', error);
+        }
+      },
+      removeItem: (key: string) => {
+        try {
+          // Remove from both storages
+          localStorage.removeItem(key);
+          sessionStorage.removeItem(key);
+        } catch (error) {
+          console.warn('Storage removeItem failed:', error);
+        }
+      }
+    }
   },
   global: {
     headers: {
-      'X-Client-Info': 'supabase-js-web'
+      'X-Client-Info': 'supabase-js-web',
+      'X-Platform': navigator?.userAgent?.includes('Windows') ? 'windows' : 'other'
     }
   }
 });

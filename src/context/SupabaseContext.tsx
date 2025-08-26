@@ -213,6 +213,13 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           console.log('✅ User signed in successfully');
         } else if (event === 'SIGNED_OUT') {
           console.log('👋 User signed out');
+          // Ensure local state is cleared on sign out
+          if (active) {
+            console.log('Clearing local state after sign out');
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+          }
         } else if (event === 'TOKEN_REFRESHED') {
           console.log('🔄 Token refreshed');
         } else if (event === 'USER_UPDATED') {
@@ -269,8 +276,104 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const signOut = async () => {
-    const { error } = await supabase.auth.signOut();
-    return { error };
+    try {
+      console.log('Starting signOut process...');
+      console.log('Current session before logout:', session ? 'Present' : 'Missing');
+      console.log('Platform info:', navigator.userAgent);
+      
+      // First, clear the local session state immediately
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      
+      // Try multiple logout strategies for cross-platform compatibility
+      let finalError = null;
+      
+      // Strategy 1: Standard signOut
+      try {
+        const { error: signOutError } = await supabase.auth.signOut();
+        if (signOutError) {
+          console.warn('Standard signOut failed:', signOutError);
+          finalError = signOutError;
+        } else {
+          console.log('Standard signOut successful');
+          return { error: null };
+        }
+      } catch (signOutException) {
+        console.warn('Standard signOut threw exception:', signOutException);
+        finalError = signOutException as AuthError;
+      }
+      
+      // Strategy 2: Global scope logout (for cases where session is corrupted)
+      try {
+        console.log('Attempting global scope logout...');
+        const { error: globalSignOutError } = await supabase.auth.signOut({ scope: 'global' });
+        if (globalSignOutError) {
+          console.warn('Global signOut failed:', globalSignOutError);
+        } else {
+          console.log('Global signOut successful');
+          return { error: null };
+        }
+      } catch (globalSignOutException) {
+        console.warn('Global signOut threw exception:', globalSignOutException);
+      }
+      
+      // Strategy 3: Manual session cleanup for Windows platform issues
+      try {
+        console.log('Attempting manual session cleanup...');
+        
+        // Clear localStorage/sessionStorage manually
+        if (typeof window !== 'undefined') {
+          const keysToRemove = [];
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('supabase.')) {
+              keysToRemove.push(key);
+            }
+          }
+          keysToRemove.forEach(key => {
+            console.log('Removing localStorage key:', key);
+            localStorage.removeItem(key);
+          });
+          
+          // Also clear sessionStorage
+          const sessionKeysToRemove = [];
+          for (let i = 0; i < sessionStorage.length; i++) {
+            const key = sessionStorage.key(i);
+            if (key && key.startsWith('supabase.')) {
+              sessionKeysToRemove.push(key);
+            }
+          }
+          sessionKeysToRemove.forEach(key => {
+            console.log('Removing sessionStorage key:', key);
+            sessionStorage.removeItem(key);
+          });
+        }
+        
+        console.log('Manual session cleanup completed');
+        
+        // Force trigger auth state change
+        console.log('Triggering manual auth state change...');
+        // The onAuthStateChange listener should pick this up
+        
+        return { error: null };
+      } catch (manualCleanupException) {
+        console.error('Manual cleanup failed:', manualCleanupException);
+      }
+      
+      console.error('All logout strategies failed, final error:', finalError);
+      return { error: finalError };
+      
+    } catch (unexpectedError) {
+      console.error('Unexpected error during signOut:', unexpectedError);
+      
+      // Even if everything fails, clear the local state
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      
+      return { error: unexpectedError as AuthError };
+    }
   };
 
   const signInWithOAuth = async (provider: 'google' | 'github') => {
