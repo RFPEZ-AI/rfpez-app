@@ -6,6 +6,7 @@ import SessionDialog from '../components/SessionDialog';
 import ArtifactWindow from '../components/ArtifactWindow';
 import AgentSelector from '../components/AgentSelector';
 import AgentIndicator from '../components/AgentIndicator';
+import AuthDebugger from '../components/AuthDebugger';
 // Only import in development mode to avoid unused import warnings
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import ClaudeTestComponent from '../components/ClaudeTestComponent';
@@ -656,6 +657,11 @@ const Home: React.FC = () => {
           <div style={{ padding: '16px' }}>
             <ClaudeTestComponent />
           </div>
+        )}
+
+        {/* Auth Debugger (Development Only) */}
+        {process.env.NODE_ENV === 'development' && (
+          <AuthDebugger />
         )}
 
         {/* Agent Selector Modal */}
