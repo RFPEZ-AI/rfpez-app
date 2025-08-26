@@ -17,19 +17,45 @@ const PWAInstallPrompt: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
   const [isInstalled, setIsInstalled] = useState(false);
   const [isIOS, setIsIOS] = useState(false);
+  const [isSafariMac, setIsSafariMac] = useState(false);
   const [showIOSModal, setShowIOSModal] = useState(false);
 
   useEffect(() => {
     // Detect iOS
     const detectIOS = () => {
       const userAgent = window.navigator.userAgent.toLowerCase();
-      const isIOSDevice = /iphone|ipad|ipod/.test(userAgent) || 
-        (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); // iPad on iOS 13+
-      setIsIOS(isIOSDevice);
-      return isIOSDevice;
+      
+      // Check for iPhone, iPad, iPod
+      if (/iphone|ipod/.test(userAgent)) {
+        setIsIOS(true);
+        return true;
+      }
+      
+      // Check for iPad (including iPad on iOS 13+ that reports as MacIntel)
+      if (/ipad/.test(userAgent) || 
+          (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1 && 
+           !window.matchMedia('(pointer: fine)').matches)) {
+        setIsIOS(true);
+        return true;
+      }
+      
+      setIsIOS(false);
+      return false;
     };
 
     const isIOSDevice = detectIOS();
+
+    // Detect Safari on macOS
+    const detectSafariMac = () => {
+      const userAgent = window.navigator.userAgent.toLowerCase();
+      const isMac = navigator.platform.toLowerCase().includes('mac');
+      const isSafari = /safari/.test(userAgent) && !/chrome/.test(userAgent) && !/firefox/.test(userAgent);
+      const isSafariMacOS = isMac && isSafari && !isIOSDevice;
+      setIsSafariMac(isSafariMacOS);
+      return isSafariMacOS;
+    };
+
+    const isSafariMacOS = detectSafariMac();
 
     // Check if app is already installed
     const checkIfInstalled = () => {
@@ -50,6 +76,11 @@ const PWAInstallPrompt: React.FC = () => {
 
     // For iOS devices, show install button if not installed and not in standalone mode
     if (isIOSDevice && !isAppInstalled) {
+      setShowInstallButton(true);
+    }
+
+    // For Safari on macOS, show a helpful message since beforeinstallprompt doesn't fire
+    if (isSafariMacOS && !isAppInstalled) {
       setShowInstallButton(true);
     }
 
@@ -82,6 +113,12 @@ const PWAInstallPrompt: React.FC = () => {
     if (isIOS) {
       // For iOS, show instructions modal
       setShowIOSModal(true);
+      return;
+    }
+
+    if (isSafariMac) {
+      // For Safari on macOS, show instructions since beforeinstallprompt doesn't fire
+      alert('To install RFPEZ.AI:\n\n1. Click the File menu\n2. Select "Add to Dock"\n\nOr click the install button in the address bar if available.');
       return;
     }
 
