@@ -60,12 +60,31 @@ const Home: React.FC = () => {
   const [currentAgent, setCurrentAgent] = useState<SessionActiveAgent | null>(null);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
 
+  // Clear UI state when user logs out
+  const clearUIState = () => {
+    console.log('Clearing UI state for logout');
+    setMessages([]);
+    setSessions([]);
+    setArtifacts([]);
+    setSelectedSessionId(undefined);
+    setCurrentSessionId(undefined);
+    setCurrentAgent(null);
+  };
+
   // Load user sessions on mount if authenticated
   useEffect(() => {
     console.log('Auth state:', { isAuthenticated, supabaseLoading, user: !!user, userProfile: !!userProfile });
     console.log('Session details:', session);
     console.log('User details:', user);
     console.log('UserProfile details:', userProfile);
+    
+    // If user logs out (no session), clear UI state and show default agent
+    if (!isAuthenticated && !supabaseLoading) {
+      console.log('User not authenticated, clearing UI state and loading default agent...');
+      clearUIState();
+      loadDefaultAgentWithPrompt();
+      return;
+    }
     
     // Always load default agent and show initial prompt, regardless of authentication
     if (!supabaseLoading) {
@@ -91,6 +110,17 @@ const Home: React.FC = () => {
       });
     }
   }, [isAuthenticated, supabaseLoading, user, userProfile]);
+
+  // Monitor session changes specifically for logout detection
+  useEffect(() => {
+    // If we had a session before but now we don't (logout scenario)
+    if (!session && !supabaseLoading) {
+      console.log('Session removed - user logged out, clearing UI state');
+      clearUIState();
+      // Load default agent after clearing state
+      loadDefaultAgentWithPrompt();
+    }
+  }, [session, supabaseLoading]);
 
   // Load active agent when session changes
   useEffect(() => {
@@ -452,6 +482,9 @@ const Home: React.FC = () => {
         // Fallback to default agent if no current agent is selected
         await loadDefaultAgentWithPrompt();
       }
+    } else {
+      // For non-authenticated users, load default agent
+      await loadDefaultAgentWithPrompt();
     }
     
     console.log('New session started with initial prompt displayed');
