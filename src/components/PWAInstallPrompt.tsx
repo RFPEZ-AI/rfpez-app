@@ -154,15 +154,15 @@ const PWAInstallPrompt: React.FC = () => {
             <IonItem>
               <IonIcon icon={addOutline} slot="start" color="primary" />
               <IonLabel className="ion-text-wrap">
-                <h3>2. Select "Add to Home Screen"</h3>
-                <p>Scroll down and tap "Add to Home Screen" in the share menu</p>
+                <h3>2. Select &quot;Add to Home Screen&quot;</h3>
+                <p>Scroll down and tap &quot;Add to Home Screen&quot; in the share menu</p>
               </IonLabel>
             </IonItem>
             
             <IonItem>
               <IonLabel className="ion-text-wrap">
                 <h3>3. Confirm the installation</h3>
-                <p>Tap "Add" in the top-right corner to install RFPEZ.AI to your home screen</p>
+                <p>Tap &quot;Add&quot; in the top-right corner to install RFPEZ.AI to your home screen</p>
               </IonLabel>
             </IonItem>
           </IonList>
