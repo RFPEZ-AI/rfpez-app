@@ -3,6 +3,7 @@ import { Route, Redirect } from 'react-router-dom';
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import Home from './pages/Home';
+import MCPTestComponent from './components/MCPTestComponent';
 import { SupabaseProvider } from './context/SupabaseContext';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineNotification from './components/OfflineNotification';
@@ -35,6 +36,7 @@ const App: React.FC = () => (
       <IonReactRouter>
         <IonRouterOutlet>
           <Route exact path="/home" component={Home} />
+          <Route exact path="/mcp-test" component={MCPTestComponent} />
           <Route exact path="/callback" component={Home} />
           <Route exact path="/" render={() => <Redirect to="/home" />} />
         </IonRouterOutlet>
