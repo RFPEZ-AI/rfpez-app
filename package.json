@@ -8,6 +8,7 @@
     "@ionic/react-router": "^7.8.6",
     "@supabase/supabase-js": "^2.56.0",
     "cross-env": "^7.0.3",
+    "dotenv": "^17.2.1",
     "history": "^4.9.0",
     "ionicons": "^7.0.0",
     "react": "18.3.1",
@@ -40,12 +41,18 @@
     "@typescript-eslint/parser": "^5.59.2",
     "eslint": "^8.35.0",
     "eslint-plugin-react": "^7.32.2",
+    "node-fetch": "^2.6.7",
     "sharp": "^0.34.3"
   },
   "scripts": {
     "start": "cross-env GENERATE_SOURCEMAP=false react-scripts start",
     "build": "react-scripts build",
-    "test": "react-scripts test"
+    "test": "react-scripts test",
+    "mcp:deploy": "bash deploy-mcp.sh",
+    "mcp:test": "node test-mcp.js",
+    "mcp:install": "npm install node-fetch@2.6.7",
+    "claude-api:deploy": "supabase functions deploy claude-api",
+    "claude-api:test": "node test-claude-api.js"
   },
   "browserslist": [
     "Chrome >=79",

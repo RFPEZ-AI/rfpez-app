@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "rfpez-supabase": {
+      "command": "node",
+      "args": ["./mcp-client.js"],
+      "env": {
+        "SUPABASE_URL": "https://jxlutaztoukwbbgtoulc.supabase.co",
+        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4bHV0YXp0b3Vrd2JiZ3RvdWxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4ODM3MTIsImV4cCI6MjA3MTQ1OTcxMn0.WJRaC_MccZxNi7nPpu0LygC3nt6lr3SyZEqt61_7yqM", 
+        "ACCESS_TOKEN": "YOUR_ACCESS_TOKEN"
+      }
+    }
+  }
+}
