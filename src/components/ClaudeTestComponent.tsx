@@ -21,12 +21,15 @@ import {
 import { ClaudeService } from '../services/claudeService';
 
 const ClaudeTestComponent: React.FC = () => {
-  const [testMessage, setTestMessage] = useState('Hello, can you help me with RFP management?');
+  const [testMessage, setTestMessage] = useState('Hello, can you help me create a new session and then retrieve my recent conversations?');
   const [response, setResponse] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
   const [connectionStatus, setConnectionStatus] = useState<'unknown' | 'connected' | 'failed'>('unknown');
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  const [currentSessionId, setCurrentSessionId] = useState<string>('');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [recentSessions, setRecentSessions] = useState<any[]>([]);
 
   const testConnection = async () => {
     setIsLoading(true);
@@ -54,42 +57,107 @@ const ClaudeTestComponent: React.FC = () => {
     setResponse('');
     
     try {
-      // Create a test agent
+      // Create a session if we don't have one
+      let sessionId = currentSessionId;
+      if (!sessionId) {
+        console.log('Creating new session...');
+        sessionId = await ClaudeService.createSession(
+          'Claude API Test Session',
+          'Testing Claude API with MCP function calling'
+        );
+        setCurrentSessionId(sessionId);
+        console.log('Created session:', sessionId);
+      }
+
+      // Mock agent for testing
       const testAgent = {
         id: 'test-agent',
-        name: 'Test Agent',
-        instructions: 'You are a helpful AI assistant for RFPEZ.AI. Provide clear, concise responses about RFP and procurement processes.',
-        initial_prompt: 'Hello! How can I help you today?',
-        description: 'Test agent for Claude API',
-        avatar_url: '',
+        name: 'Claude Test Agent',
+        instructions: 'You are a helpful AI assistant with access to conversation management functions. Help users manage their conversations and demonstrate your ability to use the available functions.',
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        user_id: 'test-user',
         is_active: true,
+        initial_prompt: '',
         is_default: false,
         is_restricted: false,
-        sort_order: 0,
-        created_at: '',
-        updated_at: '',
-        metadata: {}
+        sort_order: 0
       };
-      
+
+      console.log('Sending message to Claude with MCP integration...');
       const claudeResponse = await ClaudeService.generateResponse(
-        testMessage,
+        testMessage, 
         testAgent,
-        []
+        [], // No previous conversation history for this test
+        sessionId
       );
       
       setResponse(claudeResponse.content);
-      setConnectionStatus('connected');
+      
+      // Show metadata about the response
+      if (claudeResponse.metadata.functions_called && claudeResponse.metadata.functions_called.length > 0) {
+        console.log('Functions called:', claudeResponse.metadata.functions_called);
+        setAlertMessage(`✅ MCP Functions called: ${claudeResponse.metadata.functions_called.join(', ')}`);
+        setShowAlert(true);
+      }
+
+      // Refresh recent sessions to show the updated data
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sessionsData = await ClaudeService.getRecentSessions(5) as any;
+        setRecentSessions(sessionsData.sessions || []);
+      } catch (error) {
+        console.warn('Failed to refresh sessions:', error);
+      }
+
     } catch (error) {
-      console.error('Test message error:', error);
-      setResponse(`Error: ${error instanceof Error ? error.message : 'Failed to get response'}`);
-      setConnectionStatus('failed');
-      setAlertMessage(`Failed to send test message: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      console.error('Message send error:', error);
+      setAlertMessage(`Failed to send message: ${error instanceof Error ? error.message : 'Unknown error'}`);
       setShowAlert(true);
     }
     
     setIsLoading(false);
   };
 
+  const loadRecentSessions = async () => {
+    try {
+      setIsLoading(true);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sessionsData = await ClaudeService.getRecentSessions(10) as any;
+      setRecentSessions(sessionsData.sessions || []);
+      setAlertMessage(`✅ Loaded ${sessionsData.sessions?.length || 0} recent sessions`);
+      setShowAlert(true);
+    } catch (error) {
+      console.error('Failed to load sessions:', error);
+      setAlertMessage(`Failed to load sessions: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowAlert(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const createNewSession = async () => {
+    try {
+      setIsLoading(true);
+      const sessionId = await ClaudeService.createSession(
+        `Test Session ${new Date().toLocaleTimeString()}`,
+        'Created via Claude Test Component'
+      );
+      setCurrentSessionId(sessionId);
+      setAlertMessage(`✅ Created new session: ${sessionId}`);
+      setShowAlert(true);
+      
+      // Refresh sessions list
+      await loadRecentSessions();
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      setAlertMessage(`Failed to create session: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      setShowAlert(true);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+    
   const getStatusIcon = () => {
     switch (connectionStatus) {
       case 'connected':
@@ -117,7 +185,7 @@ const ClaudeTestComponent: React.FC = () => {
       <IonCard>
         <IonCardHeader>
           <IonCardTitle>
-            <IonIcon icon={chatbubbleEllipsesOutline} /> Claude API Test
+            <IonIcon icon={chatbubbleEllipsesOutline} /> Claude API with MCP Test
           </IonCardTitle>
         </IonCardHeader>
         <IonCardContent>
@@ -146,13 +214,45 @@ const ClaudeTestComponent: React.FC = () => {
             </IonButton>
           </IonItem>
 
+          {/* Current Session */}
+          <IonItem>
+            <IonLabel>
+              <h3>Current Session</h3>
+              <p>{currentSessionId || 'No session created'}</p>
+            </IonLabel>
+            <IonButton 
+              fill="outline" 
+              size="small" 
+              onClick={createNewSession}
+              disabled={isLoading}
+            >
+              New Session
+            </IonButton>
+          </IonItem>
+
+          {/* Recent Sessions */}
+          <IonItem>
+            <IonLabel>
+              <h3>Recent Sessions ({recentSessions.length})</h3>
+              <p>Click to load your recent conversations</p>
+            </IonLabel>
+            <IonButton 
+              fill="outline" 
+              size="small" 
+              onClick={loadRecentSessions}
+              disabled={isLoading}
+            >
+              Load Sessions
+            </IonButton>
+          </IonItem>
+
           {/* Test Message Input */}
           <IonItem>
-            <IonLabel position="stacked">Test Message</IonLabel>
+            <IonLabel position="stacked">Test Message (Try asking about sessions or conversations)</IonLabel>
             <IonTextarea
               value={testMessage}
               onIonInput={(e) => setTestMessage(e.detail.value || '')}
-              placeholder="Enter a test message..."
+              placeholder="Try: 'Can you create a new session and show me my recent conversations?'"
               rows={3}
             />
           </IonItem>
@@ -170,7 +270,7 @@ const ClaudeTestComponent: React.FC = () => {
                   Sending...
                 </>
               ) : (
-                'Send Test Message'
+                'Send Test Message with MCP'
               )}
             </IonButton>
           </div>
@@ -212,7 +312,7 @@ const ClaudeTestComponent: React.FC = () => {
       <IonAlert
         isOpen={showAlert}
         onDidDismiss={() => setShowAlert(false)}
-        header="Claude API Test"
+        header="Claude API MCP Test"
         message={alertMessage}
         buttons={['OK']}
       />

@@ -1,6 +1,7 @@
-// Claude API service for RFPEZ.AI Multi-Agent System
+// Claude API service for RFPEZ.AI Multi-Agent System with MCP Integration
 import Anthropic from '@anthropic-ai/sdk';
 import type { Agent } from '../types/database';
+import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
@@ -14,6 +15,7 @@ interface ClaudeResponse {
     tokens_used?: number;
     response_time: number;
     temperature: number;
+    functions_called?: string[];
   };
 }
 
@@ -43,14 +45,16 @@ export class ClaudeService {
   }
 
   /**
-   * Generate a response using Claude API
+   * Generate a response using Claude API with MCP function calling
    */
   static async generateResponse(
     userMessage: string,
     agent: Agent,
-    conversationHistory: ClaudeMessage[] = []
+    conversationHistory: ClaudeMessage[] = [],
+    sessionId?: string
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
+    const functionsExecuted: string[] = [];
     
     try {
       const client = this.getClient();
@@ -64,45 +68,156 @@ export class ClaudeService {
         }
       ];
 
-      // Create system prompt based on agent instructions
-      const systemPrompt = agent.instructions || 
-        `You are ${agent.name}, an AI assistant. Be helpful, accurate, and professional.`;
+      // Create system prompt based on agent instructions with MCP context
+      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}
 
-      console.log('Sending request to Claude API...', {
+You have access to conversation management functions that allow you to:
+- Retrieve conversation history from previous sessions
+- Store messages and create new sessions
+- Search through past conversations
+- Access recent sessions
+
+Use these functions when relevant to help the user. For example:
+- If they ask about previous conversations, use get_recent_sessions or search_messages
+- If they reference something from earlier, use get_conversation_history
+- Always store important conversation milestones using store_message
+
+Be helpful, accurate, and professional.`;
+
+      console.log('Sending request to Claude API with MCP functions...', {
         agent: agent.name,
-        systemPrompt,
-        messageCount: messages.length
+        messageCount: messages.length,
+        sessionId,
+        functionsAvailable: claudeApiFunctions.length
       });
 
-      const response = await client.messages.create({
-        model: 'claude-3-haiku-20240307', // Using Haiku for faster, cost-effective responses
-        max_tokens: 1000,
+      let response = await client.messages.create({
+        model: 'claude-3-5-sonnet-20241022', // Use Claude 3.5 Sonnet for better function calling
+        max_tokens: 2000,
         temperature: 0.7,
         system: systemPrompt,
-        messages: messages
+        messages: messages,
+        tools: claudeApiFunctions, // Include MCP functions
+        tool_choice: { type: 'auto' } // Let Claude decide when to use functions
       });
 
-      const responseTime = Date.now() - startTime;
-      
-      // Extract the text content from the response
-      const content = response.content
-        .filter(block => block.type === 'text')
-        .map(block => (block as { text: string }).text)
-        .join('');
+      // Handle function calls if any
+      let finalContent = '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allFunctionResults: any[] = [];
 
-      console.log('Claude API response received', {
+      // Process the response and handle any function calls
+      while (response.content.some(block => block.type === 'tool_use')) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const toolUses = response.content.filter(block => block.type === 'tool_use') as any[];
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const textBlocks = response.content.filter(block => block.type === 'text') as any[];
+        
+        // Collect any text content
+        if (textBlocks.length > 0) {
+          finalContent += textBlocks.map(block => block.text).join('');
+        }
+
+        // Add assistant's message with tool calls to conversation
+        messages.push({
+          role: 'assistant',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          content: response.content as any
+        });
+
+        // Execute each function call and prepare tool results
+        const toolResults = [];
+        for (const toolUse of toolUses) {
+          try {
+            console.log(`Executing function: ${toolUse.name}`, toolUse.input);
+            functionsExecuted.push(toolUse.name);
+            
+            const result = await claudeAPIHandler.executeFunction(toolUse.name, toolUse.input);
+            allFunctionResults.push({ function: toolUse.name, result });
+            
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: JSON.stringify(result, null, 2)
+            });
+          } catch (error) {
+            console.error(`Function execution error for ${toolUse.name}:`, error);
+            toolResults.push({
+              type: 'tool_result',
+              tool_use_id: toolUse.id,
+              content: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+              is_error: true
+            });
+          }
+        }
+
+        // Add tool results as user message
+        messages.push({
+          role: 'user',
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          content: toolResults as any
+        });
+
+        // Get Claude's response to the function results
+        response = await client.messages.create({
+          model: 'claude-3-5-sonnet-20241022',
+          max_tokens: 2000,
+          temperature: 0.7,
+          system: systemPrompt,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          messages: messages as any,
+          tools: claudeApiFunctions,
+          tool_choice: { type: 'auto' }
+        });
+      }
+
+      // Collect final text content
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const finalTextBlocks = response.content.filter(block => block.type === 'text') as any[];
+      finalContent += finalTextBlocks.map(block => block.text).join('');
+
+      const responseTime = Date.now() - startTime;
+
+      console.log('Claude API response with MCP integration received', {
         responseTime,
-        contentLength: content.length,
+        contentLength: finalContent.length,
+        functionsExecuted,
+        functionResults: allFunctionResults.length,
         usage: response.usage
       });
 
+      // Store the conversation in the current session if sessionId is provided
+      if (sessionId && finalContent.trim()) {
+        try {
+          await claudeAPIHandler.executeFunction('store_message', {
+            session_id: sessionId,
+            content: userMessage,
+            role: 'user'
+          });
+          
+          await claudeAPIHandler.executeFunction('store_message', {
+            session_id: sessionId,
+            content: finalContent,
+            role: 'assistant',
+            metadata: {
+              agent_id: agent.id,
+              functions_called: functionsExecuted,
+              model: response.model
+            }
+          });
+        } catch (error) {
+          console.warn('Failed to store conversation:', error);
+        }
+      }
+
       return {
-        content,
+        content: finalContent,
         metadata: {
           model: response.model,
           tokens_used: response.usage?.input_tokens + response.usage?.output_tokens || 0,
           response_time: responseTime,
-          temperature: 0.7
+          temperature: 0.7,
+          functions_called: functionsExecuted
         }
       };
 
@@ -132,12 +247,13 @@ export class ClaudeService {
   static async generateStreamingResponse(
     userMessage: string,
     agent: Agent,
-    conversationHistory: ClaudeMessage[] = []
+    conversationHistory: ClaudeMessage[] = [],
+    sessionId?: string
     // onChunk parameter removed as it's not currently used
   ): Promise<ClaudeResponse> {
-    // For now, fall back to regular response
+    // For now, fall back to regular response with session support
     // Streaming can be implemented later when needed
-    return this.generateResponse(userMessage, agent, conversationHistory);
+    return this.generateResponse(userMessage, agent, conversationHistory, sessionId);
   }
 
   /**
@@ -176,5 +292,51 @@ export class ClaudeService {
         content: msg.content
       }))
       .slice(-10); // Keep last 10 messages for context
+  }
+
+  /**
+   * Create a new conversation session for MCP integration
+   */
+  static async createSession(title: string, description?: string): Promise<string> {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const result = await claudeAPIHandler.executeFunction('create_session', {
+        title,
+        description
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      }) as any;
+      return result.session_id;
+    } catch (error) {
+      console.error('Failed to create session:', error);
+      throw new Error('Failed to create conversation session');
+    }
+  }
+
+  /**
+   * Get recent sessions for the current user
+   */
+  static async getRecentSessions(limit = 10) {
+    try {
+      return await claudeAPIHandler.executeFunction('get_recent_sessions', { limit });
+    } catch (error) {
+      console.error('Failed to get recent sessions:', error);
+      throw new Error('Failed to retrieve recent sessions');
+    }
+  }
+
+  /**
+   * Get conversation history for a session
+   */
+  static async getConversationHistory(sessionId: string, limit = 50, offset = 0) {
+    try {
+      return await claudeAPIHandler.executeFunction('get_conversation_history', {
+        session_id: sessionId,
+        limit,
+        offset
+      });
+    } catch (error) {
+      console.error('Failed to get conversation history:', error);
+      throw new Error('Failed to retrieve conversation history');
+    }
   }
 }
