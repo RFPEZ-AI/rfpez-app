@@ -3,13 +3,43 @@ import { IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonLis
 import { useSupabase } from '../context/SupabaseContext';
 import { supabase } from '../supabaseClient';
 
+interface DebugInfo {
+  timestamp: string;
+  platform: {
+    userAgent: string;
+    platform: string;
+    isWindows: boolean;
+  };
+  session: {
+    hasSession: boolean;
+    accessToken?: string;
+    refreshToken?: string;
+    expiresAt?: number;
+    [key: string]: unknown;
+  };
+  user: {
+    hasUser: boolean;
+    userId?: string;
+    email?: string;
+    metadata?: Record<string, unknown>;
+  };
+  localStorage: Record<string, string | unknown>;
+  sessionStorage: Record<string, string | unknown>;
+  directSession?: {
+    hasSession: boolean;
+    error?: string;
+    [key: string]: unknown;
+  };
+  [key: string]: unknown;
+}
+
 const AuthDebugger: React.FC = () => {
   const { session, user, signOut } = useSupabase();
-  const [debugInfo, setDebugInfo] = useState<any>({});
+  const [debugInfo, setDebugInfo] = useState<DebugInfo>({} as DebugInfo);
   const [refreshKey, setRefreshKey] = useState(0);
 
   const refreshDebugInfo = async () => {
-    const info: any = {
+    const info: DebugInfo = {
       timestamp: new Date().toISOString(),
       platform: {
         userAgent: navigator.userAgent,
@@ -67,7 +97,10 @@ const AuthDebugger: React.FC = () => {
         sessionId: currentSession?.user?.id
       };
     } catch (error) {
-      info.directSession = { error: error?.toString() };
+      info.directSession = { 
+        hasSession: false,
+        error: error?.toString() 
+      };
     }
 
     setDebugInfo(info);

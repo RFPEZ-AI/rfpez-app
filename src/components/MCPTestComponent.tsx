@@ -25,7 +25,7 @@ import { mcpClient, ConversationMessage, ConversationSession, SearchResult } fro
 import { useSupabase } from '../context/SupabaseContext';
 
 const MCPTestComponent: React.FC = () => {
-  const { user, session, loading: authLoading } = useSupabase();
+  const { user, session: authSession, loading: authLoading } = useSupabase();
   const [loading, setLoading] = useState(false);
   const [sessions, setSessions] = useState<ConversationSession[]>([]);
   const [selectedSession, setSelectedSession] = useState<string>('');
@@ -213,13 +213,13 @@ const MCPTestComponent: React.FC = () => {
               <IonLabel>
                 <h3>Access Token</h3>
                 <p style={{ wordBreak: 'break-all', fontSize: '0.8em', fontFamily: 'monospace' }}>
-                  {session?.access_token || 'No active session token'}
+                  {authSession?.access_token || 'No active session token'}
                 </p>
               </IonLabel>
               <IonButton
                 fill="clear"
                 onClick={() => {
-                  const token = session?.access_token;
+                  const token = authSession?.access_token;
                   if (token) {
                     navigator.clipboard.writeText(token);
                     setAlertMessage('Access token copied to clipboard!');

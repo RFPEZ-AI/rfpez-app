@@ -1,6 +1,29 @@
 // MCP Client for RFPEZ.AI Supabase Integration
 import { supabase } from '../supabaseClient';
 
+// Metadata type definitions
+export interface MessageMetadata {
+  source?: string;
+  timestamp?: string;
+  edited?: boolean;
+  [key: string]: unknown;
+}
+
+export interface AIMetadata {
+  model?: string;
+  temperature?: number;
+  tokens?: number;
+  reasoning?: string;
+  [key: string]: unknown;
+}
+
+export interface SessionMetadata {
+  agent?: string;
+  context?: string;
+  tags?: string[];
+  [key: string]: unknown;
+}
+
 // MCP Protocol Types
 export interface MCPRequest {
   jsonrpc: "2.0";
@@ -26,8 +49,8 @@ export interface ConversationMessage {
   role: 'user' | 'assistant' | 'system';
   created_at: string;
   message_order: number;
-  metadata?: Record<string, any>;
-  ai_metadata?: Record<string, any>;
+  metadata?: MessageMetadata;
+  ai_metadata?: AIMetadata;
 }
 
 export interface ConversationSession {
@@ -36,7 +59,7 @@ export interface ConversationSession {
   description?: string;
   created_at: string;
   updated_at: string;
-  session_metadata?: Record<string, any>;
+  session_metadata?: SessionMetadata;
 }
 
 export interface SearchResult {
@@ -54,19 +77,41 @@ export interface SearchResult {
 export class MCPClient {
   private baseUrl: string;
   private requestId = 1;
+  private debugMode = false;
 
-  constructor(baseUrl?: string) {
+  constructor(baseUrl?: string, debug = false) {
     // Use the Supabase edge function URL
     const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
     this.baseUrl = baseUrl || `${supabaseUrl}/functions/v1/mcp-server`;
+    this.debugMode = debug;
+    
+    if (this.debugMode) {
+      console.log('🔧 MCPClient initialized with URL:', this.baseUrl);
+    }
   }
 
   private async makeRequest(method: string, params?: Record<string, unknown>): Promise<MCPResponse> {
+    if (this.debugMode) {
+      console.log(`🔄 MCP Request: ${method}`, params);
+    }
+
+    // Check environment
+    if (!process.env.REACT_APP_SUPABASE_URL) {
+      throw new Error('REACT_APP_SUPABASE_URL environment variable not set');
+    }
+
     const session = await supabase.auth.getSession();
     const accessToken = session.data.session?.access_token;
 
     if (!accessToken) {
-      throw new Error('User not authenticated');
+      if (this.debugMode) {
+        console.error('❌ No access token available. Session:', session.data);
+      }
+      throw new Error('User not authenticated - please sign in');
+    }
+
+    if (this.debugMode) {
+      console.log('✅ Access token available, making request to:', this.baseUrl);
     }
 
     const request: MCPRequest = {
@@ -76,26 +121,52 @@ export class MCPClient {
       params
     };
 
-    const response = await fetch(this.baseUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`
-      },
-      body: JSON.stringify(request)
-    });
+    try {
+      const response = await fetch(this.baseUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${accessToken}`
+        },
+        body: JSON.stringify(request)
+      });
 
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
+      if (this.debugMode) {
+        console.log(`📡 Response status: ${response.status}`);
+        console.log('📡 Response headers:');
+        response.headers.forEach((value, key) => {
+          console.log(`  ${key}: ${value}`);
+        });
+      }
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        if (this.debugMode) {
+          console.error('❌ HTTP Error:', response.status, errorText);
+        }
+        throw new Error(`HTTP ${response.status}: ${errorText}`);
+      }
+
+      const mcpResponse: MCPResponse = await response.json();
+      
+      if (this.debugMode) {
+        console.log(`✅ MCP Response:`, mcpResponse);
+      }
+      
+      if (mcpResponse.error) {
+        if (this.debugMode) {
+          console.error('❌ MCP Error:', mcpResponse.error);
+        }
+        throw new Error(`MCP Error (${mcpResponse.error.code}): ${mcpResponse.error.message}`);
+      }
+
+      return mcpResponse;
+    } catch (error) {
+      if (this.debugMode) {
+        console.error('❌ Request failed:', error);
+      }
+      throw error;
     }
-
-    const mcpResponse: MCPResponse = await response.json();
-    
-    if (mcpResponse.error) {
-      throw new Error(`MCP Error: ${mcpResponse.error.message}`);
-    }
-
-    return mcpResponse;
   }
 
   // Initialize the MCP connection
@@ -250,5 +321,5 @@ export class MCPClient {
   }
 }
 
-// Export a singleton instance
-export const mcpClient = new MCPClient();
+// Export a singleton instance with debug enabled
+export const mcpClient = new MCPClient(undefined, true);

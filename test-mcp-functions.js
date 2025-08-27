@@ -16,7 +16,7 @@ const ACCESS_TOKEN = 'eyJhbGciOiJIUzI1NiIsImtpZCI6IlZnK1RuWTg4YzZyRU1neFgiLCJ0eX
 const testFunctions = {
   
   // Test MCP server endpoint
-  async testMCPServer() {
+  async testMCPServer(sessionId = null) {
     console.log('\n🔍 Testing MCP Server...');
     
     const mcpRequest = {
@@ -24,9 +24,11 @@ const testFunctions = {
       id: 1,
       method: 'tools/call',
       params: {
-        name: 'get_conversation_history',
-        arguments: {
-          session_id: 'test-session',
+        name: sessionId ? 'get_conversation_history' : 'get_recent_sessions',
+        arguments: sessionId ? {
+          session_id: sessionId,
+          limit: 5
+        } : {
           limit: 5
         }
       }
@@ -40,8 +42,7 @@ const testFunctions = {
     console.log('\n🔍 Testing Claude API...');
     
     const claudeRequest = {
-      action: 'get_conversation_history',
-      session_id: 'test-session',
+      function_name: 'get_recent_sessions',
       limit: 5
     };
 
@@ -134,8 +135,20 @@ async function runTests() {
   try {
     // Test session creation first
     const sessionResult = await testFunctions.testCreateSession();
+    let createdSessionId = null;
     
-    // Test MCP server
+    // Extract session ID from the created session
+    if (sessionResult && sessionResult.result && sessionResult.result.content) {
+      try {
+        const sessionData = JSON.parse(sessionResult.result.content[0].text);
+        createdSessionId = sessionData.session_id;
+        console.log(`✅ Created session ID: ${createdSessionId}`);
+      } catch (e) {
+        console.log('⚠️  Could not parse session ID from response');
+      }
+    }
+    
+    // Test MCP server with recent sessions
     await testFunctions.testMCPServer();
     
     // Test Claude API
