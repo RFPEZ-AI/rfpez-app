@@ -8,6 +8,7 @@ type RFP = {
   is_template: boolean;
   is_public: boolean;
   suppliers: number[]; // array of supplier IDs
+  agent_ids: number[]; // array of agent IDs
   created_at: string;
   updated_at: string;
 };
@@ -23,18 +24,6 @@ type Bid = {
   updated_at: string;
 };
 
-// Solicitation Entity
-type Solicitation = {
-  id: number;
-  rfp_id: number;
-  agent_ids: number[];
-  title?: string;
-  description?: string;
-  is_template: boolean;
-  is_public: boolean;
-  created_at: string;
-  updated_at: string;
-};
 
 type Supplier = {
   id: number;
@@ -45,4 +34,4 @@ type Supplier = {
   rfpez_account_id?: number;
 };
 
-export type { RFP, Bid, Solicitation, Supplier };
+export type { RFP, Bid, Supplier };
