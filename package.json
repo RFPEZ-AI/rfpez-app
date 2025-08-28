@@ -32,6 +32,7 @@
     "workbox-streams": "^5.1.4"
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^6.8.0",
     "@testing-library/react": "^16.3.0",
     "@types/jest": "^30.0.0",
     "@types/react": "^19.1.11",
@@ -62,6 +63,11 @@
     "Safari >=14",
     "iOS >=14"
   ],
+  "jest": {
+    "transformIgnorePatterns": [
+      "node_modules/(?!(@ionic/react|@ionic/react-router|@ionic/core|@stencil/core|ionicons)/)"
+    ]
+  },
   "description": "An Ionic project",
   "overrides": {
     "react": "18.3.1",
