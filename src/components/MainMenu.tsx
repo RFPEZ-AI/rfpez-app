@@ -16,10 +16,14 @@ const MainMenu: React.FC<MainMenuProps> = ({ onSelect }) => {
 
   return (
     <>
-      <IonButton fill="clear" onClick={() => setShowPopover(true)}>
+      <IonButton id="main-menu-trigger" fill="clear" onClick={() => setShowPopover(true)}>
         <IonIcon icon={menuIcon} slot="icon-only" />
       </IonButton>
-      <IonPopover isOpen={showPopover} onDidDismiss={() => setShowPopover(false)}>
+      <IonPopover 
+        trigger="main-menu-trigger"
+        isOpen={showPopover} 
+        onDidDismiss={() => setShowPopover(false)}
+      >
         <IonList>
           <IonItem button onClick={() => handleSelect('RFP')}>
             <IonIcon icon={documentText} slot="start" />

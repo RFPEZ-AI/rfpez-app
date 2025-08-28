@@ -23,28 +23,69 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Debug userProfile changes
+  useEffect(() => {
+    console.log('🔍 UserProfile state changed:', {
+      profile: userProfile,
+      role: userProfile?.role,
+      email: userProfile?.email
+    });
+  }, [userProfile]);
+
   useEffect(() => {
     let active = true;
     console.log('SupabaseProvider useEffect: Starting initialization');
 
     const loadUserProfile = async (user: User) => {
       try {
-        console.log('Loading user profile for:', user.id);
+        console.log('📋 Loading user profile for:', user.id);
+        
+        // First, let's verify the table structure exists and is accessible
+        console.log('🔍 Checking user_profiles table structure...');
+        const { data: tableCheck, error: tableError } = await supabase
+          .from('user_profiles')
+          .select('id, role')
+          .limit(1);
+        
+        console.log('📊 Table structure check:', { 
+          accessible: !tableError, 
+          error: tableError,
+          hasRoleColumn: tableCheck?.[0] ? 'role' in tableCheck[0] : false
+        });
         
         // First try to find existing profile
+        console.log('🔍 Querying user_profiles for user:', user.id);
         const { data: existingProfile, error: fetchError } = await supabase
           .from('user_profiles')
           .select('*')
           .eq('supabase_user_id', user.id)
           .maybeSingle();
 
+        console.log('📊 Query result:', { 
+          data: existingProfile, 
+          error: fetchError,
+          hasData: !!existingProfile,
+          roleFromDB: existingProfile?.role 
+        });
+
         if (fetchError) {
-          console.error('Error fetching user profile:', fetchError);
+          console.error('❌ Error fetching user profile:', fetchError);
+          console.error('📋 Error details:', { 
+            code: fetchError.code, 
+            message: fetchError.message,
+            details: fetchError.details,
+            hint: fetchError.hint 
+          });
           // Don't return here, try to create profile instead
         }
 
         if (existingProfile) {
-          console.log('Found existing user profile:', existingProfile);
+          console.log('✅ Found existing user profile:');
+          console.log('  - ID:', existingProfile.id);
+          console.log('  - Email:', existingProfile.email);
+          console.log('  - Role:', existingProfile.role);
+          console.log('  - Full profile:', existingProfile);
+          console.log('🏷️ Setting userProfile with role:', existingProfile.role);
           setUserProfile(existingProfile);
           
           // Update last login
@@ -60,7 +101,16 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
 
         // Create new profile if none exists
-        console.log('Creating new user profile for:', user.email);
+        console.log('🆕 Creating new user profile for:', user.email);
+        console.log('👤 User metadata:', user.user_metadata);
+        console.log('🔐 User auth details:', {
+          id: user.id,
+          email: user.email,
+          aud: user.aud,
+          role: user.role,
+          app_metadata: user.app_metadata
+        });
+        
         const newProfile = {
           supabase_user_id: user.id,
           email: user.email,
@@ -71,14 +121,38 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           created_at: new Date().toISOString()
         };
 
+        console.log('📝 Attempting to insert profile:', newProfile);
+
         const { data: newUserProfile, error: createError } = await supabase
           .from('user_profiles')
           .insert([newProfile])
           .select()
           .single();
 
+        console.log('📊 Insert result:', { 
+          data: newUserProfile, 
+          error: createError,
+          hasData: !!newUserProfile
+        });
+
         if (createError) {
-          console.error('Error creating user profile:', createError);
+          console.error('❌ Error creating user profile:', createError);
+          console.error('📋 Detailed error information:');
+          console.error('  - Code:', createError.code);
+          console.error('  - Message:', createError.message);
+          console.error('  - Details:', createError.details);
+          console.error('  - Hint:', createError.hint);
+          
+          // Test if it's a permissions issue
+          console.log('🧪 Testing basic table access...');
+          const { data: testRead, error: readError } = await supabase
+            .from('user_profiles')
+            .select('count(*)')
+            .limit(1);
+          
+          console.log('📊 Read test result:', { data: testRead, error: readError });
+          
+          console.warn('🔄 FALLBACK: Setting profile with user role due to creation error');
           // Set a minimal profile so the app can still function
           setUserProfile({
             supabase_user_id: user.id,
@@ -90,11 +164,13 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             updated_at: new Date().toISOString()
           });
         } else {
-          console.log('Successfully created user profile:', newUserProfile);
+          console.log('✅ Successfully created user profile:', newUserProfile);
+          console.log('🏷️ New profile role:', newUserProfile?.role);
           setUserProfile(newUserProfile);
         }
       } catch (error) {
-        console.error('Unexpected error in loadUserProfile:', error);
+        console.error('❌ Unexpected error in loadUserProfile:', error);
+        console.warn('🔄 FALLBACK: Setting profile with user role due to unexpected error');
         // Set a minimal profile as fallback
         setUserProfile({
           supabase_user_id: user.id,
