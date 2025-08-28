@@ -1,5 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { IonContent, IonHeader, IonPage, IonToolbar, IonButtons } from '@ionic/react';
+import MainMenu from '../components/MainMenu';
+import AgentsMenu from '../components/AgentsMenu';
+import AgentEditModal from '../components/AgentEditModal';
+import GenericMenu from '../components/GenericMenu';
+import RFPEditModal from '../components/RFPEditModal';
+import { RFPService } from '../services/rfpService';
+import type { RFP } from '../types/rfp';
 import AuthButtons from '../components/AuthButtons';
 import SessionHistory from '../components/SessionHistory';
 import SessionDialog from '../components/SessionDialog';
@@ -15,7 +22,7 @@ import { useIsMobile } from '../utils/useMediaQuery';
 import DatabaseService from '../services/database';
 import { AgentService } from '../services/agentService';
 import { ClaudeService } from '../services/claudeService';
-import type { SessionActiveAgent } from '../types/database';
+import type { SessionActiveAgent, Agent } from '../types/database';
 
 // Local interfaces for UI compatibility
 interface Message {
@@ -60,6 +67,66 @@ const Home: React.FC = () => {
   // Agent-related state
   const [currentAgent, setCurrentAgent] = useState<SessionActiveAgent | null>(null);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [showAgentModal, setShowAgentModal] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+  const [showAgentsMenu, setShowAgentsMenu] = useState(false);
+  // RFP state only
+  const [rfps, setRFPs] = useState<RFP[]>([]);
+  const [showRFPMenu, setShowRFPMenu] = useState(false);
+  const [showRFPModal, setShowRFPModal] = useState(false);
+  const [editingRFP, setEditingRFP] = useState<Partial<RFP> | null>(null);
+
+  // Main menu handler
+  const handleMainMenuSelect = (item: string) => {
+    if (item === 'Agents') setShowAgentsMenu(true);
+    if (item === 'RFP') setShowRFPMenu(true);
+  };
+
+  // Load data for menus
+  useEffect(() => { RFPService.getAll().then(setRFPs); }, []);
+
+  // RFP handlers
+  const handleNewRFP = () => { setEditingRFP(null); setShowRFPModal(true); };
+  const handleEditRFP = (rfp: RFP) => { setEditingRFP(rfp); setShowRFPModal(true); };
+  const handleDeleteRFP = async (rfp: RFP) => { await RFPService.delete(rfp.id); setRFPs(await RFPService.getAll()); };
+  const handleSaveRFP = async (rfpData: Partial<RFP>) => {
+    if (editingRFP && editingRFP.id) {
+      await RFPService.update(editingRFP.id, rfpData);
+    } else {
+      await RFPService.create(rfpData);
+    }
+    setRFPs(await RFPService.getAll());
+    setShowRFPModal(false);
+  };
+  const handleCancelRFP = () => setShowRFPModal(false);
+  // Load agents for menu
+  useEffect(() => {
+    AgentService.getActiveAgents().then(setAgents);
+  }, []);
+
+  const handleNewAgent = () => {
+    setEditingAgent(null);
+    setShowAgentModal(true);
+  };
+  const handleEditAgent = (agent: Agent) => {
+    setEditingAgent(agent);
+    setShowAgentModal(true);
+  };
+  const handleDeleteAgent = async (agent: Agent) => {
+    await AgentService.deleteAgent(agent.id);
+    setAgents(await AgentService.getActiveAgents());
+  };
+  const handleSaveAgent = async (agentData: Partial<Agent>) => {
+    if (editingAgent) {
+      await AgentService.updateAgent(editingAgent.id, agentData);
+    } else {
+      await AgentService.createAgent(agentData as any);
+    }
+    setAgents(await AgentService.getActiveAgents());
+    setShowAgentModal(false);
+  };
+  const handleCancelAgent = () => setShowAgentModal(false);
 
   // Clear UI state when user logs out
   const clearUIState = () => {
@@ -572,6 +639,26 @@ const Home: React.FC = () => {
             {!isMobile && (
               <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
             )}
+            <MainMenu onSelect={handleMainMenuSelect} />
+            <GenericMenu
+              items={rfps}
+              getLabel={r => r.name || `RFP #${r.id}`}
+              onNew={handleNewRFP}
+              onEdit={handleEditRFP}
+              onDelete={handleDeleteRFP}
+              showPopover={showRFPMenu}
+              setShowPopover={setShowRFPMenu}
+              title="RFP"
+            />
+      <AgentsMenu
+        agents={agents}
+        onNew={handleNewAgent}
+        onEdit={handleEditAgent}
+        onDelete={handleDeleteAgent}
+        // Only show popover if showAgentsMenu is true
+        showPopover={showAgentsMenu}
+        setShowPopover={setShowAgentsMenu}
+      />
             {isAuthenticated && user && userProfile && !isMobile && (
               <span style={{ 
                 fontSize: '12px', 
@@ -585,6 +672,18 @@ const Home: React.FC = () => {
               </span>
             )}
           </div>
+      <AgentEditModal
+        agent={editingAgent}
+        isOpen={showAgentModal}
+        onSave={handleSaveAgent}
+        onCancel={handleCancelAgent}
+      />
+      <RFPEditModal
+        rfp={editingRFP}
+        isOpen={showRFPModal}
+        onSave={handleSaveRFP}
+        onCancel={handleCancelRFP}
+      />
           
           {/* Center section - Agent Indicator */}
           <div style={{ 

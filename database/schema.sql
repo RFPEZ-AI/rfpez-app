@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS rfp (
   is_template BOOLEAN DEFAULT FALSE,
   is_public BOOLEAN DEFAULT FALSE,
   suppliers INTEGER[] DEFAULT '{}', -- array of supplier IDs
+  agent_ids INTEGER[] DEFAULT '{}', -- array of agent IDs
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );
@@ -26,17 +27,7 @@ CREATE TABLE IF NOT EXISTS bid (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS solicitation (
-  id SERIAL PRIMARY KEY,
-  rfp_id INTEGER REFERENCES rfp(id) ON DELETE CASCADE,
-  agent_ids INTEGER[] NOT NULL, -- array of agent IDs
-  title TEXT,
-  description TEXT,
-  is_template BOOLEAN DEFAULT FALSE,
-  is_public BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP DEFAULT NOW(),
-  updated_at TIMESTAMP DEFAULT NOW()
-);
+
 
 CREATE TABLE IF NOT EXISTS supplier (
   id SERIAL PRIMARY KEY,
