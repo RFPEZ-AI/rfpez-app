@@ -1,3 +1,11 @@
+// Form Spec Types for RJSF
+interface FormSpec {
+  version: string; // e.g., "rfpez-form@1"
+  schema: Record<string, any>; // JSON Schema (draft-07)
+  uiSchema: Record<string, any>; // RJSF uiSchema
+  defaults?: Record<string, any>; // Optional default values
+}
+
 // RFP Entity
 type RFP = {
   id: number;
@@ -5,6 +13,7 @@ type RFP = {
   due_date: string; // ISO date string
   description?: string;
   document: Record<string, unknown>; // JSONB
+  form_spec?: FormSpec | null; // JSON Schema + RJSF form specification
   is_template: boolean;
   is_public: boolean;
   suppliers: number[]; // array of supplier IDs
@@ -19,7 +28,8 @@ type Bid = {
   rfp_id: number;
   agent_id: number;
   supplier_id?: number;
-  document: Record<string, unknown>; // JSONB
+  document: Record<string, unknown>; // JSONB (legacy)
+  response?: Record<string, any>; // Form response data from form_spec
   created_at: string;
   updated_at: string;
 };
@@ -34,4 +44,4 @@ type Supplier = {
   rfpez_account_id?: number;
 };
 
-export type { RFP, Bid, Supplier };
+export type { RFP, Bid, Supplier, FormSpec };

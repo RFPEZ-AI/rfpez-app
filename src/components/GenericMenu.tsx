@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { IonPopover, IonList, IonItem, IonLabel, IonIcon, IonButton, IonAlert } from '@ionic/react';
-import { add, create, trash } from 'ionicons/icons';
+import { add, create, trash, eye, share } from 'ionicons/icons';
 
 interface GenericMenuProps<T> {
   items: T[];
@@ -8,31 +8,77 @@ interface GenericMenuProps<T> {
   onNew: () => void;
   onEdit: (item: T) => void;
   onDelete: (item: T) => void;
+  onPreview?: (item: T) => void; // Optional preview handler
+  onShare?: (item: T) => void; // Optional share handler
   showPopover: boolean;
   setShowPopover: (show: boolean) => void;
   title: string;
 }
 
-function GenericMenu<T extends { id: string | number }>({ items, getLabel, onNew, onEdit, onDelete, showPopover, setShowPopover, title }: GenericMenuProps<T>) {
+function GenericMenu<T extends { id: string | number }>({ 
+  items, 
+  getLabel, 
+  onNew, 
+  onEdit, 
+  onDelete, 
+  onPreview,
+  onShare,
+  showPopover, 
+  setShowPopover, 
+  title 
+}: GenericMenuProps<T>) {
   const [deleteItem, setDeleteItem] = useState<T | null>(null);
 
   return (
     <>
-      <IonPopover isOpen={showPopover} onDidDismiss={() => setShowPopover(false)}>
+      <IonPopover isOpen={showPopover} onDidDismiss={() => setShowPopover(false)} style={{ '--width': '400px' }}>
         <IonList>
           <IonItem button onClick={() => { setShowPopover(false); onNew(); }}>
             <IonIcon icon={add} slot="start" />
             <IonLabel>New {title}</IonLabel>
           </IonItem>
           {items.map(item => (
-            <IonItem key={item.id}>
-              <IonLabel>{getLabel(item)}</IonLabel>
-              <IonButton fill="clear" slot="end" onClick={() => { setShowPopover(false); onEdit(item); }}>
-                <IonIcon icon={create} />
-              </IonButton>
-              <IonButton fill="clear" color="danger" slot="end" onClick={() => setDeleteItem(item)}>
-                <IonIcon icon={trash} />
-              </IonButton>
+            <IonItem key={item.id} style={{ '--padding-start': '16px', '--padding-end': '8px' }}>
+              <IonLabel style={{ marginRight: '12px', minWidth: '120px' }}>{getLabel(item)}</IonLabel>
+              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                {onPreview && (
+                  <IonButton 
+                    fill="clear" 
+                    size="small" 
+                    onClick={() => { setShowPopover(false); onPreview(item); }}
+                    style={{ '--padding-start': '4px', '--padding-end': '4px', margin: 0 }}
+                  >
+                    <IonIcon icon={eye} />
+                  </IonButton>
+                )}
+                {onShare && (
+                  <IonButton 
+                    fill="clear" 
+                    size="small" 
+                    onClick={() => { setShowPopover(false); onShare(item); }}
+                    style={{ '--padding-start': '4px', '--padding-end': '4px', margin: 0 }}
+                  >
+                    <IonIcon icon={share} />
+                  </IonButton>
+                )}
+                <IonButton 
+                  fill="clear" 
+                  size="small" 
+                  onClick={() => { setShowPopover(false); onEdit(item); }}
+                  style={{ '--padding-start': '4px', '--padding-end': '4px', margin: 0 }}
+                >
+                  <IonIcon icon={create} />
+                </IonButton>
+                <IonButton 
+                  fill="clear" 
+                  color="danger" 
+                  size="small" 
+                  onClick={() => setDeleteItem(item)}
+                  style={{ '--padding-start': '4px', '--padding-end': '4px', margin: 0 }}
+                >
+                  <IonIcon icon={trash} />
+                </IonButton>
+              </div>
             </IonItem>
           ))}
         </IonList>

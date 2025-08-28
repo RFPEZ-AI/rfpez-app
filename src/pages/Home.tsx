@@ -5,6 +5,7 @@ import AgentsMenu from '../components/AgentsMenu';
 import AgentEditModal from '../components/AgentEditModal';
 import GenericMenu from '../components/GenericMenu';
 import RFPEditModal, { RFPFormValues, RFPEditFormValues } from '../components/RFPEditModal';
+import RFPPreviewModal from '../components/RFPPreviewModal';
 import { RFPService } from '../services/rfpService';
 import type { RFP } from '../types/rfp';
 import AuthButtons from '../components/AuthButtons';
@@ -77,7 +78,9 @@ const Home: React.FC = () => {
   const [rfps, setRFPs] = useState<RFP[]>([]);
   const [showRFPMenu, setShowRFPMenu] = useState(false);
   const [showRFPModal, setShowRFPModal] = useState(false);
+  const [showRFPPreviewModal, setShowRFPPreviewModal] = useState(false);
   const [editingRFP, setEditingRFP] = useState<Partial<RFP> | null>(null);
+  const [previewingRFP, setPreviewingRFP] = useState<RFP | null>(null);
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -91,6 +94,19 @@ const Home: React.FC = () => {
   // RFP handlers
   const handleNewRFP = () => { setEditingRFP(null); setShowRFPModal(true); };
   const handleEditRFP = (rfp: RFP) => { setEditingRFP(rfp); setShowRFPModal(true); };
+  const handlePreviewRFP = (rfp: RFP) => { setPreviewingRFP(rfp); setShowRFPPreviewModal(true); };
+  const handleShareRFP = async (rfp: RFP) => {
+    const formUrl = `${window.location.origin}/rfp/${rfp.id}/bid`;
+    try {
+      await navigator.clipboard.writeText(formUrl);
+      // You could add a toast notification here if you want
+      console.log('RFP bid form URL copied to clipboard:', formUrl);
+    } catch (err) {
+      console.error('Failed to copy to clipboard:', err);
+      // Fallback: show an alert with the URL
+      alert(`RFP Bid Form URL: ${formUrl}`);
+    }
+  };
   const handleDeleteRFP = async (rfp: RFP) => { await RFPService.delete(rfp.id); setRFPs(await RFPService.getAll()); };
   const handleSaveRFP = async (formData: Partial<RFPFormValues>) => {
     // Convert form values to RFP data structure
@@ -110,6 +126,7 @@ const Home: React.FC = () => {
     setShowRFPModal(false);
   };
   const handleCancelRFP = () => setShowRFPModal(false);
+  const handleClosePreview = () => setShowRFPPreviewModal(false);
   // Load agents for menu
   useEffect(() => {
     AgentService.getActiveAgents().then(setAgents);
@@ -672,6 +689,8 @@ const Home: React.FC = () => {
               onNew={handleNewRFP}
               onEdit={handleEditRFP}
               onDelete={handleDeleteRFP}
+              onPreview={handlePreviewRFP}
+              onShare={handleShareRFP}
               showPopover={showRFPMenu}
               setShowPopover={setShowRFPMenu}
               title="RFP"
@@ -709,6 +728,12 @@ const Home: React.FC = () => {
         isOpen={showRFPModal}
         onSave={handleSaveRFP}
         onCancel={handleCancelRFP}
+      />
+      
+      <RFPPreviewModal
+        isOpen={showRFPPreviewModal}
+        onClose={handleClosePreview}
+        rfp={previewingRFP}
       />
           
           {/* Center section - Agent Indicator */}
