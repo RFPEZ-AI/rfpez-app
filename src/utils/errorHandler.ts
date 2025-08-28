@@ -16,7 +16,7 @@ export interface AppError {
   message: string;
   userMessage: string;
   code?: string;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
   retryable?: boolean;
 }
 
@@ -27,7 +27,7 @@ export class AppErrorHandler {
     userMessage: string,
     options?: {
       code?: string;
-      context?: Record<string, any>;
+      context?: Record<string, unknown>;
       retryable?: boolean;
     }
   ): AppError {
@@ -41,7 +41,7 @@ export class AppErrorHandler {
     };
   }
 
-  static handleError(error: Error | AppError, context?: Record<string, any>): AppError {
+  static handleError(error: Error | AppError, context?: Record<string, unknown>): AppError {
     // If it's already an AppError, just log and return
     if ('type' in error) {
       logger.error(`AppError: ${error.message}`, undefined, { ...error.context, ...context });
@@ -107,7 +107,7 @@ export class AppErrorHandler {
 // Hook for React components to handle errors consistently
 export function useErrorHandler() {
   return {
-    handleError: (error: Error | AppError, context?: Record<string, any>) => {
+    handleError: (error: Error | AppError, context?: Record<string, unknown>) => {
       const appError = AppErrorHandler.handleError(error, context);
       
       // Could integrate with toast notifications, error boundaries, etc.

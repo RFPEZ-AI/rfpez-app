@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { IonButton, IonIcon, IonPopover, IonList, IonItem, IonLabel } from '@ionic/react';
-import { menu as menuIcon, people, documentText, briefcase } from 'ionicons/icons';
+import { menu as menuIcon, people, documentText } from 'ionicons/icons';
 
 interface MainMenuProps {
   onSelect: (item: string) => void;

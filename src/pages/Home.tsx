@@ -4,7 +4,7 @@ import MainMenu from '../components/MainMenu';
 import AgentsMenu from '../components/AgentsMenu';
 import AgentEditModal from '../components/AgentEditModal';
 import GenericMenu from '../components/GenericMenu';
-import RFPEditModal from '../components/RFPEditModal';
+import RFPEditModal, { RFPFormValues, RFPEditFormValues } from '../components/RFPEditModal';
 import { RFPService } from '../services/rfpService';
 import type { RFP } from '../types/rfp';
 import AuthButtons from '../components/AuthButtons';
@@ -14,10 +14,12 @@ import ArtifactWindow from '../components/ArtifactWindow';
 import AgentSelector from '../components/AgentSelector';
 import AgentIndicator from '../components/AgentIndicator';
 import AuthDebugger from '../components/AuthDebugger';
+import RoleManagement from '../components/RoleManagement';
 // Only import in development mode to avoid unused import warnings
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 import ClaudeTestComponent from '../components/ClaudeTestComponent';
 import { useSupabase } from '../context/SupabaseContext';
+import { RoleService } from '../services/roleService';
 import { useIsMobile } from '../utils/useMediaQuery';
 import DatabaseService from '../services/database';
 import { AgentService } from '../services/agentService';
@@ -90,7 +92,15 @@ const Home: React.FC = () => {
   const handleNewRFP = () => { setEditingRFP(null); setShowRFPModal(true); };
   const handleEditRFP = (rfp: RFP) => { setEditingRFP(rfp); setShowRFPModal(true); };
   const handleDeleteRFP = async (rfp: RFP) => { await RFPService.delete(rfp.id); setRFPs(await RFPService.getAll()); };
-  const handleSaveRFP = async (rfpData: Partial<RFP>) => {
+  const handleSaveRFP = async (formData: Partial<RFPFormValues>) => {
+    // Convert form values to RFP data structure
+    const { document, ...rest } = formData;
+    const rfpData: Partial<RFP> = {
+      ...rest,
+      // Convert File to Record<string, unknown> for database storage
+      document: document ? { name: document.name, size: document.size, type: document.type } : {}
+    };
+    
     if (editingRFP && editingRFP.id) {
       await RFPService.update(editingRFP.id, rfpData);
     } else {
@@ -121,7 +131,7 @@ const Home: React.FC = () => {
     if (editingAgent) {
       await AgentService.updateAgent(editingAgent.id, agentData);
     } else {
-      await AgentService.createAgent(agentData as any);
+      await AgentService.createAgent(agentData as Omit<Agent, 'id' | 'created_at' | 'updated_at'>);
     }
     setAgents(await AgentService.getActiveAgents());
     setShowAgentModal(false);
@@ -679,7 +689,7 @@ const Home: React.FC = () => {
         onCancel={handleCancelAgent}
       />
       <RFPEditModal
-        rfp={editingRFP}
+        rfp={editingRFP as Partial<RFPEditFormValues>}
         isOpen={showRFPModal}
         onSave={handleSaveRFP}
         onCancel={handleCancelRFP}
@@ -761,6 +771,13 @@ const Home: React.FC = () => {
         {/* Auth Debugger (Development Only) */}
         {process.env.NODE_ENV === 'development' && (
           <AuthDebugger />
+        )}
+
+        {/* Role Management (Development Only - for Administrators) */}
+        {process.env.NODE_ENV === 'development' && userProfile?.role && RoleService.isAdministrator(userProfile.role) && (
+          <div style={{ padding: '16px' }}>
+            <RoleManagement currentUserRole={userProfile.role} />
+          </div>
         )}
 
         {/* Agent Selector Modal */}

@@ -101,7 +101,7 @@ export function useConversation() {
     setMessages([]);
   }, []);
 
-  const loadMessagesFromSession = useCallback((sessionMessages: any[]) => {
+  const loadMessagesFromSession = useCallback((sessionMessages: Array<{ id: string; content: string; role: string; created_at: string; agent_name?: string }>) => {
     const formattedMessages: Message[] = sessionMessages.map(msg => ({
       id: msg.id,
       content: msg.content,

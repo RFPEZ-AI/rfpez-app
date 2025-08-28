@@ -1,10 +1,15 @@
 // TypeScript types for RFPEZ.AI Supabase database schema
 
+export type UserRole = 'user' | 'developer' | 'administrator';
+
 export interface UserProfile {
-  id: string; // UUID from auth.users
+  id?: string; // UUID from auth.users - optional for fallback cases
+  supabase_user_id: string; // UUID reference to auth.users
   email?: string;
   full_name?: string;
   avatar_url?: string;
+  role: UserRole;
+  last_login?: string;
   created_at: string;
   updated_at: string;
 }
@@ -17,7 +22,7 @@ export interface Session {
   created_at: string;
   updated_at: string;
   is_archived: boolean;
-  session_metadata?: Record<string, any>;
+  session_metadata?: Record<string, unknown>;
 }
 
 export interface SessionWithStats extends Session {
@@ -38,13 +43,13 @@ export interface Message {
   message_order: number;
   agent_id?: string; // UUID - which agent handled this message
   agent_name?: string; // Name of the agent that handled this message
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   ai_metadata?: {
     model?: string;
     tokens_used?: number;
     response_time?: number;
     temperature?: number;
-    [key: string]: any;
+    [key: string]: unknown;
   };
 }
 
@@ -58,7 +63,7 @@ export interface Artifact {
   storage_path?: string; // Supabase storage path
   mime_type?: string;
   created_at: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
   processed_content?: string; // Extracted text content
   processing_status: 'pending' | 'processing' | 'completed' | 'failed';
 }
@@ -83,7 +88,7 @@ export interface Agent {
   sort_order: number;
   created_at: string;
   updated_at: string;
-  metadata?: Record<string, any>;
+  metadata?: Record<string, unknown>;
 }
 
 export interface SessionAgent {

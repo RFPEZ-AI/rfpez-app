@@ -4,8 +4,10 @@ import type {
   Agent, 
   SessionAgent, 
   SessionActiveAgent,
-  AgentWithActivity
+  AgentWithActivity,
+  UserRole
 } from '../types/database';
+import { RoleService } from './roleService';
 
 export class AgentService {
   /**
@@ -71,6 +73,44 @@ export class AgentService {
 
     console.log('Available agents filtered:', availableAgents);
     return availableAgents;
+  }
+
+  /**
+   * Get agents available to user based on their role (role-based filtering)
+   */
+  static async getAgentsByUserRole(userRole: UserRole = 'user'): Promise<Agent[]> {
+    console.log('AgentService.getAgentsByUserRole called with role:', userRole);
+    
+    try {
+      const { data, error } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching agents by role:', error);
+        return [];
+      }
+
+      // For now, we'll use the existing is_restricted field but map it to roles
+      // In the future, you could add a minimum_role column to the agents table
+      const availableAgents = (data || []).filter(agent => {
+        // Map existing restrictions to role requirements
+        if (agent.is_restricted) {
+          // Restricted agents require at least developer role
+          return RoleService.hasRoleAccess(userRole, 'developer');
+        }
+        // Non-restricted agents are available to all roles
+        return true;
+      });
+
+      console.log(`Agents available for role ${userRole}:`, availableAgents);
+      return availableAgents;
+    } catch (err) {
+      console.error('Unexpected error in getAgentsByUserRole:', err);
+      return [];
+    }
   }
 
   /**

@@ -15,8 +15,8 @@ interface AgentsMenuProps {
 const AgentsMenu: React.FC<AgentsMenuProps> = ({ agents, onNew, onEdit, onDelete, showPopover, setShowPopover }) => {
   const [internalPopover, setInternalPopover] = useState(false);
   const isControlled = typeof showPopover === 'boolean' && typeof setShowPopover === 'function';
-  const popoverOpen = isControlled ? showPopover! : internalPopover;
-  const setPopover = isControlled ? setShowPopover! : setInternalPopover;
+  const popoverOpen = isControlled ? (showPopover || false) : internalPopover;
+  const setPopover = isControlled ? (setShowPopover || setInternalPopover) : setInternalPopover;
   const [deleteAgent, setDeleteAgent] = useState<Agent | null>(null);
 
   return (

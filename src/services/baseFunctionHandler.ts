@@ -34,18 +34,19 @@ export abstract class BaseFunctionHandler {
   }
 
   protected async executeQuery<T>(
-    operation: () => Promise<{ data: T; error: any }>,
+    operation: () => Promise<{ data: T; error: unknown }>,
     errorMessage: string,
-    context?: Record<string, any>
+    context?: Record<string, unknown>
   ): Promise<T> {
     try {
       const { data, error } = await operation();
       
       if (error) {
-        logger.error(`Database error: ${errorMessage}`, error, context);
+        const errorMsg = error instanceof Error ? error.message : 'Unknown database error';
+        logger.error(`Database error: ${errorMessage}`, error as Error, context);
         throw AppErrorHandler.createError(
           ErrorType.DATABASE,
-          `${errorMessage}: ${error.message}`,
+          `${errorMessage}: ${errorMsg}`,
           'Database error. Please try again.',
           { retryable: true, context }
         );
@@ -53,7 +54,7 @@ export abstract class BaseFunctionHandler {
       
       return data;
     } catch (error) {
-      if ('type' in (error as any)) {
+      if (error && typeof error === 'object' && 'type' in error) {
         throw error; // Re-throw AppErrors
       }
       
@@ -67,7 +68,7 @@ export abstract class BaseFunctionHandler {
     }
   }
 
-  protected validateRequiredParams(params: any, required: string[]): void {
+  protected validateRequiredParams(params: Record<string, unknown>, required: string[]): void {
     const missing = required.filter(param => !params[param]);
     if (missing.length > 0) {
       throw AppErrorHandler.createError(
@@ -80,12 +81,12 @@ export abstract class BaseFunctionHandler {
   }
 
   // Template method for function execution
-  protected async executeFunction(
+  protected async executeFunction<T>(
     functionName: string,
-    params: any,
+    params: Record<string, unknown>,
     userId: string,
-    handler: (params: any, userId: string) => Promise<any>
-  ): Promise<any> {
+    handler: (params: Record<string, unknown>, userId: string) => Promise<T>
+  ): Promise<T> {
     const startTime = Date.now();
     
     try {
@@ -121,7 +122,7 @@ export abstract class BaseFunctionHandler {
     }
   }
 
-  private sanitizeParams(params: any): any {
+  private sanitizeParams(params: Record<string, unknown>): Record<string, unknown> {
     // Remove sensitive data from logs
     const sanitized = { ...params };
     if (sanitized.password) sanitized.password = '[REDACTED]';
