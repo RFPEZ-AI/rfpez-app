@@ -51,7 +51,13 @@ export class ClaudeService {
     userMessage: string,
     agent: Agent,
     conversationHistory: ClaudeMessage[] = [],
-    sessionId?: string
+    sessionId?: string,
+    userProfile?: {
+      id?: string;
+      email?: string;
+      full_name?: string;
+      role?: string;
+    }
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
     const functionsExecuted: string[] = [];
@@ -69,7 +75,17 @@ export class ClaudeService {
       ];
 
       // Create system prompt based on agent instructions with MCP context
-      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}
+      const userContext = userProfile ? `
+
+CURRENT USER CONTEXT:
+- User ID: ${userProfile.id || 'anonymous'}
+- Name: ${userProfile.full_name || 'Anonymous User'}
+- Email: ${userProfile.email || 'not provided'}
+- Role: ${userProfile.role || 'user'}
+
+Please personalize your responses appropriately based on this user information.` : '';
+
+      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}
 
 You have access to conversation management functions that allow you to:
 - Retrieve conversation history from previous sessions
@@ -88,7 +104,12 @@ Be helpful, accurate, and professional.`;
         agent: agent.name,
         messageCount: messages.length,
         sessionId,
-        functionsAvailable: claudeApiFunctions.length
+        functionsAvailable: claudeApiFunctions.length,
+        userContext: userProfile ? {
+          name: userProfile.full_name,
+          email: userProfile.email,
+          role: userProfile.role
+        } : 'anonymous'
       });
 
       let response = await client.messages.create({
