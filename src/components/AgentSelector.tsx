@@ -233,7 +233,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                               <IonCardTitle className="agent-name">
                                 <span className="agent-name-text">
                                   {agent.name}
-                                  <span className="agent-suffix"> agent</span>
+                                  <span className="agent-suffix"> Agent</span>
                                 </span>
                                 {agent.is_default && (
                                   <IonIcon 
