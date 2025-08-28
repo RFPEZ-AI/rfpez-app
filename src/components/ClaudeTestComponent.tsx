@@ -19,8 +19,10 @@ import {
   chatbubbleEllipsesOutline 
 } from 'ionicons/icons';
 import { ClaudeService } from '../services/claudeService';
+import { useSupabase } from '../context/SupabaseContext';
 
 const ClaudeTestComponent: React.FC = () => {
+  const { userProfile } = useSupabase();
   const [testMessage, setTestMessage] = useState('Hello, can you help me create a new session and then retrieve my recent conversations?');
   const [response, setResponse] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -89,7 +91,13 @@ const ClaudeTestComponent: React.FC = () => {
         testMessage, 
         testAgent,
         [], // No previous conversation history for this test
-        sessionId
+        sessionId,
+        userProfile ? {
+          id: userProfile.id,
+          email: userProfile.email,
+          full_name: userProfile.full_name,
+          role: userProfile.role
+        } : undefined
       );
       
       setResponse(claudeResponse.content);

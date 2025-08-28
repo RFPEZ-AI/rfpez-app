@@ -463,7 +463,14 @@ const Home: React.FC = () => {
         const claudeResponse = await ClaudeService.generateResponse(
           content,
           agentForClaude,
-          conversationHistory
+          conversationHistory,
+          undefined, // sessionId
+          userProfile ? {
+            id: userProfile.id,
+            email: userProfile.email,
+            full_name: userProfile.full_name,
+            role: userProfile.role
+          } : undefined
         );
         
         const aiMessage: Message = {
