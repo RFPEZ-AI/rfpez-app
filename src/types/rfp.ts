@@ -4,7 +4,7 @@ type RFP = {
   name: string;
   due_date: string; // ISO date string
   description?: string;
-  document: any; // JSONB
+  document: Record<string, unknown>; // JSONB
   is_template: boolean;
   is_public: boolean;
   suppliers: number[]; // array of supplier IDs
@@ -19,7 +19,7 @@ type Bid = {
   rfp_id: number;
   agent_id: number;
   supplier_id?: number;
-  document: any; // JSONB
+  document: Record<string, unknown>; // JSONB
   created_at: string;
   updated_at: string;
 };

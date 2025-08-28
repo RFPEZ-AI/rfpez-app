@@ -1,11 +1,12 @@
 import React, { useState, useRef } from 'react';
-import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon, IonInput, IonModal, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
+import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon, IonInput, IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonBadge } from '@ionic/react';
 import { useSupabase } from '../context/SupabaseContext';
 import { logOutOutline, chevronDownOutline, logoGoogle, logoGithub } from 'ionicons/icons';
 import { devLog } from '../utils/devLog';
+import { RoleService } from '../services/roleService';
 
 const AuthButtons: React.FC = () => {
-  const { session, user, loading, signIn, signUp, signOut, signInWithOAuth } = useSupabase();
+  const { session, user, userProfile, loading, signIn, signUp, signOut, signInWithOAuth } = useSupabase();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [isSignUp, setIsSignUp] = useState(false);
@@ -159,6 +160,20 @@ const AuthButtons: React.FC = () => {
               onDidDismiss={() => setShowUserMenu(false)}
             >
               <IonList>
+                {userProfile?.role && RoleService.isValidRole(userProfile.role) ? (
+                  <IonItem>
+                    <IonLabel>
+                      <h3>Role</h3>
+                      <p>{RoleService.getRoleDisplayName(userProfile.role)}</p>
+                    </IonLabel>
+                    <IonBadge color={
+                      userProfile.role === 'administrator' ? 'danger' :
+                      userProfile.role === 'developer' ? 'warning' : 'medium'
+                    }>
+                      {userProfile.role}
+                    </IonBadge>
+                  </IonItem>
+                ) : null}
                 <IonItem button onClick={handleLogout}>
                   <IonIcon icon={logOutOutline} slot="start" />
                   <IonLabel>Logout</IonLabel>

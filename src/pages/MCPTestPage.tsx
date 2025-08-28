@@ -68,9 +68,10 @@ const MCPTestPage: React.FC = () => {
       
       setAlertMessage('MCP Initialize successful!');
       setShowAlert(true);
-    } catch (error: any) {
-      addDebugLog(`Initialize failed: ${error.message}`);
-      setAlertMessage(`Initialize failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addDebugLog(`Initialize failed: ${errorMsg}`);
+      setAlertMessage(`Initialize failed: ${errorMsg}`);
       setShowAlert(true);
     } finally {
       setIsLoading(false);
@@ -84,15 +85,16 @@ const MCPTestPage: React.FC = () => {
       
       const tools = await mcpClient.listTools();
       addDebugLog(`Tools found: ${tools.length}`);
-      tools.forEach((tool: any) => {
+      (tools as Array<{ name: string; description: string }>).forEach((tool) => {
         addDebugLog(`  - ${tool.name}: ${tool.description}`);
       });
       
       setAlertMessage(`Found ${tools.length} MCP tools!`);
       setShowAlert(true);
-    } catch (error: any) {
-      addDebugLog(`List tools failed: ${error.message}`);
-      setAlertMessage(`List tools failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addDebugLog(`List tools failed: ${errorMsg}`);
+      setAlertMessage(`List tools failed: ${errorMsg}`);
       setShowAlert(true);
     } finally {
       setIsLoading(false);
@@ -107,15 +109,16 @@ const MCPTestPage: React.FC = () => {
       const result = await mcpClient.getRecentSessions(5);
       const sessions = result.sessions;
       addDebugLog(`Sessions found: ${sessions.length}`);
-      sessions.forEach((session: any) => {
+      (sessions as Array<{ title: string; created_at: string }>).forEach((session) => {
         addDebugLog(`  - ${session.title} (${session.created_at})`);
       });
       
       setAlertMessage(`Found ${sessions.length} recent sessions!`);
       setShowAlert(true);
-    } catch (error: any) {
-      addDebugLog(`Get sessions failed: ${error.message}`);
-      setAlertMessage(`Get sessions failed: ${error.message}`);
+    } catch (error: unknown) {
+      const errorMsg = error instanceof Error ? error.message : 'Unknown error';
+      addDebugLog(`Get sessions failed: ${errorMsg}`);
+      setAlertMessage(`Get sessions failed: ${errorMsg}`);
       setShowAlert(true);
     } finally {
       setIsLoading(false);

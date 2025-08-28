@@ -1,22 +1,14 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User, SupabaseClient, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';
-
-type UserProfile = {
-  id?: string;
-  supabase_user_id?: string;
-  email?: string;
-  full_name?: string;
-  avatar_url?: string;
-  [key: string]: unknown;
-} | null;
+import type { UserProfile } from '../types/database';
 
 export type SupabaseCtx = {
   supabase: SupabaseClient;
   session: Session | null;
   user: User | null;
   loading: boolean;
-  userProfile: UserProfile;
+  userProfile: UserProfile | null;
   signIn: (email: string, password: string) => Promise<{ error: AuthError | null }>;
   signUp: (email: string, password: string, options?: { data?: object }) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
@@ -28,7 +20,7 @@ const SupabaseContext = createContext<SupabaseCtx | undefined>(undefined);
 export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
-  const [userProfile, setUserProfile] = useState<UserProfile>(null);
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -74,6 +66,7 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           email: user.email,
           full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
           avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+          role: 'user' as const, // Default role for new users
           last_login: new Date().toISOString(),
           created_at: new Date().toISOString()
         };
@@ -91,7 +84,10 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             supabase_user_id: user.id,
             email: user.email,
             full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
-            avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+            avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+            role: 'user',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
           });
         } else {
           console.log('Successfully created user profile:', newUserProfile);
@@ -104,7 +100,10 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           supabase_user_id: user.id,
           email: user.email,
           full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
-          avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+          avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
+          role: 'user',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         });
       }
     };

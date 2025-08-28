@@ -8,6 +8,12 @@ export interface ClaudeMessage {
   content: string;
 }
 
+export interface ClaudeTool {
+  name: string;
+  description: string;
+  input_schema: Record<string, unknown>;
+}
+
 export interface ClaudeAPIResponse {
   content: string;
   usage?: {
@@ -45,7 +51,7 @@ export class ClaudeAPIClient {
   static async sendMessage(
     messages: ClaudeMessage[],
     systemPrompt: string,
-    tools?: any[],
+    tools?: unknown[],
     options?: {
       model?: string;
       maxTokens?: number;
@@ -68,8 +74,8 @@ export class ClaudeAPIClient {
         max_tokens: options?.maxTokens || 2000,
         temperature: options?.temperature || 0.7,
         system: systemPrompt,
-        messages: messages as any,
-        tools: tools,
+        messages: messages as Anthropic.MessageParam[],
+        tools: tools as Anthropic.Tool[],
         tool_choice: tools ? { type: 'auto' } : undefined
       });
 
@@ -82,7 +88,7 @@ export class ClaudeAPIClient {
       });
 
       // Extract text content
-      const textBlocks = response.content.filter(block => block.type === 'text') as any[];
+      const textBlocks = response.content.filter(block => block.type === 'text') as Array<{ text: string }>;
       const content = textBlocks.map(block => block.text).join('');
 
       return {

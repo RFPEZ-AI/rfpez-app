@@ -26,19 +26,19 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({ agent, isOpen, onSave, 
       <IonContent>
         <IonItem>
           <IonLabel position="stacked">Name</IonLabel>
-          <IonInput value={form.name || ''} onIonChange={e => setForm(f => ({ ...f, name: e.detail.value! }))} />
+          <IonInput value={form.name || ''} onIonChange={e => setForm(f => ({ ...f, name: e.detail.value || '' }))} />
         </IonItem>
         <IonItem>
           <IonLabel position="stacked">Description</IonLabel>
-          <IonTextarea value={form.description || ''} onIonChange={e => setForm(f => ({ ...f, description: e.detail.value! }))} />
+          <IonTextarea value={form.description || ''} onIonChange={e => setForm(f => ({ ...f, description: e.detail.value || '' }))} />
         </IonItem>
         <IonItem>
           <IonLabel position="stacked">Instructions</IonLabel>
-          <IonTextarea value={form.instructions || ''} onIonChange={e => setForm(f => ({ ...f, instructions: e.detail.value! }))} />
+          <IonTextarea value={form.instructions || ''} onIonChange={e => setForm(f => ({ ...f, instructions: e.detail.value || '' }))} />
         </IonItem>
         <IonItem>
           <IonLabel position="stacked">Initial Prompt</IonLabel>
-          <IonTextarea value={form.initial_prompt || ''} onIonChange={e => setForm(f => ({ ...f, initial_prompt: e.detail.value! }))} />
+          <IonTextarea value={form.initial_prompt || ''} onIonChange={e => setForm(f => ({ ...f, initial_prompt: e.detail.value || '' }))} />
         </IonItem>
       </IonContent>
       <IonFooter>

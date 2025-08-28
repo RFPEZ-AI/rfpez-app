@@ -12,7 +12,7 @@ export interface LogContext {
   action?: string;
   userId?: string;
   sessionId?: string;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 class Logger {
@@ -45,13 +45,6 @@ class Logger {
     const timestamp = new Date().toISOString();
     const levelName = LogLevel[level];
     const formattedContext = context ? JSON.stringify(context) : '';
-    
-    const logEntry = {
-      timestamp,
-      level: levelName,
-      message,
-      context
-    };
 
     // Console output for development
     if (process.env.NODE_ENV !== 'production') {
@@ -61,7 +54,7 @@ class Logger {
 
     // Could add remote logging here
     if (this.enableRemoteLogging && level >= LogLevel.ERROR) {
-      this.sendToRemoteService(logEntry);
+      this.sendToRemoteService();
     }
   }
 
@@ -75,7 +68,7 @@ class Logger {
     }
   }
 
-  private async sendToRemoteService(logEntry: any): Promise<void> {
+  private async sendToRemoteService(): Promise<void> {
     // Implementation for remote logging service
     // Could integrate with services like LogRocket, Sentry, etc.
   }
