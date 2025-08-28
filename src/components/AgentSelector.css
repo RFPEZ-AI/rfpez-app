@@ -76,6 +76,24 @@
   margin: 0;
 }
 
+.agent-name-text {
+  display: flex;
+  align-items: center;
+  flex-wrap: nowrap;
+}
+
+.agent-suffix {
+  display: inline;
+  margin-left: 0.25em; /* Ensures proper spacing */
+}
+
+/* Hide agent suffix on smaller screens */
+@media (max-width: 992px) {
+  .agent-suffix {
+    display: none;
+  }
+}
+
 .current-indicator {
   font-size: 20px;
 }

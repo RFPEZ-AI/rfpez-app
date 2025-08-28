@@ -61,7 +61,12 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
             <IonIcon icon={personOutline} />
           )}
         </IonAvatar>
-        <IonLabel>{agent.agent_name}</IonLabel>
+        <IonLabel>
+          <span className="agent-name-text">
+            {agent.agent_name}
+            <span className="agent-suffix"> agent</span>
+          </span>
+        </IonLabel>
         {showSwitchButton && <IonIcon icon={swapHorizontalOutline} />}
       </IonChip>
     );
@@ -79,7 +84,12 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
         </IonAvatar>
         <div className="agent-details">
           <IonText color="dark">
-            <h3 className="agent-name">{agent.agent_name}</h3>
+            <h3 className="agent-name">
+              <span className="agent-name-text">
+                {agent.agent_name}
+                <span className="agent-suffix"> agent</span>
+              </span>
+            </h3>
           </IonText>
           <IonText color="medium">
             <p className="agent-initial-prompt">&quot;{agent.agent_initial_prompt}&quot;</p>
