@@ -1,3 +1,51 @@
+-- =============================
+-- RFP, Bid, Solicitation, Supplier Schema
+-- =============================
+
+
+CREATE TABLE IF NOT EXISTS rfp (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  due_date DATE NOT NULL,
+  description TEXT,
+  document JSONB NOT NULL,
+  is_template BOOLEAN DEFAULT FALSE,
+  is_public BOOLEAN DEFAULT FALSE,
+  suppliers INTEGER[] DEFAULT '{}', -- array of supplier IDs
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS bid (
+  id SERIAL PRIMARY KEY,
+  rfp_id INTEGER REFERENCES rfp(id) ON DELETE CASCADE,
+  agent_id INTEGER NOT NULL, -- assuming agent table exists
+  supplier_id INTEGER REFERENCES supplier(id),
+  document JSONB NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS solicitation (
+  id SERIAL PRIMARY KEY,
+  rfp_id INTEGER REFERENCES rfp(id) ON DELETE CASCADE,
+  agent_ids INTEGER[] NOT NULL, -- array of agent IDs
+  title TEXT,
+  description TEXT,
+  is_template BOOLEAN DEFAULT FALSE,
+  is_public BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS supplier (
+  id SERIAL PRIMARY KEY,
+  name TEXT NOT NULL,
+  description TEXT,
+  email TEXT,
+  phone TEXT,
+  rfpez_account_id INTEGER -- nullable, references user/account table if exists
+);
 -- RFPEZ.AI Supabase Database Schema
 -- Run these SQL commands in your Supabase SQL Editor
 
