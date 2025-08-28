@@ -649,7 +649,16 @@ const Home: React.FC = () => {
             {!isMobile && (
               <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
             )}
-            <MainMenu onSelect={handleMainMenuSelect} />
+            {/* Main Menu - Only visible to developer and administrator roles */}
+            {(() => {
+              const shouldShowMenu = userProfile?.role && RoleService.isDeveloperOrHigher(userProfile.role);
+              console.log('MainMenu visibility check:', {
+                userRole: userProfile?.role,
+                shouldShow: shouldShowMenu,
+                isDeveloperOrHigher: userProfile?.role ? RoleService.isDeveloperOrHigher(userProfile.role) : false
+              });
+              return shouldShowMenu ? <MainMenu onSelect={handleMainMenuSelect} /> : null;
+            })()}
             <GenericMenu
               items={rfps}
               getLabel={r => r.name || `RFP #${r.id}`}
@@ -748,7 +757,7 @@ const Home: React.FC = () => {
                 isLoading={isLoading}
                 onSendMessage={handleSendMessage}
                 onAttachFile={handleAttachFile}
-                promptPlaceholder="Ask RFPEZ.AI about RFPs, proposals, or document analysis..."
+                promptPlaceholder="chat here..."
               />
             </div>
 
