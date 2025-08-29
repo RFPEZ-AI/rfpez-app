@@ -23,8 +23,8 @@ import type { FormSpec } from '../types/rfp';
 export interface RFPFormValues {
   name: string;
   due_date: string;
-  description?: string;
-  document?: File | null;
+  description: string; // Required - public description
+  specification: string; // Required - detailed specs for Claude
   form_spec?: FormSpec | null;
   is_template?: boolean;
   is_public?: boolean;
@@ -35,8 +35,8 @@ export interface RFPFormValues {
 export interface RFPEditFormValues {
   name: string;
   due_date: string;
-  description?: string;
-  document?: Record<string, unknown> | File | null;
+  description: string; // Required - public description
+  specification: string; // Required - detailed specs for Claude
   form_spec?: FormSpec | null;
   is_template?: boolean;
   is_public?: boolean;
@@ -52,14 +52,32 @@ interface RFPEditModalProps {
 
 // Helper function to convert RFPEditFormValues to RFPFormValues
 const convertToFormValues = (editValues: Partial<RFPEditFormValues> | null): Partial<RFPFormValues> => {
-  if (!editValues) return {};
+  if (!editValues) return { 
+    description: '', 
+    specification: '' 
+  };
   
-  const { document, ...rest } = editValues;
+  // Extract only the fields we want (excluding document)
+  const {
+    name,
+    due_date,
+    description,
+    specification,
+    form_spec,
+    is_template,
+    is_public,
+    suppliers
+  } = editValues;
+  
   return {
-    ...rest,
-    // If document is a Record (from database), convert to null for form
-    // If it's already a File or null, keep as is
-    document: document && typeof document === 'object' && !(document instanceof File) ? null : document as File | null
+    name,
+    due_date,
+    description: description || '',
+    specification: specification || '',
+    form_spec,
+    is_template,
+    is_public,
+    suppliers
   };
 };
 
@@ -92,7 +110,7 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
         {/* Tab Navigation */}
         <IonSegment 
           value={activeTab} 
-          onIonChange={(e) => setActiveTab(e.detail.value as any)}
+          onIonChange={(e) => setActiveTab(e.detail.value as 'basic' | 'form' | 'preview')}
           style={{ padding: '16px' }}
         >
           <IonSegmentButton value="basic">
@@ -128,13 +146,26 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             </IonItem>
             
             <IonItem>
-              <IonLabel position="stacked">Description</IonLabel>
+              <IonLabel position="stacked">Description *</IonLabel>
               <IonTextarea 
                 value={form.description || ''} 
                 onIonInput={e => setForm(f => ({ ...f, description: e.detail.value || '' }))}
-                placeholder="Describe the RFP requirements..."
-                rows={4}
+                placeholder="Brief public description of the RFP..."
+                rows={3}
                 autoGrow
+                required
+              />
+            </IonItem>
+
+            <IonItem>
+              <IonLabel position="stacked">Specification *</IonLabel>
+              <IonTextarea 
+                value={form.specification || ''} 
+                onIonInput={e => setForm(f => ({ ...f, specification: e.detail.value || '' }))}
+                placeholder="Detailed requirements and specifications for form generation..."
+                rows={6}
+                autoGrow
+                required
               />
             </IonItem>
 
@@ -158,7 +189,7 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
               <IonButton 
                 expand="block" 
                 onClick={() => setActiveTab('form')}
-                disabled={!form.name || !form.due_date}
+                disabled={!form.name || !form.due_date || !form.description || form.description.trim() === '' || !form.specification || form.specification.trim() === ''}
               >
                 Next: Configure Bid Form
               </IonButton>
@@ -176,6 +207,7 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             
             <FormBuilder 
               onFormSpecGenerated={handleFormSpecGenerated}
+              initialSpecification={form.specification}
             />
             
             {form.form_spec && (
@@ -242,7 +274,7 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
               
               <IonButton 
                 onClick={handleSave}
-                disabled={!form.name || !form.due_date}
+                disabled={!form.name || !form.due_date || !form.description || form.description.trim() === '' || !form.specification || form.specification.trim() === ''}
                 size="default"
               >
                 Save RFP

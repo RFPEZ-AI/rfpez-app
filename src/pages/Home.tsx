@@ -109,21 +109,39 @@ const Home: React.FC = () => {
   };
   const handleDeleteRFP = async (rfp: RFP) => { await RFPService.delete(rfp.id); setRFPs(await RFPService.getAll()); };
   const handleSaveRFP = async (formData: Partial<RFPFormValues>) => {
-    // Convert form values to RFP data structure
-    const { document, ...rest } = formData;
-    const rfpData: Partial<RFP> = {
-      ...rest,
-      // Convert File to Record<string, unknown> for database storage
-      document: document ? { name: document.name, size: document.size, type: document.type } : {}
-    };
-    
-    if (editingRFP && editingRFP.id) {
-      await RFPService.update(editingRFP.id, rfpData);
-    } else {
-      await RFPService.create(rfpData);
+    try {
+      console.log('💾 Saving RFP with form data:', formData);
+      
+      // Convert form values to RFP data structure
+      const rfpData: Partial<RFP> = {
+        ...formData,
+        // Ensure required fields have values
+        description: formData.description || 'No description provided',
+        specification: formData.specification || 'No specification provided'
+      };
+      
+      console.log('💾 Converted RFP data for database:', rfpData);
+      
+      let result: RFP | null = null;
+      if (editingRFP && editingRFP.id) {
+        result = await RFPService.update(editingRFP.id, rfpData);
+      } else {
+        result = await RFPService.create(rfpData);
+      }
+      
+      if (result) {
+        console.log('✅ RFP saved successfully');
+        setRFPs(await RFPService.getAll());
+        setShowRFPModal(false);
+      } else {
+        console.error('❌ Failed to save RFP - service returned null');
+        // You might want to show an error message to the user here
+        alert('Failed to save RFP. Please check the console for details and ensure all required fields are filled.');
+      }
+    } catch (error) {
+      console.error('❌ Error saving RFP:', error);
+      alert('An error occurred while saving the RFP. Please try again.');
     }
-    setRFPs(await RFPService.getAll());
-    setShowRFPModal(false);
   };
   const handleCancelRFP = () => setShowRFPModal(false);
   const handleClosePreview = () => setShowRFPPreviewModal(false);

@@ -23,6 +23,7 @@ import type { FormSpec } from '../../types/rfp';
 interface FormBuilderProps {
   onFormSpecGenerated?: (formSpec: FormSpec) => void;
   className?: string;
+  initialSpecification?: string; // Pre-fill with RFP specification
 }
 
 const FORM_TEMPLATES = [
@@ -63,14 +64,16 @@ Requirements:
 
 export const FormBuilder: React.FC<FormBuilderProps> = ({
   onFormSpecGenerated,
-  className
+  className,
+  initialSpecification = ''
 }) => {
-  const [customPrompt, setCustomPrompt] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState<string>('');
+  const [customPrompt, setCustomPrompt] = useState(initialSpecification);
+  const [selectedTemplate, setSelectedTemplate] = useState<string>(initialSpecification ? 'custom' : '');
   const [isGenerating, setIsGenerating] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [generatedFormSpec, setGeneratedFormSpec] = useState<FormSpec | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [previewFormData, setPreviewFormData] = useState<Record<string, any>>({});
 
   const generateFormSpec = async () => {
@@ -115,6 +118,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
     }
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handlePreviewSubmit = (data: Record<string, any>) => {
     console.log('Preview form submitted:', data);
     setAlertMessage('Form submitted successfully! In a real scenario, this would save the bid response.');
@@ -167,10 +171,16 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
 
           {selectedTemplate === 'custom' && (
             <IonItem>
-              <IonLabel position="stacked">Custom Form Requirements</IonLabel>
+              <IonLabel position="stacked">
+                {initialSpecification ? 'RFP Specification (Customize as needed)' : 'Custom Form Requirements'}
+              </IonLabel>
               <IonTextarea
-                placeholder="Describe the form you want to create. Include field names, types, validation rules, and any specific requirements..."
+                placeholder={initialSpecification ? 
+                  "Review and modify the RFP specification below, or describe additional form requirements..." :
+                  "Describe the form you want to create. Include field names, types, validation rules, and any specific requirements..."
+                }
                 value={customPrompt}
+                // eslint-disable-next-line @typescript-eslint/no-non-null-assertion
                 onIonInput={(e) => setCustomPrompt(e.detail.value!)}
                 rows={6}
                 autoGrow
@@ -275,6 +285,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
 };
 
 // Mock form generation function (replace with actual Claude API call)
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 async function mockGenerateFormSpec(template: string, prompt: string): Promise<FormSpec> {
   // Simulate API delay
   await new Promise(resolve => setTimeout(resolve, 2000));
