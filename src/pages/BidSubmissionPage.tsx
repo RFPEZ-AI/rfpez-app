@@ -13,16 +13,15 @@ import {
   IonText,
   IonSpinner,
   IonAlert,
-  IonButton,
   IonIcon,
   IonItem,
   IonLabel,
   IonInput
 } from '@ionic/react';
-import { documentTextOutline, sendOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import { documentTextOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { RfpForm } from '../components/forms/RfpForm';
 import { RFPService } from '../services/rfpService';
-import type { RFP, FormSpec } from '../types/rfp';
+import type { RFP, FormSpec, Bid } from '../types/rfp';
 
 // Empty interface serves as a base for future extension
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
@@ -45,7 +44,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
     email: '',
     company: ''
   });
-  const [bidData, setBidData] = useState<Record<string, any>>({});
+  const [bidData, setBidData] = useState<Record<string, unknown>>({});
 
   useEffect(() => {
     const loadRfpData = async () => {
@@ -112,11 +111,11 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
     setSupplierInfo(prev => ({ ...prev, [field]: value }));
   };
 
-  const handleBidDataChange = (data: Record<string, any>) => {
+  const handleBidDataChange = (data: Record<string, unknown>) => {
     setBidData(data);
   };
 
-  const handleSubmitBid = async (formData: Record<string, any>) => {
+  const handleSubmitBid = async (formData: Record<string, unknown>) => {
     if (!rfp || !formSpec) return;
 
     // Validate supplier info
@@ -129,17 +128,19 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
     setSubmitting(true);
 
     try {
-      // Create bid record
-      const bidData = {
+      // Create bid record - store everything in response field to match DB schema
+      const bidData: Partial<Bid> = {
         rfp_id: rfp.id,
-        agent_id: 1, // TODO: Handle agent assignment properly
-        response: formData,
-        document: {
+        agent_id: 0, // Use 0 as default for system-generated bids
+        response: {
           supplier_info: supplierInfo,
+          form_data: formData, // Form response data
           submitted_at: new Date().toISOString(),
           form_version: formSpec.version
         }
       };
+
+      console.log('📝 Attempting to create bid with data:', JSON.stringify(bidData, null, 2));
 
       const createdBid = await RFPService.createBid(bidData);
       
@@ -263,7 +264,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
               <IonInput
                 value={supplierInfo.name}
                 placeholder="Your full name"
-                onIonInput={(e) => handleSupplierInfoChange('name', e.detail.value!)}
+                onIonInput={(e) => handleSupplierInfoChange('name', e.detail.value || '')}
               />
             </IonItem>
             
@@ -273,7 +274,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
                 type="email"
                 value={supplierInfo.email}
                 placeholder="your.email@company.com"
-                onIonInput={(e) => handleSupplierInfoChange('email', e.detail.value!)}
+                onIonInput={(e) => handleSupplierInfoChange('email', e.detail.value || '')}
               />
             </IonItem>
             
@@ -282,7 +283,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
               <IonInput
                 value={supplierInfo.company}
                 placeholder="Your company name (optional)"
-                onIonInput={(e) => handleSupplierInfoChange('company', e.detail.value!)}
+                onIonInput={(e) => handleSupplierInfoChange('company', e.detail.value || '')}
               />
             </IonItem>
           </IonCardContent>
