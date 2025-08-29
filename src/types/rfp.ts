@@ -28,8 +28,7 @@ type Bid = {
   rfp_id: number;
   agent_id: number;
   supplier_id?: number;
-  document: Record<string, unknown>; // JSONB (legacy)
-  response?: Record<string, any>; // Form response data from form_spec
+  response: Record<string, unknown>; // JSONB - contains supplier_info, response, submitted_at, form_version
   created_at: string;
   updated_at: string;
 };

@@ -43,8 +43,17 @@ export class RFPService {
 
   // Bid Methods
   static async createBid(bid: Partial<Bid>): Promise<Bid | null> {
+    console.log('🔄 Creating bid with data:', JSON.stringify(bid, null, 2));
     const { data, error } = await supabase.from('bid').insert(bid).select().single();
-    if (error) return null;
+    if (error) {
+      console.error('❌ Supabase error creating bid:', JSON.stringify(error, null, 2));
+      console.error('Error message:', error.message);
+      console.error('Error code:', error.code);
+      console.error('Error details:', error.details);
+      console.error('Error hint:', error.hint);
+      return null;
+    }
+    console.log('✅ Bid created successfully:', JSON.stringify(data, null, 2));
     return data;
   }
 
@@ -54,7 +63,7 @@ export class RFPService {
     return data || [];
   }
 
-  static async updateBidResponse(bidId: number, response: Record<string, any>): Promise<Bid | null> {
+  static async updateBidResponse(bidId: number, response: Record<string, unknown>): Promise<Bid | null> {
     const { data, error } = await supabase.from('bid').update({ response }).eq('id', bidId).select().single();
     if (error) return null;
     return data;
