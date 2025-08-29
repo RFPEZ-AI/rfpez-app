@@ -1,5 +1,7 @@
 {
     "recommendations": [
-        "Webnative.webnative"
+        "Webnative.webnative",
+        "Orta.vscode-jest",
+        "ms-vscode.test-adapter-converter"
     ]
 }
