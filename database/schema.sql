@@ -7,8 +7,8 @@ CREATE TABLE IF NOT EXISTS rfp (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   due_date DATE NOT NULL,
-  description TEXT,
-  document JSONB NOT NULL,
+  description TEXT NOT NULL CHECK (trim(description) != ''), -- Public description
+  specification TEXT NOT NULL CHECK (trim(specification) != ''), -- Detailed specs for Claude
   is_template BOOLEAN DEFAULT FALSE,
   is_public BOOLEAN DEFAULT FALSE,
   suppliers INTEGER[] DEFAULT '{}', -- array of supplier IDs

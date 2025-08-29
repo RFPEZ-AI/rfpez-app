@@ -11,8 +11,8 @@ type RFP = {
   id: number;
   name: string;
   due_date: string; // ISO date string
-  description?: string;
-  document: Record<string, unknown>; // JSONB
+  description: string; // Public description - what the RFP is about
+  specification: string; // Detailed requirements for Claude to generate forms
   form_spec?: FormSpec | null; // JSON Schema + RJSF form specification
   is_template: boolean;
   is_public: boolean;

@@ -11,8 +11,7 @@ import {
   IonItem,
   IonButton,
   IonIcon,
-  IonList,
-  IonText
+  IonList
 } from '@ionic/react';
 import { addOutline, removeOutline } from 'ionicons/icons';
 import type { WidgetProps } from '@rjsf/utils';
@@ -24,7 +23,9 @@ export const IonTextWidget: React.FC<WidgetProps> = ({
   onChange,
   onBlur,
   onFocus,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   options,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   schema,
   disabled,
   readonly,
@@ -51,6 +52,7 @@ export const IonNumberWidget: React.FC<WidgetProps> = ({
   onChange,
   onBlur,
   onFocus,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   options,
   schema,
   disabled,
@@ -112,6 +114,7 @@ export const IonSelectWidget: React.FC<WidgetProps> = ({
   value,
   onChange,
   options,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   schema,
   disabled,
   readonly,
@@ -129,6 +132,7 @@ export const IonSelectWidget: React.FC<WidgetProps> = ({
       fill="outline"
       interface="popover"
     >
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {enumOptions.map((option: any) => (
         <IonSelectOption key={option.value} value={option.value}>
           {option.label}
@@ -140,7 +144,6 @@ export const IonSelectWidget: React.FC<WidgetProps> = ({
 
 // Multiple Select Widget (Checkboxes)
 export const IonCheckboxesWidget: React.FC<WidgetProps> = ({
-  id,
   value = [],
   onChange,
   options,
@@ -149,6 +152,7 @@ export const IonCheckboxesWidget: React.FC<WidgetProps> = ({
 }) => {
   const { enumOptions = [] } = options;
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleChange = (optionValue: any, checked: boolean) => {
     const newValue = [...(value || [])];
     if (checked) {
@@ -166,6 +170,7 @@ export const IonCheckboxesWidget: React.FC<WidgetProps> = ({
 
   return (
     <IonList>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {enumOptions.map((option: any) => (
         <IonItem key={option.value}>
           <IonCheckbox
@@ -185,7 +190,6 @@ export const IonToggleWidget: React.FC<WidgetProps> = ({
   id,
   value,
   onChange,
-  options,
   disabled,
   readonly,
   label
@@ -208,7 +212,6 @@ export const IonDateWidget: React.FC<WidgetProps> = ({
   id,
   value,
   onChange,
-  options,
   disabled,
   readonly
 }) => {
@@ -232,10 +235,8 @@ export const IonDateWidget: React.FC<WidgetProps> = ({
 
 // Array Widget for managing arrays of simple values
 export const IonArrayWidget: React.FC<WidgetProps> = ({
-  id,
   value = [],
   onChange,
-  schema,
   disabled,
   readonly,
   title
@@ -246,10 +247,12 @@ export const IonArrayWidget: React.FC<WidgetProps> = ({
   };
 
   const handleRemoveItem = (index: number) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const newValue = value.filter((_: any, i: number) => i !== index);
     onChange(newValue);
   };
 
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const handleItemChange = (index: number, itemValue: any) => {
     const newValue = [...value];
     newValue[index] = itemValue;
@@ -258,6 +261,7 @@ export const IonArrayWidget: React.FC<WidgetProps> = ({
 
   return (
     <div>
+      {/* eslint-disable-next-line @typescript-eslint/no-explicit-any */}
       {value.map((item: any, index: number) => (
         <IonItem key={index}>
           <IonInput

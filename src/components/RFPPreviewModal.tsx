@@ -73,6 +73,15 @@ export const RFPPreviewModal: React.FC<RFPPreviewModalProps> = ({
                 </IonLabel>
               </IonItem>
             )}
+
+            {rfp.specification && (
+              <IonItem lines="none">
+                <IonLabel>
+                  <h3>Specification</h3>
+                  <p style={{ whiteSpace: 'pre-wrap' }}>{rfp.specification}</p>
+                </IonLabel>
+              </IonItem>
+            )}
             
             <IonItem lines="none">
               <IonLabel>
@@ -142,31 +151,7 @@ export const RFPPreviewModal: React.FC<RFPPreviewModalProps> = ({
           </IonCard>
         )}
 
-        {/* Legacy Document Preview */}
-        {rfp.document && Object.keys(rfp.document).length > 0 && (
-          <IonCard>
-            <IonCardHeader>
-              <IonCardTitle>
-                Legacy Document Data
-              </IonCardTitle>
-            </IonCardHeader>
-            <IonCardContent>
-              <IonText color="medium">
-                <p>This RFP contains legacy document data:</p>
-              </IonText>
-              <pre style={{ 
-                fontSize: '12px', 
-                backgroundColor: 'var(--ion-color-light)', 
-                padding: '12px', 
-                borderRadius: '4px',
-                overflow: 'auto',
-                maxHeight: '200px'
-              }}>
-                {JSON.stringify(rfp.document, null, 2)}
-              </pre>
-            </IonCardContent>
-          </IonCard>
-        )}
+        {/* Note: Document field has been removed */}
       </IonContent>
     </IonModal>
   );
