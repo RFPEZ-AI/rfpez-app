@@ -85,7 +85,7 @@ const testFormSpec: FormSpec = {
 };
 
 const RjsfTestPage: React.FC = () => {
-  const [formData, setFormData] = useState<any>({});
+  const [formData, setFormData] = useState<Record<string, unknown>>({});
   const [generatedFormSpec, setGeneratedFormSpec] = useState<FormSpec | null>(null);
   const [testResults, setTestResults] = useState<string[]>([]);
 
@@ -93,12 +93,12 @@ const RjsfTestPage: React.FC = () => {
     setTestResults(prev => [...prev, `${new Date().toLocaleTimeString()}: ${message}`]);
   };
 
-  const handleFormChange = (data: any) => {
+  const handleFormChange = (data: Record<string, unknown>) => {
     setFormData(data);
     addTestResult(`Form data updated: ${JSON.stringify(data, null, 2)}`);
   };
 
-  const handleFormSubmit = (data: any) => {
+  const handleFormSubmit = (data: Record<string, unknown>) => {
     addTestResult(`Form submitted with data: ${JSON.stringify(data, null, 2)}`);
   };
 

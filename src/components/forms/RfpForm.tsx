@@ -9,10 +9,10 @@ import type { FormSpec } from '../../types/rfp';
 
 interface RfpFormProps {
   formSpec: FormSpec;
-  formData?: Record<string, any>;
-  onSubmit?: (data: Record<string, any>) => void;
-  onChange?: (data: Record<string, any>) => void;
-  onError?: (errors: any[]) => void;
+  formData?: Record<string, unknown>;
+  onSubmit?: (data: Record<string, unknown>) => void;
+  onChange?: (data: Record<string, unknown>) => void;
+  onError?: (errors: unknown[]) => void;
   disabled?: boolean;
   readonly?: boolean;
   title?: string;
@@ -45,19 +45,19 @@ export const RfpForm: React.FC<RfpFormProps> = ({
     return { ...defaults, ...formData };
   }, [defaults, formData]);
 
-  const handleSubmit = (data: IChangeEvent<any>) => {
+  const handleSubmit = (data: IChangeEvent<Record<string, unknown>>) => {
     if (data.formData) {
       onSubmit?.(data.formData);
     }
   };
 
-  const handleChange = (data: IChangeEvent<any>) => {
+  const handleChange = (data: IChangeEvent<Record<string, unknown>>) => {
     if (data.formData) {
       onChange?.(data.formData);
     }
   };
 
-  const handleError = (errors: any[]) => {
+  const handleError = (errors: unknown[]) => {
     onError?.(errors);
   };
 
@@ -89,6 +89,7 @@ export const RfpForm: React.FC<RfpFormProps> = ({
           formData={effectiveFormData}
           widgets={ionicWidgets}
           templates={templates}
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           validator={validator as any}
           onSubmit={handleSubmit}
           onChange={handleChange}
