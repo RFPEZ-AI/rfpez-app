@@ -287,6 +287,13 @@ The application includes PWA features:
 
 ## 🧪 Testing & Debugging
 
+### Unit Testing
+- **Test Framework**: Jest + React Testing Library
+- **Coverage Reports**: Built-in coverage analysis
+- **Component Testing**: Comprehensive test suite for React components
+- **CI/CD Integration**: Automated testing in deployment pipelines
+- **Test Documentation**: See [DOCUMENTATION/UNIT-TESTING.md](DOCUMENTATION/UNIT-TESTING.md) for detailed testing guidelines
+
 ### MCP Testing
 - **Web Interface**: `/mcp-test` page for interactive testing
 - **Debug Utilities**: Browser console MCP debugging tools

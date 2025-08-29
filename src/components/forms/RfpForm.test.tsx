@@ -22,7 +22,7 @@ jest.mock('@ionic/react', () => ({
 
 // Mock RJSF
 jest.mock('@rjsf/core', () => {
-  return function MockForm({ schema, formData, onSubmit, onChange, disabled }: any) {
+  return function MockForm({ schema, formData, onSubmit, onChange, disabled, children }: any) {
     const handleSubmit = (e: React.FormEvent) => {
       e.preventDefault();
       onSubmit?.({ formData });
@@ -41,9 +41,8 @@ jest.mock('@rjsf/core', () => {
           onChange={(e) => handleChange(e.target.value)}
           disabled={disabled}
         />
-        <button type="submit" data-testid="form-submit" disabled={disabled}>
-          Submit
-        </button>
+        {/* Render children (IonButton) from RfpForm */}
+        {children}
       </form>
     );
   };
@@ -99,7 +98,7 @@ describe('RfpForm', () => {
       />
     );
     
-    fireEvent.click(screen.getByTestId('form-submit'));
+    fireEvent.click(screen.getByTestId('ion-button'));
     
     await waitFor(() => {
       expect(handleSubmit).toHaveBeenCalledWith({ testField: 'test value' });
@@ -129,14 +128,14 @@ describe('RfpForm', () => {
     render(<RfpForm formSpec={mockFormSpec} disabled={true} />);
     
     expect(screen.getByTestId('test-input')).toBeDisabled();
-    expect(screen.getByTestId('form-submit')).toBeDisabled();
+    expect(screen.getByTestId('ion-button')).toBeDisabled();
   });
 
   it('disables form when readonly prop is true', () => {
     render(<RfpForm formSpec={mockFormSpec} readonly={true} />);
     
     expect(screen.getByTestId('test-input')).toBeDisabled();
-    expect(screen.getByTestId('form-submit')).toBeDisabled();
+    expect(screen.queryByTestId('ion-button')).not.toBeInTheDocument(); // No submit button in readonly mode
   });
 
   it('hides submit button when showSubmitButton is false', () => {
