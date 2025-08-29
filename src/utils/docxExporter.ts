@@ -118,11 +118,23 @@ export class DocxExporter {
     responseData: Record<string, any>,
     options: DocxExportOptions = {}
   ): Promise<void> {
-    const { filename = 'bid-response.docx' } = options;
+    // Generate filename from form title if not provided
+    const { filename = this.sanitizeFilename(formSpec.schema.title || 'bid-response') + '.docx' } = options;
     
     const doc = this.buildBidDocx(formSpec, responseData, options);
     const blob = await Packer.toBlob(doc);
     saveAs(blob, filename);
+  }
+
+  /**
+   * Sanitizes a filename by removing/replacing invalid characters
+   */
+  private static sanitizeFilename(filename: string): string {
+    return filename
+      .replace(/[\/\\:*?"<>|]/g, '_')  // Replace invalid chars with underscore
+      .replace(/\s+/g, '_')           // Replace spaces with underscore
+      .replace(/_+/g, '_')            // Replace multiple underscores with single
+      .replace(/^_|_$/g, '');         // Remove leading/trailing underscores
   }
 
   /**
@@ -141,12 +153,7 @@ export class DocxExporter {
       tables: []
     };
 
-    // Create a summary table of key fields
-    const summaryTable: DocumentTable = {
-      headers: ['Field', 'Response'],
-      rows: []
-    };
-
+    // Create paragraphs for each field instead of a table
     if (schema.properties) {
       Object.entries(schema.properties).forEach(([key, fieldSchema]: [string, any]) => {
         const value = responseData[key];
@@ -154,13 +161,9 @@ export class DocxExporter {
         
         if (value !== undefined && value !== null && value !== '') {
           const formattedValue = this.formatFieldValue(value, fieldSchema);
-          summaryTable.rows.push([label, formattedValue]);
+          mainSection.paragraphs.push(`${label}: ${formattedValue}`);
         }
       });
-    }
-
-    if (summaryTable.rows.length > 0) {
-      mainSection.tables.push(summaryTable);
     }
 
     sections.push(mainSection);
