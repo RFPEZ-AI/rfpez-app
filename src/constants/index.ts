@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Application constants
 export const APP_CONSTANTS = {
   // UI Constants

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Form Spec Types for RJSF
 interface FormSpec {
   version: string; // e.g., "rfpez-form@1"

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // MCP Debug Console Utility
 // Use this in the browser console to debug MCP issues
 

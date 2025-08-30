@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Base class for function handlers with common functionality
 import { supabase } from '../supabaseClient';
 import { logger } from '../utils/logger';

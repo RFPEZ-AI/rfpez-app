@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 /* eslint-disable @typescript-eslint/no-empty-function */
 
 // jest-dom adds custom jest matchers for asserting on DOM nodes.

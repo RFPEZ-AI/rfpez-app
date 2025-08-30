@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../supabaseClient';
 import { useSupabase } from '../context/SupabaseContext';

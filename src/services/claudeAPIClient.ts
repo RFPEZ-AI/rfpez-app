@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Claude API client - handles only API communication
 import Anthropic from '@anthropic-ai/sdk';
 import { logger } from '../utils/logger';

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import { UserRole } from '../types/database';
 
 export class RoleService {

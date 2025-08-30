@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonActionSheet } from '@ionic/react';
 import { create, chatbubbleOutline, chevronForward, chevronDown, trash } from 'ionicons/icons';

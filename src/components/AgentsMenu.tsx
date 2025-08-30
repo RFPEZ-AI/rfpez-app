@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useState } from 'react';
 import { IonButton, IonIcon, IonPopover, IonList, IonItem, IonLabel, IonAlert } from '@ionic/react';
 import { personCircle, add, create, trash } from 'ionicons/icons';

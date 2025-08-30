@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React from 'react';
 import { IonItem, IonLabel, IonNote, IonText } from '@ionic/react';
 import type { FieldTemplateProps } from '@rjsf/utils';

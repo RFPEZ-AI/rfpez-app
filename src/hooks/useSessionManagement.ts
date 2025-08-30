@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Custom hook for session management
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from '../context/SupabaseContext';

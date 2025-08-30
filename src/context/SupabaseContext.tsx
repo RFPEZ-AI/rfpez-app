@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import type { Session, User, SupabaseClient, AuthError } from '@supabase/supabase-js';
 import { supabase } from '../supabaseClient';

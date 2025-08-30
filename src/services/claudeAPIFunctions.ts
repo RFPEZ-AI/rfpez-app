@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Claude API Function Calling Integration for RFPEZ MCP
 // This provides the same functionality as MCP but via HTTP endpoints that Claude API can call
 

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useState } from 'react';
 import { IonModal, IonButton, IonInput, IonTextarea, IonItem, IonLabel, IonHeader, IonToolbar, IonTitle, IonContent, IonFooter } from '@ionic/react';
 import type { Agent } from '../types/database';

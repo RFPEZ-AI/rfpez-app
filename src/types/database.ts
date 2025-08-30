@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // TypeScript types for RFPEZ.AI Supabase database schema
 
 export type UserRole = 'user' | 'developer' | 'administrator';

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useState, useRef, useEffect } from 'react';
 import { IonButton, IonIcon, IonTextarea } from '@ionic/react';
 import { sendOutline, attachOutline } from 'ionicons/icons';

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Centralized error handling system
 import { logger } from './logger';
 

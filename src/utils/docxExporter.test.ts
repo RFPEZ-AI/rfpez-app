@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import { DocxExporter } from './docxExporter';
 import type { FormSpec } from '../types/rfp';
 import { saveAs } from 'file-saver';

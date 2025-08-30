@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useState } from 'react';
 import { IonButton, IonIcon, IonPopover, IonList, IonItem, IonLabel } from '@ionic/react';
 import { menu as menuIcon, people, documentText } from 'ionicons/icons';

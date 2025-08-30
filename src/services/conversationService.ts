@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Conversation management service - handles session/message logic
 import { ClaudeAPIClient, ClaudeMessage } from './claudeAPIClient';
 import { claudeAPIHandler } from './claudeAPIFunctions';
