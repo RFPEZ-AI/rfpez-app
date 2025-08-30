@@ -10,6 +10,15 @@
   overflow: hidden;
 }
 
+/* Override default Ionic card header padding to remove extra space */
+.agent-card ion-card-header {
+  padding: 16px 16px 8px 16px; /* Reduce bottom padding */
+}
+
+.agent-card ion-card-title {
+  padding: 0; /* Remove default title padding */
+}
+
 .agent-card:hover {
   transform: translateY(-2px);
   box-shadow: 0 8px 25px rgba(0, 0, 0, 0.15);
@@ -48,6 +57,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  padding: 0; /* Remove default padding that creates extra space */
 }
 
 .agent-avatar {
@@ -59,6 +69,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0; /* Prevent avatar from shrinking */
 }
 
 .agent-avatar ion-icon {
@@ -74,6 +85,7 @@
   align-items: center;
   gap: 8px;
   margin: 0;
+  padding: 0; /* Remove default padding */
 }
 
 .agent-name-text {
@@ -165,6 +177,11 @@
 @media (max-width: 768px) {
   .agent-card {
     margin: 4px;
+  }
+  
+  /* Maintain consistent padding on mobile */
+  .agent-card ion-card-header {
+    padding: 12px 12px 6px 12px;
   }
   
   .agent-card-header {
