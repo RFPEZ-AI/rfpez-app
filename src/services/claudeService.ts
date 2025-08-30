@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Claude API service for RFPEZ.AI Multi-Agent System with MCP Integration
 import Anthropic from '@anthropic-ai/sdk';
 import type { Agent } from '../types/database';

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Database service layer for RFPEZ.AI
 import { supabase } from '../supabaseClient';
 import type { 

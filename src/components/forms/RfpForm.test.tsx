@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React from 'react';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';

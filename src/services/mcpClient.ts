@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // MCP Client for RFPEZ.AI Supabase Integration
 import { supabase } from '../supabaseClient';
 

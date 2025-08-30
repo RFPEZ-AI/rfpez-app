@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Agent service layer for RFPEZ.AI Multi-Agent System
 import { supabase } from '../supabaseClient';
 import type { 

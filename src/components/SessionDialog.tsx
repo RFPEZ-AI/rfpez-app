@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useEffect, useRef } from 'react';
 import { IonCard, IonCardContent } from '@ionic/react';
 import PromptComponent from './PromptComponent';

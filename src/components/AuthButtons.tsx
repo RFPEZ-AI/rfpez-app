@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useState, useRef } from 'react';
 import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon, IonInput, IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonBadge } from '@ionic/react';
 import { useSupabase } from '../context/SupabaseContext';

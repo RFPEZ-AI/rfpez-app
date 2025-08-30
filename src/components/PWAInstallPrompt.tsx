@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon, IonToast, IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonText, IonList, IonItem, IonLabel } from '@ionic/react';
 import { downloadOutline, closeOutline, shareOutline, addOutline } from 'ionicons/icons';

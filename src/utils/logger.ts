@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Enhanced logging service for RFPEZ.AI
 export enum LogLevel {
   DEBUG = 0,

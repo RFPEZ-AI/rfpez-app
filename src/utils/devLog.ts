@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Utility for development-only console logging
 // This helps avoid ESLint no-console errors in production builds
 

@@ -1,3 +1,5 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+
 // Custom hook for conversation management
 import { useState, useCallback } from 'react';
 import { ConversationService } from '../services/conversationService';
