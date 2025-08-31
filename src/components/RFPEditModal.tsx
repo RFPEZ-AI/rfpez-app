@@ -16,11 +16,19 @@ import {
   IonSegment,
   IonSegmentButton,
   IonText,
-  IonToggle
+  IonToggle,
+  IonList,
+  IonIcon
 } from '@ionic/react';
+import { add, create, trash, personCircle } from 'ionicons/icons';
 import FormBuilder from './forms/FormBuilder';
 import { RfpFormArtifact } from './forms/RfpForm';
+import AgentEditModal from './AgentEditModal';
+import { useSupabase } from '../context/SupabaseContext';
+import { RoleService } from '../services/roleService';
+import { AgentService } from '../services/agentService';
 import type { FormSpec } from '../types/rfp';
+import type { Agent } from '../types/database';
 
 export interface RFPFormValues {
   name: string;
@@ -84,8 +92,73 @@ const convertToFormValues = (editValues: Partial<RFPEditFormValues> | null): Par
 };
 
 const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCancel }) => {
+  const { userProfile } = useSupabase();
   const [form, setForm] = useState<Partial<RFPFormValues>>(() => convertToFormValues(rfp));
-  const [activeTab, setActiveTab] = useState<'basic' | 'form' | 'preview'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'form' | 'agents' | 'preview'>('basic');
+  
+  // Agent state
+  const [agents, setAgents] = useState<Agent[]>([]);
+  const [showAgentModal, setShowAgentModal] = useState(false);
+  const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
+
+  React.useEffect(() => {
+    setForm(convertToFormValues(rfp));
+  }, [rfp]);
+
+  // Load agents when component mounts or when agents tab is accessed
+  React.useEffect(() => {
+    if (isOpen && userProfile?.role && RoleService.isDeveloperOrHigher(userProfile.role)) {
+      const loadAgents = async () => {
+        try {
+          const activeAgents = await AgentService.getActiveAgents();
+          setAgents(activeAgents);
+        } catch (err) {
+          console.error('Error loading agents:', err);
+        }
+      };
+      loadAgents();
+    }
+  }, [isOpen, userProfile]);
+
+  // Agent management handlers
+  const handleNewAgent = () => {
+    setEditingAgent(null);
+    setShowAgentModal(true);
+  };
+
+  const handleEditAgent = (agent: Agent) => {
+    setEditingAgent(agent);
+    setShowAgentModal(true);
+  };
+
+  const handleDeleteAgent = async (agent: Agent) => {
+    try {
+      await AgentService.deleteAgent(agent.id);
+      setAgents(prev => prev.filter(a => a.id !== agent.id));
+    } catch (err) {
+      console.error('Error deleting agent:', err);
+    }
+  };
+
+  const handleAgentSave = async (agentData: Partial<Agent>) => {
+    try {
+      if (editingAgent?.id) {
+        // Update existing agent
+        await AgentService.updateAgent(editingAgent.id, agentData);
+      } else {
+        // Create new agent
+        await AgentService.createAgent(agentData as Omit<Agent, 'id' | 'created_at' | 'updated_at'>);
+      }
+      
+      // Reload agents after save
+      const activeAgents = await AgentService.getActiveAgents();
+      setAgents(activeAgents);
+      setShowAgentModal(false);
+      setEditingAgent(null);
+    } catch (err) {
+      console.error('Error saving agent:', err);
+    }
+  };
 
   React.useEffect(() => {
     setForm(convertToFormValues(rfp));
@@ -101,7 +174,8 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
   };
 
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={onCancel} style={{ '--height': '90%' }}>
+    <>
+      <IonModal isOpen={isOpen} onDidDismiss={onCancel} style={{ '--height': '90%' }}>
       <IonHeader>
         <IonToolbar>
           <IonTitle>{rfp ? 'Edit RFP' : 'New RFP'}</IonTitle>
@@ -112,7 +186,7 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
         {/* Tab Navigation */}
         <IonSegment 
           value={activeTab} 
-          onIonChange={(e) => setActiveTab(e.detail.value as 'basic' | 'form' | 'preview')}
+          onIonChange={(e) => setActiveTab(e.detail.value as 'basic' | 'form' | 'agents' | 'preview')}
           style={{ padding: '16px' }}
         >
           <IonSegmentButton value="basic">
@@ -124,6 +198,11 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
           <IonSegmentButton value="preview" disabled={!form.form_spec}>
             <IonLabel>Preview</IonLabel>
           </IonSegmentButton>
+          {userProfile?.role && RoleService.isDeveloperOrHigher(userProfile.role) && (
+            <IonSegmentButton value="agents">
+              <IonLabel>Agents</IonLabel>
+            </IonSegmentButton>
+          )}
         </IonSegment>
 
         {/* Basic Info Tab */}
@@ -242,6 +321,57 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             />
           </div>
         )}
+
+        {/* Agents Tab - Only visible to developer/editor role users */}
+        {activeTab === 'agents' && userProfile?.role && RoleService.isDeveloperOrHigher(userProfile.role) && (
+          <div style={{ padding: '16px' }}>
+            <IonText>
+              <h3>Agent Management</h3>
+              <p>Manage AI agents available for this RFP context:</p>
+            </IonText>
+            
+            {/* New Agent Button */}
+            <IonButton 
+              expand="block" 
+              fill="outline" 
+              onClick={handleNewAgent}
+              style={{ marginBottom: '16px' }}
+            >
+              <IonIcon icon={add} slot="start" />
+              New Agent
+            </IonButton>
+            
+            {/* Agents List */}
+            <IonList>
+              {agents.length === 0 ? (
+                <IonItem>
+                  <IonLabel color="medium">No agents available. Create your first agent!</IonLabel>
+                </IonItem>
+              ) : (
+                agents.map(agent => (
+                  <IonItem key={agent.id}>
+                    <IonIcon icon={personCircle} slot="start" />
+                    <IonLabel>
+                      <h3>{agent.name}</h3>
+                      {agent.description && <p>{agent.description}</p>}
+                    </IonLabel>
+                    <IonButton fill="clear" slot="end" onClick={() => handleEditAgent(agent)}>
+                      <IonIcon icon={create} />
+                    </IonButton>
+                    <IonButton 
+                      fill="clear" 
+                      color="danger" 
+                      slot="end" 
+                      onClick={() => handleDeleteAgent(agent)}
+                    >
+                      <IonIcon icon={trash} />
+                    </IonButton>
+                  </IonItem>
+                ))
+              )}
+            </IonList>
+          </div>
+        )}
       </IonContent>
       
       <IonFooter>
@@ -269,6 +399,7 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
                   onClick={() => {
                     if (activeTab === 'form') setActiveTab('basic');
                     if (activeTab === 'preview') setActiveTab('form');
+                    if (activeTab === 'agents') setActiveTab('preview');
                   }}
                   size="default"
                 >
@@ -287,7 +418,16 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
           </div>
         </IonToolbar>
       </IonFooter>
-    </IonModal>
+      </IonModal>
+      
+      {/* Agent Edit Modal */}
+      <AgentEditModal
+        isOpen={showAgentModal}
+        onCancel={() => setShowAgentModal(false)}
+        agent={editingAgent}
+        onSave={handleAgentSave}
+      />
+    </>
   );
 };
 
