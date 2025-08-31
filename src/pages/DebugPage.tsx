@@ -12,8 +12,11 @@ import {
   IonCard,
   IonCardHeader,
   IonCardTitle,
-  IonCardContent
+  IonCardContent,
+  IonButton,
+  IonIcon
 } from '@ionic/react';
+import { colorPaletteOutline } from 'ionicons/icons';
 import ClaudeTestComponent from '../components/ClaudeTestComponent';
 import AuthDebugger from '../components/AuthDebugger';
 import RoleManagement from '../components/RoleManagement';
@@ -51,6 +54,24 @@ const DebugPage: React.FC = () => {
           </IonCardHeader>
           <IonCardContent>
             <AuthDebugger />
+          </IonCardContent>
+        </IonCard>
+
+        {/* Component Demos */}
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>Component Demos</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            <IonButton 
+              expand="block" 
+              fill="outline" 
+              routerLink="/debug/avatars"
+              style={{ marginBottom: '8px' }}
+            >
+              <IonIcon icon={colorPaletteOutline} slot="start" />
+              Agent Avatar Demo
+            </IonButton>
           </IonCardContent>
         </IonCard>
 

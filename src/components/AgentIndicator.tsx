@@ -5,16 +5,15 @@ import {
   IonButton,
   IonIcon,
   IonText,
-  IonAvatar,
   IonChip,
   IonLabel
 } from '@ionic/react';
 import { 
-  personOutline, 
   swapHorizontalOutline,
   informationCircleOutline
 } from 'ionicons/icons';
 import type { SessionActiveAgent } from '../types/database';
+import AgentAvatar from './AgentAvatar';
 import './AgentIndicator.css';
 
 interface AgentIndicatorProps {
@@ -56,13 +55,11 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
         onClick={showSwitchButton ? onSwitchAgent : undefined}
         style={{ cursor: showSwitchButton ? 'pointer' : 'default' }}
       >
-        <IonAvatar>
-          {agent.agent_avatar_url ? (
-            <img src={agent.agent_avatar_url} alt={agent.agent_name} />
-          ) : (
-            <IonIcon icon={personOutline} />
-          )}
-        </IonAvatar>
+        <AgentAvatar
+          agentName={agent.agent_name}
+          avatarUrl={agent.agent_avatar_url}
+          size="small"
+        />
         <IonLabel>
           <span className="agent-name-text">
             {agent.agent_name}
@@ -77,13 +74,12 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
   return (
     <div className="agent-indicator full">
       <div className="agent-info">
-        <IonAvatar className="agent-avatar">
-          {agent.agent_avatar_url ? (
-            <img src={agent.agent_avatar_url} alt={agent.agent_name} />
-          ) : (
-            <IonIcon icon={personOutline} />
-          )}
-        </IonAvatar>
+        <AgentAvatar
+          agentName={agent.agent_name}
+          avatarUrl={agent.agent_avatar_url}
+          size="medium"
+          className="agent-avatar"
+        />
         <div className="agent-details">
           <IonText color="dark">
             <h3 className="agent-name">
