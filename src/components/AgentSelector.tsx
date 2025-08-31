@@ -26,7 +26,6 @@ import {
 } from '@ionic/react';
 import { 
   closeOutline, 
-  personOutline, 
   chatbubbleOutline,
   checkmarkCircle,
   informationCircleOutline,
@@ -36,6 +35,7 @@ import {
 } from 'ionicons/icons';
 import { AgentService } from '../services/agentService';
 import type { Agent, SessionActiveAgent } from '../types/database';
+import AgentAvatar from './AgentAvatar';
 import './AgentSelector.css';
 
 interface AgentSelectorProps {
@@ -249,13 +249,15 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                         >
                           <IonCardHeader>
                             <div className="agent-card-header">
-                              <IonAvatar className="agent-avatar">
-                                {agent.avatar_url ? (
-                                  <img src={agent.avatar_url} alt={agent.name} />
-                                ) : (
-                                  <IonIcon icon={personOutline} />
-                                )}
-                              </IonAvatar>
+                              <AgentAvatar
+                                agentName={agent.name}
+                                avatarUrl={agent.avatar_url}
+                                size="large"
+                                isActive={isCurrentAgent}
+                                isDefault={agent.is_default}
+                                isFree={agent.is_free}
+                                isPremium={agent.is_restricted}
+                              />
                               <IonCardTitle className="agent-name">
                                 <span className="agent-name-text">
                                   {agent.name}

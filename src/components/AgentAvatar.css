@@ -1,0 +1,418 @@
+/* Copyright Mark Skiba, 2025 All rights reserved */
+
+.agent-avatar {
+  --border-radius: 50%;
+  border: 2px solid var(--ion-color-light);
+  background: var(--ion-color-light);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  position: relative;
+  overflow: hidden;
+  transition: all 0.2s ease;
+}
+
+/* Size variants */
+.agent-avatar--small {
+  width: 32px;
+  height: 32px;
+}
+
+.agent-avatar--small .fallback-icon {
+  font-size: 16px;
+}
+
+.agent-avatar--medium {
+  width: 40px;
+  height: 40px;
+}
+
+.agent-avatar--medium .fallback-icon {
+  font-size: 20px;
+}
+
+.agent-avatar--large {
+  width: 48px;
+  height: 48px;
+}
+
+.agent-avatar--large .fallback-icon {
+  font-size: 24px;
+}
+
+.agent-avatar--xlarge {
+  width: 64px;
+  height: 64px;
+}
+
+.agent-avatar--xlarge .fallback-icon {
+  font-size: 32px;
+}
+
+/* State variants */
+.agent-avatar--active {
+  border-color: var(--ion-color-success);
+  background: var(--ion-color-success-tint);
+  box-shadow: 0 0 0 2px rgba(var(--ion-color-success-rgb), 0.2);
+}
+
+.agent-avatar--active .fallback-icon {
+  color: var(--ion-color-success);
+}
+
+.agent-avatar--default {
+  border-color: var(--ion-color-warning);
+  background: var(--ion-color-warning-tint);
+}
+
+.agent-avatar--default .fallback-icon {
+  color: var(--ion-color-warning);
+}
+
+.agent-avatar--premium {
+  border-color: var(--ion-color-secondary);
+  background: var(--ion-color-secondary-tint);
+}
+
+.agent-avatar--premium .fallback-icon {
+  color: var(--ion-color-secondary);
+}
+
+.agent-avatar--free {
+  border-color: var(--ion-color-tertiary);
+  background: var(--ion-color-tertiary-tint);
+}
+
+.agent-avatar--free .fallback-icon {
+  color: var(--ion-color-tertiary);
+}
+
+/* Interactive states */
+.agent-avatar--clickable:hover {
+  transform: scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.agent-avatar--clickable:active {
+  transform: scale(0.95);
+}
+
+/* Default styling for fallback icon */
+.agent-avatar .fallback-icon {
+  color: var(--ion-color-medium);
+}
+
+/* Cartoon icon container */
+.cartoon-icon-container {
+  background: linear-gradient(145deg, #f0f0f0, #ffffff);
+  border-radius: 50%;
+  padding: 4px;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+/* Cartoon icon styling */
+.cartoon-agent-icon {
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1));
+  transition: transform 0.2s ease;
+}
+
+/* Hover effect for cartoon icons */
+.agent-avatar--clickable .cartoon-agent-icon:hover {
+  transform: scale(1.05);
+}
+
+/* Active state animations */
+.agent-avatar--active .cartoon-agent-icon {
+  animation: gentle-pulse 2s ease-in-out infinite;
+}
+
+/* Premium agent sparkle effect */
+.agent-avatar--premium .cartoon-agent-icon {
+  animation: premium-glow 3s ease-in-out infinite;
+}
+
+/* Free agent bounce effect */
+.agent-avatar--free .cartoon-agent-icon {
+  animation: happy-bounce 2.5s ease-in-out infinite;
+}
+
+@keyframes gentle-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes premium-glow {
+  0%, 100% { 
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)) drop-shadow(0 0 8px rgba(156, 39, 176, 0.3)); 
+  }
+  50% { 
+    filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.1)) drop-shadow(0 0 16px rgba(156, 39, 176, 0.5)); 
+  }
+}
+
+@keyframes happy-bounce {
+  0%, 100% { transform: scale(1) translateY(0); }
+  25% { transform: scale(1.01) translateY(-1px); }
+  75% { transform: scale(0.99) translateY(1px); }
+}
+
+/* State-specific cartoon icon backgrounds */
+.agent-avatar--active .cartoon-icon-container {
+  background: linear-gradient(145deg, #e8f5e8, #c8e6c9);
+  box-shadow: 
+    inset 0 2px 4px rgba(76, 175, 80, 0.1),
+    0 0 8px rgba(76, 175, 80, 0.3);
+}
+
+.agent-avatar--default .cartoon-icon-container {
+  background: linear-gradient(145deg, #fff3e0, #ffe0b2);
+  box-shadow: 
+    inset 0 2px 4px rgba(255, 152, 0, 0.1),
+    0 0 8px rgba(255, 152, 0, 0.3);
+}
+
+.agent-avatar--premium .cartoon-icon-container {
+  background: linear-gradient(145deg, #f3e5f5, #e1bee7);
+  box-shadow: 
+    inset 0 2px 4px rgba(156, 39, 176, 0.1),
+    0 0 8px rgba(156, 39, 176, 0.3);
+}
+
+.agent-avatar--free .cartoon-icon-container {
+  background: linear-gradient(145deg, #e0f2f1, #b2dfdb);
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 188, 212, 0.1),
+    0 0 8px rgba(0, 188, 212, 0.3);
+}
+
+/* Image styling */
+.agent-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* Status indicators */
+.agent-avatar::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--ion-color-light);
+  display: none;
+}
+
+.agent-avatar--active::after {
+  display: block;
+  background: var(--ion-color-success);
+}
+
+.agent-avatar--default::after {
+  display: block;
+  background: var(--ion-color-warning);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  /* Scale down all sizes for mobile */
+  .agent-avatar--small {
+    width: 28px;
+    height: 28px;
+  }
+
+  .agent-avatar--small .fallback-icon {
+    font-size: 14px;
+  }
+
+  .agent-avatar--medium {
+    width: 32px;
+    height: 32px;
+  }
+
+  .agent-avatar--medium .fallback-icon {
+    font-size: 16px;
+  }
+
+  .agent-avatar--large {
+    width: 40px;
+    height: 40px;
+  }
+
+  .agent-avatar--large .fallback-icon {
+    font-size: 20px;
+  }
+
+  .agent-avatar--xlarge {
+    width: 56px;
+    height: 56px;
+  }
+
+  .agent-avatar--xlarge .fallback-icon {
+    font-size: 28px;
+  }
+
+  /* Smaller status indicators on mobile */
+  .agent-avatar::after {
+    width: 10px;
+    height: 10px;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Further scale down for very small screens */
+  .agent-avatar--small {
+    width: 24px;
+    height: 24px;
+  }
+
+  .agent-avatar--small .fallback-icon {
+    font-size: 12px;
+  }
+
+  .agent-avatar--medium {
+    width: 28px;
+    height: 28px;
+  }
+
+  .agent-avatar--medium .fallback-icon {
+    font-size: 14px;
+  }
+
+  .agent-avatar--large {
+    width: 36px;
+    height: 36px;
+  }
+
+  .agent-avatar--large .fallback-icon {
+    font-size: 18px;
+  }
+
+  .agent-avatar--xlarge {
+    width: 48px;
+    height: 48px;
+  }
+
+  .agent-avatar--xlarge .fallback-icon {
+    font-size: 24px;
+  }
+
+  /* Even smaller status indicators */
+  .agent-avatar::after {
+    width: 8px;
+    height: 8px;
+  }
+}
+
+/* Dark mode support */
+@media (prefers-color-scheme: dark) {
+  .agent-avatar {
+    border-color: var(--ion-color-dark);
+    background: var(--ion-color-dark);
+  }
+
+  .agent-avatar .fallback-icon {
+    color: var(--ion-color-light);
+  }
+
+  .agent-avatar::after {
+    border-color: var(--ion-color-dark);
+  }
+
+  .agent-avatar--active {
+    border-color: var(--ion-color-success);
+    background: var(--ion-color-success-shade);
+  }
+
+  .agent-avatar--default {
+    border-color: var(--ion-color-warning);
+    background: var(--ion-color-warning-shade);
+  }
+
+  .agent-avatar--premium {
+    border-color: var(--ion-color-secondary);
+    background: var(--ion-color-secondary-shade);
+  }
+
+  .agent-avatar--free {
+    border-color: var(--ion-color-tertiary);
+    background: var(--ion-color-tertiary-shade);
+  }
+
+  /* Dark mode cartoon icon containers */
+  .cartoon-icon-container {
+    background: linear-gradient(145deg, #2d2d2d, #404040);
+    box-shadow: inset 0 2px 4px rgba(255, 255, 255, 0.05);
+  }
+
+  .agent-avatar--active .cartoon-icon-container {
+    background: linear-gradient(145deg, #1b3d1b, #2e5d2e);
+    box-shadow: 
+      inset 0 2px 4px rgba(76, 175, 80, 0.2),
+      0 0 8px rgba(76, 175, 80, 0.4);
+  }
+
+  .agent-avatar--default .cartoon-icon-container {
+    background: linear-gradient(145deg, #3d2d1b, #5d4a2e);
+    box-shadow: 
+      inset 0 2px 4px rgba(255, 152, 0, 0.2),
+      0 0 8px rgba(255, 152, 0, 0.4);
+  }
+
+  .agent-avatar--premium .cartoon-icon-container {
+    background: linear-gradient(145deg, #3d1b3d, #5d2e5d);
+    box-shadow: 
+      inset 0 2px 4px rgba(156, 39, 176, 0.2),
+      0 0 8px rgba(156, 39, 176, 0.4);
+  }
+
+  .agent-avatar--free .cartoon-icon-container {
+    background: linear-gradient(145deg, #1b3d3d, #2e5d5d);
+    box-shadow: 
+      inset 0 2px 4px rgba(0, 188, 212, 0.2),
+      0 0 8px rgba(0, 188, 212, 0.4);
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .agent-avatar {
+    border-width: 3px;
+  }
+
+  .agent-avatar--active {
+    box-shadow: 0 0 0 3px rgba(var(--ion-color-success-rgb), 0.4);
+  }
+}
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  .agent-avatar {
+    transition: none;
+  }
+
+  .agent-avatar--clickable:hover {
+    transform: none;
+  }
+
+  .agent-avatar--clickable:active {
+    transform: none;
+  }
+
+  .cartoon-agent-icon {
+    transition: none;
+  }
+
+  .agent-avatar--clickable .cartoon-agent-icon:hover {
+    transform: none;
+  }
+
+  .agent-avatar--active .cartoon-agent-icon,
+  .agent-avatar--premium .cartoon-agent-icon,
+  .agent-avatar--free .cartoon-agent-icon {
+    animation: none;
+  }
+}
