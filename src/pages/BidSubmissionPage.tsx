@@ -17,7 +17,6 @@ import {
   IonAlert,
   IonIcon,
   IonItem,
-  IonLabel,
   IonInput
 } from '@ionic/react';
 import { documentTextOutline, checkmarkCircleOutline } from 'ionicons/icons';
@@ -262,8 +261,8 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
           </IonCardHeader>
           <IonCardContent>
             <IonItem>
-              <IonLabel position="stacked">Name *</IonLabel>
               <IonInput
+                label="Name *"
                 value={supplierInfo.name}
                 placeholder="Your full name"
                 onIonInput={(e) => handleSupplierInfoChange('name', e.detail.value || '')}
@@ -271,8 +270,8 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
             </IonItem>
             
             <IonItem>
-              <IonLabel position="stacked">Email *</IonLabel>
               <IonInput
+                label="Email *"
                 type="email"
                 value={supplierInfo.email}
                 placeholder="your.email@company.com"
@@ -281,8 +280,8 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
             </IonItem>
             
             <IonItem>
-              <IonLabel position="stacked">Company</IonLabel>
               <IonInput
+                label="Company"
                 value={supplierInfo.company}
                 placeholder="Your company name (optional)"
                 onIonInput={(e) => handleSupplierInfoChange('company', e.detail.value || '')}

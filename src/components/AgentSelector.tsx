@@ -31,7 +31,8 @@ import {
   checkmarkCircle,
   informationCircleOutline,
   starOutline,
-  lockClosedOutline
+  lockClosedOutline,
+  giftOutline
 } from 'ionicons/icons';
 import { AgentService } from '../services/agentService';
 import type { Agent, SessionActiveAgent } from '../types/database';
@@ -93,16 +94,30 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
     }
 
     // Check if user can access this agent
-    const canAccess = isAuthenticated ? 
-      (agent.is_restricted ? hasProperAccountSetup : true) : 
-      !agent.is_restricted; // Non-authenticated users can access any non-restricted agent
+    let canAccess = false;
+    let accessMessage = '';
+
+    if (!isAuthenticated) {
+      // Non-authenticated users can only access the default agent
+      canAccess = agent.is_default;
+      accessMessage = 'Please sign in to access more agents and features.';
+    } else {
+      // Authenticated users can access:
+      // 1. Default agents (always available)
+      // 2. Free agents (available to all authenticated users)
+      // 3. Non-restricted, non-free agents
+      // 4. Restricted agents only if they have proper account setup
+      
+      if (agent.is_default || agent.is_free || (!agent.is_restricted && !agent.is_free)) {
+        canAccess = true;
+      } else if (agent.is_restricted) {
+        canAccess = hasProperAccountSetup;
+        accessMessage = 'This premium agent requires billing setup. Please complete account setup to access advanced features.';
+      }
+    }
 
     if (!canAccess) {
-      if (!isAuthenticated) {
-        setToastMessage('This agent requires account setup. Please sign in to access advanced features.');
-      } else if (agent.is_restricted && !hasProperAccountSetup) {
-        setToastMessage('This agent requires account setup and billing. Please complete onboarding first.');
-      }
+      setToastMessage(accessMessage);
       setShowToast(true);
       return;
     }
@@ -173,9 +188,9 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                 {isAuthenticated 
                   ? `RFP EZ has a team of specialized agents to get your sourcing job done EZ.  
                   We'll try to guide you to the right agent for each step in the process, 
-                  but you can always select an agent if the need arrises.  For exanple, the ''Support Agent'' can be very helpful. 
-                  ${hasProperAccountSetup ? 'All agents are available.' : 'Premium agents require billing setup.'}`
-                  : 'Choose from our AI agents. Premium agents with advanced features require billaccount setup.'
+                  but you can always select an agent if the need arrises. Free agents (🎁) are available to all authenticated users. 
+                  ${hasProperAccountSetup ? 'Premium agents (🔒) are also available with your billing setup.' : 'Premium agents (🔒) require billing setup.'}`
+                  : 'Sign in to access our AI agents. Free agents are available to authenticated users, while premium agents require billing setup.'
                 }
 
               </p>
@@ -211,17 +226,26 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                     const isSwitching = switching === agent.id;
                     
                     // Determine if user can access this agent
-                    const canAccess = isAuthenticated ? 
-                      (agent.is_restricted ? hasProperAccountSetup : true) : 
-                      !agent.is_restricted; // Non-authenticated users can access any non-restricted agent
+                    let canAccess = false;
+                    if (!isAuthenticated) {
+                      // Non-authenticated users can only access the default agent
+                      canAccess = agent.is_default;
+                    } else {
+                      // Authenticated users can access:
+                      // 1. Default agents, 2. Free agents, 3. Non-restricted non-free agents
+                      // 4. Restricted agents only if they have proper account setup
+                      canAccess = agent.is_default || agent.is_free || 
+                                (!agent.is_restricted && !agent.is_free) ||
+                                (agent.is_restricted && hasProperAccountSetup);
+                    }
                     
                     return (
                       <IonCol size="12" sizeMd="6" sizeLg="4" key={agent.id}>
                         <IonCard 
                           className={`agent-card ${isCurrentAgent ? 'current-agent' : ''} ${!canAccess ? 'disabled-agent' : ''}`}
-                          button={canAccess}
-                          onClick={canAccess ? () => handleAgentSelect(agent) : undefined}
-                          disabled={isSwitching || !canAccess}
+                          button={true}
+                          onClick={() => handleAgentSelect(agent)}
+                          disabled={isSwitching}
                         >
                           <IonCardHeader>
                             <div className="agent-card-header">
@@ -245,12 +269,20 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                                     title="Default Agent"
                                   />
                                 )}
+                                {agent.is_free && (
+                                  <IonIcon 
+                                    icon={giftOutline} 
+                                    color="success" 
+                                    className="free-indicator"
+                                    title="Free Agent - Available to authenticated users"
+                                  />
+                                )}
                                 {agent.is_restricted && (
                                   <IonIcon 
                                     icon={lockClosedOutline} 
                                     color="medium" 
                                     className="restricted-indicator"
-                                    title="Requires Account Setup"
+                                    title="Premium Agent - Requires billing setup"
                                   />
                                 )}
                                 {isCurrentAgent && (
@@ -317,6 +349,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
         message={toastMessage}
         duration={3000}
         position="top"
+        data-testid="toast"
       />
     </>
   );

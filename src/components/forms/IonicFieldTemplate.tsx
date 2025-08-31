@@ -91,7 +91,7 @@ export const IonicFieldTemplate: React.FC<FieldTemplateProps> = ({
     >
       <div style={{ width: '100%' }}>
         {displayLabel && label && (
-          <IonLabel position="stacked">
+          <IonLabel id={`${id}-label`} position="stacked">
             {label}
             {required && <span style={{ color: 'var(--ion-color-danger)' }}> *</span>}
           </IonLabel>

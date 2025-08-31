@@ -85,6 +85,7 @@ const ClaudeTestComponent: React.FC = () => {
         initial_prompt: '',
         is_default: false,
         is_restricted: false,
+        is_free: false,
         sort_order: 0
       };
 
@@ -258,8 +259,8 @@ const ClaudeTestComponent: React.FC = () => {
 
           {/* Test Message Input */}
           <IonItem>
-            <IonLabel position="stacked">Test Message (Try asking about sessions or conversations)</IonLabel>
             <IonTextarea
+              label="Test Message (Try asking about sessions or conversations)"
               value={testMessage}
               onIonInput={(e) => setTestMessage(e.detail.value || '')}
               placeholder="Try: 'Can you create a new session and show me my recent conversations?'"

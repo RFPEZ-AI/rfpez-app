@@ -46,6 +46,23 @@ The system comes with three pre-configured agents:
 - **Instructions**: "You are an RFP specialist. Help users create, manage, and optimize their RFP processes."
 - **Initial Prompt**: "Welcome! I'm your RFP Assistant. I specialize in helping you create effective RFPs and manage your procurement process."
 
+### 4. RFP Design (Free)
+- **Purpose**: Free RFP design assistance for authenticated users
+- **Instructions**: "You are an RFP Design specialist that helps users create basic RFPs and understand the RFP process. Focus on fundamental RFP structure, basic requirements gathering, and simple procurement strategies."
+- **Initial Prompt**: "Welcome! I'm your RFP Design assistant. I'm here to help you understand and create basic RFPs. Whether you're new to procurement or need guidance on RFP structure, I can help you get started."
+
+## Agent Access Control
+
+The system supports three tiers of access control:
+
+1. **Public Access** - Default agent (Solutions) available to all users
+2. **Free Access** - Free agents (RFP Design) available to authenticated users without billing
+3. **Premium Access** - Restricted agents (Technical Support, RFP Assistant) requiring billing setup
+
+For detailed access control information, see:
+- [AGENT-ACCESS-CONTROL.md](./AGENT-ACCESS-CONTROL.md) - Original access control system
+- [AGENT-FREE-ACCESS.md](./AGENT-FREE-ACCESS.md) - New free access tier documentation
+
 ## Features
 
 ### Agent Management

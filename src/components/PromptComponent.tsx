@@ -230,6 +230,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             ref={textareaRef}
             value={message}
             placeholder={placeholder}
+            aria-label="Message input"
             onIonInput={(e) => setMessage(e.detail.value || '')}
             onKeyDown={handleKeyDown}
             rows={1}
