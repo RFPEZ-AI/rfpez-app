@@ -149,6 +149,7 @@ const Home: React.FC = () => {
   const handleClosePreview = () => setShowRFPPreviewModal(false);
   // Load agents for menu
   useEffect(() => {
+    AgentService.debugAgents(); // Debug current database state
     AgentService.getActiveAgents().then(setAgents);
   }, []);
 
@@ -165,13 +166,28 @@ const Home: React.FC = () => {
     setAgents(await AgentService.getActiveAgents());
   };
   const handleSaveAgent = async (agentData: Partial<Agent>) => {
-    if (editingAgent) {
-      await AgentService.updateAgent(editingAgent.id, agentData);
-    } else {
-      await AgentService.createAgent(agentData as Omit<Agent, 'id' | 'created_at' | 'updated_at'>);
+    try {
+      if (editingAgent) {
+        const result = await AgentService.updateAgent(editingAgent.id, agentData);
+        if (!result) {
+          console.error('Failed to update agent:', editingAgent.id);
+          // Still refresh the agents list to show current state
+        }
+      } else {
+        const result = await AgentService.createAgent(agentData as Omit<Agent, 'id' | 'created_at' | 'updated_at'>);
+        if (!result) {
+          console.error('Failed to create agent');
+          // Still refresh the agents list to show current state
+        }
+      }
+      setAgents(await AgentService.getActiveAgents());
+      setShowAgentModal(false);
+    } catch (error) {
+      console.error('Error in handleSaveAgent:', error);
+      // Still refresh the agents list and close modal to prevent UI issues
+      setAgents(await AgentService.getActiveAgents());
+      setShowAgentModal(false);
     }
-    setAgents(await AgentService.getActiveAgents());
-    setShowAgentModal(false);
   };
   const handleCancelAgent = () => setShowAgentModal(false);
 
@@ -491,6 +507,7 @@ const Home: React.FC = () => {
           is_active: true,
           is_default: false,
           is_restricted: false,
+          is_free: false,
           sort_order: 0,
           created_at: '',
           updated_at: '',

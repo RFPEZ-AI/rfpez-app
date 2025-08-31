@@ -87,6 +87,7 @@ export interface Agent {
   is_active: boolean;
   is_default: boolean; // Identifies the default agent
   is_restricted: boolean; // Requires proper account setup to use
+  is_free: boolean; // Available to authenticated users without billing
   sort_order: number;
   created_at: string;
   updated_at: string;

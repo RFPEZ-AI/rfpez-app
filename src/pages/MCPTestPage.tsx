@@ -211,6 +211,7 @@ const MCPTestPage: React.FC = () => {
             </IonCardHeader>
             <IonCardContent>
               <IonTextarea
+                aria-label="Debug Output"
                 value={debugOutput.join('\n')}
                 rows={15}
                 readonly

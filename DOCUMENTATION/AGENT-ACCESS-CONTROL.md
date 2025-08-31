@@ -2,7 +2,13 @@
 
 ## Overview
 
-The RFPEZ.AI multi-agent system now includes access control features that allow for different levels of agent availability based on user account setup and business requirements.
+The RFPEZ.AI multi-agent system includes comprehensive access control features that provide different levels of agent availability based on user authentication status, account setup, and business requirements. The system now supports three tiers of access:
+
+1. **Public Access** - Default agent available to all users
+2. **Free Access** - Free agents available to authenticated users without billing
+3. **Premium Access** - Restricted agents requiring proper account setup and billing
+
+> **Note**: For detailed information about the free access tier, see [AGENT-FREE-ACCESS.md](./AGENT-FREE-ACCESS.md)
 
 ## New Database Fields
 

@@ -253,8 +253,8 @@ const MCPTestComponent: React.FC = () => {
           </IonCardHeader>
           <IonCardContent>
             <IonItem>
-              <IonLabel position="stacked">Session Title</IonLabel>
               <IonInput
+                label="Session Title"
                 value={newSessionTitle}
                 onIonInput={(e) => setNewSessionTitle(e.detail.value || '')}
                 placeholder="Enter session title"
@@ -343,8 +343,8 @@ const MCPTestComponent: React.FC = () => {
                 </IonSelect>
               </IonItem>
               <IonItem>
-                <IonLabel position="stacked">Message</IonLabel>
                 <IonTextarea
+                  label="Message"
                   value={newMessage}
                   onIonInput={(e) => setNewMessage(e.detail.value || '')}
                   placeholder="Enter your message"
@@ -369,8 +369,8 @@ const MCPTestComponent: React.FC = () => {
           </IonCardHeader>
           <IonCardContent>
             <IonItem>
-              <IonLabel position="stacked">Search Query</IonLabel>
               <IonInput
+                label="Search Query"
                 value={searchQuery}
                 onIonInput={(e) => setSearchQuery(e.detail.value || '')}
                 placeholder="Enter search terms"

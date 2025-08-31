@@ -18,6 +18,7 @@ import {
 import { addOutline, removeOutline } from 'ionicons/icons';
 import type { WidgetProps } from '@rjsf/utils';
 
+//
 // Text Input Widget
 export const IonTextWidget: React.FC<WidgetProps> = ({
   id,
@@ -38,6 +39,7 @@ export const IonTextWidget: React.FC<WidgetProps> = ({
       id={id}
       value={value ?? ''}
       placeholder={placeholder}
+      aria-labelledby={`${id}-label`}
       disabled={disabled || readonly}
       onIonInput={(e) => onChange(e.detail.value || '')}
       onIonBlur={() => onBlur && onBlur(id, value)}
@@ -67,6 +69,7 @@ export const IonNumberWidget: React.FC<WidgetProps> = ({
       type="number"
       value={value ?? ''}
       placeholder={placeholder}
+      aria-labelledby={`${id}-label`}
       disabled={disabled || readonly}
       min={schema.minimum}
       max={schema.maximum}
@@ -99,6 +102,7 @@ export const IonTextareaWidget: React.FC<WidgetProps> = ({
       id={id}
       value={value ?? ''}
       placeholder={placeholder}
+      aria-labelledby={`${id}-label`}
       disabled={disabled || readonly}
       rows={options?.rows || 4}
       onIonInput={(e) => onChange(e.detail.value || '')}
@@ -198,13 +202,15 @@ export const IonToggleWidget: React.FC<WidgetProps> = ({
 }) => {
   return (
     <IonItem>
-      <IonLabel>{label}</IonLabel>
       <IonToggle
         id={id}
         checked={value ?? false}
         disabled={disabled || readonly}
         onIonChange={(e) => onChange(e.detail.checked)}
-      />
+        aria-labelledby={`${id}-label`}
+      >
+        {label}
+      </IonToggle>
     </IonItem>
   );
 };
@@ -269,6 +275,7 @@ export const IonArrayWidget: React.FC<WidgetProps> = ({
           <IonInput
             value={item}
             placeholder={`${title || 'Item'} ${index + 1}`}
+            aria-label={`${title || 'Item'} ${index + 1}`}
             disabled={disabled || readonly}
             onIonInput={(e) => handleItemChange(index, e.detail.value || '')}
             fill="outline"

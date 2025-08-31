@@ -68,13 +68,50 @@ export class AgentService {
       return availableAgents;
     }
 
-    // Filter out restricted agents if user doesn't have proper account setup
-    if (!hasProperAccountSetup) {
-      availableAgents = availableAgents.filter(agent => !agent.is_restricted);
-    }
+    // For authenticated users, include:
+    // 1. Default agents (available to all)
+    // 2. Free agents (available to authenticated users without billing)
+    // 3. Restricted agents only if user has proper account setup
+    availableAgents = availableAgents.filter(agent => {
+      // Always include default agent
+      if (agent.is_default) return true;
+      
+      // Include free agents for authenticated users
+      if (agent.is_free) return true;
+      
+      // Include non-restricted, non-free agents for all authenticated users
+      if (!agent.is_restricted && !agent.is_free) return true;
+      
+      // Include restricted agents only if user has proper account setup
+      if (agent.is_restricted && hasProperAccountSetup) return true;
+      
+      return false;
+    });
 
     console.log('Available agents filtered:', availableAgents);
     return availableAgents;
+  }
+
+  /**
+   * Get free agents available to authenticated users
+   */
+  static async getFreeAgents(): Promise<Agent[]> {
+    console.log('AgentService.getFreeAgents called');
+    
+    const { data, error } = await supabase
+      .from('agents')
+      .select('*')
+      .eq('is_active', true)
+      .eq('is_free', true)
+      .order('sort_order', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching free agents:', error);
+      return [];
+    }
+
+    console.log('Free agents fetched:', data);
+    return data || [];
   }
 
   /**
@@ -95,15 +132,20 @@ export class AgentService {
         return [];
       }
 
-      // For now, we'll use the existing is_restricted field but map it to roles
-      // In the future, you could add a minimum_role column to the agents table
+      // Role-based filtering includes free agents for all authenticated users
       const availableAgents = (data || []).filter(agent => {
+        // Free agents are available to all authenticated users (user role and above)
+        if (agent.is_free) {
+          return true;
+        }
+        
         // Map existing restrictions to role requirements
         if (agent.is_restricted) {
           // Restricted agents require at least developer role
           return RoleService.hasRoleAccess(userRole, 'developer');
         }
-        // Non-restricted agents are available to all roles
+        
+        // Non-restricted, non-free agents are available to all roles
         return true;
       });
 
@@ -188,7 +230,20 @@ export class AgentService {
   ): Promise<boolean> {
     console.log('AgentService.setSessionAgent called with:', { sessionId, agentId, supabaseUserId });
     
-    // First get the user profile to get the internal ID
+    // First verify the agent exists
+    const { data: agent, error: agentError } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('id', agentId)
+      .eq('is_active', true)
+      .single();
+
+    if (agentError || !agent) {
+      console.error('Agent not found or inactive:', agentId, agentError);
+      return false;
+    }
+    
+    // Get the user profile to get the internal ID
     const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
@@ -303,6 +358,18 @@ export class AgentService {
   ): Promise<Agent | null> {
     console.log('AgentService.updateAgent called with:', { agentId, updates });
     
+    // First check if the agent exists
+    const { data: existingAgent, error: checkError } = await supabase
+      .from('agents')
+      .select('id')
+      .eq('id', agentId)
+      .single();
+
+    if (checkError || !existingAgent) {
+      console.error('Agent not found for update:', agentId, checkError);
+      return null;
+    }
+
     const { data, error } = await supabase
       .from('agents')
       .update(updates)
@@ -337,6 +404,35 @@ export class AgentService {
 
     console.log('Agent deleted successfully');
     return true;
+  }
+
+  /**
+   * Debug function to check current agents in database
+   */
+  static async debugAgents(): Promise<void> {
+    console.log('=== DEBUGGING AGENTS ===');
+    
+    const { data: agents, error } = await supabase
+      .from('agents')
+      .select('*')
+      .order('sort_order');
+
+    if (error) {
+      console.error('Error fetching agents for debug:', error);
+      return;
+    }
+
+    console.log('Current agents in database:', agents);
+    console.log('Agent count:', agents?.length || 0);
+    
+    if (agents && agents.length > 0) {
+      console.log('Agent fields available:', Object.keys(agents[0]));
+      agents.forEach(agent => {
+        console.log(`Agent: ${agent.name} (ID: ${agent.id}) - Active: ${agent.is_active}, Default: ${agent.is_default}, Restricted: ${agent.is_restricted}, Free: ${agent.is_free}`);
+      });
+    }
+    
+    console.log('=== END DEBUG ===');
   }
 
   /**

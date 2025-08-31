@@ -7,7 +7,7 @@ import {
   IonInput, 
   IonTextarea, 
   IonItem, 
-  IonLabel, 
+  IonLabel,
   IonHeader, 
   IonToolbar, 
   IonTitle, 
@@ -130,8 +130,8 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
         {activeTab === 'basic' && (
           <div style={{ padding: '16px' }}>
             <IonItem>
-              <IonLabel position="stacked">RFP Name *</IonLabel>
               <IonInput 
+                label="RFP Name *"
                 value={form.name || ''} 
                 onIonInput={e => setForm(f => ({ ...f, name: e.detail.value || '' }))}
                 placeholder="Enter RFP name"
@@ -139,8 +139,8 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             </IonItem>
             
             <IonItem>
-              <IonLabel position="stacked">Due Date *</IonLabel>
               <IonInput 
+                label="Due Date *"
                 type="date" 
                 value={form.due_date || ''} 
                 onIonInput={e => setForm(f => ({ ...f, due_date: e.detail.value || '' }))} 
@@ -148,8 +148,8 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             </IonItem>
             
             <IonItem>
-              <IonLabel position="stacked">Description *</IonLabel>
               <IonTextarea 
+                label="Description *"
                 value={form.description || ''} 
                 onIonInput={e => setForm(f => ({ ...f, description: e.detail.value || '' }))}
                 placeholder="Brief public description of the RFP..."
@@ -160,8 +160,8 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             </IonItem>
 
             <IonItem>
-              <IonLabel position="stacked">Specification *</IonLabel>
               <IonTextarea 
+                label="Specification *"
                 value={form.specification || ''} 
                 onIonInput={e => setForm(f => ({ ...f, specification: e.detail.value || '' }))}
                 placeholder="Detailed requirements and specifications for form generation..."
@@ -172,19 +172,21 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             </IonItem>
 
             <IonItem>
-              <IonLabel>Template RFP</IonLabel>
               <IonToggle
                 checked={form.is_template || false}
                 onIonChange={e => setForm(f => ({ ...f, is_template: e.detail.checked }))}
-              />
+              >
+                Template RFP
+              </IonToggle>
             </IonItem>
 
             <IonItem>
-              <IonLabel>Public RFP</IonLabel>
               <IonToggle
                 checked={form.is_public || false}
                 onIonChange={e => setForm(f => ({ ...f, is_public: e.detail.checked }))}
-              />
+              >
+                Public RFP
+              </IonToggle>
             </IonItem>
 
             <div style={{ marginTop: '20px', textAlign: 'center' }}>

@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React from 'react';
-import { render, RenderOptions } from '@testing-library/react';
+import { render, RenderOptions, act } from '@testing-library/react';
 import { BrowserRouter } from 'react-router-dom';
 import { SupabaseProvider } from './context/SupabaseContext';
 
@@ -49,11 +49,19 @@ const TestWrapper: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   );
 };
 
-// Custom render function that includes providers
-const customRender = (
+// Custom render function that includes providers and proper async handling
+const customRender = async (
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>,
-) => render(ui, { wrapper: TestWrapper, ...options });
+) => {
+  let result: any;
+  await act(async () => {
+    result = render(ui, { wrapper: TestWrapper, ...options });
+    // Allow any pending state updates to complete
+    await new Promise(resolve => setTimeout(resolve, 0));
+  });
+  return result;
+};
 
 // Mock implementations for common services
 export const mockClaudeService = {

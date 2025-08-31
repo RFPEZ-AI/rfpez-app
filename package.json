@@ -74,6 +74,10 @@
   "jest": {
     "transformIgnorePatterns": [
       "node_modules/(?!(@ionic/react|@ionic/react-router|@ionic/core|@stencil/core|ionicons)/)"
+    ],
+    "collectCoverageFrom": [
+      "src/**/*.{js,jsx,ts,tsx}",
+      "!src/**/*.d.ts"
     ]
   },
   "description": "An Ionic project",
