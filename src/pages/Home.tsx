@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { IonContent, IonHeader, IonPage, IonToolbar, IonButtons } from '@ionic/react';
+import { useHistory } from 'react-router-dom';
 import MainMenu from '../components/MainMenu';
 import AgentsMenu from '../components/AgentsMenu';
 import AgentEditModal from '../components/AgentEditModal';
@@ -16,11 +17,6 @@ import SessionDialog from '../components/SessionDialog';
 import ArtifactWindow from '../components/ArtifactWindow';
 import AgentSelector from '../components/AgentSelector';
 import AgentIndicator from '../components/AgentIndicator';
-import AuthDebugger from '../components/AuthDebugger';
-import RoleManagement from '../components/RoleManagement';
-// Only import in development mode to avoid unused import warnings
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-import ClaudeTestComponent from '../components/ClaudeTestComponent';
 import { useSupabase } from '../context/SupabaseContext';
 import { RoleService } from '../services/roleService';
 import { useIsMobile } from '../utils/useMediaQuery';
@@ -57,6 +53,7 @@ interface Artifact {
 const Home: React.FC = () => {
   const { user, session, loading: supabaseLoading, userProfile } = useSupabase();
   const isMobile = useIsMobile();
+  const history = useHistory();
   
   // Derived authentication state
   const isAuthenticated = !!session;
@@ -88,6 +85,7 @@ const Home: React.FC = () => {
   const handleMainMenuSelect = (item: string) => {
     if (item === 'Agents') setShowAgentsMenu(true);
     if (item === 'RFP') setShowRFPMenu(true);
+    if (item === 'Debug') history.push('/debug');
   };
 
   // Load data for menus
@@ -838,25 +836,6 @@ const Home: React.FC = () => {
             />
           </div>
         </div>
-
-        {/* Claude API Test Component (Development Only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <div style={{ padding: '16px' }}>
-            <ClaudeTestComponent />
-          </div>
-        )}
-
-        {/* Auth Debugger (Development Only) */}
-        {process.env.NODE_ENV === 'development' && (
-          <AuthDebugger />
-        )}
-
-        {/* Role Management (Development Only - for Administrators) */}
-        {process.env.NODE_ENV === 'development' && userProfile?.role && RoleService.isAdministrator(userProfile.role) && (
-          <div style={{ padding: '16px' }}>
-            <RoleManagement currentUserRole={userProfile.role} />
-          </div>
-        )}
 
         {/* Agent Selector Modal */}
         <AgentSelector
