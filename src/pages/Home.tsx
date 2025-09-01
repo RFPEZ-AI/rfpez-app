@@ -306,16 +306,18 @@ const Home: React.FC = () => {
     setCurrentAgent(newAgent);
     console.log('Agent changed to:', newAgent);
     
-    // If we're not in an active session (preview mode), update the initial message
-    if (!currentSessionId && messages.length <= 1) {
+    // Always show the agent's initial prompt when switching agents
+    if (newAgent.agent_initial_prompt) {
       const initialMessage: Message = {
-        id: 'initial-prompt',
+        id: `agent-greeting-${newAgent.agent_id}-${Date.now()}`,
         content: newAgent.agent_initial_prompt,
         isUser: false,
         timestamp: new Date(),
         agentName: newAgent.agent_name
       };
-      setMessages([initialMessage]);
+      
+      // Add the greeting message to the conversation
+      setMessages(prevMessages => [...prevMessages, initialMessage]);
     }
   };
 
@@ -516,7 +518,7 @@ const Home: React.FC = () => {
           content,
           agentForClaude,
           conversationHistory,
-          undefined, // sessionId
+          activeSessionId, // Pass the active session ID to Claude
           userProfile ? {
             id: userProfile.id,
             email: userProfile.email,
@@ -535,6 +537,34 @@ const Home: React.FC = () => {
         
         setMessages(prev => [...prev, aiMessage]);
         setIsLoading(false);
+
+        // Check if an agent switch occurred during the Claude response
+        if (claudeResponse.metadata.agent_switch_occurred) {
+          console.log('Agent switch detected via Claude function, refreshing UI...');
+          // Small delay to ensure database transaction has completed
+          await new Promise(resolve => setTimeout(resolve, 200));
+          
+          // Refresh the current agent from database to update UI
+          if (activeSessionId) {
+            try {
+              const newAgent = await AgentService.getSessionActiveAgent(activeSessionId);
+              if (newAgent) {
+                console.log('UI refresh after agent switch - loaded agent:', newAgent.agent_name);
+                handleAgentChanged(newAgent);
+              } else {
+                console.warn('No agent found after switch, retrying...');
+                // Retry once after additional delay
+                await new Promise(resolve => setTimeout(resolve, 300));
+                const retryAgent = await AgentService.getSessionActiveAgent(activeSessionId);
+                if (retryAgent) {
+                  handleAgentChanged(retryAgent);
+                }
+              }
+            } catch (error) {
+              console.error('Failed to refresh agent after Claude switch:', error);
+            }
+          }
+        }
 
         // Save AI response to database if authenticated
         if (isAuthenticated && userId && activeSessionId) {

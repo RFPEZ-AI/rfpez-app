@@ -9,6 +9,7 @@ import BidSubmissionPage from './pages/BidSubmissionPage';
 import RjsfTestPage from './pages/RjsfTestPage';
 import DebugPage from './pages/DebugPage';
 import MCPTestComponent from './components/MCPTestComponent';
+import AgentManagementTest from './components/AgentManagementTest';
 import AgentAvatarDemo from './pages/AgentAvatarDemo';
 import { SupabaseProvider } from './context/SupabaseContext';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
@@ -53,6 +54,7 @@ const App: React.FC = () => (
           <Route exact path="/test/rjsf" component={RjsfTestPage} />
           <Route exact path="/debug" component={DebugPage} />
           <Route exact path="/debug/avatars" component={AgentAvatarDemo} />
+          <Route exact path="/test/agent-management" component={AgentManagementTest} />
           <Route exact path="/mcp-test" component={MCPTestComponent} />
           <Route exact path="/callback" component={Home} />
           <Route exact path="/" render={() => <Redirect to="/home" />} />

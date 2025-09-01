@@ -18,6 +18,14 @@ interface ClaudeResponse {
     response_time: number;
     temperature: number;
     functions_called?: string[];
+    function_results?: Array<{
+      function: string;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      result: any; // Function results can be various types depending on the function
+    }>;
+    agent_switch_occurred?: boolean;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    agent_switch_result?: any;
   };
 }
 
@@ -87,20 +95,49 @@ CURRENT USER CONTEXT:
 
 Please personalize your responses appropriately based on this user information.` : '';
 
-      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}
+      const sessionContext = sessionId ? `
 
-You have access to conversation management functions that allow you to:
+CURRENT SESSION CONTEXT:
+- Session ID: ${sessionId}
+- Use this session ID when calling functions that require a session_id parameter (like switch_agent, store_message, etc.)` : '';
+
+      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}
+
+You are part of a multi-agent system and have access to several powerful functions:
+
+CONVERSATION MANAGEMENT:
 - Retrieve conversation history from previous sessions
 - Store messages and create new sessions
 - Search through past conversations
 - Access recent sessions
 
+AGENT MANAGEMENT:
+- Get available agents in the system (get_available_agents)
+- Check which agent is currently active (get_current_agent)
+- Switch to a different agent when appropriate (switch_agent)
+- Recommend the best agent for specific topics (recommend_agent)
+
+AGENT SWITCHING GUIDELINES:
+- Switch agents when the user's request would be better handled by a specialist
+- For RFP creation/management: Switch to "RFP Assistant" or "RFP Design" agent
+- For technical issues/support: Switch to "Technical Support" agent
+- For sales/pricing questions: Switch to "Solutions" agent
+- For platform guidance: Switch to "Onboarding" agent
+- Always explain WHY you're switching and what the new agent can help with
+
+AGENT ACCESS LEVELS:
+- Default agents: Available to all users (even non-authenticated)
+- Free agents: Available to any user with login (no billing setup required)
+- Premium agents: Require account upgrade/billing setup
+- Respect access restrictions when switching agents
+
 Use these functions when relevant to help the user. For example:
 - If they ask about previous conversations, use get_recent_sessions or search_messages
 - If they reference something from earlier, use get_conversation_history
+- If their request needs specialized help, recommend or switch to the appropriate agent
 - Always store important conversation milestones using store_message
 
-Be helpful, accurate, and professional.`;
+Be helpful, accurate, and professional. When switching agents, make the transition smooth and explain the benefits.`;
 
       console.log('Sending request to Claude API with MCP functions...', {
         agent: agent.name,
@@ -115,7 +152,7 @@ Be helpful, accurate, and professional.`;
       });
 
       let response = await client.messages.create({
-        model: 'claude-3-5-sonnet-20241022', // Use Claude 3.5 Sonnet for better function calling
+        model: 'claude-3-5-sonnet-latest', // Use latest version automatically
         max_tokens: 2000,
         temperature: 0.7,
         system: systemPrompt,
@@ -150,6 +187,8 @@ Be helpful, accurate, and professional.`;
 
         // Execute each function call and prepare tool results
         const toolResults = [];
+        let shouldStopProcessing = false;
+        
         for (const toolUse of toolUses) {
           try {
             console.log(`Executing function: ${toolUse.name}`, toolUse.input);
@@ -157,6 +196,13 @@ Be helpful, accurate, and professional.`;
             
             const result = await claudeAPIHandler.executeFunction(toolUse.name, toolUse.input);
             allFunctionResults.push({ function: toolUse.name, result });
+            
+            // Check if this is an agent switch that should stop processing
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            if (toolUse.name === 'switch_agent' && result && typeof result === 'object' && 'stop_processing' in result && (result as any).stop_processing) {
+              shouldStopProcessing = true;
+              console.log('Agent switch detected, stopping additional processing');
+            }
             
             toolResults.push({
               type: 'tool_result',
@@ -181,9 +227,15 @@ Be helpful, accurate, and professional.`;
           content: toolResults as any
         });
 
+        // If agent switch occurred, stop processing and return the switch message
+        if (shouldStopProcessing) {
+          console.log('Stopping processing due to agent switch');
+          break; // Exit the while loop to prevent additional Claude responses
+        }
+
         // Get Claude's response to the function results
         response = await client.messages.create({
-          model: 'claude-3-5-sonnet-20241022',
+          model: 'claude-3-5-sonnet-latest',
           max_tokens: 2000,
           temperature: 0.7,
           system: systemPrompt,
@@ -233,6 +285,15 @@ Be helpful, accurate, and professional.`;
         }
       }
 
+      // Check if any agent switching occurred
+      const agentSwitchOccurred = functionsExecuted.includes('switch_agent');
+      let agentSwitchResult = null;
+      
+      if (agentSwitchOccurred) {
+        // Find the agent switch result
+        agentSwitchResult = allFunctionResults.find(result => result.function === 'switch_agent')?.result;
+      }
+
       return {
         content: finalContent,
         metadata: {
@@ -240,7 +301,10 @@ Be helpful, accurate, and professional.`;
           tokens_used: response.usage?.input_tokens + response.usage?.output_tokens || 0,
           response_time: responseTime,
           temperature: 0.7,
-          functions_called: functionsExecuted
+          functions_called: functionsExecuted,
+          function_results: allFunctionResults,
+          agent_switch_occurred: agentSwitchOccurred,
+          agent_switch_result: agentSwitchResult
         }
       };
 

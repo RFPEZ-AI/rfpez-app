@@ -182,6 +182,56 @@ const agent = await AgentService.getSessionActiveAgent(sessionId);
 - User verification through Auth0 integration
 - Session ownership validation for agent switching
 
+## Recent Improvements (August 2025)
+
+### Agent Switching via Claude Function Calls
+
+The system now supports **automatic agent switching** through Claude's function calling capabilities:
+
+#### ✅ **Fixed Issues**
+1. **Session Context Missing**: Claude now receives the current session ID in its context
+2. **UI Synchronization**: Agent switches via Claude functions now properly update the UI
+3. **Initial Prompts**: Manual and automatic agent switches both display initial prompts
+
+#### 🔧 **Technical Implementation**
+
+**Session Context Integration** (`src/services/claudeService.ts`):
+```typescript
+const sessionContext = sessionId ? `
+CURRENT SESSION CONTEXT:
+- Session ID: ${sessionId}
+- Use this session ID when calling functions that require a session_id parameter (like switch_agent, store_message, etc.)` : '';
+```
+
+**Enhanced Function Calling** (`src/services/claudeAPIFunctions.ts`):
+- Added comprehensive logging for agent switch operations
+- Implemented retry logic for database consistency verification
+- Added debugging output for troubleshooting
+
+**UI Refresh Mechanism** (`src/pages/Home.tsx`):
+- Automatic detection of agent switches in Claude responses
+- Delayed UI refresh to ensure database transaction completion
+- Proper error handling and retry logic
+
+#### 🎯 **How It Works**
+
+1. **User Request**: "switch to bid design agent"
+2. **Claude Processing**: Claude sees session context and available functions
+3. **Function Execution**: Claude calls `switch_agent` with correct session_id
+4. **Database Update**: Agent switch is recorded with verification
+5. **UI Refresh**: System detects the switch and updates the interface
+6. **Initial Prompt**: New agent's greeting message is displayed automatically
+
+#### 🧪 **Testing Agent Switching**
+
+To test the improved agent switching:
+
+1. **Manual Switch**: Use the AgentSelector component in the UI
+2. **Claude Function Switch**: Ask Claude to "switch to [agent name]"
+3. **Verify**: Check that UI updates and new agent responds with initial prompt
+
+Both methods should now work seamlessly with proper session management.
+
 ## Future Enhancements
 
 1. **Agent Analytics**: Track usage statistics per agent

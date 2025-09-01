@@ -182,3 +182,33 @@ supabase functions deploy mcp-server
 ```
 
 The choice depends on whether you're building a **web application** (Claude API) or using **Claude Desktop locally** (MCP)! 🎯
+
+## 🆕 **Recent Enhancements (August 2025)**
+
+### Session Context Integration
+
+The Claude API integration now includes **explicit session context** to improve function calling reliability:
+
+#### **Enhanced System Prompt**
+```typescript
+const sessionContext = sessionId ? `
+CURRENT SESSION CONTEXT:
+- Session ID: ${sessionId}
+- Use this session ID when calling functions that require a session_id parameter (like switch_agent, store_message, etc.)` : '';
+```
+
+#### **Benefits**
+- ✅ **Explicit Session Awareness**: Claude knows exactly which session it's operating in
+- ✅ **Improved Function Calls**: Reduces errors in `switch_agent` and `store_message` calls
+- ✅ **Better Debugging**: Session context visible in logs and conversations
+- ✅ **Consistent State Management**: Ensures all function calls operate on the correct session
+
+#### **Impact on Agent Switching**
+This enhancement fixes the previous issue where Claude function calls for agent switching would fail due to missing session context. Now Claude can reliably:
+
+1. **Receive session ID** in its context prompt
+2. **Call `switch_agent`** with the correct session_id parameter
+3. **Switch agents successfully** and trigger proper UI updates
+4. **Maintain session consistency** across all function calls
+
+The session context integration works seamlessly with both manual agent switching (via UI) and automatic agent switching (via Claude function calls).

@@ -11,7 +11,27 @@ A modern React-based application for intelligent RFP (Request for Proposal) mana
 - **PWA Ready**: Progressive Web App with offline capabilities
 - **Modern UI**: Built with Ionic React components
 
-## 🏗️ Architecture
+## � Recent Updates (August 2025)
+
+### Agent Switching Enhancements
+- ✅ **Fixed Claude Function Agent Switching**: Resolved issues where Claude function calls for agent switching weren't working
+- ✅ **Session Context Integration**: Claude now receives explicit session context for reliable function calls
+- ✅ **UI Synchronization**: Agent switches via Claude functions now properly update the UI in real-time
+- ✅ **Initial Prompt Display**: Both manual and automatic agent switches now show new agent greetings
+- ✅ **Enhanced Debugging**: Comprehensive logging for troubleshooting agent switch operations
+
+### Technical Improvements
+- 🔧 **Session ID Parameter Fix**: Fixed missing session context in Claude API calls
+- 🔧 **Database Consistency**: Added retry logic and verification for agent switch operations
+- 🔧 **Error Handling**: Improved error handling and recovery for failed agent switches
+- 📖 **Documentation**: Updated documentation with troubleshooting guides and implementation details
+
+For detailed information about these fixes, see:
+- `DOCUMENTATION/AGENT-SWITCHING-FIXES.md` - Complete implementation guide
+- `DOCUMENTATION/AGENTS.md` - Updated agent system documentation
+- `DOCUMENTATION/CLAUDE-API-INTEGRATION.md` - Enhanced Claude integration details
+
+## �🏗️ Architecture
 
 ### Frontend
 - **React 18** with TypeScript
