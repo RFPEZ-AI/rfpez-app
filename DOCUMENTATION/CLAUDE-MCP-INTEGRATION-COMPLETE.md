@@ -186,3 +186,32 @@ const history = await ClaudeService.getConversationHistory(sessionId);
 | **Deployment** | Local development | Production ready |
 
 Your RFPEZ app now has **production-ready Claude integration** with full MCP capabilities! 🎉
+
+## 🆕 **Recent Enhancements (August 2025)**
+
+### Enhanced Session Context Support
+
+The Claude API integration has been enhanced with **explicit session context** to improve reliability:
+
+#### **What's New**
+- ✅ **Session ID in Context**: Claude now receives the current session ID in its system prompt
+- ✅ **Function Call Reliability**: Reduced errors in `switch_agent` and `store_message` function calls
+- ✅ **Better Debugging**: Session context visible in conversations and logs
+- ✅ **Improved Agent Switching**: Automatic agent switching via Claude functions now works reliably
+
+#### **Technical Implementation**
+```typescript
+// Session context is automatically included when sessionId is available
+const sessionContext = sessionId ? `
+CURRENT SESSION CONTEXT:
+- Session ID: ${sessionId}
+- Use this session ID when calling functions that require a session_id parameter` : '';
+```
+
+#### **Benefits for Users**
+1. **Reliable Agent Switching**: Ask Claude to "switch to bid design agent" and it works consistently
+2. **Proper Message Storage**: All messages are correctly associated with the current session
+3. **Better Conversation Continuity**: Function calls maintain proper session context
+4. **Enhanced Debugging**: Issues are easier to troubleshoot with session context logging
+
+This enhancement resolves previous issues where Claude function calls would fail due to missing session parameters, particularly affecting agent switching functionality.
