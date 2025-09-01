@@ -63,7 +63,7 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
         <IonLabel>
           <span className="agent-name-text">
             {agent.agent_name}
-            <span className="agent-suffix"> agent</span>
+            <span className="agent-suffix"> Agent</span>
           </span>
         </IonLabel>
         {showSwitchButton && <IonIcon icon={swapHorizontalOutline} />}
@@ -85,7 +85,7 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
             <h3 className="agent-name">
               <span className="agent-name-text">
                 {agent.agent_name}
-                <span className="agent-suffix"> agent</span>
+                <span className="agent-suffix"> Agent</span>
               </span>
             </h3>
           </IonText>
