@@ -23,11 +23,12 @@ import {
 import { add, create, trash, personCircle } from 'ionicons/icons';
 import FormBuilder from './forms/FormBuilder';
 import { RfpFormArtifact } from './forms/RfpForm';
+import ProposalManager from './proposals/ProposalManager';
 import AgentEditModal from './AgentEditModal';
 import { useSupabase } from '../context/SupabaseContext';
 import { RoleService } from '../services/roleService';
 import { AgentService } from '../services/agentService';
-import type { FormSpec } from '../types/rfp';
+import type { FormSpec, RFP } from '../types/rfp';
 import type { Agent } from '../types/database';
 
 export interface RFPFormValues {
@@ -41,33 +42,21 @@ export interface RFPFormValues {
   suppliers?: number[];
 }
 
-// Helper type for database entities converted to form values
-export interface RFPEditFormValues {
-  name: string;
-  due_date: string;
-  description: string; // Required - public description
-  specification: string; // Required - detailed specs for Claude
-  form_spec?: FormSpec | null;
-  is_template?: boolean;
-  is_public?: boolean;
-  suppliers?: number[];
-}
-
 interface RFPEditModalProps {
-  rfp: Partial<RFPEditFormValues> | null;
+  rfp: RFP | null;
   isOpen: boolean;
   onSave: (values: Partial<RFPFormValues>) => void;
   onCancel: () => void;
 }
 
-// Helper function to convert RFPEditFormValues to RFPFormValues
-const convertToFormValues = (editValues: Partial<RFPEditFormValues> | null): Partial<RFPFormValues> => {
-  if (!editValues) return { 
+// Helper function to convert RFP to RFPFormValues
+const convertToFormValues = (rfp: RFP | null): Partial<RFPFormValues> => {
+  if (!rfp) return { 
     description: '', 
     specification: '' 
   };
   
-  // Extract only the fields we want (excluding document)
+  // Extract only the fields we want for editing
   const {
     name,
     due_date,
@@ -77,7 +66,7 @@ const convertToFormValues = (editValues: Partial<RFPEditFormValues> | null): Par
     is_template,
     is_public,
     suppliers
-  } = editValues;
+  } = rfp;
   
   return {
     name,
@@ -94,7 +83,7 @@ const convertToFormValues = (editValues: Partial<RFPEditFormValues> | null): Par
 const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCancel }) => {
   const { userProfile } = useSupabase();
   const [form, setForm] = useState<Partial<RFPFormValues>>(() => convertToFormValues(rfp));
-  const [activeTab, setActiveTab] = useState<'basic' | 'form' | 'agents' | 'preview'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'form' | 'proposals' | 'agents' | 'preview'>('basic');
   
   // Agent state
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -186,7 +175,7 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
         {/* Tab Navigation */}
         <IonSegment 
           value={activeTab} 
-          onIonChange={(e) => setActiveTab(e.detail.value as 'basic' | 'form' | 'agents' | 'preview')}
+          onIonChange={(e) => setActiveTab(e.detail.value as 'basic' | 'form' | 'proposals' | 'agents' | 'preview')}
           style={{ padding: '16px' }}
         >
           <IonSegmentButton value="basic">
@@ -197,6 +186,9 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
           </IonSegmentButton>
           <IonSegmentButton value="preview" disabled={!form.form_spec}>
             <IonLabel>Preview</IonLabel>
+          </IonSegmentButton>
+          <IonSegmentButton value="proposals" disabled={!rfp || !rfp.name}>
+            <IonLabel>Proposals</IonLabel>
           </IonSegmentButton>
           {userProfile?.role && RoleService.isDeveloperOrHigher(userProfile.role) && (
             <IonSegmentButton value="agents">
@@ -370,6 +362,24 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
                 ))
               )}
             </IonList>
+          </div>
+        )}
+
+        {/* Proposals Tab */}
+        {activeTab === 'proposals' && rfp && (
+          <div style={{ padding: '16px' }}>
+            <IonText>
+              <h3>Proposal Management</h3>
+              <p>Generate and manage proposals based on collected bid data:</p>
+            </IonText>
+            
+            <ProposalManager
+              rfp={rfp}
+              onProposalUpdate={(proposal) => {
+                // Update local form state if needed
+                console.log('Proposal updated:', proposal);
+              }}
+            />
           </div>
         )}
       </IonContent>

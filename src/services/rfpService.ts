@@ -262,4 +262,135 @@ export class RFPService {
       errors
     };
   }
+
+  // Proposal Methods
+  static async updateRfpProposal(rfpId: number, proposal: string): Promise<RFP | null> {
+    console.log('🔄 Updating RFP proposal for ID:', rfpId);
+    const { data, error } = await supabase
+      .from('rfp')
+      .update({ proposal })
+      .eq('id', rfpId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error updating RFP proposal:', error);
+      return null;
+    }
+    
+    console.log('✅ RFP proposal updated successfully');
+    return data;
+  }
+
+  static async updateRfpProposalQuestionnaire(
+    rfpId: number, 
+    questionnaire: Record<string, any>
+  ): Promise<RFP | null> {
+    console.log('🔄 Updating RFP proposal questionnaire for ID:', rfpId);
+    const { data, error } = await supabase
+      .from('rfp')
+      .update({ proposal_questionnaire: questionnaire })
+      .eq('id', rfpId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error updating RFP proposal questionnaire:', error);
+      return null;
+    }
+    
+    console.log('✅ RFP proposal questionnaire updated successfully');
+    return data;
+  }
+
+  static async updateRfpProposalQuestionnaireResponse(
+    rfpId: number, 
+    response: Record<string, any>
+  ): Promise<RFP | null> {
+    console.log('🔄 Updating RFP proposal questionnaire response for ID:', rfpId);
+    const { data, error } = await supabase
+      .from('rfp')
+      .update({ proposal_questionnaire_response: response })
+      .eq('id', rfpId)
+      .select()
+      .single();
+    
+    if (error) {
+      console.error('❌ Error updating RFP proposal questionnaire response:', error);
+      return null;
+    }
+    
+    console.log('✅ RFP proposal questionnaire response updated successfully');
+    return data;
+  }
+
+  // Generate a proposal based on bid data and RFP information
+  static async generateProposal(
+    rfp: RFP, 
+    bidData: Record<string, unknown>, 
+    supplierInfo: { name: string; email: string; company?: string }
+  ): Promise<string> {
+    // This is a mock implementation - in reality this would call Claude API
+    // to generate a comprehensive proposal based on the RFP spec and bid data
+    
+    const proposalText = `
+# Proposal for ${rfp.name}
+
+## Executive Summary
+This proposal is submitted by ${supplierInfo.name} from ${supplierInfo.company || 'the submitting organization'} in response to the Request for Proposal: "${rfp.name}".
+
+## Company Information
+- **Contact:** ${supplierInfo.name}
+- **Email:** ${supplierInfo.email}
+${supplierInfo.company ? `- **Company:** ${supplierInfo.company}` : ''}
+
+## Proposal Details
+Based on the requirements outlined in the RFP, we propose the following solution:
+
+### Requirements Analysis
+${rfp.description}
+
+### Technical Approach
+Our approach addresses the key specifications:
+${rfp.specification}
+
+### Bid Response Summary
+${this.formatBidDataForProposal(bidData)}
+
+### Timeline and Deliverables
+We commit to delivering the proposed solution by the specified due date: ${new Date(rfp.due_date).toLocaleDateString()}.
+
+## Conclusion
+We believe our proposal offers the best value and meets all the requirements outlined in the RFP. We look forward to the opportunity to discuss this proposal further.
+
+---
+*Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*
+`;
+
+    return proposalText.trim();
+  }
+
+  // Helper method to format bid data for inclusion in proposal
+  private static formatBidDataForProposal(bidData: Record<string, unknown>): string {
+    const entries = Object.entries(bidData);
+    if (entries.length === 0) {
+      return 'No specific bid details provided.';
+    }
+
+    let formatted = '';
+    entries.forEach(([key, value]) => {
+      if (value !== null && value !== undefined && value !== '') {
+        const label = key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase());
+        if (Array.isArray(value)) {
+          formatted += `- **${label}:** ${value.join(', ')}\n`;
+        } else if (typeof value === 'object') {
+          formatted += `- **${label}:** ${JSON.stringify(value, null, 2)}\n`;
+        } else {
+          formatted += `- **${label}:** ${value}\n`;
+        }
+      }
+    });
+
+    return formatted || 'No specific bid details provided.';
+  }
 }

@@ -15,6 +15,9 @@ type RFP = {
   due_date: string; // ISO date string
   description: string; // Public description - what the RFP is about
   specification: string; // Detailed requirements for Claude to generate forms
+  proposal?: string | null; // Generated proposal text
+  proposal_questionnaire?: Record<string, any> | null; // Questionnaire structure for proposal generation
+  proposal_questionnaire_response?: Record<string, any> | null; // Collected questionnaire responses
   form_spec?: FormSpec | null; // JSON Schema + RJSF form specification
   is_template: boolean;
   is_public: boolean;

@@ -18,6 +18,11 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({ agent, isOpen, onSave, 
     setForm(agent || {});
   }, [agent]);
 
+  const handleSave = () => {
+    console.log('AgentEditModal handleSave called with form:', form);
+    onSave(form);
+  };
+
   return (
     <IonModal isOpen={isOpen} onDidDismiss={onCancel}>
       <IonHeader>
@@ -27,25 +32,45 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({ agent, isOpen, onSave, 
       </IonHeader>
       <IonContent>
         <IonItem>
-          <IonLabel position="stacked">Name</IonLabel>
-          <IonInput value={form.name || ''} onIonChange={e => setForm(f => ({ ...f, name: e.detail.value || '' }))} />
+          <IonInput 
+            label="Name" 
+            labelPlacement="stacked"
+            value={form.name || ''} 
+            onIonChange={e => {
+              const newValue = e.detail.value || '';
+              console.log('Name field changed from', form.name, 'to', newValue);
+              setForm(f => ({ ...f, name: newValue }));
+            }} 
+          />
         </IonItem>
         <IonItem>
-          <IonLabel position="stacked">Description</IonLabel>
-          <IonTextarea value={form.description || ''} onIonChange={e => setForm(f => ({ ...f, description: e.detail.value || '' }))} />
+          <IonTextarea 
+            label="Description" 
+            labelPlacement="stacked"
+            value={form.description || ''} 
+            onIonChange={e => setForm(f => ({ ...f, description: e.detail.value || '' }))} 
+          />
         </IonItem>
         <IonItem>
-          <IonLabel position="stacked">Instructions</IonLabel>
-          <IonTextarea value={form.instructions || ''} onIonChange={e => setForm(f => ({ ...f, instructions: e.detail.value || '' }))} />
+          <IonTextarea 
+            label="Instructions" 
+            labelPlacement="stacked"
+            value={form.instructions || ''} 
+            onIonChange={e => setForm(f => ({ ...f, instructions: e.detail.value || '' }))} 
+          />
         </IonItem>
         <IonItem>
-          <IonLabel position="stacked">Initial Prompt</IonLabel>
-          <IonTextarea value={form.initial_prompt || ''} onIonChange={e => setForm(f => ({ ...f, initial_prompt: e.detail.value || '' }))} />
+          <IonTextarea 
+            label="Initial Prompt" 
+            labelPlacement="stacked"
+            value={form.initial_prompt || ''} 
+            onIonChange={e => setForm(f => ({ ...f, initial_prompt: e.detail.value || '' }))} 
+          />
         </IonItem>
       </IonContent>
       <IonFooter>
         <IonToolbar>
-          <IonButton expand="block" onClick={() => onSave(form)}>
+          <IonButton expand="block" onClick={handleSave}>
             Save
           </IonButton>
           <IonButton expand="block" fill="outline" color="medium" onClick={onCancel} style={{ marginTop: 8 }}>
