@@ -379,6 +379,11 @@ export class AgentService {
 
     if (error) {
       console.error('Error updating agent:', error);
+      console.error('Update attempt details:', { agentId, updates });
+      console.error('Error message:', error.message);
+      console.error('Error details:', error.details);
+      console.error('Error hint:', error.hint);
+      console.error('Error code:', error.code);
       return null;
     }
 

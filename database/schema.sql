@@ -9,6 +9,9 @@ CREATE TABLE IF NOT EXISTS rfp (
   due_date DATE NOT NULL,
   description TEXT NOT NULL CHECK (trim(description) != ''), -- Public description
   specification TEXT NOT NULL CHECK (trim(specification) != ''), -- Detailed specs for Claude
+  proposal TEXT, -- Generated proposal text
+  proposal_questionnaire JSONB, -- Questionnaire structure for proposal generation
+  proposal_questionnaire_response JSONB, -- Collected questionnaire responses
   is_template BOOLEAN DEFAULT FALSE,
   is_public BOOLEAN DEFAULT FALSE,
   suppliers INTEGER[] DEFAULT '{}', -- array of supplier IDs
@@ -22,7 +25,7 @@ CREATE TABLE IF NOT EXISTS bid (
   rfp_id INTEGER REFERENCES rfp(id) ON DELETE CASCADE,
   agent_id INTEGER NOT NULL, -- assuming agent table exists
   supplier_id INTEGER REFERENCES supplier(id),
-  document JSONB NOT NULL,
+  response JSONB NOT NULL, -- Changed from 'document' to match TypeScript interface
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
 );

@@ -146,6 +146,28 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
       const createdBid = await RFPService.createBid(bidData);
       
       if (createdBid) {
+        // Generate and store proposal in RFP record
+        try {
+          console.log('🔄 Generating proposal for RFP...');
+          const proposal = await RFPService.generateProposal(rfp, formData, supplierInfo);
+          
+          // Store the proposal in the RFP record
+          await RFPService.updateRfpProposal(rfp.id, proposal);
+          
+          // Store the questionnaire response (the form data that was used to generate the proposal)
+          await RFPService.updateRfpProposalQuestionnaireResponse(rfp.id, {
+            supplier_info: supplierInfo,
+            form_data: formData,
+            generated_at: new Date().toISOString(),
+            bid_id: createdBid.id
+          });
+          
+          console.log('✅ Proposal generated and stored successfully');
+        } catch (proposalError) {
+          console.error('⚠️ Error generating proposal:', proposalError);
+          // Don't fail the bid submission if proposal generation fails
+        }
+        
         setSubmitted(true);
         setAlertMessage('Your bid has been submitted successfully!');
         setShowAlert(true);

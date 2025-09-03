@@ -7,7 +7,7 @@ import MainMenu from '../components/MainMenu';
 import AgentsMenu from '../components/AgentsMenu';
 import AgentEditModal from '../components/AgentEditModal';
 import GenericMenu from '../components/GenericMenu';
-import RFPEditModal, { RFPFormValues, RFPEditFormValues } from '../components/RFPEditModal';
+import RFPEditModal, { RFPFormValues } from '../components/RFPEditModal';
 import RFPPreviewModal from '../components/RFPPreviewModal';
 import { RFPService } from '../services/rfpService';
 import type { RFP } from '../types/rfp';
@@ -78,7 +78,7 @@ const Home: React.FC = () => {
   const [showRFPMenu, setShowRFPMenu] = useState(false);
   const [showRFPModal, setShowRFPModal] = useState(false);
   const [showRFPPreviewModal, setShowRFPPreviewModal] = useState(false);
-  const [editingRFP, setEditingRFP] = useState<Partial<RFP> | null>(null);
+  const [editingRFP, setEditingRFP] = useState<RFP | null>(null);
   const [previewingRFP, setPreviewingRFP] = useState<RFP | null>(null);
 
   // Main menu handler
@@ -789,7 +789,7 @@ const Home: React.FC = () => {
         onCancel={handleCancelAgent}
       />
       <RFPEditModal
-        rfp={editingRFP as Partial<RFPEditFormValues>}
+        rfp={editingRFP as RFP}
         isOpen={showRFPModal}
         onSave={handleSaveRFP}
         onCancel={handleCancelRFP}
