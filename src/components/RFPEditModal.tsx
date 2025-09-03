@@ -83,7 +83,7 @@ const convertToFormValues = (rfp: RFP | null): Partial<RFPFormValues> => {
 const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCancel }) => {
   const { userProfile } = useSupabase();
   const [form, setForm] = useState<Partial<RFPFormValues>>(() => convertToFormValues(rfp));
-  const [activeTab, setActiveTab] = useState<'basic' | 'form' | 'proposals' | 'agents' | 'preview'>('basic');
+  const [activeTab, setActiveTab] = useState<'basic' | 'proposals' | 'form' | 'preview' | 'agents'>('basic');
   
   // Agent state
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -175,24 +175,67 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
         {/* Tab Navigation */}
         <IonSegment 
           value={activeTab} 
-          onIonChange={(e) => setActiveTab(e.detail.value as 'basic' | 'form' | 'proposals' | 'agents' | 'preview')}
-          style={{ padding: '16px' }}
+          onIonChange={(e) => setActiveTab(e.detail.value as 'basic' | 'proposals' | 'form' | 'preview' | 'agents')}
+          style={{ 
+            padding: '4px 8px',
+            fontSize: '0.75rem'
+          }}
         >
           <IonSegmentButton value="basic">
-            <IonLabel>Basic Info</IonLabel>
-          </IonSegmentButton>
-          <IonSegmentButton value="form">
-            <IonLabel>Bid Form</IonLabel>
-          </IonSegmentButton>
-          <IonSegmentButton value="preview" disabled={!form.form_spec}>
-            <IonLabel>Preview</IonLabel>
+            <IonLabel style={{ 
+              fontSize: '0.75rem', 
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+              maxWidth: '100%'
+            }}>
+              BASIC
+            </IonLabel>
           </IonSegmentButton>
           <IonSegmentButton value="proposals" disabled={!rfp || !rfp.name}>
-            <IonLabel>Proposals</IonLabel>
+            <IonLabel style={{ 
+              fontSize: '0.75rem', 
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+              maxWidth: '100%'
+            }}>
+              PROPO
+            </IonLabel>
+          </IonSegmentButton>
+          <IonSegmentButton value="form">
+            <IonLabel style={{ 
+              fontSize: '0.75rem', 
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+              maxWidth: '100%'
+            }}>
+              BID
+            </IonLabel>
+          </IonSegmentButton>
+          <IonSegmentButton value="preview" disabled={!form.form_spec}>
+            <IonLabel style={{ 
+              fontSize: '0.75rem', 
+              whiteSpace: 'nowrap',
+              textOverflow: 'ellipsis',
+              overflow: 'hidden',
+              maxWidth: '100%'
+            }}>
+              VIEW
+            </IonLabel>
           </IonSegmentButton>
           {userProfile?.role && RoleService.isDeveloperOrHigher(userProfile.role) && (
             <IonSegmentButton value="agents">
-              <IonLabel>Agents</IonLabel>
+              <IonLabel style={{ 
+                fontSize: '0.75rem', 
+                whiteSpace: 'nowrap',
+                textOverflow: 'ellipsis',
+                overflow: 'hidden',
+                maxWidth: '100%'
+              }}>
+                AGENT
+              </IonLabel>
             </IonSegmentButton>
           )}
         </IonSegment>
@@ -263,10 +306,10 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
             <div style={{ marginTop: '20px', textAlign: 'center' }}>
               <IonButton 
                 expand="block" 
-                onClick={() => setActiveTab('form')}
+                onClick={() => setActiveTab('proposals')}
                 disabled={!form.name || !form.due_date || !form.description || form.description.trim() === '' || !form.specification || form.specification.trim() === ''}
               >
-                Next: Configure Bid Form
+                Next: Manage Proposals
               </IonButton>
             </div>
           </div>
@@ -380,6 +423,15 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
                 console.log('Proposal updated:', proposal);
               }}
             />
+            
+            <div style={{ marginTop: '20px', textAlign: 'center' }}>
+              <IonButton 
+                expand="block" 
+                onClick={() => setActiveTab('form')}
+              >
+                Next: Configure Bid Form
+              </IonButton>
+            </div>
           </div>
         )}
       </IonContent>
@@ -407,7 +459,8 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
                 <IonButton 
                   fill="outline" 
                   onClick={() => {
-                    if (activeTab === 'form') setActiveTab('basic');
+                    if (activeTab === 'proposals') setActiveTab('basic');
+                    if (activeTab === 'form') setActiveTab('proposals');
                     if (activeTab === 'preview') setActiveTab('form');
                     if (activeTab === 'agents') setActiveTab('preview');
                   }}
