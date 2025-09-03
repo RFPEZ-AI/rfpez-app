@@ -3,6 +3,32 @@
 import { supabase } from '../supabaseClient';
 import type { RFP, FormSpec, Bid } from '../types/rfp';
 
+// Type for proposal questionnaire structure
+interface ProposalQuestionnaire {
+  questions: Array<{
+    id: string;
+    type: string;
+    question: string;
+    required?: boolean;
+    options?: string[];
+  }>;
+  metadata?: Record<string, unknown>;
+}
+
+// Type for proposal questionnaire response
+interface ProposalQuestionnaireResponse {
+  form_data: Record<string, unknown>;
+  supplier_info: {
+    name: string;
+    email: string;
+    [key: string]: unknown;
+  };
+  submitted_at?: string;
+  form_version?: string;
+  generated_at?: string;
+  bid_id?: number;
+}
+
 export class RFPService {
   // Check if the new schema is available
   private static async checkSchemaCompatibility(): Promise<{ hasSpecificationField: boolean }> {
@@ -284,7 +310,7 @@ export class RFPService {
 
   static async updateRfpProposalQuestionnaire(
     rfpId: number, 
-    questionnaire: Record<string, any>
+    questionnaire: ProposalQuestionnaire
   ): Promise<RFP | null> {
     console.log('🔄 Updating RFP proposal questionnaire for ID:', rfpId);
     const { data, error } = await supabase
@@ -305,7 +331,7 @@ export class RFPService {
 
   static async updateRfpProposalQuestionnaireResponse(
     rfpId: number, 
-    response: Record<string, any>
+    response: ProposalQuestionnaireResponse
   ): Promise<RFP | null> {
     console.log('🔄 Updating RFP proposal questionnaire response for ID:', rfpId);
     const { data, error } = await supabase

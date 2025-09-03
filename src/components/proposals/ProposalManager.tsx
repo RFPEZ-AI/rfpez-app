@@ -25,6 +25,20 @@ import {
 import { RFPService } from '../../services/rfpService';
 import type { RFP } from '../../types/rfp';
 
+// Type for proposal questionnaire response
+interface ProposalQuestionnaireResponse {
+  form_data: Record<string, unknown>;
+  supplier_info: {
+    name: string;
+    email: string;
+    [key: string]: unknown;
+  };
+  submitted_at?: string;
+  form_version?: string;
+  generated_at?: string;
+  bid_id?: number;
+}
+
 interface ProposalManagerProps {
   rfp: RFP;
   onProposalUpdate?: (proposal: string) => void;
@@ -51,11 +65,11 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
     setIsGenerating(true);
 
     try {
-      const response = rfp.proposal_questionnaire_response as any;
+      const response = rfp.proposal_questionnaire_response as ProposalQuestionnaireResponse | null;
       const proposal = await RFPService.generateProposal(
         rfp,
-        response.form_data || {},
-        response.supplier_info || { name: 'Unknown', email: 'unknown@example.com' }
+        response?.form_data || {},
+        response?.supplier_info || { name: 'Unknown', email: 'unknown@example.com' }
       );
 
       setLocalProposal(proposal);
@@ -185,7 +199,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
                   <IonLabel position="stacked">Proposal Content (Markdown)</IonLabel>
                   <IonTextarea
                     value={localProposal}
-                    onIonInput={(e) => setLocalProposal(e.detail.value!)}
+                    onIonInput={(e) => setLocalProposal(e.detail.value || '')}
                     rows={20}
                     style={{ fontFamily: 'monospace', fontSize: '0.9rem' }}
                     placeholder="Generated proposal will appear here..."
