@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { IonPopover, IonList, IonItem, IonLabel, IonIcon, IonButton, IonAlert } from '@ionic/react';
-import { add, create, trash, eye, share } from 'ionicons/icons';
+import { add, create, trash, eye, share, radioButtonOn, radioButtonOff } from 'ionicons/icons';
 
 interface GenericMenuProps<T> {
   items: T[];
@@ -12,9 +12,11 @@ interface GenericMenuProps<T> {
   onDelete: (item: T) => void;
   onPreview?: (item: T) => void; // Optional preview handler
   onShare?: (item: T) => void; // Optional share handler
+  onSetCurrent?: (item: T | null) => void; // Optional set as current handler
   showPopover: boolean;
   setShowPopover: (show: boolean) => void;
   title: string;
+  currentItemId?: string | number; // ID of currently selected item
 }
 
 function GenericMenu<T extends { id: string | number }>({ 
@@ -25,9 +27,11 @@ function GenericMenu<T extends { id: string | number }>({
   onDelete, 
   onPreview,
   onShare,
+  onSetCurrent,
   showPopover, 
   setShowPopover, 
-  title 
+  title,
+  currentItemId
 }: GenericMenuProps<T>) {
   const [deleteItem, setDeleteItem] = useState<T | null>(null);
 
@@ -39,10 +43,27 @@ function GenericMenu<T extends { id: string | number }>({
             <IonIcon icon={add} slot="start" />
             <IonLabel>New {title}</IonLabel>
           </IonItem>
+          {onSetCurrent && currentItemId && (
+            <IonItem button onClick={() => { setShowPopover(false); onSetCurrent(null); }}>
+              <IonIcon icon={radioButtonOff} slot="start" />
+              <IonLabel color="medium">Clear Current {title}</IonLabel>
+            </IonItem>
+          )}
           {items.map(item => (
             <IonItem key={item.id} style={{ '--padding-start': '16px', '--padding-end': '8px' }}>
               <IonLabel style={{ marginRight: '12px', minWidth: '120px' }}>{getLabel(item)}</IonLabel>
               <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+                {onSetCurrent && (
+                  <IonButton 
+                    fill="clear" 
+                    size="small" 
+                    color={currentItemId === item.id ? "primary" : "medium"}
+                    onClick={() => { setShowPopover(false); onSetCurrent(item); }}
+                    style={{ '--padding-start': '4px', '--padding-end': '4px', margin: 0 }}
+                  >
+                    <IonIcon icon={currentItemId === item.id ? radioButtonOn : radioButtonOff} />
+                  </IonButton>
+                )}
                 {onPreview && (
                   <IonButton 
                     fill="clear" 

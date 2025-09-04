@@ -67,7 +67,13 @@ export class ClaudeService {
       email?: string;
       full_name?: string;
       role?: string;
-    }
+    },
+    currentRfp?: {
+      id: number;
+      name: string;
+      description: string;
+      specification: string;
+    } | null
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
     const functionsExecuted: string[] = [];
@@ -101,7 +107,17 @@ CURRENT SESSION CONTEXT:
 - Session ID: ${sessionId}
 - Use this session ID when calling functions that require a session_id parameter (like switch_agent, store_message, etc.)` : '';
 
-      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}
+      const rfpContext = currentRfp ? `
+
+CURRENT RFP CONTEXT:
+- RFP ID: ${currentRfp.id}
+- RFP Name: ${currentRfp.name}
+- Description: ${currentRfp.description}
+- Specification: ${currentRfp.specification}
+
+You are currently working with this specific RFP. When creating questionnaires, generating proposals, or managing RFP data, use this RFP ID (${currentRfp.id}) for database operations. You can reference the RFP details above to provide context-aware assistance.` : '';
+
+      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}
 
 You are part of a multi-agent system and have access to several powerful functions:
 
@@ -148,7 +164,11 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
           name: userProfile.full_name,
           email: userProfile.email,
           role: userProfile.role
-        } : 'anonymous'
+        } : 'anonymous',
+        rfpContext: currentRfp ? {
+          id: currentRfp.id,
+          name: currentRfp.name
+        } : 'none'
       });
 
       let response = await client.messages.create({

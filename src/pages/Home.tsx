@@ -80,6 +80,9 @@ const Home: React.FC = () => {
   const [showRFPPreviewModal, setShowRFPPreviewModal] = useState(false);
   const [editingRFP, setEditingRFP] = useState<RFP | null>(null);
   const [previewingRFP, setPreviewingRFP] = useState<RFP | null>(null);
+  // Current RFP context for agents
+  const [currentRfpId, setCurrentRfpId] = useState<number | null>(null);
+  const [currentRfp, setCurrentRfp] = useState<RFP | null>(null);
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -145,6 +148,26 @@ const Home: React.FC = () => {
   };
   const handleCancelRFP = () => setShowRFPModal(false);
   const handleClosePreview = () => setShowRFPPreviewModal(false);
+  
+  // RFP context management for agents
+  const handleSetCurrentRfp = async (rfpId: number) => {
+    try {
+      const rfp = await RFPService.getById(rfpId);
+      if (rfp) {
+        setCurrentRfpId(rfpId);
+        setCurrentRfp(rfp);
+        console.log('Current RFP context set:', rfp.name, rfpId);
+      }
+    } catch (error) {
+      console.error('Failed to load RFP for context:', error);
+    }
+  };
+  
+  const handleClearCurrentRfp = () => {
+    setCurrentRfpId(null);
+    setCurrentRfp(null);
+    console.log('Current RFP context cleared');
+  };
   // Load agents for menu
   useEffect(() => {
     AgentService.debugAgents(); // Debug current database state
@@ -524,7 +547,13 @@ const Home: React.FC = () => {
             email: userProfile.email,
             full_name: userProfile.full_name,
             role: userProfile.role
-          } : undefined
+          } : undefined,
+          currentRfp ? {
+            id: currentRfp.id,
+            name: currentRfp.name,
+            description: currentRfp.description,
+            specification: currentRfp.specification
+          } : null
         );
         
         const aiMessage: Message = {
@@ -756,6 +785,8 @@ const Home: React.FC = () => {
               onDelete={handleDeleteRFP}
               onPreview={handlePreviewRFP}
               onShare={handleShareRFP}
+              onSetCurrent={(rfp) => rfp ? handleSetCurrentRfp(typeof rfp.id === 'string' ? parseInt(rfp.id) : rfp.id) : handleClearCurrentRfp()}
+              currentItemId={currentRfpId || undefined}
               showPopover={showRFPMenu}
               setShowPopover={setShowRFPMenu}
               title="RFP"
@@ -810,13 +841,31 @@ const Home: React.FC = () => {
             padding: '0 8px',
             minWidth: 0 // Allow shrinking
           }}>
-            <div style={{ maxWidth: '100%' }}>
+            <div style={{ maxWidth: '100%', textAlign: 'center' }}>
               <AgentIndicator
                 agent={currentAgent}
                 onSwitchAgent={handleShowAgentSelector}
                 compact={true}
                 showSwitchButton={true}
               />
+              {currentRfp && (
+                <div style={{ 
+                  marginTop: '4px', 
+                  fontSize: '0.7rem', 
+                  color: 'var(--ion-color-primary)', 
+                  backgroundColor: 'var(--ion-color-primary-tint)',
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  border: '1px solid var(--ion-color-primary)',
+                  display: 'inline-block',
+                  maxWidth: '200px',
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  📋 {currentRfp.name}
+                </div>
+              )}
             </div>
           </div>
           
