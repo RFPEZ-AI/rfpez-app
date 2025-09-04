@@ -10,6 +10,7 @@ import GenericMenu from '../components/GenericMenu';
 import RFPEditModal, { RFPFormValues } from '../components/RFPEditModal';
 import RFPPreviewModal from '../components/RFPPreviewModal';
 import { RFPService } from '../services/rfpService';
+import { UserContextService } from '../services/userContextService';
 import type { RFP } from '../types/rfp';
 import AuthButtons from '../components/AuthButtons';
 import SessionHistory from '../components/SessionHistory';
@@ -157,16 +158,28 @@ const Home: React.FC = () => {
         setCurrentRfpId(rfpId);
         setCurrentRfp(rfp);
         console.log('Current RFP context set:', rfp.name, rfpId);
+        
+        // Persist to database if user is authenticated
+        if (userId) {
+          await UserContextService.setCurrentRfp(userId, rfpId);
+          console.log('Current RFP context saved to user profile');
+        }
       }
     } catch (error) {
       console.error('Failed to load RFP for context:', error);
     }
   };
   
-  const handleClearCurrentRfp = () => {
+  const handleClearCurrentRfp = async () => {
     setCurrentRfpId(null);
     setCurrentRfp(null);
     console.log('Current RFP context cleared');
+    
+    // Clear from database if user is authenticated
+    if (userId) {
+      await UserContextService.clearCurrentRfp(userId);
+      console.log('Current RFP context cleared from user profile');
+    }
   };
   // Load agents for menu
   useEffect(() => {
@@ -262,6 +275,34 @@ const Home: React.FC = () => {
       });
     }
   }, [isAuthenticated, supabaseLoading, user, userProfile]);
+
+  // Load user's current RFP context when authenticated
+  useEffect(() => {
+    const loadUserRfpContext = async () => {
+      if (isAuthenticated && userId && !supabaseLoading) {
+        console.log('Loading user RFP context...');
+        try {
+          const currentRfp = await UserContextService.getCurrentRfp(userId);
+          if (currentRfp) {
+            setCurrentRfpId(currentRfp.id);
+            setCurrentRfp(currentRfp);
+            console.log('Restored RFP context:', currentRfp.name);
+          } else {
+            console.log('No current RFP context found for user');
+          }
+        } catch (error) {
+          console.error('Failed to load user RFP context:', error);
+        }
+      } else if (!isAuthenticated && !supabaseLoading) {
+        // Clear RFP context when user logs out
+        setCurrentRfpId(null);
+        setCurrentRfp(null);
+        console.log('Cleared RFP context for logged out user');
+      }
+    };
+
+    loadUserRfpContext();
+  }, [isAuthenticated, userId, supabaseLoading]);
 
   // Monitor session changes specifically for logout detection
   useEffect(() => {
@@ -875,11 +916,12 @@ const Home: React.FC = () => {
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen>
+      <IonContent fullscreen scrollY={false}>
         <div style={{ 
           height: 'calc(100vh - 56px)', 
           display: 'flex', 
-          flexDirection: 'column' 
+          flexDirection: 'column',
+          overflow: 'hidden'
         }}>
           {/* Main Layout */}
           <div style={{ 
@@ -916,7 +958,7 @@ const Home: React.FC = () => {
             />
           </div>
           
-          {/* RFP Context Display - Always visible at bottom */}
+          {/* RFP Context Display - Always visible at bottom, outside scroll area */}
           <div style={{
             padding: '8px 16px',
             backgroundColor: 'var(--ion-color-light)',

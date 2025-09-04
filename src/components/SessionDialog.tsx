@@ -49,9 +49,13 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
       display: 'flex', 
       flexDirection: 'column',
       padding: '16px',
-      overflow: 'auto'
+      overflow: 'hidden'
     }}>
-      <div style={{ flex: 1 }}>
+      <div style={{ 
+        flex: 1, 
+        overflow: 'auto',
+        marginBottom: '16px'
+      }}>
         {messages.map((message) => (
             <IonCard 
               key={message.id}

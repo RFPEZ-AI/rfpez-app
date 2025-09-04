@@ -11,6 +11,7 @@ export interface UserProfile {
   full_name?: string;
   avatar_url?: string;
   role: UserRole;
+  current_rfp_id?: number; // Foreign key to rfps table
   last_login?: string;
   created_at: string;
   updated_at: string;

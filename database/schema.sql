@@ -1,9 +1,9 @@
 -- =============================
--- RFP, Bid, Solicitation, Supplier Schema
+-- RFP, Bid, Solicitation, Supplier Profile Schema
 -- =============================
 
 
-CREATE TABLE IF NOT EXISTS rfp (
+CREATE TABLE IF NOT EXISTS rfps (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   due_date DATE NOT NULL,
@@ -20,11 +20,11 @@ CREATE TABLE IF NOT EXISTS rfp (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS bid (
+CREATE TABLE IF NOT EXISTS bids (
   id SERIAL PRIMARY KEY,
-  rfp_id INTEGER REFERENCES rfp(id) ON DELETE CASCADE,
+  rfp_id INTEGER REFERENCES rfps(id) ON DELETE CASCADE,
   agent_id INTEGER NOT NULL, -- assuming agent table exists
-  supplier_id INTEGER REFERENCES supplier(id),
+  supplier_id INTEGER REFERENCES supplier_profiles(id),
   response JSONB NOT NULL, -- Changed from 'document' to match TypeScript interface
   created_at TIMESTAMP DEFAULT NOW(),
   updated_at TIMESTAMP DEFAULT NOW()
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS bid (
 
 
 
-CREATE TABLE IF NOT EXISTS supplier (
+CREATE TABLE IF NOT EXISTS supplier_profiles (
   id SERIAL PRIMARY KEY,
   name TEXT NOT NULL,
   description TEXT,
@@ -54,6 +54,7 @@ CREATE TABLE IF NOT EXISTS public.user_profiles (
   full_name TEXT,
   avatar_url TEXT,
   role TEXT DEFAULT 'user' CHECK (role IN ('user', 'developer', 'administrator')),
+  current_rfp_id INTEGER REFERENCES rfps(id) ON DELETE SET NULL, -- Current RFP context
   last_login TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
