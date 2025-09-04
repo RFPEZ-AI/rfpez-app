@@ -885,7 +885,8 @@ const Home: React.FC = () => {
           <div style={{ 
             flex: 1, 
             display: 'flex',
-            overflow: 'hidden'
+            overflow: 'hidden',
+            minHeight: 0 // Ensures flex child can shrink below content size
           }}>
             {/* Left Panel - Session History */}
             <SessionHistory
@@ -913,6 +914,25 @@ const Home: React.FC = () => {
               onDownload={(artifact) => console.log('Download:', artifact)}
               onView={(artifact) => console.log('View:', artifact)}
             />
+          </div>
+          
+          {/* RFP Context Display - Always visible at bottom */}
+          <div style={{
+            padding: '8px 16px',
+            backgroundColor: 'var(--ion-color-light)',
+            borderTop: '1px solid var(--ion-color-medium)',
+            fontSize: '14px',
+            color: 'var(--ion-color-dark)',
+            textAlign: 'left',
+            minHeight: '40px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'flex-start',
+            flexShrink: 0 // Prevents this footer from shrinking
+          }}>
+            <span>
+              Current RFP: {currentRfp ? currentRfp.name : 'none'}
+            </span>
           </div>
         </div>
 
