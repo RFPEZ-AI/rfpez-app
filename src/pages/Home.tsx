@@ -916,9 +916,14 @@ const Home: React.FC = () => {
           </IonButtons>
         </IonToolbar>
       </IonHeader>
-      <IonContent fullscreen scrollY={false}>
+      <IonContent fullscreen scrollY={false} style={{ 
+        '--overflow': 'hidden',
+        '--padding-top': '0',
+        '--padding-bottom': '0'
+      }}>
         <div style={{ 
-          height: 'calc(100vh - 56px)', 
+          height: 'calc(100vh - 25px)', 
+          maxHeight: 'calc(100vh - 25px)',
           display: 'flex', 
           flexDirection: 'column',
           overflow: 'hidden'

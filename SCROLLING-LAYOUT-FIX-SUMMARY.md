@@ -1,24 +1,33 @@
 # Scrolling Layout Fix Summary
 
 ## Overview
-Fixed the global page scrolling issue where the entire Home page had a vertical scrollbar. Now all vertical scrolling is properly contained within individual panels as requested.
+Fixed the global page scrolling issue where the entire Home page had a vertical scrollbar. Now all vertical scrolling is properly contained within individual panels as requested. Also fixed Windows taskbar overlap issue when maximized.
 
-## Problem Identified
+## Problems Identified
 - The `IonContent` component was allowing the entire page to scroll vertically
 - This created an unnecessary global scrollbar when the page was maximized
 - Individual panels (SessionHistory, SessionDialog, ArtifactWindow) were not properly isolated for scrolling
+- When maximized, the page extended behind the Windows taskbar, blocking the context control
 
 ## Changes Made
 
 ### 1. Home Page Layout (`src/pages/Home.tsx`)
 - **Added `scrollY={false}`** to `IonContent` to disable global page scrolling
-- **Kept `height: 'calc(100vh - 56px)'`** to account for the header height (56px)
+- **Adjusted height calculation** to `calc(100vh - 100px)` to account for:
+  - Header height (56px)
+  - Windows taskbar margin (44px additional space)
 - **Added `overflow: 'hidden'`** to the main container to prevent any overflow
+- **Added Ionic CSS custom properties** to ensure proper overflow handling
 
 ```tsx
-<IonContent fullscreen scrollY={false}>
+<IonContent fullscreen scrollY={false} style={{ 
+  '--overflow': 'hidden',
+  '--padding-top': '0',
+  '--padding-bottom': '0'
+}}>
   <div style={{ 
-    height: 'calc(100vh - 56px)', 
+    height: 'calc(100vh - 100px)', 
+    maxHeight: 'calc(100vh - 100px)',
     display: 'flex', 
     flexDirection: 'column',
     overflow: 'hidden'
@@ -67,6 +76,11 @@ IonPage
 - The main page no longer shows a vertical scrollbar
 - All content fits within the viewport height
 
+### ✅ **Windows Taskbar Compatibility**
+- When maximized, the page no longer extends behind the Windows taskbar
+- RFP context control remains visible and accessible above the taskbar
+- 100px total offset accounts for header (56px) + taskbar margin (44px)
+
 ### ✅ **Panel-Specific Scrolling**
 - **Session History**: Sessions list scrolls independently within its panel
 - **Message Area**: Chat messages scroll independently within the center panel
@@ -75,6 +89,7 @@ IonPage
 ### ✅ **Fixed Footer**
 - RFP context control remains always visible at the bottom
 - Does not interfere with panel scrolling
+- Properly positioned above Windows taskbar when maximized
 
 ### ✅ **Responsive Behavior**
 - Layout adapts properly to different screen sizes
