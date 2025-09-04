@@ -35,7 +35,7 @@ export class RFPService {
     try {
       // Try to select the specification field - if it fails, the field doesn't exist
       const { error } = await supabase
-        .from('rfp')
+        .from('rfps')
         .select('specification')
         .limit(1);
       
@@ -52,7 +52,7 @@ export class RFPService {
       const compatibility = await this.checkSchemaCompatibility();
       console.log('📋 Schema compatibility check:', compatibility);
       
-      const { data, error } = await supabase.from('rfp').select('*');
+      const { data, error } = await supabase.from('rfps').select('*');
       
       if (error) {
         console.error('❌ Supabase error fetching RFPs:', JSON.stringify(error, null, 2));
@@ -78,7 +78,7 @@ export class RFPService {
   }
 
   static async getById(id: number): Promise<RFP | null> {
-    const { data, error } = await supabase.from('rfp').select('*').eq('id', id).single();
+    const { data, error } = await supabase.from('rfps').select('*').eq('id', id).single();
     if (error) return null;
     return data;
   }
@@ -130,7 +130,7 @@ export class RFPService {
       
       console.log('📝 Prepared insert data:', JSON.stringify(insertData, null, 2));
       
-      const { data, error } = await supabase.from('rfp').insert(insertData).select().single();
+      const { data, error } = await supabase.from('rfps').insert(insertData).select().single();
       
       if (error) {
         console.error('❌ Supabase error creating RFP:', JSON.stringify(error, null, 2));
@@ -185,7 +185,7 @@ export class RFPService {
       
       console.log('📝 Prepared update data:', JSON.stringify(updateData, null, 2));
       
-      const { data, error } = await supabase.from('rfp').update(updateData).eq('id', id).select().single();
+      const { data, error } = await supabase.from('rfps').update(updateData).eq('id', id).select().single();
       
       if (error) {
         console.error('❌ Supabase error updating RFP:', JSON.stringify(error, null, 2));
@@ -201,7 +201,7 @@ export class RFPService {
   }
 
   static async delete(id: number): Promise<boolean> {
-    const { error } = await supabase.from('rfp').delete().eq('id', id);
+    const { error } = await supabase.from('rfps').delete().eq('id', id);
     return !error;
   }
 
@@ -218,7 +218,7 @@ export class RFPService {
   // Bid Methods
   static async createBid(bid: Partial<Bid>): Promise<Bid | null> {
     console.log('🔄 Creating bid with data:', JSON.stringify(bid, null, 2));
-    const { data, error } = await supabase.from('bid').insert(bid).select().single();
+    const { data, error } = await supabase.from('bids').insert(bid).select().single();
     if (error) {
       console.error('❌ Supabase error creating bid:', JSON.stringify(error, null, 2));
       console.error('Error message:', error.message);
@@ -232,13 +232,13 @@ export class RFPService {
   }
 
   static async getBidsByRfp(rfpId: number): Promise<Bid[]> {
-    const { data, error } = await supabase.from('bid').select('*').eq('rfp_id', rfpId);
+    const { data, error } = await supabase.from('bids').select('*').eq('rfp_id', rfpId);
     if (error) return [];
     return data || [];
   }
 
   static async updateBidResponse(bidId: number, response: Record<string, unknown>): Promise<Bid | null> {
-    const { data, error } = await supabase.from('bid').update({ response }).eq('id', bidId).select().single();
+    const { data, error } = await supabase.from('bids').update({ response }).eq('id', bidId).select().single();
     if (error) return null;
     return data;
   }
@@ -293,7 +293,7 @@ export class RFPService {
   static async updateRfpProposal(rfpId: number, proposal: string): Promise<RFP | null> {
     console.log('🔄 Updating RFP proposal for ID:', rfpId);
     const { data, error } = await supabase
-      .from('rfp')
+      .from('rfps')
       .update({ proposal })
       .eq('id', rfpId)
       .select()
@@ -314,7 +314,7 @@ export class RFPService {
   ): Promise<RFP | null> {
     console.log('🔄 Updating RFP proposal questionnaire for ID:', rfpId);
     const { data, error } = await supabase
-      .from('rfp')
+      .from('rfps')
       .update({ proposal_questionnaire: questionnaire })
       .eq('id', rfpId)
       .select()
@@ -335,7 +335,7 @@ export class RFPService {
   ): Promise<RFP | null> {
     console.log('🔄 Updating RFP proposal questionnaire response for ID:', rfpId);
     const { data, error } = await supabase
-      .from('rfp')
+      .from('rfps')
       .update({ proposal_questionnaire_response: response })
       .eq('id', rfpId)
       .select()
