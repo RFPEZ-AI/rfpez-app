@@ -889,24 +889,6 @@ const Home: React.FC = () => {
                 compact={true}
                 showSwitchButton={true}
               />
-              {currentRfp && (
-                <div style={{ 
-                  marginTop: '4px', 
-                  fontSize: '0.7rem', 
-                  color: 'var(--ion-color-primary)', 
-                  backgroundColor: 'var(--ion-color-primary-tint)',
-                  padding: '2px 8px',
-                  borderRadius: '12px',
-                  border: '1px solid var(--ion-color-primary)',
-                  display: 'inline-block',
-                  maxWidth: '200px',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  📋 {currentRfp.name}
-                </div>
-              )}
             </div>
           </div>
           

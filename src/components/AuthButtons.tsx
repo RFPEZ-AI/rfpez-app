@@ -25,6 +25,13 @@ const AuthButtons: React.FC = () => {
       isAuthenticated: !!session,
       user: user ? { id: user.id, email: user.email } : null,
     });
+    
+    // Debug user metadata for avatar
+    if (user) {
+      console.log('User metadata:', user.user_metadata);
+      console.log('Avatar URL:', user.user_metadata?.avatar_url);
+      console.log('Picture:', user.user_metadata?.picture);
+    }
   }, [loading, session, user]);
 
   if (loading) {
@@ -138,9 +145,9 @@ const AuthButtons: React.FC = () => {
                 fontSize: '14px'
               }}
             >
-              {user?.user_metadata?.avatar_url && (
+              {(user?.user_metadata?.avatar_url || user?.user_metadata?.picture) ? (
                 <img 
-                  src={user.user_metadata.avatar_url} 
+                  src={user.user_metadata.avatar_url || user.user_metadata.picture} 
                   alt="avatar" 
                   style={{ 
                     height: 28, 
@@ -149,6 +156,27 @@ const AuthButtons: React.FC = () => {
                     marginRight: 8 
                   }} 
                 />
+              ) : (
+                <div style={{
+                  height: 28,
+                  width: 28,
+                  borderRadius: '50%',
+                  backgroundColor: 'var(--ion-color-primary)',
+                  color: 'white',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  marginRight: 8
+                }}>
+                  {(user?.user_metadata?.full_name || user?.email || 'U')
+                    .split(' ')
+                    .map((n: string) => n[0])
+                    .join('')
+                    .toUpperCase()
+                    .slice(0, 2)}
+                </div>
               )}
               <span style={{ marginRight: 4 }}>
                 {user?.user_metadata?.full_name || user?.email}
@@ -187,7 +215,12 @@ const AuthButtons: React.FC = () => {
       </IonButtons>
 
       {/* Auth Modal */}
-      <IonModal isOpen={showAuthModal} onDidDismiss={() => setShowAuthModal(false)}>
+      <IonModal 
+        isOpen={showAuthModal} 
+        onDidDismiss={() => setShowAuthModal(false)}
+        aria-label="Login Modal"
+        backdropDismiss={true}
+      >
         <IonHeader>
           <IonToolbar>
             <IonTitle>{isSignUp ? 'Sign Up' : 'Sign In'}</IonTitle>
