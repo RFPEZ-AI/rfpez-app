@@ -168,7 +168,12 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
 
   return (
     <>
-      <IonModal isOpen={isOpen} onDidDismiss={onClose}>
+      <IonModal 
+        isOpen={isOpen} 
+        onDidDismiss={onClose}
+        aria-label="Agent Selection Modal"
+        backdropDismiss={true}
+      >
         <IonHeader>
           <IonToolbar>
             <IonTitle>

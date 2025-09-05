@@ -38,7 +38,12 @@ export const RFPPreviewModal: React.FC<RFPPreviewModalProps> = ({
   const hasFormSpec = rfp.form_spec && rfp.form_spec.schema;
 
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={onClose}>
+    <IonModal 
+      isOpen={isOpen} 
+      onDidDismiss={onClose}
+      aria-label="RFP Preview Modal"
+      backdropDismiss={true}
+    >
       <IonHeader>
         <IonToolbar>
           <IonTitle>Preview RFP: {rfp.name}</IonTitle>

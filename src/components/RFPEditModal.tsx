@@ -164,7 +164,13 @@ const RFPEditModal: React.FC<RFPEditModalProps> = ({ rfp, isOpen, onSave, onCanc
 
   return (
     <>
-      <IonModal isOpen={isOpen} onDidDismiss={onCancel} style={{ '--height': '90%' }}>
+      <IonModal 
+        isOpen={isOpen} 
+        onDidDismiss={onCancel} 
+        style={{ '--height': '90%' }}
+        aria-label="RFP Edit Modal"
+        backdropDismiss={false}
+      >
       <IonHeader>
         <IonToolbar>
           <IonTitle>{rfp ? 'Edit RFP' : 'New RFP'}</IonTitle>

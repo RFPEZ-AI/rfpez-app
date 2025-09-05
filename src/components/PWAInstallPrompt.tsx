@@ -162,7 +162,12 @@ const PWAInstallPrompt: React.FC = () => {
       </IonButton>
 
       {/* iOS Installation Instructions Modal */}
-      <IonModal isOpen={showIOSModal} onDidDismiss={() => setShowIOSModal(false)}>
+      <IonModal 
+        isOpen={showIOSModal} 
+        onDidDismiss={() => setShowIOSModal(false)}
+        aria-label="iOS Install Instructions"
+        backdropDismiss={true}
+      >
         <IonHeader>
           <IonToolbar>
             <IonTitle>Install RFPEZ.AI</IonTitle>

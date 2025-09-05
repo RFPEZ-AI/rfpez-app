@@ -24,7 +24,12 @@ const AgentEditModal: React.FC<AgentEditModalProps> = ({ agent, isOpen, onSave, 
   };
 
   return (
-    <IonModal isOpen={isOpen} onDidDismiss={onCancel}>
+    <IonModal 
+      isOpen={isOpen} 
+      onDidDismiss={onCancel}
+      aria-label="Agent Edit Modal"
+      backdropDismiss={true}
+    >
       <IonHeader>
         <IonToolbar>
           <IonTitle>{agent ? 'Edit Agent' : 'New Agent'}</IonTitle>
