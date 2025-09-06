@@ -35,7 +35,7 @@ export const RFPPreviewModal: React.FC<RFPPreviewModalProps> = ({
 }) => {
   if (!rfp) return null;
 
-  const hasFormSpec = rfp.form_spec && rfp.form_spec.schema;
+  const hasFormSpec = rfp.bid_form_questionaire && rfp.bid_form_questionaire.schema;
 
   return (
     <IonModal 
@@ -128,8 +128,8 @@ export const RFPPreviewModal: React.FC<RFPPreviewModalProps> = ({
               
               <div style={{ marginTop: '16px' }}>
                 <RfpFormArtifact
-                  formSpec={rfp.form_spec as FormSpec}
-                  formData={(rfp.form_spec as FormSpec).defaults || {}}
+                  formSpec={rfp.bid_form_questionaire as FormSpec}
+                  formData={(rfp.bid_form_questionaire as FormSpec).defaults || {}}
                   showTitle={false}
                   readonly={true}
                 />
