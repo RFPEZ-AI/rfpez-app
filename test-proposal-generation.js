@@ -13,7 +13,7 @@ const mockRFP: RFP = {
   proposal: null,
   proposal_questionnaire: null,
   proposal_questionnaire_response: null,
-  form_spec: null,
+  bid_form_questionaire: null,
   is_template: false,
   is_public: false,
   suppliers: [],

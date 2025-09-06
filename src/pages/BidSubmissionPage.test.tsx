@@ -114,7 +114,7 @@ const mockRfp = {
   id: '123',
   title: 'Test RFP',
   description: 'Test description',
-  form_spec: {
+  bid_form_questionaire: {
     version: 'rfpez-form@1',
     schema: {
       title: 'Test Form',

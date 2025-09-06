@@ -12,6 +12,7 @@ CREATE TABLE IF NOT EXISTS rfps (
   proposal TEXT, -- Generated proposal text
   proposal_questionnaire JSONB, -- Questionnaire structure for proposal generation
   proposal_questionnaire_response JSONB, -- Collected questionnaire responses
+  bid_form_questionaire JSONB, -- JSON Schema + RJSF form specification for bid submission
   is_template BOOLEAN DEFAULT FALSE,
   is_public BOOLEAN DEFAULT FALSE,
   suppliers INTEGER[] DEFAULT '{}', -- array of supplier IDs

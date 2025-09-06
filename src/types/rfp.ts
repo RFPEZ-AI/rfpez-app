@@ -18,7 +18,7 @@ type RFP = {
   proposal?: string | null; // Generated proposal text
   proposal_questionnaire?: Record<string, any> | null; // Questionnaire structure for proposal generation
   proposal_questionnaire_response?: Record<string, any> | null; // Collected questionnaire responses
-  form_spec?: FormSpec | null; // JSON Schema + RJSF form specification
+  bid_form_questionaire?: FormSpec | null; // JSON Schema + RJSF form specification for bid submission
   is_template: boolean;
   is_public: boolean;
   suppliers: number[]; // array of supplier IDs
