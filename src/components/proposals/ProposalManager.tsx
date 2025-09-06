@@ -26,7 +26,7 @@ import { RFPService } from '../../services/rfpService';
 import type { RFP } from '../../types/rfp';
 
 // Type for proposal questionnaire response
-interface ProposalQuestionnaireResponse {
+interface BuyerQuestionnaireResponse {
   form_data: Record<string, unknown>;
   supplier_info: {
     name: string;
@@ -56,7 +56,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
   const [localProposal, setLocalProposal] = useState(rfp.proposal || '');
 
   const handleGenerateProposal = async () => {
-    if (!rfp.proposal_questionnaire_response) {
+    if (!rfp.buyer_questionnaire_response) {
       setAlertMessage('No questionnaire response data available to generate proposal.');
       setShowAlert(true);
       return;
@@ -65,7 +65,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
     setIsGenerating(true);
 
     try {
-      const response = rfp.proposal_questionnaire_response as ProposalQuestionnaireResponse | null;
+      const response = rfp.buyer_questionnaire_response as BuyerQuestionnaireResponse | null;
       const proposal = await RFPService.generateProposal(
         rfp,
         response?.form_data || {},
@@ -140,7 +140,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
           <IonText color="medium">
             <p>
               Generate a comprehensive proposal based on the submitted bid data and RFP requirements.
-              {rfp.proposal_questionnaire_response 
+              {rfp.buyer_questionnaire_response 
                 ? ' Proposal will be generated from the collected questionnaire responses.'
                 : ' No questionnaire responses available yet.'
               }
@@ -151,7 +151,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
             <IonButton
               expand="block"
               onClick={handleGenerateProposal}
-              disabled={isGenerating || !rfp.proposal_questionnaire_response}
+              disabled={isGenerating || !rfp.buyer_questionnaire_response}
               fill="outline"
             >
               {isGenerating && <IonSpinner name="crescent" slot="start" />}
@@ -222,7 +222,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
       )}
 
       {/* Questionnaire Response Data */}
-      {rfp.proposal_questionnaire_response && (
+      {rfp.buyer_questionnaire_response && (
         <IonCard>
           <IonCardHeader>
             <IonCardTitle>Questionnaire Response Data</IonCardTitle>
@@ -245,7 +245,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}>
-                {JSON.stringify(rfp.proposal_questionnaire_response, null, 2)}
+                {JSON.stringify(rfp.buyer_questionnaire_response, null, 2)}
               </pre>
             </div>
           </IonCardContent>

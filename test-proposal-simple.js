@@ -134,7 +134,7 @@ function testProposalGeneration() {
 testProposalGeneration();
 
 console.log('\n📋 Summary of new features implemented:');
-console.log('1. ✅ Added proposal, proposal_questionnaire, and proposal_questionnaire_response fields to RFP table');
+console.log('1. ✅ Added proposal, buyer_questionnaire, and buyer_questionnaire_response fields to RFP table');
 console.log('2. ✅ Updated TypeScript types to include new fields');
 console.log('3. ✅ Created ProposalManager component for proposal management');
 console.log('4. ✅ Added proposals tab to RFPEditModal');

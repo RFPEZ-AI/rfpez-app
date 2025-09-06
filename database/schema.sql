@@ -10,8 +10,8 @@ CREATE TABLE IF NOT EXISTS rfps (
   description TEXT NOT NULL CHECK (trim(description) != ''), -- Public description
   specification TEXT NOT NULL CHECK (trim(specification) != ''), -- Detailed specs for Claude
   proposal TEXT, -- Generated proposal text
-  proposal_questionnaire JSONB, -- Questionnaire structure for proposal generation
-  proposal_questionnaire_response JSONB, -- Collected questionnaire responses
+  buyer_questionnaire JSONB, -- Questionnaire structure for buyer requirements gathering
+  buyer_questionnaire_response JSONB, -- Collected buyer questionnaire responses
   bid_form_questionaire JSONB, -- JSON Schema + RJSF form specification for bid submission
   is_template BOOLEAN DEFAULT FALSE,
   is_public BOOLEAN DEFAULT FALSE,

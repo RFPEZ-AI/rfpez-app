@@ -6,8 +6,8 @@
 
 **Added to RFP table:**
 - `proposal` (TEXT) - Stores generated proposal text
-- `proposal_questionnaire` (JSONB) - Questionnaire structure for proposal generation  
-- `proposal_questionnaire_response` (JSONB) - Collected responses for generating proposals
+- `buyer_questionnaire` (JSONB) - Questionnaire structure for buyer requirements gathering  
+- `buyer_questionnaire_response` (JSONB) - Collected responses for generating proposals
 
 **Fixed bid table:**
 - Renamed `document` field to `response` to match TypeScript interface
@@ -21,8 +21,8 @@
 **Updated RFP interface to include:**
 ```typescript
 proposal?: string | null;
-proposal_questionnaire?: Record<string, any> | null;
-proposal_questionnaire_response?: Record<string, any> | null;
+buyer_questionnaire?: Record<string, any> | null;
+buyer_questionnaire_response?: Record<string, any> | null;
 ```
 
 **Files modified:**
@@ -32,8 +32,8 @@ proposal_questionnaire_response?: Record<string, any> | null;
 
 **Added new RFPService methods:**
 - `updateRfpProposal()` - Update proposal text
-- `updateRfpProposalQuestionnaire()` - Update questionnaire structure
-- `updateRfpProposalQuestionnaireResponse()` - Update response data
+- `updateRfpBuyerQuestionnaire()` - Update questionnaire structure
+- `updateRfpBuyerQuestionnaireResponse()` - Update response data
 - `generateProposal()` - Generate proposal from bid data
 - `formatBidDataForProposal()` - Helper for formatting bid data
 

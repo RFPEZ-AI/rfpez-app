@@ -155,7 +155,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
           await RFPService.updateRfpProposal(rfp.id, proposal);
           
           // Store the questionnaire response (the form data that was used to generate the proposal)
-          await RFPService.updateRfpProposalQuestionnaireResponse(rfp.id, {
+          await RFPService.updateRfpBuyerQuestionnaireResponse(rfp.id, {
             supplier_info: supplierInfo,
             form_data: formData,
             generated_at: new Date().toISOString(),

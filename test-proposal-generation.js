@@ -11,8 +11,8 @@ const mockRFP: RFP = {
   description: 'We need a web application for our business',
   specification: 'React-based web application with user authentication, dashboard, and reporting features',
   proposal: null,
-  proposal_questionnaire: null,
-  proposal_questionnaire_response: null,
+  buyer_questionnaire: null,
+  buyer_questionnaire_response: null,
   bid_form_questionaire: null,
   is_template: false,
   is_public: false,
@@ -85,7 +85,7 @@ async function testProposalGeneration() {
 testProposalGeneration();
 
 console.log('\n📋 Summary of new features:');
-console.log('1. ✅ Added proposal, proposal_questionnaire, and proposal_questionnaire_response fields to RFP table');
+console.log('1. ✅ Added proposal, buyer_questionnaire, and buyer_questionnaire_response fields to RFP table');
 console.log('2. ✅ Updated TypeScript types to include new fields');
 console.log('3. ✅ Created ProposalManager component for proposal management');
 console.log('4. ✅ Added proposals tab to RFPEditModal');
