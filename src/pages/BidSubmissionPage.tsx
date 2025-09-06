@@ -80,13 +80,13 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
         setRfp(rfpData);
 
         // Check if RFP has a form spec
-        if (!rfpData.form_spec) {
+        if (!rfpData.bid_form_questionaire) {
           setError('This RFP does not have a bid form configured');
           setLoading(false);
           return;
         }
 
-        setFormSpec(rfpData.form_spec);
+        setFormSpec(rfpData.bid_form_questionaire);
 
         // Pre-fill supplier info if provided in URL
         if (supplierName || supplierEmail) {
