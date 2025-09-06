@@ -206,16 +206,14 @@ export class RFPService {
   }
 
   // Form Spec Methods
-  static async updateFormSpec(rfpId: number, formSpec: FormSpec): Promise<RFP | null> {
-    return this.update(rfpId, { form_spec: formSpec });
+  static async updateFormSpec(rfpId: number, formSpec: FormSpec): Promise<RFP | null> { 
+    return this.update(rfpId, { bid_form_questionaire: formSpec });
   }
 
   static async getFormSpec(rfpId: number): Promise<FormSpec | null> {
     const rfp = await this.getById(rfpId);
-    return rfp?.form_spec || null;
-  }
-
-  // Bid Methods
+    return rfp?.bid_form_questionaire || null;
+  }  // Bid Methods
   static async createBid(bid: Partial<Bid>): Promise<Bid | null> {
     console.log('🔄 Creating bid with data:', JSON.stringify(bid, null, 2));
     const { data, error } = await supabase.from('bids').insert(bid).select().single();

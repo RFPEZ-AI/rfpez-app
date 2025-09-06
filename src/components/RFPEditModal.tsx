@@ -62,7 +62,7 @@ const convertToFormValues = (rfp: RFP | null): Partial<RFPFormValues> => {
     due_date,
     description,
     specification,
-    form_spec,
+    bid_form_questionaire,
     is_template,
     is_public,
     suppliers
@@ -73,7 +73,7 @@ const convertToFormValues = (rfp: RFP | null): Partial<RFPFormValues> => {
     due_date,
     description: description || '',
     specification: specification || '',
-    form_spec,
+    form_spec: bid_form_questionaire,
     is_template,
     is_public,
     suppliers
