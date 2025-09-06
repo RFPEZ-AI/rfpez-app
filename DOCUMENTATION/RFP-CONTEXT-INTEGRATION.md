@@ -71,8 +71,8 @@ Added UI elements to show current RFP context:
 ## Database Integration
 
 The system uses existing RFP database fields with the current RFP ID:
-- `proposal_questionnaire`: Stores questionnaire structure
-- `proposal_questionnaire_response`: Stores user responses
+- `buyer_questionnaire`: Stores questionnaire structure
+- `buyer_questionnaire_response`: Stores user responses
 - `proposal`: Stores final RFP design content
 
 ## Benefits

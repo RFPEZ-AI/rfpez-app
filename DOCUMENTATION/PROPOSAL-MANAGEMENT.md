@@ -11,8 +11,8 @@ This document describes the proposal management features added to the RFPEZ.AI a
 Three new fields have been added to the `rfp` table:
 
 1. **`proposal`** (TEXT): Stores the generated proposal text in Markdown format
-2. **`proposal_questionnaire`** (JSONB): Stores the questionnaire structure for proposal generation
-3. **`proposal_questionnaire_response`** (JSONB): Stores the collected responses used to generate proposals
+2. **`buyer_questionnaire`** (JSONB): Stores the questionnaire structure for buyer requirements gathering
+3. **`buyer_questionnaire_response`** (JSONB): Stores the collected responses used to generate proposals
 
 ### Migration
 
@@ -31,7 +31,7 @@ When a bid is submitted through the `BidSubmissionPage`:
 1. The bid data is stored in the `bid.response` field
 2. A proposal is automatically generated using the bid data and RFP information
 3. The proposal is stored in the `rfp.proposal` field
-4. The questionnaire response data is stored in the `rfp.proposal_questionnaire_response` field
+4. The questionnaire response data is stored in the `rfp.buyer_questionnaire_response` field
 
 ### Proposal Management UI
 
@@ -68,8 +68,8 @@ The `BidSubmissionPage` automatically:
 New methods added to `RFPService`:
 
 - `updateRfpProposal(rfpId, proposal)`: Updates the proposal text
-- `updateRfpProposalQuestionnaire(rfpId, questionnaire)`: Updates questionnaire structure
-- `updateRfpProposalQuestionnaireResponse(rfpId, response)`: Updates response data
+- `updateRfpBuyerQuestionnaire(rfpId, questionnaire)`: Updates questionnaire structure
+- `updateRfpBuyerQuestionnaireResponse(rfpId, response)`: Updates response data
 - `generateProposal(rfp, bidData, supplierInfo)`: Generates proposal text
 
 ## Usage Examples

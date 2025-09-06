@@ -3,8 +3,8 @@
 import { supabase } from '../supabaseClient';
 import type { RFP, FormSpec, Bid } from '../types/rfp';
 
-// Type for proposal questionnaire structure
-interface ProposalQuestionnaire {
+// Type for buyer questionnaire structure
+export interface BuyerQuestionnaire {
   questions: Array<{
     id: string;
     type: string;
@@ -15,8 +15,8 @@ interface ProposalQuestionnaire {
   metadata?: Record<string, unknown>;
 }
 
-// Type for proposal questionnaire response
-interface ProposalQuestionnaireResponse {
+// Type for buyer questionnaire response
+export interface BuyerQuestionnaireResponse {
   form_data: Record<string, unknown>;
   supplier_info: {
     name: string;
@@ -308,45 +308,45 @@ export class RFPService {
     return data;
   }
 
-  static async updateRfpProposalQuestionnaire(
+  static async updateRfpBuyerQuestionnaire(
     rfpId: number, 
-    questionnaire: ProposalQuestionnaire
+    questionnaire: BuyerQuestionnaire
   ): Promise<RFP | null> {
-    console.log('🔄 Updating RFP proposal questionnaire for ID:', rfpId);
+    console.log('🔄 Updating RFP buyer questionnaire for ID:', rfpId);
     const { data, error } = await supabase
       .from('rfps')
-      .update({ proposal_questionnaire: questionnaire })
+      .update({ buyer_questionnaire: questionnaire })
       .eq('id', rfpId)
       .select()
       .single();
     
     if (error) {
-      console.error('❌ Error updating RFP proposal questionnaire:', error);
+      console.error('❌ Error updating RFP buyer questionnaire:', error);
       return null;
     }
     
-    console.log('✅ RFP proposal questionnaire updated successfully');
+    console.log('✅ RFP buyer questionnaire updated successfully');
     return data;
   }
 
-  static async updateRfpProposalQuestionnaireResponse(
+  static async updateRfpBuyerQuestionnaireResponse(
     rfpId: number, 
-    response: ProposalQuestionnaireResponse
+    response: BuyerQuestionnaireResponse
   ): Promise<RFP | null> {
-    console.log('🔄 Updating RFP proposal questionnaire response for ID:', rfpId);
+    console.log('🔄 Updating RFP buyer questionnaire response for ID:', rfpId);
     const { data, error } = await supabase
       .from('rfps')
-      .update({ proposal_questionnaire_response: response })
+      .update({ buyer_questionnaire_response: response })
       .eq('id', rfpId)
       .select()
       .single();
     
     if (error) {
-      console.error('❌ Error updating RFP proposal questionnaire response:', error);
+      console.error('❌ Error updating RFP buyer questionnaire response:', error);
       return null;
     }
     
-    console.log('✅ RFP proposal questionnaire response updated successfully');
+    console.log('✅ RFP buyer questionnaire response updated successfully');
     return data;
   }
 
