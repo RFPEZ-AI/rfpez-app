@@ -193,17 +193,19 @@ const AuthButtons: React.FC = () => {
                 {userProfile?.role && RoleService.isValidRole(userProfile.role) ? (
                   <IonItem>
                     <IonLabel>
-                      <h3>Role</h3>
-                      <p>{RoleService.getRoleDisplayName(userProfile.role)}</p>
+                      Role: {RoleService.getRoleDisplayName(userProfile.role)}
                     </IonLabel>
-                    <IonBadge color={
-                      userProfile.role === 'administrator' ? 'danger' :
-                      userProfile.role === 'developer' ? 'warning' : 'medium'
-                    }>
-                      {userProfile.role}
-                    </IonBadge>
                   </IonItem>
                 ) : null}
+                
+                {user?.app_metadata?.provider && (
+                  <IonItem>
+                    <IonLabel>
+                      Authentication by: {user.app_metadata.provider === 'email' ? 'Email' : user.app_metadata.provider.charAt(0).toUpperCase() + user.app_metadata.provider.slice(1)}
+                    </IonLabel>
+                  </IonItem>
+                )}
+                
                 <IonItem button onClick={handleLogout}>
                   <IonIcon icon={logOutOutline} slot="start" />
                   <IonLabel>Logout</IonLabel>
