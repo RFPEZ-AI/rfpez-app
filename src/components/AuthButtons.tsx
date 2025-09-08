@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState, useRef } from 'react';
-import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon, IonInput, IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonBadge } from '@ionic/react';
+import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon, IonInput, IonModal, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
 import { useSupabase } from '../context/SupabaseContext';
 import { logOutOutline, chevronDownOutline, logoGoogle, logoGithub } from 'ionicons/icons';
 import { devLog } from '../utils/devLog';
@@ -188,10 +188,14 @@ const AuthButtons: React.FC = () => {
               trigger="user-menu-trigger"
               isOpen={showUserMenu}
               onDidDismiss={() => setShowUserMenu(false)}
+              showBackdrop={true}
+              backdropDismiss={true}
+              role="menu"
+              aria-label="User menu"
             >
-              <IonList>
+              <IonList role="menubar">
                 {userProfile?.role && RoleService.isValidRole(userProfile.role) ? (
-                  <IonItem>
+                  <IonItem role="menuitem">
                     <IonLabel>
                       Role: {RoleService.getRoleDisplayName(userProfile.role)}
                     </IonLabel>
@@ -199,14 +203,19 @@ const AuthButtons: React.FC = () => {
                 ) : null}
                 
                 {user?.app_metadata?.provider && (
-                  <IonItem>
+                  <IonItem role="menuitem">
                     <IonLabel>
                       Authentication by: {user.app_metadata.provider === 'email' ? 'Email' : user.app_metadata.provider.charAt(0).toUpperCase() + user.app_metadata.provider.slice(1)}
                     </IonLabel>
                   </IonItem>
                 )}
                 
-                <IonItem button onClick={handleLogout}>
+                <IonItem 
+                  button 
+                  onClick={handleLogout}
+                  role="menuitem"
+                  aria-label="Logout from account"
+                >
                   <IonIcon icon={logOutOutline} slot="start" />
                   <IonLabel>Logout</IonLabel>
                 </IonItem>
