@@ -43,12 +43,6 @@ function GenericMenu<T extends { id: string | number }>({
             <IonIcon icon={add} slot="start" />
             <IonLabel>New {title}</IonLabel>
           </IonItem>
-          {onSetCurrent && currentItemId && (
-            <IonItem button onClick={() => { setShowPopover(false); onSetCurrent(null); }}>
-              <IonIcon icon={radioButtonOff} slot="start" />
-              <IonLabel color="medium">Clear Current {title}</IonLabel>
-            </IonItem>
-          )}
           {items.map(item => (
             <IonItem key={item.id} style={{ '--padding-start': '16px', '--padding-end': '8px' }}>
               <IonLabel style={{ marginRight: '12px', minWidth: '120px' }}>{getLabel(item)}</IonLabel>
