@@ -45,7 +45,7 @@ interface Session {
 interface Artifact {
   id: string;
   name: string;
-  type: 'document' | 'image' | 'pdf' | 'other';
+  type: 'document' | 'image' | 'pdf' | 'form' | 'other';
   size: string;
   url?: string;
   content?: string;
@@ -471,6 +471,11 @@ const Home: React.FC = () => {
   };
 
   const handleSendMessage = async (content: string) => {
+    // Add debug logging at the start
+    console.log('=== SENDING MESSAGE ===');
+    console.log('Message content:', content);
+    console.log('Current artifacts before:', artifacts);
+    
     const newMessage: Message = {
       id: Date.now().toString(),
       content,
@@ -597,6 +602,19 @@ const Home: React.FC = () => {
           } : null
         );
         
+        // Add this right after claudeResponse is received
+        console.log('=== CLAUDE RESPONSE DEBUG ===');
+        console.log('1. Raw response content:', claudeResponse.content.substring(0, 200) + '...');
+        console.log('2. Response has metadata:', !!claudeResponse.metadata);
+        console.log('3. Metadata keys:', Object.keys(claudeResponse.metadata || {}));
+        console.log('4. Has buyer_questionnaire in metadata:', !!claudeResponse.metadata?.buyer_questionnaire);
+        console.log('5. buyer_questionnaire content preview:', 
+          claudeResponse.metadata?.buyer_questionnaire ? 
+            JSON.stringify(claudeResponse.metadata.buyer_questionnaire).substring(0, 200) + '...' :
+            'NOT PRESENT'
+        );
+        console.log('6. Current artifacts before processing:', artifacts.map(a => a.name));
+        
         const aiMessage: Message = {
           id: (Date.now() + 1).toString(),
           content: claudeResponse.content,
@@ -606,6 +624,53 @@ const Home: React.FC = () => {
         };
         
         setMessages(prev => [...prev, aiMessage]);
+
+        // Process Claude response metadata for artifacts (including forms)
+        console.log('Claude response metadata:', claudeResponse.metadata);
+        
+        // Fix the buyer questionnaire artifact creation with null check
+        // Handle buyer questionnaire form with proper typing
+        const metadata = claudeResponse.metadata as Record<string, unknown>;
+        if (metadata.buyer_questionnaire) {
+          console.log('Buyer questionnaire detected:', metadata.buyer_questionnaire);
+          
+          const formArtifact: Artifact = {
+            id: `buyer-form-${currentRfp?.id || Date.now()}`,
+            name: 'Buyer Questionnaire',
+            type: 'form',
+            size: 'Interactive Form',
+            content: JSON.stringify(metadata.buyer_questionnaire)
+          };
+          
+          setArtifacts(prev => [...prev, formArtifact]);
+          console.log('Added buyer questionnaire to artifacts:', formArtifact);
+        }
+
+        // Handle any other artifacts from Claude response
+        if (metadata.artifacts && Array.isArray(metadata.artifacts)) {
+          console.log('Additional artifacts detected:', metadata.artifacts);
+          
+          interface ArtifactData {
+            name?: string;
+            type?: string;
+            size?: string;
+            content?: string;
+            url?: string;
+          }
+          
+          const newArtifacts: Artifact[] = (metadata.artifacts as ArtifactData[]).map((artifact, index) => ({
+            id: `claude-artifact-${Date.now()}-${index}`,
+            name: artifact.name || `Generated Artifact ${index + 1}`,
+            type: artifact.type as 'document' | 'image' | 'pdf' | 'other' || 'document',
+            size: artifact.size || 'Generated',
+            content: artifact.content,
+            url: artifact.url
+          }));
+          
+          setArtifacts(prev => [...prev, ...newArtifacts]);
+          console.log('Added Claude artifacts:', newArtifacts);
+        }
+
         setIsLoading(false);
 
         // Check if an agent switch occurred during the Claude response
@@ -794,6 +859,179 @@ const Home: React.FC = () => {
     }
   };
 
+  // Add this debug useEffect to log RFP content
+  useEffect(() => {
+    if (currentRfp) {
+      console.log('=== CURRENT RFP CONTENT ANALYSIS ===');
+      console.log('RFP ID:', currentRfp.id);
+      console.log('RFP Name:', currentRfp.name);
+      
+      console.log('buyer_questionnaire exists:', !!currentRfp.buyer_questionnaire);
+      console.log('buyer_questionnaire type:', typeof currentRfp.buyer_questionnaire);
+      console.log('buyer_questionnaire content preview:', 
+        currentRfp.buyer_questionnaire ? 
+          String(currentRfp.buyer_questionnaire).substring(0, 200) + '...' : 
+          'NULL');
+          
+      console.log('bid_form_questionaire exists:', !!currentRfp.bid_form_questionaire);
+      console.log('bid_form_questionaire type:', typeof currentRfp.bid_form_questionaire);
+      console.log('bid_form_questionaire content preview:', 
+        currentRfp.bid_form_questionaire ? 
+          String(currentRfp.bid_form_questionaire).substring(0, 200) + '...' : 
+          'NULL');
+    }
+  }, [currentRfp]);
+
+  // Add this useEffect to monitor artifacts changes
+  useEffect(() => {
+    console.log('=== ARTIFACTS STATE CHANGED ===');
+    console.log('Total artifacts:', artifacts.length);
+    artifacts.forEach((artifact, index) => {
+      console.log(`Artifact ${index + 1}:`, {
+        id: artifact.id,
+        name: artifact.name,
+        type: artifact.type,
+        size: artifact.size,
+        hasContent: !!artifact.content,
+        isForm: artifact.name === 'Buyer Questionnaire' || artifact.type === 'form'
+      });
+      
+      // Check if this looks like a buyer questionnaire
+      if (artifact.name === 'Buyer Questionnaire' || 
+          (artifact.content && artifact.content.includes('schema'))) {
+        console.log('🟢 BUYER QUESTIONNAIRE FOUND:', artifact);
+        try {
+          const parsed = JSON.parse(artifact.content || '{}');
+          console.log('Form schema present:', !!parsed.schema);
+          console.log('Form uiSchema present:', !!parsed.uiSchema);
+        } catch (e) {
+          console.log('❌ Failed to parse form content:', e);
+        }
+      }
+    });
+  }, [artifacts]);
+
+  // Add this debug useEffect to monitor artifact flow
+  useEffect(() => {
+    console.log('🔍 ARTIFACT FLOW DEBUG:', {
+      totalArtifacts: artifacts.length,
+      artifactNames: artifacts.map(a => a.name),
+      artifactTypes: artifacts.map(a => a.type),
+      timestamp: new Date().toISOString()
+    });
+    
+    artifacts.forEach((artifact, index) => {
+      console.log(`🔍 Artifact ${index + 1}:`, {
+        id: artifact.id,
+        name: artifact.name,
+        type: artifact.type,
+        source: artifact.id.includes('buyer-form') ? 'RFP Database' : 
+                 artifact.id.includes('claude-artifact') ? 'Claude Response' : 'Unknown'
+      });
+    });
+  }, [artifacts]);
+
+  // Fix the RFP context change useEffect to preserve existing artifacts
+  useEffect(() => {
+    console.log('=== RFP CONTEXT CHANGED - LOADING ARTIFACTS ===');
+    
+    if (currentRfp) {
+      console.log('Current RFP data:', currentRfp);
+      
+      // Get existing artifacts that are NOT from database (preserve Claude-generated ones)
+      const existingClaudeArtifacts = artifacts.filter(artifact => 
+        !artifact.id.startsWith('buyer-form-') && 
+        !artifact.id.startsWith('bid-form-') &&
+        !artifact.id.startsWith('proposal-')
+      );
+      console.log('Preserving existing Claude artifacts:', existingClaudeArtifacts);
+      
+      const newArtifacts: Artifact[] = [...existingClaudeArtifacts]; // Start with existing Claude artifacts
+    
+      // Load buyer questionnaire if exists
+      if (currentRfp.buyer_questionnaire) {
+        console.log('🟢 Loading buyer questionnaire from RFP database');
+        try {
+          // Parse to validate it's proper JSON
+          const formData = typeof currentRfp.buyer_questionnaire === 'string' 
+            ? JSON.parse(currentRfp.buyer_questionnaire)
+            : currentRfp.buyer_questionnaire;
+            
+          const buyerFormArtifact: Artifact = {
+            id: `buyer-form-${currentRfp.id}`,
+            name: 'Buyer Questionnaire',
+            type: 'form',
+            size: 'Interactive Form',
+            content: JSON.stringify(formData)
+          };
+          
+          newArtifacts.push(buyerFormArtifact);
+          console.log('✅ Added buyer questionnaire artifact:', buyerFormArtifact);
+        } catch (e) {
+          console.error('❌ Failed to parse buyer questionnaire JSON:', e);
+        }
+      } else {
+        console.log('ℹ️ No buyer questionnaire found in current RFP');
+      }
+      
+      // Load bid form questionnaire if exists
+      if (currentRfp.bid_form_questionaire) {
+        console.log('🟢 Loading bid form questionnaire from RFP database');
+        try {
+          const formData = typeof currentRfp.bid_form_questionaire === 'string'
+            ? JSON.parse(currentRfp.bid_form_questionaire)
+            : currentRfp.bid_form_questionaire;
+            
+          const bidFormArtifact: Artifact = {
+            id: `bid-form-${currentRfp.id}`,
+            name: 'Supplier Bid Form',
+            type: 'form', 
+            size: 'Interactive Form',
+            content: JSON.stringify(formData)
+          };
+          
+          newArtifacts.push(bidFormArtifact);
+          console.log('✅ Added bid form questionnaire artifact:', bidFormArtifact);
+        } catch (e) {
+          console.error('❌ Failed to parse bid form questionnaire JSON:', e);
+        }
+      } else {
+        console.log('ℹ️ No bid form questionnaire found in current RFP');
+      }
+      
+      // Load proposal content if exists
+      if (currentRfp.proposal) {
+        console.log('🟢 Loading proposal content from RFP database');
+        const proposalArtifact: Artifact = {
+          id: `proposal-${currentRfp.id}`,
+          name: 'RFP Proposal',
+          type: 'document',
+          size: 'Generated Content',
+          content: currentRfp.proposal
+        };
+        
+        newArtifacts.push(proposalArtifact);
+        console.log('✅ Added proposal artifact:', proposalArtifact);
+      } else {
+        console.log('ℹ️ No proposal content found in current RFP');
+      }
+    
+      // Update artifacts state
+      setArtifacts(newArtifacts);
+      console.log(`🎉 Total artifacts after RFP load: ${newArtifacts.length}`);
+      console.log('Final artifact list:', newArtifacts.map(a => ({ name: a.name, source: a.id.includes('claude') ? 'Claude' : 'Database' })));
+      
+    } else {
+      // No current RFP, only keep Claude-generated artifacts
+      const claudeArtifacts = artifacts.filter(artifact => 
+        artifact.id.includes('claude-artifact') || 
+        artifact.id.includes('buyer-form-') && !artifact.id.includes(`buyer-form-${currentRfpId}`)
+      );
+      setArtifacts(claudeArtifacts);
+      console.log('🧹 Cleared database artifacts - kept Claude artifacts');
+    }
+  }, [currentRfp]); // Remove 'artifacts' from dependency to avoid infinite loop
+
   return (
     <IonPage>
       <IonHeader>
@@ -904,18 +1142,19 @@ const Home: React.FC = () => {
         '--padding-bottom': '0'
       }}>
         <div style={{ 
-          height: 'calc(100vh - 25px)', 
-          maxHeight: 'calc(100vh - 25px)',
+          height: '100vh',
           display: 'flex', 
           flexDirection: 'column',
           overflow: 'hidden'
         }}>
-          {/* Main Layout */}
+          {/* Main Layout - Takes remaining space after header and footer */}
           <div style={{ 
-            flex: 1, 
+            flex: 1,
             display: 'flex',
             overflow: 'hidden',
-            minHeight: 0 // Ensures flex child can shrink below content size
+            minHeight: 0,
+            paddingTop: '56px', // Account for header height
+            paddingBottom: '40px' // Account for footer height
           }}>
             {/* Left Panel - Session History */}
             <SessionHistory
@@ -942,27 +1181,33 @@ const Home: React.FC = () => {
               artifacts={artifacts}
               onDownload={(artifact) => console.log('Download:', artifact)}
               onView={(artifact) => console.log('View:', artifact)}
+              currentRfpId={currentRfpId}
             />
           </div>
-          
-          {/* RFP Context Display - Always visible at bottom, outside scroll area */}
-          <div style={{
-            padding: '8px 16px',
-            backgroundColor: 'var(--ion-color-light)',
-            borderTop: '1px solid var(--ion-color-medium)',
-            fontSize: '14px',
-            color: 'var(--ion-color-dark)',
-            textAlign: 'left',
-            minHeight: '40px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'flex-start',
-            flexShrink: 0 // Prevents this footer from shrinking
-          }}>
-            <span>
-              Current RFP: {currentRfp ? currentRfp.name : 'none'}
-            </span>
-          </div>
+        </div>
+
+        {/* RFP Context Display - Fixed at bottom, outside main container */}
+        <div style={{
+          position: 'fixed',
+          bottom: 0,
+          left: 0,
+          right: 0,
+          padding: '8px 16px',
+          backgroundColor: 'var(--ion-color-light)',
+          borderTop: '1px solid var(--ion-color-medium)',
+          fontSize: '14px',
+          color: 'var(--ion-color-dark)',
+          textAlign: 'left',
+          height: '40px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-start',
+          zIndex: 1000,
+          boxSizing: 'border-box'
+        }}>
+          <span>
+            Current RFP: {currentRfp ? currentRfp.name : 'none'}
+          </span>
         </div>
 
         {/* Agent Selector Modal */}

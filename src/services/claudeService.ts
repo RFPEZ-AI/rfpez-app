@@ -26,6 +26,8 @@ interface ClaudeResponse {
     agent_switch_occurred?: boolean;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     agent_switch_result?: any;
+    buyer_questionnaire?: Record<string, unknown>;
+    [key: string]: unknown; // Allow additional metadata properties
   };
 }
 
@@ -119,19 +121,24 @@ You are currently working with this specific RFP. When creating questionnaires, 
 
       const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}
 
-You are part of a multi-agent system and have access to several powerful functions:
+You are part of a multi-agent system with integrated MCP (Model Context Protocol) support and have access to several powerful functions:
 
-CONVERSATION MANAGEMENT:
-- Retrieve conversation history from previous sessions
-- Store messages and create new sessions
-- Search through past conversations
-- Access recent sessions
+CONVERSATION MANAGEMENT (via MCP Server):
+- Retrieve conversation history from previous sessions (get_conversation_history)
+- Store messages and create new sessions (store_message, create_session)
+- Search through past conversations (search_messages)
+- Access recent sessions (get_recent_sessions)
 
 AGENT MANAGEMENT:
 - Get available agents in the system (get_available_agents)
 - Check which agent is currently active (get_current_agent)
 - Switch to a different agent when appropriate (switch_agent)
 - Recommend the best agent for specific topics (recommend_agent)
+
+MCP INTEGRATION NOTES:
+- Your conversation functions now use a Supabase MCP server for enhanced reliability
+- All conversation data is stored securely and can be accessed across sessions
+- The MCP connection provides real-time access to the conversation database
 
 AGENT SWITCHING GUIDELINES:
 - Switch agents when the user's request would be better handled by a specialist
