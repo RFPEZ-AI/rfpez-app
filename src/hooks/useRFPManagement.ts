@@ -84,10 +84,16 @@ export const useRFPManagement = (userId?: string) => {
     try {
       console.log('💾 Saving RFP with form data:', formData);
       
+      // Convert form field names to database field names
       const rfpData: Partial<RFP> = {
-        ...formData,
+        name: formData.name,
+        due_date: formData.due_date,
         description: formData.description || 'No description provided',
-        specification: formData.specification || 'No specification provided'
+        specification: formData.specification || 'No specification provided',
+        bid_form_questionaire: formData.form_spec, // Convert form_spec to bid_form_questionaire
+        is_template: formData.is_template,
+        is_public: formData.is_public,
+        suppliers: formData.suppliers
       };
       
       console.log('💾 Converted RFP data for database:', rfpData);
