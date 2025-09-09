@@ -87,7 +87,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
           )}
           
-          {/* Main Menu - Only visible to developer and administrator roles */}
+          {/* Main Menu - Visible to developer and administrator roles (includes Debug menu access) */}
           {(() => {
             const shouldShowMenu = userProfile?.role && RoleService.isDeveloperOrHigher(userProfile.role);
             console.log('MainMenu visibility check:', {
@@ -98,6 +98,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             return shouldShowMenu ? <MainMenu onSelect={onMainMenuSelect} /> : null;
           })()}
           
+          {/* RFP Menu - Available to all authenticated users for creating and editing RFPs */}
           <GenericMenu
             items={rfps}
             getLabel={r => r.name || `RFP #${r.id}`}

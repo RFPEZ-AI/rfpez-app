@@ -2,7 +2,14 @@
 
 ## Overview
 
-The Main Menu component is now restricted to users with **developer** or **administrator** roles only. Users with the basic "user" role will not see the Main Menu.
+The Main Menu component provides access to development tools and debugging features, including:
+- **Debug Menu**: Access to `/debug` route and debugging utilities
+- **Agent Management**: Advanced agent configuration tools
+- **RFP Management**: Advanced RFP administration features
+
+This menu is restricted to users with **developer** or **administrator** roles only. Users with the basic "user" role will not see the Main Menu.
+
+**Note**: Regular RFP editing is available to ALL authenticated users through the RFP menu in the header, regardless of role.
 
 ## Implementation
 
@@ -29,16 +36,19 @@ The Main Menu component is now restricted to users with **developer** or **admin
 ## User Experience by Role
 
 ### **User Role (Level 1)**
-- ❌ **Cannot see** Main Menu
+- ❌ **Cannot see** Main Menu (no access to Debug menu)
+- ✅ **Can access** RFP editing through the RFP menu in header
 - ✅ Can see other UI elements (agents, chat, etc.)
 
 ### **Developer Role (Level 2)**
-- ✅ **Can see** Main Menu
+- ✅ **Can see** Main Menu (includes Debug menu access)
+- ✅ **Can access** RFP editing through both Main Menu and RFP header menu
 - ✅ Full access to development features
 - ✅ Can access all Main Menu functions
 
 ### **Administrator Role (Level 3)**
-- ✅ **Can see** Main Menu
+- ✅ **Can see** Main Menu (includes Debug menu access)
+- ✅ **Can access** RFP editing through both Main Menu and RFP header menu
 - ✅ Full access to all features
 - ✅ Can manage user roles (in development mode)
 
