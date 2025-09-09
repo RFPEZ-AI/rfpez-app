@@ -300,6 +300,188 @@ export const claudeApiFunctions: Tool[] = [
       },
       "required": ["table", "filter"]
     }
+  },
+  
+  // Add Artifact Functions for presenting content in the artifacts window
+  {
+    "name": "create_form_artifact",
+    "description": "Create and display a form in the artifacts window for user interaction",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title for the form artifact"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what the form is for"
+        },
+        "form_schema": {
+          "type": "object",
+          "description": "JSON Schema defining the form structure and validation",
+          "properties": {
+            "type": { "type": "string", "enum": ["object"] },
+            "properties": { "type": "object" },
+            "required": { "type": "array", "items": { "type": "string" } },
+            "title": { "type": "string" },
+            "description": { "type": "string" }
+          },
+          "required": ["type", "properties"]
+        },
+        "ui_schema": {
+          "type": "object",
+          "description": "UI Schema for customizing form appearance and behavior"
+        },
+        "form_data": {
+          "type": "object",
+          "description": "Initial/default data to populate the form with"
+        },
+        "submit_action": {
+          "type": "object",
+          "description": "Configuration for form submission",
+          "properties": {
+            "type": { "type": "string", "enum": ["function_call", "save_session", "export_data"] },
+            "function_name": { "type": "string" },
+            "success_message": { "type": "string" }
+          },
+          "required": ["type"]
+        }
+      },
+      "required": ["title", "form_schema"]
+    }
+  },
+  {
+    "name": "update_form_artifact",
+    "description": "Update an existing form artifact with new data or schema",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "description": "ID of the artifact to update"
+        },
+        "updates": {
+          "type": "object",
+          "description": "Updates to apply to the artifact",
+          "properties": {
+            "title": { "type": "string" },
+            "description": { "type": "string" },
+            "form_schema": { "type": "object" },
+            "ui_schema": { "type": "object" },
+            "form_data": { "type": "object" },
+            "submit_action": { "type": "object" }
+          }
+        }
+      },
+      "required": ["artifact_id", "updates"]
+    }
+  },
+  {
+    "name": "get_form_submission",
+    "description": "Retrieve form submission data from a specific artifact",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "description": "ID of the form artifact to get submission from"
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Session ID to associate with the submission"
+        }
+      },
+      "required": ["artifact_id"]
+    }
+  },
+  {
+    "name": "validate_form_data",
+    "description": "Validate form data against a JSON schema",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "form_schema": {
+          "type": "object",
+          "description": "JSON Schema to validate against"
+        },
+        "form_data": {
+          "type": "object",
+          "description": "Form data to validate"
+        }
+      },
+      "required": ["form_schema", "form_data"]
+    }
+  },
+  {
+    "name": "create_artifact_template",
+    "description": "Create a reusable template for forms or other artifacts",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "template_name": {
+          "type": "string",
+          "description": "Name of the template"
+        },
+        "template_type": {
+          "type": "string",
+          "enum": ["form", "document", "chart", "table"],
+          "description": "Type of artifact template"
+        },
+        "template_schema": {
+          "type": "object",
+          "description": "Schema definition for the template"
+        },
+        "template_ui": {
+          "type": "object",
+          "description": "UI configuration for the template"
+        },
+        "description": {
+          "type": "string",
+          "description": "Description of what this template is for"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tags for categorizing the template"
+        }
+      },
+      "required": ["template_name", "template_type", "template_schema"]
+    }
+  },
+  {
+    "name": "list_artifact_templates",
+    "description": "List available artifact templates",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "template_type": {
+          "type": "string",
+          "enum": ["form", "document", "chart", "table", "all"],
+          "description": "Filter templates by type (default: all)",
+          "default": "all"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Filter templates by tags"
+        }
+      }
+    }
+  },
+  {
+    "name": "get_artifact_status",
+    "description": "Get the current status and data of an artifact",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "description": "ID of the artifact to check"
+        }
+      },
+      "required": ["artifact_id"]
+    }
   }
 ];
 
@@ -349,32 +531,266 @@ export class ClaudeAPIFunctionHandler {
     return profile?.id || null;
   }
 
-  // TODO: Fix TypeScript issues in these helper methods - commented out for now
-  /*
+  // Supabase MCP function implementations with simplified TypeScript approach
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async supabaseSelect(params: any, userId: string) {
-    // Implementation commented out due to TypeScript compatibility issues
-    throw new Error('supabaseSelect is temporarily disabled');
+    const { table, columns = '*', filter, limit, order } = params;
+    
+    console.log('🔍 Supabase SELECT:', { table, columns, filter, limit, order, userId });
+    
+    if (!table) {
+      throw new Error('Table name is required for supabase_select');
+    }
+    
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query: any = supabase.from(table).select(columns);
+      
+      // Apply filter if provided
+      if (filter && filter.field && filter.operator && filter.value !== undefined) {
+        const { field, operator, value } = filter;
+        
+        switch (operator) {
+          case 'eq':
+            query = query.eq(field, value);
+            break;
+          case 'neq':
+            query = query.neq(field, value);
+            break;
+          case 'gt':
+            query = query.gt(field, value);
+            break;
+          case 'lt':
+            query = query.lt(field, value);
+            break;
+          case 'gte':
+            query = query.gte(field, value);
+            break;
+          case 'lte':
+            query = query.lte(field, value);
+            break;
+          case 'like':
+            query = query.like(field, value);
+            break;
+          case 'in':
+            if (Array.isArray(value)) {
+              query = query.in(field, value);
+            } else {
+              throw new Error('Value must be an array when using "in" operator');
+            }
+            break;
+          default:
+            throw new Error(`Unsupported operator: ${operator}`);
+        }
+      }
+      
+      // Apply ordering if provided
+      if (order && order.field) {
+        query = query.order(order.field, { ascending: order.ascending !== false });
+      }
+      
+      // Apply limit if provided
+      if (limit && typeof limit === 'number' && limit > 0) {
+        query = query.limit(limit);
+      }
+      
+      const result = await query;
+      const { data, error } = result;
+      
+      if (error) {
+        console.error('❌ Supabase SELECT error:', error);
+        throw new Error(`Failed to select from ${table}: ${error.message}`);
+      }
+      
+      console.log('✅ Supabase SELECT success:', { table, rowCount: data?.length || 0 });
+      
+      return {
+        table,
+        data: data || [],
+        count: data?.length || 0
+      };
+    } catch (error) {
+      console.error('❌ Supabase SELECT exception:', error);
+      throw error;
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async supabaseInsert(params: any, userId: string) {
-    // Implementation commented out due to TypeScript compatibility issues
-    throw new Error('supabaseInsert is temporarily disabled');
+    const { table, data, returning = '*' } = params;
+    
+    console.log('📝 Supabase INSERT:', { table, data, returning, userId });
+    
+    if (!table) {
+      throw new Error('Table name is required for supabase_insert');
+    }
+    
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data object is required for supabase_insert');
+    }
+    
+    try {
+      const result = await supabase
+        .from(table)
+        .insert(data)
+        .select(returning);
+        
+      const { data: insertedData, error } = result;
+      
+      if (error) {
+        console.error('❌ Supabase INSERT error:', error);
+        throw new Error(`Failed to insert into ${table}: ${error.message}`);
+      }
+      
+      console.log('✅ Supabase INSERT success:', { table, rowCount: insertedData?.length || 0 });
+      
+      return {
+        table,
+        data: insertedData || [],
+        count: insertedData?.length || 0
+      };
+    } catch (error) {
+      console.error('❌ Supabase INSERT exception:', error);
+      throw error;
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async supabaseUpdate(params: any, userId: string) {
-    // Implementation commented out due to TypeScript compatibility issues
-    throw new Error('supabaseUpdate is temporarily disabled');
+    const { table, data, filter, returning = '*' } = params;
+    
+    console.log('✏️ Supabase UPDATE:', { table, data, filter, returning, userId });
+    
+    if (!table) {
+      throw new Error('Table name is required for supabase_update');
+    }
+    
+    if (!data || typeof data !== 'object') {
+      throw new Error('Data object is required for supabase_update');
+    }
+    
+    if (!filter || !filter.field || !filter.operator || filter.value === undefined) {
+      throw new Error('Filter with field, operator, and value is required for supabase_update');
+    }
+    
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let query: any = supabase.from(table).update(data);
+      
+      // Apply filter
+      const { field, operator, value } = filter;
+      
+      switch (operator) {
+        case 'eq':
+          query = query.eq(field, value);
+          break;
+        case 'neq':
+          query = query.neq(field, value);
+          break;
+        case 'gt':
+          query = query.gt(field, value);
+          break;
+        case 'lt':
+          query = query.lt(field, value);
+          break;
+        case 'gte':
+          query = query.gte(field, value);
+          break;
+        case 'lte':
+          query = query.lte(field, value);
+          break;
+        default:
+          throw new Error(`Unsupported operator for update: ${operator}`);
+      }
+      
+      // Add select clause to get returning data
+      query = query.select(returning);
+      
+      const result = await query;
+      const { data: updatedData, error } = result;
+      
+      if (error) {
+        console.error('❌ Supabase UPDATE error:', error);
+        throw new Error(`Failed to update ${table}: ${error.message}`);
+      }
+      
+      console.log('✅ Supabase UPDATE success:', { table, rowCount: updatedData?.length || 0 });
+      
+      return {
+        table,
+        data: updatedData || [],
+        count: updatedData?.length || 0
+      };
+    } catch (error) {
+      console.error('❌ Supabase UPDATE exception:', error);
+      throw error;
+    }
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async supabaseDelete(params: any, userId: string) {
-    // Implementation commented out due to TypeScript compatibility issues
-    throw new Error('supabaseDelete is temporarily disabled');
+    const { table, filter } = params;
+    
+    console.log('🗑️ Supabase DELETE:', { table, filter, userId });
+    
+    if (!table) {
+      throw new Error('Table name is required for supabase_delete');
+    }
+    
+    if (!filter || !filter.field || !filter.operator || filter.value === undefined) {
+      throw new Error('Filter with field, operator, and value is required for supabase_delete');
+    }
+    
+    try {
+      // Build the delete query step by step
+      const { field, operator, value } = filter;
+      
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      let deleteQuery: any = supabase.from(table).delete();
+      
+      switch (operator) {
+        case 'eq':
+          deleteQuery = deleteQuery.eq(field, value);
+          break;
+        case 'neq':
+          deleteQuery = deleteQuery.neq(field, value);
+          break;
+        case 'gt':
+          deleteQuery = deleteQuery.gt(field, value);
+          break;
+        case 'lt':
+          deleteQuery = deleteQuery.lt(field, value);
+          break;
+        case 'gte':
+          deleteQuery = deleteQuery.gte(field, value);
+          break;
+        case 'lte':
+          deleteQuery = deleteQuery.lte(field, value);
+          break;
+        default:
+          throw new Error(`Unsupported operator for delete: ${operator}`);
+      }
+      
+      const result = await deleteQuery;
+      const { data, error } = result;
+      
+      if (error) {
+        console.error('❌ Supabase DELETE error:', error);
+        throw new Error(`Failed to delete from ${table}: ${error.message}`);
+      }
+      
+      console.log('✅ Supabase DELETE success:', { table, rowCount: data?.length || 0 });
+      
+      return {
+        table,
+        data: data || [],
+        count: data?.length || 0
+      };
+    } catch (error) {
+      console.error('❌ Supabase DELETE exception:', error);
+      throw error;
+    }
   }
-  */
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async executeFunction(functionName: string, parameters: any) {
@@ -457,12 +873,31 @@ export class ClaudeAPIFunctionHandler {
       case 'recommend_agent':
         return await this.recommendAgent(parameters, userId);
         
-      // Disable complex Supabase functions for now - MCP integration is the priority
+      // Re-enabled Supabase functions with TypeScript fixes
       case 'supabase_select':
+        return await this.supabaseSelect(parameters, userId);
       case 'supabase_insert':
+        return await this.supabaseInsert(parameters, userId);
       case 'supabase_update':
+        return await this.supabaseUpdate(parameters, userId);
       case 'supabase_delete':
-        throw new Error(`Function ${functionName} is temporarily disabled due to TypeScript compatibility issues`);
+        return await this.supabaseDelete(parameters, userId);
+        
+      // Artifact functions
+      case 'create_form_artifact':
+        return await this.createFormArtifact(parameters, userId);
+      case 'update_form_artifact':
+        return await this.updateFormArtifact(parameters, userId);
+      case 'get_form_submission':
+        return await this.getFormSubmission(parameters, userId);
+      case 'validate_form_data':
+        return await this.validateFormData(parameters, userId);
+      case 'create_artifact_template':
+        return await this.createArtifactTemplate(parameters, userId);
+      case 'list_artifact_templates':
+        return await this.listArtifactTemplates(parameters, userId);
+      case 'get_artifact_status':
+        return await this.getArtifactStatus(parameters, userId);
     
       default:
         throw new Error(`Unknown function: ${functionName}`);
@@ -1166,6 +1601,441 @@ export class ClaudeAPIFunctionHandler {
         ? `Found ${topRecommendations.length} agent recommendations for: "${topic}"`
         : 'No specific agent recommendations found, consider using the default agent'
     };
+  }
+
+  // Artifact Functions Implementation
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async createFormArtifact(params: any, userId: string) {
+    const { title, description, form_schema, ui_schema, form_data, submit_action } = params;
+    
+    console.log('🎨 Creating form artifact:', { title, userId });
+    
+    if (!title) {
+      throw new Error('Title is required for creating a form artifact');
+    }
+    
+    if (!form_schema || typeof form_schema !== 'object') {
+      throw new Error('Valid form_schema is required for creating a form artifact');
+    }
+    
+    if (!form_schema.type || form_schema.type !== 'object') {
+      throw new Error('Form schema must have type "object"');
+    }
+    
+    if (!form_schema.properties || typeof form_schema.properties !== 'object') {
+      throw new Error('Form schema must have properties object');
+    }
+    
+    try {
+      // Generate a unique artifact ID
+      const artifact_id = `form_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Store artifact in the database for persistence
+      const { data: artifact, error } = await supabase
+        .from('artifacts')
+        .insert({
+          id: artifact_id,
+          user_id: userId !== 'anonymous' ? userId : null,
+          type: 'form',
+          title,
+          description: description || null,
+          schema: form_schema,
+          ui_schema: ui_schema || null,
+          data: form_data || null,
+          submit_action: submit_action || null,
+          status: 'active',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Failed to store artifact in database:', error);
+        // Continue without database storage for anonymous users or fallback
+      }
+      
+      console.log('✅ Form artifact created successfully:', { artifact_id, title });
+      
+      return {
+        success: true,
+        artifact_id,
+        title,
+        description,
+        type: 'form',
+        form_schema,
+        ui_schema: ui_schema || {},
+        form_data: form_data || {},
+        submit_action: submit_action || { type: 'save_session' },
+        created_at: new Date().toISOString(),
+        message: `Form artifact "${title}" created successfully`
+      };
+    } catch (error) {
+      console.error('❌ Error creating form artifact:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async updateFormArtifact(params: any, userId: string) {
+    const { artifact_id, updates } = params;
+    
+    console.log('✏️ Updating form artifact:', { artifact_id, userId });
+    
+    if (!artifact_id) {
+      throw new Error('Artifact ID is required for updating');
+    }
+    
+    if (!updates || typeof updates !== 'object') {
+      throw new Error('Updates object is required');
+    }
+    
+    try {
+      // Update artifact in database
+      const { data: artifact, error } = await supabase
+        .from('artifacts')
+        .update({
+          title: updates.title,
+          description: updates.description,
+          schema: updates.form_schema,
+          ui_schema: updates.ui_schema,
+          data: updates.form_data,
+          submit_action: updates.submit_action,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', artifact_id)
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Failed to update artifact in database:', error);
+        throw new Error(`Failed to update artifact: ${error.message}`);
+      }
+      
+      console.log('✅ Form artifact updated successfully:', { artifact_id });
+      
+      return {
+        success: true,
+        artifact_id,
+        updated_fields: Object.keys(updates),
+        updated_at: new Date().toISOString(),
+        message: `Artifact "${artifact_id}" updated successfully`
+      };
+    } catch (error) {
+      console.error('❌ Error updating form artifact:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async getFormSubmission(params: any, userId: string) {
+    const { artifact_id, session_id } = params;
+    
+    console.log('📋 Getting form submission:', { artifact_id, session_id, userId });
+    
+    if (!artifact_id) {
+      throw new Error('Artifact ID is required');
+    }
+    
+    try {
+      // Get the artifact
+      const { data: artifact, error: artifactError } = await supabase
+        .from('artifacts')
+        .select('*')
+        .eq('id', artifact_id)
+        .single();
+      
+      if (artifactError) {
+        console.error('❌ Failed to get artifact:', artifactError);
+        throw new Error(`Failed to get artifact: ${artifactError.message}`);
+      }
+      
+      // Get any submissions for this artifact
+      const { data: submissions, error: submissionError } = await supabase
+        .from('artifact_submissions')
+        .select('*')
+        .eq('artifact_id', artifact_id)
+        .eq('session_id', session_id || 'current')
+        .order('created_at', { ascending: false })
+        .limit(1);
+      
+      if (submissionError) {
+        console.warn('⚠️ Could not retrieve submissions:', submissionError);
+      }
+      
+      const latestSubmission = submissions?.[0] || null;
+      
+      console.log('✅ Form submission retrieved:', { artifact_id, has_submission: !!latestSubmission });
+      
+      return {
+        artifact_id,
+        artifact: {
+          title: artifact.title,
+          description: artifact.description,
+          form_schema: artifact.schema,
+          ui_schema: artifact.ui_schema,
+          form_data: artifact.data
+        },
+        latest_submission: latestSubmission ? {
+          submission_id: latestSubmission.id,
+          data: latestSubmission.submission_data,
+          submitted_at: latestSubmission.created_at
+        } : null,
+        message: latestSubmission ? 'Form submission found' : 'No submissions found for this artifact'
+      };
+    } catch (error) {
+      console.error('❌ Error getting form submission:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async validateFormData(params: any, userId: string) {
+    const { form_schema, form_data } = params;
+    
+    console.log('✅ Validating form data:', { userId });
+    
+    if (!form_schema || typeof form_schema !== 'object') {
+      throw new Error('Valid form_schema is required for validation');
+    }
+    
+    if (!form_data || typeof form_data !== 'object') {
+      throw new Error('Valid form_data is required for validation');
+    }
+    
+    try {
+      const errors: string[] = [];
+      const warnings: string[] = [];
+      
+      // Basic validation against schema
+      if (form_schema.required && Array.isArray(form_schema.required)) {
+        for (const requiredField of form_schema.required) {
+          if (!(requiredField in form_data) || form_data[requiredField] === '' || form_data[requiredField] == null) {
+            errors.push(`Required field "${requiredField}" is missing or empty`);
+          }
+        }
+      }
+      
+      // Type validation for each field
+      if (form_schema.properties) {
+        for (const [fieldName, fieldSchema] of Object.entries(form_schema.properties as Record<string, any>)) {
+          const fieldValue = form_data[fieldName];
+          const fieldType = (fieldSchema as any).type;
+          
+          if (fieldValue != null && fieldType) {
+            switch (fieldType) {
+              case 'string':
+                if (typeof fieldValue !== 'string') {
+                  errors.push(`Field "${fieldName}" must be a string`);
+                }
+                break;
+              case 'number':
+                if (typeof fieldValue !== 'number' && !Number.isFinite(Number(fieldValue))) {
+                  errors.push(`Field "${fieldName}" must be a number`);
+                }
+                break;
+              case 'boolean':
+                if (typeof fieldValue !== 'boolean') {
+                  errors.push(`Field "${fieldName}" must be a boolean`);
+                }
+                break;
+              case 'array':
+                if (!Array.isArray(fieldValue)) {
+                  errors.push(`Field "${fieldName}" must be an array`);
+                }
+                break;
+              case 'object':
+                if (typeof fieldValue !== 'object' || Array.isArray(fieldValue)) {
+                  errors.push(`Field "${fieldName}" must be an object`);
+                }
+                break;
+            }
+          }
+        }
+      }
+      
+      const isValid = errors.length === 0;
+      
+      console.log('✅ Form validation complete:', { isValid, errorCount: errors.length, warningCount: warnings.length });
+      
+      return {
+        valid: isValid,
+        errors,
+        warnings,
+        validated_fields: Object.keys(form_data),
+        message: isValid ? 'Form data is valid' : `Form validation failed with ${errors.length} error(s)`
+      };
+    } catch (error) {
+      console.error('❌ Error validating form data:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async createArtifactTemplate(params: any, userId: string) {
+    const { template_name, template_type, template_schema, template_ui, description, tags } = params;
+    
+    console.log('📄 Creating artifact template:', { template_name, template_type, userId });
+    
+    if (!template_name) {
+      throw new Error('Template name is required');
+    }
+    
+    if (!template_type || !['form', 'document', 'chart', 'table'].includes(template_type)) {
+      throw new Error('Valid template_type is required (form, document, chart, table)');
+    }
+    
+    if (!template_schema || typeof template_schema !== 'object') {
+      throw new Error('Valid template_schema is required');
+    }
+    
+    try {
+      const template_id = `template_${template_type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Store template in database
+      const { data: template, error } = await supabase
+        .from('artifact_templates')
+        .insert({
+          id: template_id,
+          user_id: userId !== 'anonymous' ? userId : null,
+          name: template_name,
+          type: template_type,
+          schema: template_schema,
+          ui_config: template_ui || null,
+          description: description || null,
+          tags: tags || [],
+          is_public: false, // Private by default
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Failed to store template in database:', error);
+        throw new Error(`Failed to create template: ${error.message}`);
+      }
+      
+      console.log('✅ Artifact template created successfully:', { template_id, template_name });
+      
+      return {
+        success: true,
+        template_id,
+        template_name,
+        template_type,
+        description,
+        tags: tags || [],
+        created_at: new Date().toISOString(),
+        message: `Template "${template_name}" created successfully`
+      };
+    } catch (error) {
+      console.error('❌ Error creating artifact template:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async listArtifactTemplates(params: any, userId: string) {
+    const { template_type = 'all', tags } = params;
+    
+    console.log('📋 Listing artifact templates:', { template_type, tags, userId });
+    
+    try {
+      let query = supabase
+        .from('artifact_templates')
+        .select('*')
+        .or(`user_id.eq.${userId !== 'anonymous' ? userId : null},is_public.eq.true`);
+      
+      if (template_type !== 'all') {
+        query = query.eq('type', template_type);
+      }
+      
+      if (tags && Array.isArray(tags) && tags.length > 0) {
+        query = query.contains('tags', tags);
+      }
+      
+      const { data: templates, error } = await query
+        .order('created_at', { ascending: false });
+      
+      if (error) {
+        console.error('❌ Failed to list templates:', error);
+        throw new Error(`Failed to list templates: ${error.message}`);
+      }
+      
+      console.log('✅ Templates listed successfully:', { count: templates?.length || 0 });
+      
+      return {
+        templates: (templates || []).map(template => ({
+          template_id: template.id,
+          name: template.name,
+          type: template.type,
+          description: template.description,
+          tags: template.tags || [],
+          is_public: template.is_public,
+          created_at: template.created_at
+        })),
+        filter: {
+          template_type: template_type,
+          tags: tags || []
+        },
+        total_found: templates?.length || 0,
+        message: `Found ${templates?.length || 0} templates`
+      };
+    } catch (error) {
+      console.error('❌ Error listing artifact templates:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async getArtifactStatus(params: any, userId: string) {
+    const { artifact_id } = params;
+    
+    console.log('📊 Getting artifact status:', { artifact_id, userId });
+    
+    if (!artifact_id) {
+      throw new Error('Artifact ID is required');
+    }
+    
+    try {
+      // Get artifact details
+      const { data: artifact, error: artifactError } = await supabase
+        .from('artifacts')
+        .select('*')
+        .eq('id', artifact_id)
+        .single();
+      
+      if (artifactError) {
+        console.error('❌ Failed to get artifact:', artifactError);
+        throw new Error(`Failed to get artifact: ${artifactError.message}`);
+      }
+      
+      // Get submission count
+      const { count: submissionCount, error: countError } = await supabase
+        .from('artifact_submissions')
+        .select('*', { count: 'exact', head: true })
+        .eq('artifact_id', artifact_id);
+      
+      if (countError) {
+        console.warn('⚠️ Could not get submission count:', countError);
+      }
+      
+      console.log('✅ Artifact status retrieved:', { artifact_id, submissionCount });
+      
+      return {
+        artifact_id,
+        status: artifact.status || 'active',
+        type: artifact.type,
+        title: artifact.title,
+        description: artifact.description,
+        created_at: artifact.created_at,
+        updated_at: artifact.updated_at,
+        submission_count: submissionCount || 0,
+        last_activity: artifact.updated_at || artifact.created_at,
+        message: `Artifact status for "${artifact.title}"`
+      };
+    } catch (error) {
+      console.error('❌ Error getting artifact status:', error);
+      throw error;
+    }
   }
 }
 
