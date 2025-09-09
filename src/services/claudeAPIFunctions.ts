@@ -2,9 +2,11 @@
 
 // Claude API Function Calling Integration for RFPEZ MCP
 // This provides the same functionality as MCP but via HTTP endpoints that Claude API can call
+// Now integrated with the Supabase MCP Server
 
 import { supabase } from '../supabaseClient';
 import { AgentService } from './agentService';
+import { mcpClient } from './mcpClient';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages.mjs';
 
 // Claude API Function Definitions (Anthropic SDK format)
@@ -178,6 +180,126 @@ export const claudeApiFunctions: Tool[] = [
       },
       "required": ["topic"]
     }
+  },
+  
+  // Add Supabase MCP functions
+  {
+    "name": "supabase_select",
+    "description": "Query and retrieve data from Supabase tables",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "The table name to query"
+        },
+        "columns": {
+          "type": "string",
+          "description": "Columns to select (comma-separated or *)"
+        },
+        "filter": {
+          "type": "object",
+          "description": "Filter conditions",
+          "properties": {
+            "field": { "type": "string" },
+            "operator": { "type": "string", "enum": ["eq", "neq", "gt", "lt", "gte", "lte", "like", "in"] },
+            "value": { "type": ["string", "number", "boolean", "array"] }
+          }
+        },
+        "limit": {
+          "type": "number",
+          "description": "Maximum number of rows to return"
+        },
+        "order": {
+          "type": "object",
+          "properties": {
+            "field": { "type": "string" },
+            "ascending": { "type": "boolean", "default": true }
+          }
+        }
+      },
+      "required": ["table"]
+    }
+  },
+  {
+    "name": "supabase_insert",
+    "description": "Insert new records into Supabase tables",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "The table name to insert into"
+        },
+        "data": {
+          "type": "object",
+          "description": "Data object to insert"
+        },
+        "returning": {
+          "type": "string",
+          "description": "Columns to return after insert",
+          "default": "*"
+        }
+      },
+      "required": ["table", "data"]
+    }
+  },
+  {
+    "name": "supabase_update",
+    "description": "Update existing records in Supabase tables",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "The table name to update"
+        },
+        "data": {
+          "type": "object",
+          "description": "Data object with fields to update"
+        },
+        "filter": {
+          "type": "object",
+          "description": "Filter conditions to identify records",
+          "properties": {
+            "field": { "type": "string" },
+            "operator": { "type": "string", "enum": ["eq", "neq", "gt", "lt", "gte", "lte"] },
+            "value": { "type": ["string", "number", "boolean"] }
+          },
+          "required": ["field", "operator", "value"]
+        },
+        "returning": {
+          "type": "string",
+          "description": "Columns to return after update",
+          "default": "*"
+        }
+      },
+      "required": ["table", "data", "filter"]
+    }
+  },
+  {
+    "name": "supabase_delete",
+    "description": "Delete records from Supabase tables",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "table": {
+          "type": "string",
+          "description": "The table name to delete from"
+        },
+        "filter": {
+          "type": "object",
+          "description": "Filter conditions to identify records",
+          "properties": {
+            "field": { "type": "string" },
+            "operator": { "type": "string", "enum": ["eq", "neq", "gt", "lt", "gte", "lte"] },
+            "value": { "type": ["string", "number", "boolean"] }
+          },
+          "required": ["field", "operator", "value"]
+        }
+      },
+      "required": ["table", "filter"]
+    }
   }
 ];
 
@@ -227,10 +349,94 @@ export class ClaudeAPIFunctionHandler {
     return profile?.id || null;
   }
 
+  // TODO: Fix TypeScript issues in these helper methods - commented out for now
+  /*
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async supabaseSelect(params: any, userId: string) {
+    // Implementation commented out due to TypeScript compatibility issues
+    throw new Error('supabaseSelect is temporarily disabled');
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async supabaseInsert(params: any, userId: string) {
+    // Implementation commented out due to TypeScript compatibility issues
+    throw new Error('supabaseInsert is temporarily disabled');
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async supabaseUpdate(params: any, userId: string) {
+    // Implementation commented out due to TypeScript compatibility issues
+    throw new Error('supabaseUpdate is temporarily disabled');
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async supabaseDelete(params: any, userId: string) {
+    // Implementation commented out due to TypeScript compatibility issues
+    throw new Error('supabaseDelete is temporarily disabled');
+  }
+  */
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   async executeFunction(functionName: string, parameters: any) {
     const userId = await this.getCurrentUserId();
     
+    // MCP-enabled conversation functions - use MCP client for these
+    try {
+      console.log(`🔗 Attempting MCP client for function: ${functionName}`);
+      
+      // Try using MCP client methods directly
+      switch (functionName) {
+        case 'get_conversation_history': {
+          const historyResult = await mcpClient.getConversationHistory(
+            parameters.session_id, 
+            parameters.limit || 50, 
+            parameters.offset || 0
+          );
+          console.log('✅ MCP client success for get_conversation_history');
+          return historyResult;
+        }
+
+        case 'get_recent_sessions': {
+          const sessionsResult = await mcpClient.getRecentSessions(parameters.limit || 10);
+          console.log('✅ MCP client success for get_recent_sessions');
+          return sessionsResult;
+        }
+
+        case 'store_message': {
+          const storeResult = await mcpClient.storeMessage(
+            parameters.session_id,
+            parameters.content,
+            parameters.role,
+            parameters.metadata
+          );
+          console.log('✅ MCP client success for store_message');
+          return storeResult;
+        }
+
+        case 'create_session': {
+          const createResult = await mcpClient.createSession(
+            parameters.title,
+            parameters.description
+          );
+          console.log('✅ MCP client success for create_session');
+          return createResult;
+        }
+
+        case 'search_messages': {
+          const searchResult = await mcpClient.searchMessages(
+            parameters.query,
+            parameters.limit || 20
+          );
+          console.log('✅ MCP client success for search_messages');
+          return searchResult;
+        }
+      }
+    } catch (error) {
+      console.warn(`❌ MCP client failed for ${functionName}, falling back to HTTP:`, error);
+      // Fall through to original HTTP implementation
+    }
+    
+    // Original HTTP endpoint implementations for non-conversation functions and fallbacks
     switch (functionName) {
       case 'get_conversation_history':
         return await this.getConversationHistory(parameters, userId);
@@ -250,6 +456,14 @@ export class ClaudeAPIFunctionHandler {
         return await this.switchAgent(parameters, userId);
       case 'recommend_agent':
         return await this.recommendAgent(parameters, userId);
+        
+      // Disable complex Supabase functions for now - MCP integration is the priority
+      case 'supabase_select':
+      case 'supabase_insert':
+      case 'supabase_update':
+      case 'supabase_delete':
+        throw new Error(`Function ${functionName} is temporarily disabled due to TypeScript compatibility issues`);
+    
       default:
         throw new Error(`Unknown function: ${functionName}`);
     }
