@@ -6,6 +6,7 @@ import { SessionActiveAgent, UserProfile } from '../types/database';
 import DatabaseService from '../services/database';
 import { ClaudeService } from '../services/claudeService';
 import { AgentService } from '../services/agentService';
+import { categorizeError } from '../components/APIErrorHandler';
 
 export const useMessageHandling = () => {
   
@@ -233,15 +234,39 @@ export const useMessageHandling = () => {
         console.error('Claude API Error:', claudeError);
         setIsLoading(false);
         
-        const errorMessage: Message = {
+        // Categorize the error for better user messaging
+        const categorizedError = categorizeError(claudeError);
+        
+        let errorMessage: string;
+        switch (categorizedError.type) {
+          case 'rate_limit':
+            errorMessage = `⏰ The AI service is temporarily busy due to high demand. Your message has been saved and you can try again in a moment. ${categorizedError.suggestion || ''}`;
+            break;
+          case 'network':
+            errorMessage = `🌐 There seems to be a connection issue. Please check your internet connection and try again. Your message has been saved. ${categorizedError.suggestion || ''}`;
+            break;
+          case 'auth':
+            errorMessage = `🔐 There's an authentication issue with the AI service. Please contact support if this persists. ${categorizedError.suggestion || ''}`;
+            break;
+          case 'quota':
+            errorMessage = `📊 The AI service usage limit has been reached. Please try again later or contact support. ${categorizedError.suggestion || ''}`;
+            break;
+          case 'server':
+            errorMessage = `⚠️ The AI service is temporarily unavailable. Your message has been saved and you can try again in a few moments. ${categorizedError.suggestion || ''}`;
+            break;
+          default:
+            errorMessage = `❌ I'm having trouble connecting to the AI service right now. ${categorizedError.message || 'Please try again later.'} Your message has been saved.`;
+        }
+
+        const aiErrorMessage: Message = {
           id: (Date.now() + 1).toString(),
-          content: `I apologize, but I'm having trouble connecting to my AI service right now. ${claudeError instanceof Error ? claudeError.message : 'Please try again later.'} You can still use the platform - your messages are being saved.`,
+          content: errorMessage,
           isUser: false,
           timestamp: new Date(),
           agentName: currentAgent?.agent_name || 'System'
         };
         
-        setMessages(prev => [...prev, errorMessage]);
+        setMessages(prev => [...prev, aiErrorMessage]);
 
         // Save error message to database if authenticated
         if (isAuthenticated && userId && activeSessionId) {
@@ -249,7 +274,7 @@ export const useMessageHandling = () => {
             await DatabaseService.addMessage(
               activeSessionId, 
               userId, 
-              errorMessage.content, 
+              aiErrorMessage.content, 
               'assistant',
               currentAgent?.agent_id,
               currentAgent?.agent_name

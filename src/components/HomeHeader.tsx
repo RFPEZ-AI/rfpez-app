@@ -10,6 +10,7 @@ import AgentsMenu from './AgentsMenu';
 import GenericMenu from './GenericMenu';
 import AgentIndicator from './AgentIndicator';
 import AuthButtons from './AuthButtons';
+import { SimpleRateLimitStatus } from './RateLimitStatus';
 import { RoleService } from '../services/roleService';
 import { useIsMobile } from '../utils/useMediaQuery';
 
@@ -156,9 +157,17 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
           </div>
         </div>
         
-        {/* Right section - Auth buttons */}
+        {/* Right section - Rate limit status and Auth buttons */}
         <IonButtons slot="end">
-          <AuthButtons />
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'center', 
+            gap: '8px',
+            marginRight: '8px'
+          }}>
+            <SimpleRateLimitStatus />
+            <AuthButtons />
+          </div>
         </IonButtons>
       </IonToolbar>
     </IonHeader>

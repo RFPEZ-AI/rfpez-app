@@ -1,70 +1,59 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState } from 'react';
-import { IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonButton, IonIcon } from '@ionic/react';
+import { IonButton, IonIcon } from '@ionic/react';
 import { downloadOutline, documentTextOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/icons';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import { RJSFSchema, UiSchema } from '@rjsf/utils';
-
-interface Artifact {
-  id: string;
-  name: string;
-  type: 'document' | 'image' | 'pdf' | 'form' | 'other';
-  size: string;
-  url?: string;
-  content?: string;
-}
-
-interface ArtifactWindowProps {
-  artifacts: Artifact[];
-  onDownload?: (artifact: Artifact) => void;
-  onView?: (artifact: Artifact) => void;
-  isCollapsed?: boolean;
-  onToggleCollapse?: () => void;
-  currentRfpId?: number | null; // Add this prop to pass current RFP context
-}
+import { SingletonArtifactWindowProps, Artifact } from '../types/home';
 
 interface BuyerQuestionnaireData {
   schema: RJSFSchema;
   uiSchema?: UiSchema;
   formData?: Record<string, unknown>;
+  title?: string;
+  description?: string;
+  submitAction?: {
+    type: string;
+    function_name?: string;
+    success_message?: string;
+  };
 }
 
 interface FormSubmissionData {
   formData?: Record<string, unknown>;
 }
 
-const ArtifactWindow: React.FC<ArtifactWindowProps> = ({ 
-  artifacts, 
+const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({ 
+  artifact,
   onDownload, 
-  onView,
+  onFormSubmit,
   isCollapsed = false,
   onToggleCollapse,
   currentRfpId
 }) => {
-  const [internalCollapsed, setInternalCollapsed] = useState(true); // Start collapsed initially
-
-  // Allow manual toggle without auto-collapsing when empty
+  const [internalCollapsed, setInternalCollapsed] = useState(true);
 
   const collapsed = onToggleCollapse ? isCollapsed : internalCollapsed;
   const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'document':
       case 'pdf':
         return documentTextOutline;
       case 'form':
-        return documentTextOutline; // You could use a different icon like clipboardOutline if preferred
+        return documentTextOutline;
       default:
         return documentTextOutline;
     }
   };
 
-  // Add this helper function to check if artifact is a form
+  // Check if artifact is a form
   const isBuyerQuestionnaire = (artifact: Artifact): boolean => {
     try {
-      if (artifact.content && artifact.name === 'Buyer Questionnaire') {
+      if (artifact.content && (artifact.name === 'Buyer Questionnaire' || artifact.type === 'form')) {
         const parsed = JSON.parse(artifact.content);
         return parsed.schema && typeof parsed.schema === 'object';
       }
@@ -74,7 +63,7 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
     return false;
   };
 
-  // Add this component for form rendering
+  // Form renderer component
   interface FormRendererProps {
     artifact: Artifact;
     onSubmit: (formData: Record<string, unknown>) => void;
@@ -91,11 +80,76 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
         }
       };
 
+      // Use title and description from the form spec if available, fallback to artifact name
+      const formTitle = formSpec.title || artifact.name;
+      const formDescription = formSpec.description;
+
       return (
-        <div style={{ padding: '16px' }}>
-          <h3 style={{ marginBottom: '16px', color: 'var(--ion-color-primary)' }}>
-            {artifact.name}
+        <div style={{ padding: '16px', height: '100%', overflow: 'auto' }}>
+          {/* Custom styles for form inputs */}
+          <style>{`
+            .form-group input[type="text"],
+            .form-group input[type="email"],
+            .form-group input[type="number"],
+            .form-group input[type="date"],
+            .form-group input[type="time"],
+            .form-group input[type="password"],
+            .form-group input[type="tel"],
+            .form-group input[type="url"],
+            .form-group textarea,
+            .form-group select {
+              background-color: #f0f8ff !important;
+              border: 1px solid #d0d0d0 !important;
+              color: #333333 !important;
+              padding: 8px 12px !important;
+              border-radius: 4px !important;
+              font-size: 14px !important;
+              line-height: 1.4 !important;
+            }
+            
+            .form-group input[type="text"]:focus,
+            .form-group input[type="email"]:focus,
+            .form-group input[type="number"]:focus,
+            .form-group input[type="date"]:focus,
+            .form-group input[type="time"]:focus,
+            .form-group input[type="password"]:focus,
+            .form-group input[type="tel"]:focus,
+            .form-group input[type="url"]:focus,
+            .form-group textarea:focus,
+            .form-group select:focus {
+              background-color: #e6f3ff !important;
+              border-color: var(--ion-color-primary) !important;
+              outline: none !important;
+              box-shadow: 0 0 0 2px rgba(66, 133, 244, 0.2) !important;
+            }
+            
+            .form-group label {
+              color: #333333 !important;
+              font-weight: 500 !important;
+              margin-bottom: 4px !important;
+              display: block !important;
+            }
+            
+            .form-group .help-block {
+              color: #666666 !important;
+              font-size: 12px !important;
+              margin-top: 4px !important;
+            }
+          `}</style>
+          
+          <h3 style={{ marginBottom: '8px', color: 'var(--ion-color-primary)' }}>
+            {formTitle}
           </h3>
+          {formDescription && (
+            <p style={{ 
+              marginBottom: '16px', 
+              color: 'var(--ion-color-medium)', 
+              fontSize: '14px',
+              lineHeight: '1.4'
+            }}>
+              {formDescription}
+            </p>
+          )}
           <Form
             schema={formSpec.schema}
             uiSchema={(formSpec.uiSchema || {}) as UiSchema<Record<string, unknown>>}
@@ -147,7 +201,7 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
     }
   };
 
-  // Render form if it's a buyer questionnaire
+  // Render artifact content
   const renderArtifactContent = (artifact: Artifact) => {
     if (isBuyerQuestionnaire(artifact)) {
       return (
@@ -160,24 +214,54 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
     
     // Default rendering for other artifacts
     return (
-      <div style={{ padding: '16px' }}>
+      <div style={{ padding: '16px', height: '100%', overflow: 'auto' }}>
         <h3>{artifact.name}</h3>
         <p>Type: {artifact.type}</p>
         <p>Size: {artifact.size}</p>
+        
+        {/* Download button for non-form artifacts */}
+        {onDownload && (
+          <div style={{ marginTop: '16px' }}>
+            <IonButton 
+              size="small" 
+              fill="outline"
+              onClick={() => onDownload(artifact)}
+            >
+              <IonIcon icon={downloadOutline} slot="start" />
+              Download
+            </IonButton>
+          </div>
+        )}
+        
         {artifact.content && (
-          <pre style={{ fontSize: '12px', overflow: 'auto', maxHeight: '300px' }}>
-            {artifact.content}
-          </pre>
+          <div style={{ marginTop: '16px' }}>
+            <h4>Content:</h4>
+            <pre style={{ 
+              fontSize: '12px', 
+              overflow: 'auto', 
+              maxHeight: '300px',
+              backgroundColor: 'var(--ion-color-light)',
+              padding: '12px',
+              borderRadius: '4px'
+            }}>
+              {artifact.content}
+            </pre>
+          </div>
         )}
       </div>
     );
   };
 
-  // Add the form submission handler
+  // Form submission handler
   const handleFormSubmit = async (artifact: Artifact, formData: Record<string, unknown>) => {
     console.log('=== FORM SUBMISSION ===');
     console.log('Artifact:', artifact.name);
     console.log('Form data:', formData);
+    
+    if (onFormSubmit) {
+      onFormSubmit(artifact, formData);
+      return;
+    }
     
     try {
       // Use currentRfpId from props
@@ -199,13 +283,7 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
 
       if (response.ok) {
         console.log('✅ Form response saved successfully');
-        
-        // Show success feedback
         alert('Questionnaire submitted successfully!');
-        
-        // Optionally trigger next phase (generate bid form)
-        // You could emit an event or call a callback here
-        
       } else {
         console.error('❌ Failed to save form response');
         alert('Failed to save questionnaire response. Please try again.');
@@ -223,25 +301,30 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
       display: 'flex', 
       flexDirection: 'column',
       borderLeft: '1px solid var(--ion-color-light-shade)',
-      width: collapsed ? '40px' : '300px',
-      minWidth: collapsed ? '40px' : '300px',
+      width: collapsed ? '40px' : '400px',
+      minWidth: collapsed ? '40px' : '400px',
       transition: 'width 0.3s ease-in-out',
       overflow: 'hidden'
     }}>
-      {/* Collapse/Expand Button */}
+      {/* Header with collapse button */}
       <div style={{ 
         padding: '16px',
         borderBottom: collapsed ? 'none' : '1px solid var(--ion-color-light-shade)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: collapsed ? 'center' : 'space-between'
+        justifyContent: collapsed ? 'center' : 'space-between',
+        flexShrink: 0
       }}>
-        {!collapsed && <h3 style={{ margin: '0' }}>Documents</h3>}
+        {!collapsed && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+            <h3 style={{ margin: '0', fontSize: '1.1em' }}>Artifact</h3>
+          </div>
+        )}
         <IonButton
           fill="clear"
           size="small"
           onClick={toggleCollapse}
-          title="Expand/collapse documents"
+          title="Expand/collapse artifact panel"
           style={{ 
             '--padding-start': '8px',
             '--padding-end': '8px'
@@ -257,70 +340,76 @@ const ArtifactWindow: React.FC<ArtifactWindowProps> = ({
         </IonButton>
       </div>
 
-      {/* Content - only show when not collapsed */}
+      {/* Content area */}
       {!collapsed && (
-        <>
-          {artifacts.length === 0 ? (
-            <div style={{ 
-              display: 'flex', 
-              justifyContent: 'center', 
-              alignItems: 'center', 
-              height: '100%',
-              flexDirection: 'column',
-              textAlign: 'center',
-              color: 'var(--ion-color-medium)',
-              padding: '16px'
-            }}>
-              <IonIcon icon={documentTextOutline} size="large" />
-              <p>No documents yet</p>
-              <p style={{ fontSize: '0.9em' }}>
-                Documents and files will appear here during your conversation
-              </p>
-            </div>
-          ) : (
-            <div style={{ flex: 1, overflow: 'auto', padding: '0 16px 16px 16px' }}>
-              {artifacts.map((artifact) => (
-                <IonCard key={artifact.id} style={{ margin: '0 0 16px 0' }}>
-                  <IonCardHeader>
-                    <IonCardTitle style={{ fontSize: '1rem' }}>
-                      <IonIcon icon={getTypeIcon(artifact.type)} style={{ marginRight: '8px' }} />
-                      {artifact.name}
-                    </IonCardTitle>
-                  </IonCardHeader>
-                  <IonCardContent>
-                    <p style={{ margin: '0 0 12px 0', color: 'var(--ion-color-medium)' }}>
+        <div style={{ 
+          flex: 1, 
+          display: 'flex', 
+          flexDirection: 'column',
+          overflow: 'hidden',
+          backgroundColor: 'var(--ion-background-color)'
+        }}>
+          {/* Artifact display area */}
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            {!artifact ? (
+              // No artifact state
+              <div style={{ 
+                display: 'flex', 
+                justifyContent: 'center', 
+                alignItems: 'center', 
+                height: '100%',
+                flexDirection: 'column',
+                textAlign: 'center',
+                color: 'var(--ion-color-medium)',
+                padding: '16px'
+              }}>
+                <IonIcon icon={documentTextOutline} size="large" />
+                <p>No artifact to display</p>
+                <p style={{ fontSize: '0.9em' }}>
+                  Artifacts will appear here during your conversation
+                </p>
+              </div>
+            ) : (
+              // Display the artifact
+              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                {/* Artifact header */}
+                <div style={{ 
+                  padding: '16px',
+                  borderBottom: '1px solid var(--ion-color-light-shade)',
+                  flexShrink: 0,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px'
+                }}>
+                  <IonIcon 
+                    icon={getTypeIcon(artifact.type)} 
+                    style={{ fontSize: '20px', color: 'var(--ion-color-primary)' }} 
+                  />
+                  <div style={{ flex: 1 }}>
+                    <h4 style={{ margin: '0', fontSize: '1em' }}>{artifact.name}</h4>
+                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8em', color: 'var(--ion-color-medium)' }}>
                       {artifact.type.toUpperCase()} • {artifact.size}
                     </p>
-                    <div style={{ display: 'flex', gap: '8px' }}>
-                      {onView && (
-                        <IonButton 
-                          size="small" 
-                          fill="outline"
-                          onClick={() => onView(artifact)}
-                        >
-                          View
-                        </IonButton>
-                      )}
-                      {onDownload && (
-                        <IonButton 
-                          size="small" 
-                          fill="clear"
-                          onClick={() => onDownload(artifact)}
-                        >
-                          <IonIcon icon={downloadOutline} />
-                        </IonButton>
-                      )}
-                    </div>
-                    {/* Render artifact content (e.g., form) */}
-                    <div style={{ marginTop: '16px' }}>
-                      {renderArtifactContent(artifact)}
-                    </div>
-                  </IonCardContent>
-                </IonCard>
-              ))}
-            </div>
-          )}
-        </>
+                  </div>
+                  {onDownload && (
+                    <IonButton
+                      fill="clear"
+                      size="small"
+                      onClick={() => onDownload(artifact)}
+                    >
+                      <IonIcon icon={downloadOutline} />
+                    </IonButton>
+                  )}
+                </div>
+                
+                {/* Artifact content */}
+                <div style={{ flex: 1, overflow: 'hidden' }}>
+                  {renderArtifactContent(artifact)}
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );

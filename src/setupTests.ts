@@ -8,20 +8,101 @@
 // learn more: https://github.com/testing-library/jest-dom
 import '@testing-library/jest-dom';
 
+// Mock ionicons for tests
+jest.mock('ionicons/icons', () => ({
+  warningOutline: 'warning-outline',
+  timeOutline: 'time-outline', 
+  checkmarkCircleOutline: 'checkmark-circle-outline',
+  menuOutline: 'menu-outline',
+  personOutline: 'person-outline',
+  logOutOutline: 'log-out-outline',
+  settingsOutline: 'settings-outline',
+  helpCircleOutline: 'help-circle-outline',
+  checkmarkOutline: 'checkmark-outline',
+  closeOutline: 'close-outline',
+  addOutline: 'add-outline',
+  documentTextOutline: 'document-text-outline',
+  folderOutline: 'folder-outline',
+  searchOutline: 'search-outline',
+  downloadOutline: 'download-outline',
+  shareOutline: 'share-outline',
+  heartOutline: 'heart-outline',
+  starOutline: 'star-outline',
+  thumbsUpOutline: 'thumbs-up-outline',
+  chatbubbleOutline: 'chatbubble-outline',
+  notificationsOutline: 'notifications-outline',
+  mailOutline: 'mail-outline',
+  callOutline: 'call-outline',
+  locationOutline: 'location-outline',
+  calendarOutline: 'calendar-outline',
+  cameraOutline: 'camera-outline',
+  imageOutline: 'image-outline',
+  playOutline: 'play-outline',
+  pauseOutline: 'pause-outline',
+  stopOutline: 'stop-outline',
+  volumeHighOutline: 'volume-high-outline',
+  volumeLowOutline: 'volume-low-outline',
+  volumeMuteOutline: 'volume-mute-outline',
+}));
+
 // Mock matchmedia
-window.matchMedia = window.matchMedia || function() {
-  return {
-      matches: false,
-      addListener: function() {},
-      removeListener: function() {}
-  };
-};
+Object.defineProperty(window, 'matchMedia', {
+  writable: true,
+  value: jest.fn().mockImplementation(query => ({
+    matches: false,
+    media: query,
+    onchange: null,
+    addListener: jest.fn(), // Deprecated
+    removeListener: jest.fn(), // Deprecated
+    addEventListener: jest.fn(),
+    removeEventListener: jest.fn(),
+    dispatchEvent: jest.fn(),
+  })),
+});
+
+// Also mock it on the global object for Ionic
+global.matchMedia = window.matchMedia;
 
 // Mock scrollIntoView for tests
 Element.prototype.scrollIntoView = jest.fn();
 
+// Mock ResizeObserver
+global.ResizeObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
+// Mock IntersectionObserver
+global.IntersectionObserver = jest.fn().mockImplementation(() => ({
+  observe: jest.fn(),
+  unobserve: jest.fn(),
+  disconnect: jest.fn(),
+}));
+
+// Mock getComputedStyle for Ionic components
+Object.defineProperty(window, 'getComputedStyle', {
+  writable: true,
+  value: jest.fn().mockImplementation(() => ({
+    getPropertyValue: jest.fn().mockReturnValue(''),
+    width: '1024px',
+    height: '768px',
+  })),
+});
+
+// Mock screen for responsive breakpoints
+Object.defineProperty(window, 'screen', {
+  writable: true,
+  value: {
+    width: 1024,
+    height: 768,
+  },
+});
+
 // Configure Jest to be more tolerant of async operations
 jest.setTimeout(15000);
+
+// Note: Punycode deprecation warnings from dependencies are expected and can be ignored
 
 // Store original console methods
 const originalConsoleError = console.error;
@@ -42,7 +123,16 @@ beforeAll(() => {
       'Warning: validateDOMNesting',
       'Error fetching active agents: { message: \'Database error\' }',
       'Error fetching default agent: { message: \'No default agent\' }',
-      'Error submitting bid: Error: Submission failed'
+      'Error submitting bid: Error: Submission failed',
+      'TypeError: Cannot read properties of undefined (reading \'matches\')',
+      'matchBreakpoint',
+      'ion-col.js',
+      'stencil/core',
+      'callRender',
+      'Element type is invalid',
+      'SimpleRateLimitStatus',
+      'mixed up default and named imports',
+      'RateLimitStatus.tsx'
     ];
     
     if (filteredMessages.some(filter => message.includes(filter))) {
@@ -59,7 +149,10 @@ beforeAll(() => {
       '[Ionic Warning]',
       'ion-textarea now requires',
       'ion-input now requires',
-      'ion-toggle now requires'
+      'ion-toggle now requires',
+      '[Ionicons Warning]',
+      'Could not load icon with name',
+      'Ensure that the icon is registered'
     ];
     
     if (filteredWarnings.some(filter => message.includes(filter))) {

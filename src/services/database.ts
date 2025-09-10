@@ -475,6 +475,62 @@ export class DatabaseService {
 
     return data.publicUrl;
   }
+
+  // Form Artifacts Management
+  static async getFormArtifacts(userId?: string | null): Promise<any[]> {
+    console.log('📥 Loading form artifacts from database for user:', userId || 'anonymous');
+    
+    try {
+      // First check if the table exists by doing a simple query
+      const { data: tableCheck, error: tableError } = await supabase
+        .from('form_artifacts')
+        .select('id', { count: 'exact', head: true })
+        .limit(1);
+
+      if (tableError) {
+        console.warn('⚠️ Form artifacts table not found:', tableError.message);
+        console.log('📝 This likely means the form_artifacts table does not exist yet.');
+        console.log('📝 Please run the migration: database/migration-add-form-artifacts-table.sql');
+        console.log('📝 Falling back to empty artifacts array for now.');
+        return [];
+      }
+
+      console.log('✅ Form artifacts table exists, proceeding with query...');
+
+      let query = supabase
+        .from('form_artifacts')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false });
+
+      // If user is authenticated, get their artifacts + anonymous ones
+      // If not authenticated, only get anonymous ones
+      if (userId) {
+        query = query.or(`user_id.eq.${userId},user_id.is.null`);
+      } else {
+        query = query.is('user_id', null);
+      }
+
+      const { data: formArtifacts, error } = await query;
+
+      if (error) {
+        console.error('❌ Error loading form artifacts:', error);
+        console.error('❌ Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        return [];
+      }
+
+      console.log(`✅ Loaded ${formArtifacts?.length || 0} form artifacts from database`);
+      return formArtifacts || [];
+    } catch (error) {
+      console.error('❌ Exception loading form artifacts:', error);
+      return [];
+    }
+  }
 }
 
 export default DatabaseService;

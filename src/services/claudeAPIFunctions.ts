@@ -875,12 +875,16 @@ export class ClaudeAPIFunctionHandler {
         
       // Re-enabled Supabase functions with TypeScript fixes
       case 'supabase_select':
+        console.log('✅ Executing supabase_select - function is ENABLED');
         return await this.supabaseSelect(parameters, userId);
       case 'supabase_insert':
+        console.log('✅ Executing supabase_insert - function is ENABLED');
         return await this.supabaseInsert(parameters, userId);
       case 'supabase_update':
+        console.log('✅ Executing supabase_update - function is ENABLED and working');
         return await this.supabaseUpdate(parameters, userId);
       case 'supabase_delete':
+        console.log('✅ Executing supabase_delete - function is ENABLED');
         return await this.supabaseDelete(parameters, userId);
         
       // Artifact functions
@@ -1632,7 +1636,7 @@ export class ClaudeAPIFunctionHandler {
       
       // Store artifact in the database for persistence
       const { data: artifact, error } = await supabase
-        .from('artifacts')
+        .from('form_artifacts')
         .insert({
           id: artifact_id,
           user_id: userId !== 'anonymous' ? userId : null,
@@ -1692,7 +1696,7 @@ export class ClaudeAPIFunctionHandler {
     try {
       // Update artifact in database
       const { data: artifact, error } = await supabase
-        .from('artifacts')
+        .from('form_artifacts')
         .update({
           title: updates.title,
           description: updates.description,
@@ -1739,7 +1743,7 @@ export class ClaudeAPIFunctionHandler {
     try {
       // Get the artifact
       const { data: artifact, error: artifactError } = await supabase
-        .from('artifacts')
+        .from('form_artifacts')
         .select('*')
         .eq('id', artifact_id)
         .single();
@@ -1998,7 +2002,7 @@ export class ClaudeAPIFunctionHandler {
     try {
       // Get artifact details
       const { data: artifact, error: artifactError } = await supabase
-        .from('artifacts')
+        .from('form_artifacts')
         .select('*')
         .eq('id', artifact_id)
         .single();
