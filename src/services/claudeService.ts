@@ -194,7 +194,8 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
           baseDelay: 2000, // Start with 2 seconds
           maxDelay: 60000, // Max 1 minute delay
           onRetry: (attempt, error) => {
-            console.log(`🔄 Retrying Claude API call (attempt ${attempt}) due to:`, error.message || error);
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            console.log(`🔄 Retrying Claude API call (attempt ${attempt}) due to:`, errorMessage);
           }
         }
       );
@@ -288,7 +289,8 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             baseDelay: 2000,
             maxDelay: 60000,
             onRetry: (attempt, error) => {
-              console.log(`🔄 Retrying Claude API follow-up call (attempt ${attempt}) due to:`, error.message || error);
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              console.log(`🔄 Retrying Claude API follow-up call (attempt ${attempt}) due to:`, errorMessage);
             }
           }
         );
@@ -383,7 +385,9 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       }
 
       // Check for HTTP status codes if available
-      const status = (error as any)?.status;
+      const status = typeof error === 'object' && error !== null && 'status' in error 
+        ? (error as { status: number }).status 
+        : undefined;
       if (status) {
         switch (status) {
           case 401:

@@ -477,12 +477,12 @@ export class DatabaseService {
   }
 
   // Form Artifacts Management
-  static async getFormArtifacts(userId?: string | null): Promise<any[]> {
+  static async getFormArtifacts(userId?: string | null): Promise<unknown[]> {
     console.log('📥 Loading form artifacts from database for user:', userId || 'anonymous');
     
     try {
       // First check if the table exists by doing a simple query
-      const { data: tableCheck, error: tableError } = await supabase
+      const { error: tableError } = await supabase
         .from('form_artifacts')
         .select('id', { count: 'exact', head: true })
         .limit(1);

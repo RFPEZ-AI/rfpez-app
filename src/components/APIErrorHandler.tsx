@@ -127,8 +127,8 @@ const APIErrorHandler: React.FC<APIErrorHandlerProps> = ({
 /**
  * Utility function to categorize errors
  */
-export const categorizeError = (error: Error | any): APIError => {
-  const message = error.message || error.toString();
+export const categorizeError = (error: Error | unknown): APIError => {
+  const message = error instanceof Error ? error.message : String(error);
   const messageLower = message.toLowerCase();
 
   if (messageLower.includes('rate limit') || messageLower.includes('too many requests')) {
@@ -167,7 +167,10 @@ export const categorizeError = (error: Error | any): APIError => {
     };
   }
 
-  if (messageLower.includes('temporarily unavailable') || messageLower.includes('service unavailable') || error.status >= 500) {
+  const hasStatus = typeof error === 'object' && error !== null && 'status' in error;
+  const status = hasStatus ? (error as { status: number }).status : 0;
+  
+  if (messageLower.includes('temporarily unavailable') || messageLower.includes('service unavailable') || status >= 500) {
     return {
       message,
       type: 'server',

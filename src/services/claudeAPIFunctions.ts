@@ -1635,7 +1635,7 @@ export class ClaudeAPIFunctionHandler {
       const artifact_id = `form_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       // Store artifact in the database for persistence
-      const { data: artifact, error } = await supabase
+      const { error } = await supabase
         .from('form_artifacts')
         .insert({
           id: artifact_id,
@@ -1695,7 +1695,7 @@ export class ClaudeAPIFunctionHandler {
     
     try {
       // Update artifact in database
-      const { data: artifact, error } = await supabase
+      const { error } = await supabase
         .from('form_artifacts')
         .update({
           title: updates.title,
@@ -1821,9 +1821,9 @@ export class ClaudeAPIFunctionHandler {
       
       // Type validation for each field
       if (form_schema.properties) {
-        for (const [fieldName, fieldSchema] of Object.entries(form_schema.properties as Record<string, any>)) {
+        for (const [fieldName, fieldSchema] of Object.entries(form_schema.properties as Record<string, unknown>)) {
           const fieldValue = form_data[fieldName];
-          const fieldType = (fieldSchema as any).type;
+          const fieldType = (fieldSchema as { type?: string }).type;
           
           if (fieldValue != null && fieldType) {
             switch (fieldType) {
@@ -1896,7 +1896,7 @@ export class ClaudeAPIFunctionHandler {
       const template_id = `template_${template_type}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       // Store template in database
-      const { data: template, error } = await supabase
+      const { error } = await supabase
         .from('artifact_templates')
         .insert({
           id: template_id,
