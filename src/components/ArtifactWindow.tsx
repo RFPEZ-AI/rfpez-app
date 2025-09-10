@@ -1,12 +1,13 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { downloadOutline, documentTextOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/icons';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import { RJSFSchema, UiSchema } from '@rjsf/utils';
 import { SingletonArtifactWindowProps, Artifact } from '../types/home';
+import { RFPService } from '../services/rfpService';
 
 interface BuyerQuestionnaireData {
   schema: RJSFSchema;
@@ -70,6 +71,9 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
   }
 
   const FormRenderer: React.FC<FormRendererProps> = ({ artifact, onSubmit }) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const formRef = useRef<any>(null);
+
     try {
       const formSpec: BuyerQuestionnaireData = JSON.parse(artifact.content || '{}');
       
@@ -85,7 +89,12 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
       const formDescription = formSpec.description;
 
       return (
-        <div style={{ padding: '16px', height: '100%', overflow: 'auto' }}>
+        <div style={{ 
+          padding: '16px', 
+          height: '100%', 
+          display: 'flex', 
+          flexDirection: 'column' 
+        }}>
           {/* Custom styles for form inputs */}
           <style>{`
             .form-group input[type="text"],
@@ -137,51 +146,82 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
             }
           `}</style>
           
-          <h3 style={{ marginBottom: '8px', color: 'var(--ion-color-primary)' }}>
-            {formTitle}
-          </h3>
-          {formDescription && (
-            <p style={{ 
-              marginBottom: '16px', 
-              color: 'var(--ion-color-medium)', 
-              fontSize: '14px',
-              lineHeight: '1.4'
-            }}>
-              {formDescription}
-            </p>
-          )}
-          <Form
-            schema={formSpec.schema}
-            uiSchema={(formSpec.uiSchema || {}) as UiSchema<Record<string, unknown>>}
-            formData={formSpec.formData || {}}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            validator={validator as any}
-            onSubmit={handleSubmit}
-            showErrorList={false}
-          >
-            <div style={{ 
-              marginTop: '20px', 
-              padding: '12px 0',
-              borderTop: '1px solid var(--ion-color-medium)'
-            }}>
-              <button
-                type="submit"
-                style={{
-                  backgroundColor: 'var(--ion-color-primary)',
-                  color: 'white',
-                  border: 'none',
-                  padding: '12px 24px',
-                  borderRadius: '6px',
-                  fontSize: '14px',
-                  fontWeight: '500',
-                  cursor: 'pointer',
-                  width: '100%'
-                }}
-              >
-                Submit Questionnaire
-              </button>
-            </div>
-          </Form>
+          <div style={{ marginBottom: '16px' }}>
+            <h3 style={{ margin: '0 0 8px 0', color: 'var(--ion-color-primary)' }}>
+              {formTitle}
+            </h3>
+            {formDescription && (
+              <p style={{ 
+                margin: '0', 
+                color: 'var(--ion-color-medium)', 
+                fontSize: '14px',
+                lineHeight: '1.4'
+              }}>
+                {formDescription}
+              </p>
+            )}
+          </div>
+          
+          <div style={{ flex: 1, overflow: 'auto', marginBottom: '16px' }}>
+            <Form
+              schema={formSpec.schema}
+              uiSchema={(formSpec.uiSchema || {}) as UiSchema<Record<string, unknown>>}
+              formData={formSpec.formData || {}}
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              validator={validator as any}
+              onSubmit={handleSubmit}
+              showErrorList={false}
+              ref={formRef}
+            >
+              {/* Hidden submit button for react-jsonschema-form */}
+              <button type="submit" style={{ display: 'none' }} />
+            </Form>
+          </div>
+          
+          <div style={{ 
+            padding: '12px 0',
+            borderTop: '1px solid var(--ion-color-light)',
+            flexShrink: 0
+          }}>
+            <IonButton
+              expand="block"
+              onClick={() => {
+                console.log('Submit button clicked');
+                // Trigger form submission using the ref
+                if (formRef.current) {
+                  console.log('Form ref available, attempting to submit...');
+                  try {
+                    // Try to call the submit method if it exists
+                    if (formRef.current.submit) {
+                      formRef.current.submit();
+                    } else {
+                      // Fallback: find the form element and submit it
+                      const formElement = formRef.current.formElement || 
+                                         document.querySelector('form[class*="rjsf"]') ||
+                                         document.querySelector('form');
+                      if (formElement) {
+                        console.log('Found form element, triggering submit...');
+                        const submitButton = formElement.querySelector('button[type="submit"]');
+                        if (submitButton) {
+                          submitButton.click();
+                        } else {
+                          formElement.requestSubmit();
+                        }
+                      } else {
+                        console.warn('Could not find form element to submit');
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error submitting form:', error);
+                  }
+                } else {
+                  console.warn('Form ref not available');
+                }
+              }}
+            >
+              Submit Questionnaire
+            </IonButton>
+          </div>
         </div>
       );
     } catch (error) {
@@ -254,11 +294,15 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
 
   // Form submission handler
   const handleFormSubmit = async (artifact: Artifact, formData: Record<string, unknown>) => {
-    console.log('=== FORM SUBMISSION ===');
-    console.log('Artifact:', artifact.name);
+    console.log('=== FORM SUBMISSION START ===');
+    console.log('Artifact name:', artifact.name);
+    console.log('Artifact type:', artifact.type);
     console.log('Form data:', formData);
+    console.log('Current RFP ID:', currentRfpId);
+    console.log('onFormSubmit prop:', typeof onFormSubmit);
     
     if (onFormSubmit) {
+      console.log('Using external onFormSubmit handler');
       onFormSubmit(artifact, formData);
       return;
     }
@@ -266,26 +310,24 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
     try {
       // Use currentRfpId from props
       if (!currentRfpId) {
+        console.error('❌ No RFP context available');
         alert('No RFP context available. Please select an RFP first.');
         return;
       }
 
-      // Save the form response to the database
-      const response = await fetch('/api/rfps/' + currentRfpId, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          buyer_questionnaire_response: formData
-        })
+      console.log('📤 Updating RFP using RFPService...');
+      
+      // Save the form response to the database using RFP service
+      const updatedRfp = await RFPService.update(currentRfpId, {
+        buyer_questionnaire_response: formData
       });
 
-      if (response.ok) {
+      if (updatedRfp) {
         console.log('✅ Form response saved successfully');
+        console.log('Updated RFP:', updatedRfp);
         alert('Questionnaire submitted successfully!');
       } else {
-        console.error('❌ Failed to save form response');
+        console.error('❌ Failed to save form response - RFPService.update returned null');
         alert('Failed to save questionnaire response. Please try again.');
       }
       
@@ -293,6 +335,8 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
       console.error('❌ Error submitting form:', error);
       alert('An error occurred while submitting the questionnaire.');
     }
+    
+    console.log('=== FORM SUBMISSION END ===');
   };
 
   return (
@@ -317,7 +361,9 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
       }}>
         {!collapsed && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-            <h3 style={{ margin: '0', fontSize: '1.1em' }}>Artifact</h3>
+            <h3 style={{ margin: '0', fontSize: '1.1em' }}>
+              {artifact ? artifact.type.toUpperCase() : 'Artifact'}
+            </h3>
           </div>
         )}
         <IonButton
@@ -387,9 +433,6 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
                   />
                   <div style={{ flex: 1 }}>
                     <h4 style={{ margin: '0', fontSize: '1em' }}>{artifact.name}</h4>
-                    <p style={{ margin: '4px 0 0 0', fontSize: '0.8em', color: 'var(--ion-color-medium)' }}>
-                      {artifact.type.toUpperCase()} • {artifact.size}
-                    </p>
                   </div>
                   {onDownload && (
                     <IonButton
