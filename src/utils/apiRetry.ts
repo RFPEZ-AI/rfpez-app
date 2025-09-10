@@ -8,7 +8,7 @@ interface RetryOptions {
   maxDelay?: number; // Maximum delay in milliseconds
   backoffFactor?: number; // Exponential backoff multiplier
   retryableStatusCodes?: number[];
-  onRetry?: (attempt: number, error: any) => void;
+  onRetry?: (attempt: number, error: unknown) => void;
 }
 
 interface RateLimitInfo {
@@ -19,7 +19,7 @@ interface RateLimitInfo {
 
 export class APIRetryHandler {
   private static rateLimitInfo: RateLimitInfo | null = null;
-  private static requestQueue: Array<() => Promise<any>> = [];
+  private static requestQueue: Array<() => Promise<unknown>> = [];
   private static isProcessingQueue = false;
 
   /**
@@ -47,7 +47,7 @@ export class APIRetryHandler {
       }
     }
 
-    let lastError: any;
+    let lastError: unknown;
 
     for (let attempt = 0; attempt <= maxRetries; attempt++) {
       try {
@@ -57,7 +57,7 @@ export class APIRetryHandler {
         this.rateLimitInfo = null;
         
         return result;
-      } catch (error: any) {
+      } catch (error: unknown) {
         lastError = error;
 
         // Extract rate limit information from error
@@ -74,9 +74,14 @@ export class APIRetryHandler {
         // Calculate delay with exponential backoff
         const delay = this.calculateDelay(attempt, baseDelay, maxDelay, backoffFactor, error);
         
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const statusCode = typeof error === 'object' && error !== null && 'status' in error 
+          ? (error as { status: number }).status 
+          : undefined;
+        
         console.warn(`⚠️ API call failed (attempt ${attempt + 1}/${maxRetries + 1}). Retrying in ${delay}ms...`, {
-          error: error.message || error,
-          statusCode: error.status
+          error: errorMessage,
+          statusCode
         });
 
         if (onRetry) {
@@ -132,20 +137,28 @@ export class APIRetryHandler {
     this.isProcessingQueue = false;
   }
 
-  private static extractRateLimitInfo(error: any): void {
-    if (error.status === 429 || error.message?.includes('rate limit')) {
+  private static extractRateLimitInfo(error: unknown): void {
+    const hasStatus = typeof error === 'object' && error !== null && 'status' in error;
+    const status = hasStatus ? (error as { status: number }).status : 0;
+    const hasMessage = error instanceof Error;
+    const message = hasMessage ? error.message : '';
+    
+    if (status === 429 || message.includes('rate limit')) {
       // Try to extract rate limit info from headers if available
-      const headers = error.headers || {};
+      const hasHeaders = typeof error === 'object' && error !== null && 'headers' in error;
+      const headers = hasHeaders ? (error as { headers: Record<string, unknown> }).headers : {};
       
       this.rateLimitInfo = {
         remaining: 0,
         resetTime: Date.now() + 60000, // Default to 1 minute if no reset time available
-        limit: parseInt(headers['x-ratelimit-limit']) || 0
+        limit: typeof headers['x-ratelimit-limit'] === 'string' 
+          ? parseInt(headers['x-ratelimit-limit']) || 0 
+          : 0
       };
 
       // Extract reset time if available
       const resetTimeHeader = headers['x-ratelimit-reset'];
-      if (resetTimeHeader) {
+      if (typeof resetTimeHeader === 'string') {
         this.rateLimitInfo.resetTime = parseInt(resetTimeHeader) * 1000; // Convert to milliseconds
       }
 
@@ -153,14 +166,16 @@ export class APIRetryHandler {
     }
   }
 
-  private static isRetryableError(error: any, retryableStatusCodes: number[]): boolean {
+  private static isRetryableError(error: unknown, retryableStatusCodes: number[]): boolean {
     // Check status code
-    if (error.status && retryableStatusCodes.includes(error.status)) {
+    const hasStatus = typeof error === 'object' && error !== null && 'status' in error;
+    const status = hasStatus ? (error as { status: number }).status : 0;
+    if (status && retryableStatusCodes.includes(status)) {
       return true;
     }
 
     // Check error message for rate limiting
-    const message = error.message?.toLowerCase() || '';
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
     if (message.includes('rate limit') || message.includes('too many requests')) {
       return true;
     }
@@ -178,10 +193,14 @@ export class APIRetryHandler {
     baseDelay: number,
     maxDelay: number,
     backoffFactor: number,
-    error: any
+    error: unknown
   ): number {
     // For rate limit errors, use a longer delay
-    if (error.status === 429 || error.message?.includes('rate limit')) {
+    const hasStatus = typeof error === 'object' && error !== null && 'status' in error;
+    const status = hasStatus ? (error as { status: number }).status : 0;
+    const message = error instanceof Error ? error.message : '';
+    
+    if (status === 429 || message.includes('rate limit')) {
       const rateLimitDelay = this.rateLimitInfo?.resetTime 
         ? Math.max(0, this.rateLimitInfo.resetTime - Date.now())
         : 60000; // Default to 1 minute
@@ -198,26 +217,35 @@ export class APIRetryHandler {
     return Math.min(delay + jitter, maxDelay);
   }
 
-  private static enhanceError(error: any): Error {
-    if (error.status === 429) {
-      const waitTime = this.rateLimitInfo?.resetTime 
-        ? Math.ceil((this.rateLimitInfo.resetTime - Date.now()) / 1000)
-        : 60;
+  private static enhanceError(error: unknown): Error {
+    if (error instanceof Error) {
+      // Check if it's a rate limit error and enhance the message
+      const hasStatus = typeof error === 'object' && error !== null && 'status' in error;
+      const status = hasStatus ? (error as { status: number }).status : 0;
+      
+      if (status === 429) {
+        const waitTime = this.rateLimitInfo?.resetTime 
+          ? Math.ceil((this.rateLimitInfo.resetTime - Date.now()) / 1000)
+          : 60;
 
-      return new Error(
-        `Rate limit exceeded. Please wait ${waitTime} seconds before trying again. ` +
-        `Consider reducing the frequency of API calls or implementing request queuing.`
-      );
+        return new Error(
+          `Rate limit exceeded. Please wait ${waitTime} seconds before trying again. ` +
+          `Consider reducing the frequency of API calls or implementing request queuing.`
+        );
+      }
+
+      if (error.message.includes('rate limit')) {
+        return new Error(
+          'Rate limit exceeded. The API is receiving too many requests. ' +
+          'Please wait a moment before trying again.'
+        );
+      }
+
+      return error;
     }
-
-    if (error.message?.includes('rate limit')) {
-      return new Error(
-        'Rate limit exceeded. The API is receiving too many requests. ' +
-        'Please wait a moment before trying again.'
-      );
-    }
-
-    return error;
+    
+    // Convert unknown error to Error instance
+    return new Error(String(error));
   }
 
   private static delay(ms: number): Promise<void> {

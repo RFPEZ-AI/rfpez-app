@@ -143,19 +143,36 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
         if (formArtifactsData.length > 0) {
           console.log(`📦 Converting ${formArtifactsData.length} form artifacts to UI format`);
           
-          const formattedFormArtifacts: Artifact[] = formArtifactsData.map(formArtifact => ({
-            id: formArtifact.id,
-            name: formArtifact.title,
-            type: 'form' as const,
-            size: 'Interactive Form',
-            content: JSON.stringify({
-              schema: formArtifact.schema,
-              ui_schema: formArtifact.ui_schema || {},
-              form_data: formArtifact.data || {},
-              submit_action: formArtifact.submit_action || { type: 'save_session' },
-              description: formArtifact.description
-            })
-          }));
+          const formattedFormArtifacts: Artifact[] = formArtifactsData.map(formArtifact => {
+            // Type guard for formArtifact
+            if (typeof formArtifact !== 'object' || formArtifact === null) {
+              throw new Error('Invalid form artifact data');
+            }
+            
+            const artifact = formArtifact as {
+              id: string;
+              title: string;
+              schema: unknown;
+              ui_schema?: unknown;
+              data?: unknown;
+              submit_action?: unknown;
+              description?: string;
+            };
+            
+            return {
+              id: artifact.id,
+              name: artifact.title,
+              type: 'form' as const,
+              size: 'Interactive Form',
+              content: JSON.stringify({
+                schema: artifact.schema,
+                ui_schema: artifact.ui_schema || {},
+                form_data: artifact.data || {},
+                submit_action: artifact.submit_action || { type: 'save_session' },
+                description: artifact.description
+              })
+            };
+          });
           
           // Merge with existing artifacts, avoiding duplicates
           setArtifacts(prev => {
