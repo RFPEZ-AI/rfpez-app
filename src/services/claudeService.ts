@@ -4,6 +4,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Agent } from '../types/database';
 import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
+import { APIRetryHandler } from '../utils/apiRetry';
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
@@ -178,15 +179,25 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         } : 'none'
       });
 
-      let response = await client.messages.create({
-        model: 'claude-3-5-sonnet-latest', // Use latest version automatically
-        max_tokens: 2000,
-        temperature: 0.7,
-        system: systemPrompt,
-        messages: messages,
-        tools: claudeApiFunctions, // Include MCP functions
-        tool_choice: { type: 'auto' } // Let Claude decide when to use functions
-      });
+      let response = await APIRetryHandler.executeWithRetry(
+        () => client.messages.create({
+          model: 'claude-3-5-sonnet-latest', // Use latest version automatically
+          max_tokens: 2000,
+          temperature: 0.7,
+          system: systemPrompt,
+          messages: messages,
+          tools: claudeApiFunctions, // Include MCP functions
+          tool_choice: { type: 'auto' } // Let Claude decide when to use functions
+        }),
+        {
+          maxRetries: 3,
+          baseDelay: 2000, // Start with 2 seconds
+          maxDelay: 60000, // Max 1 minute delay
+          onRetry: (attempt, error) => {
+            console.log(`🔄 Retrying Claude API call (attempt ${attempt}) due to:`, error.message || error);
+          }
+        }
+      );
 
       // Handle function calls if any
       let finalContent = '';
@@ -261,16 +272,26 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         }
 
         // Get Claude's response to the function results
-        response = await client.messages.create({
-          model: 'claude-3-5-sonnet-latest',
-          max_tokens: 2000,
-          temperature: 0.7,
-          system: systemPrompt,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          messages: messages as any,
-          tools: claudeApiFunctions,
-          tool_choice: { type: 'auto' }
-        });
+        response = await APIRetryHandler.executeWithRetry(
+          () => client.messages.create({
+            model: 'claude-3-5-sonnet-latest',
+            max_tokens: 2000,
+            temperature: 0.7,
+            system: systemPrompt,
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            messages: messages as any,
+            tools: claudeApiFunctions,
+            tool_choice: { type: 'auto' }
+          }),
+          {
+            maxRetries: 3,
+            baseDelay: 2000,
+            maxDelay: 60000,
+            onRetry: (attempt, error) => {
+              console.log(`🔄 Retrying Claude API follow-up call (attempt ${attempt}) due to:`, error.message || error);
+            }
+          }
+        );
       }
 
       // Collect final text content
@@ -338,16 +359,46 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
     } catch (error) {
       console.error('Claude API Error:', error);
       
-      // Handle specific error types
+      // Handle specific error types with better user messaging
       if (error instanceof Error) {
         if (error.message.includes('API key')) {
           throw new Error('Invalid Claude API key. Please check your configuration.');
         }
+        if (error.message.includes('Rate limit exceeded')) {
+          // Enhanced rate limit message from APIRetryHandler
+          throw error; // Re-throw the enhanced error
+        }
         if (error.message.includes('rate limit')) {
-          throw new Error('Claude API rate limit exceeded. Please try again later.');
+          throw new Error('Claude API is temporarily busy. Please wait a moment and try again.');
         }
         if (error.message.includes('CORS')) {
           throw new Error('CORS error. Claude API may need to be called from a backend service.');
+        }
+        if (error.message.includes('network') || error.message.includes('timeout')) {
+          throw new Error('Network connection issue. Please check your internet connection and try again.');
+        }
+        if (error.message.includes('quota') || error.message.includes('usage')) {
+          throw new Error('Claude API usage quota exceeded. Please check your account billing or try again later.');
+        }
+      }
+
+      // Check for HTTP status codes if available
+      const status = (error as any)?.status;
+      if (status) {
+        switch (status) {
+          case 401:
+            throw new Error('Authentication failed. Please check your Claude API key.');
+          case 403:
+            throw new Error('Access forbidden. Your API key may not have the required permissions.');
+          case 429:
+            throw new Error('Too many requests. Please wait before trying again.');
+          case 500:
+          case 502:
+          case 503:
+          case 504:
+            throw new Error('Claude API is temporarily unavailable. Please try again in a few moments.');
+          default:
+            throw new Error(`Claude API Error (${status}): ${(error as Error).message || 'Unknown error'}`);
         }
       }
       
@@ -377,16 +428,23 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
     try {
       const client = this.getClient();
       
-      const response = await client.messages.create({
-        model: 'claude-3-haiku-20240307',
-        max_tokens: 10,
-        messages: [
-          {
-            role: 'user',
-            content: 'Hello'
-          }
-        ]
-      });
+      const response = await APIRetryHandler.executeWithRetry(
+        () => client.messages.create({
+          model: 'claude-3-haiku-20240307',
+          max_tokens: 10,
+          messages: [
+            {
+              role: 'user',
+              content: 'Hello'
+            }
+          ]
+        }),
+        {
+          maxRetries: 2, // Fewer retries for connection test
+          baseDelay: 1000,
+          maxDelay: 10000
+        }
+      );
 
       return response.content.length > 0;
     } catch (error) {

@@ -7,6 +7,24 @@ export interface Message {
   isUser: boolean;
   timestamp: Date;
   agentName?: string; // Agent name for assistant messages
+  artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
+}
+
+export interface ArtifactReference {
+  artifactId: string;
+  artifactName: string;
+  artifactType: 'document' | 'image' | 'pdf' | 'form' | 'other';
+  isCreated?: boolean; // True if this message created the artifact
+}
+
+// Singleton artifact window props
+export interface SingletonArtifactWindowProps {
+  artifact: Artifact | null; // Single artifact to display
+  onDownload?: (artifact: Artifact) => void;
+  onFormSubmit?: (artifact: Artifact, formData: Record<string, unknown>) => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
+  currentRfpId?: number | null;
 }
 
 export interface Session {
@@ -23,4 +41,8 @@ export interface Artifact {
   size: string;
   url?: string;
   content?: string;
+  // Metadata for session-based artifacts
+  sessionId?: string;
+  messageId?: string;
+  isReferencedInSession?: boolean;
 }

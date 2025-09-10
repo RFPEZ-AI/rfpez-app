@@ -26,7 +26,6 @@ interface HomeContentProps {
   artifacts: Artifact[];
   currentRfpId: number | null;
   onDownloadArtifact: (artifact: Artifact) => void;
-  onViewArtifact: (artifact: Artifact) => void;
 }
 
 const HomeContent: React.FC<HomeContentProps> = ({
@@ -41,9 +40,11 @@ const HomeContent: React.FC<HomeContentProps> = ({
   onAttachFile,
   artifacts,
   currentRfpId,
-  onDownloadArtifact,
-  onViewArtifact
+  onDownloadArtifact
 }) => {
+  // For singleton artifact display, show the most recent artifact
+  const currentArtifact = artifacts.length > 0 ? artifacts[artifacts.length - 1] : null;
+
   return (
     <div style={{ 
       flex: 1,
@@ -75,9 +76,8 @@ const HomeContent: React.FC<HomeContentProps> = ({
 
       {/* Right Panel - Artifacts */}
       <ArtifactWindow
-        artifacts={artifacts}
+        artifact={currentArtifact}
         onDownload={onDownloadArtifact}
-        onView={onViewArtifact}
         currentRfpId={currentRfpId}
       />
     </div>

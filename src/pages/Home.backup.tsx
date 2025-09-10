@@ -63,6 +63,8 @@ const Home: React.FC = () => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  // For singleton artifact display, show the most recent artifact
+  const currentArtifact = artifacts.length > 0 ? artifacts[artifacts.length - 1] : null;
   const [selectedSessionId, setSelectedSessionId] = useState<string>();
   const [currentSessionId, setCurrentSessionId] = useState<string>();
   const [isLoading, setIsLoading] = useState(false);
@@ -1178,9 +1180,8 @@ const Home: React.FC = () => {
 
             {/* Right Panel - Artifacts */}
             <ArtifactWindow
-              artifacts={artifacts}
-              onDownload={(artifact) => console.log('Download:', artifact)}
-              onView={(artifact) => console.log('View:', artifact)}
+              artifact={currentArtifact}
+              onDownload={(artifact: Artifact) => console.log('Download:', artifact)}
               currentRfpId={currentRfpId}
             />
           </div>

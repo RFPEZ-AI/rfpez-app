@@ -48,6 +48,12 @@ jest.mock('../AuthButtons', () => {
   };
 });
 
+jest.mock('../RateLimitStatus', () => ({
+  SimpleRateLimitStatus: function SimpleRateLimitStatus() {
+    return <div data-testid="rate-limit-status">Rate Limit Status</div>;
+  }
+}));
+
 const mockUseIsMobile = useIsMobile as jest.MockedFunction<typeof useIsMobile>;
 const mockRoleService = RoleService as jest.Mocked<typeof RoleService>;
 
@@ -105,7 +111,12 @@ describe('HomeHeader', () => {
   });
 
   it('should show main menu for developer or higher roles', () => {
-    const userProfile = { role: 'developer' };
+    const userProfile = { 
+      supabase_user_id: 'user-123',
+      role: 'developer' as any,
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z'
+    };
     mockRoleService.isDeveloperOrHigher.mockReturnValue(true);
 
     render(<HomeHeader {...defaultProps} userProfile={userProfile} />);
@@ -114,7 +125,12 @@ describe('HomeHeader', () => {
   });
 
   it('should not show main menu for non-developer roles', () => {
-    const userProfile = { role: 'user' };
+    const userProfile = { 
+      supabase_user_id: 'user-123',
+      role: 'user' as any,
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z'
+    };
     mockRoleService.isDeveloperOrHigher.mockReturnValue(false);
 
     render(<HomeHeader {...defaultProps} userProfile={userProfile} />);
@@ -126,8 +142,20 @@ describe('HomeHeader', () => {
     const props = {
       ...defaultProps,
       isAuthenticated: true,
-      user: { id: 'user-123' },
-      userProfile: { id: 'profile-123' }
+      user: { 
+        id: 'user-123',
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: '2024-01-01T00:00:00.000Z'
+      } as any,
+      userProfile: { 
+        id: 'profile-123',
+        supabase_user_id: 'user-123',
+        role: 'user' as any,
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z'
+      }
     };
     mockUseIsMobile.mockReturnValue(false);
 
@@ -140,8 +168,20 @@ describe('HomeHeader', () => {
     const props = {
       ...defaultProps,
       isAuthenticated: true,
-      user: { id: 'user-123' },
-      userProfile: { id: 'profile-123' }
+      user: { 
+        id: 'user-123',
+        app_metadata: {},
+        user_metadata: {},
+        aud: 'authenticated',
+        created_at: '2024-01-01T00:00:00.000Z'
+      } as any,
+      userProfile: { 
+        id: 'profile-123',
+        supabase_user_id: 'user-123',
+        role: 'user' as any,
+        created_at: '2024-01-01T00:00:00.000Z',
+        updated_at: '2024-01-01T00:00:00.000Z'
+      }
     };
     mockUseIsMobile.mockReturnValue(true);
 

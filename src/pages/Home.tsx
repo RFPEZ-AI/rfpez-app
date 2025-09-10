@@ -313,7 +313,6 @@ const Home: React.FC = () => {
             artifacts={artifacts}
             currentRfpId={currentRfpId}
             onDownloadArtifact={(artifact) => console.log('Download:', artifact)}
-            onViewArtifact={(artifact) => console.log('View:', artifact)}
           />
         </div>
 
