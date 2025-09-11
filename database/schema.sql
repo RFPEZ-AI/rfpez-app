@@ -212,7 +212,8 @@ BEGIN
   NEW.updated_at = NOW();
   RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ language 'plpgsql' SECURITY DEFINER
+SET search_path = '';
 
 -- Triggers for automatic timestamp updates
 CREATE TRIGGER update_user_profiles_updated_at BEFORE UPDATE ON public.user_profiles 
@@ -267,4 +268,5 @@ BEGIN
   WHERE s.user_id = user_uuid AND s.is_archived = FALSE
   ORDER BY s.updated_at DESC;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql SECURITY DEFINER
+SET search_path = '';
