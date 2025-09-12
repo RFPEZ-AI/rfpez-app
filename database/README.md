@@ -2,7 +2,16 @@
 
 This guide will help you set up the Supabase database for storing RFPEZ.AI session history.
 
-## 📋 Prerequisites
+## � **IMPORTANT: Authentication Fixes Applied**
+
+**Before running any database setup**, note that authentication fixes have been applied (September 2025):
+- Fixed duplicate RLS policy conflicts
+- Resolved PKCE authentication flow issues  
+- Standardized user_profiles table policies
+
+**For authentication troubleshooting**, see: `../AUTHENTICATION_FIXES.md`
+
+## �📋 Prerequisites
 
 1. **Supabase Account**: Sign up at [supabase.com](https://supabase.com)
 2. **Project Created**: Create a new Supabase project
@@ -11,6 +20,12 @@ This guide will help you set up the Supabase database for storing RFPEZ.AI sessi
    REACT_APP_SUPABASE_URL=your_supabase_url
    REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
    ```
+
+## 🔧 **Quick Setup (Recommended)**
+
+1. **Run Main Schema**: Copy and paste `schema.sql` in Supabase SQL Editor
+2. **Apply RLS Fixes**: Run `fix-user-profiles-rls-policies.sql` (if needed)
+3. **Verify Setup**: Check that authentication works without console errors
 
 ## 🗄️ Database Schema
 
@@ -43,7 +58,16 @@ messages ←---------┘
 4. **Copy and Paste**: Copy the entire content from `database/schema.sql` and paste it
 5. **Run**: Click "Run" to execute the script
 
-### Step 2: Set Up Storage for Artifacts
+### Step 2: Apply RLS Policy Fixes (If Needed)
+
+**⚠️ Only run this if you encounter authentication issues:**
+
+1. **Check for Errors**: If you see "policy already exists" errors or authentication fails
+2. **Run Fix Script**: Copy and paste `database/fix-user-profiles-rls-policies.sql` 
+3. **Execute**: Click "Run" to clean up conflicting policies
+4. **Verify**: Check that login works without console errors
+
+### Step 3: Set Up Storage for Artifacts
 
 1. **Navigate to Storage**: Click on "Storage" in the sidebar
 2. **Create Bucket**: Click "Create bucket"

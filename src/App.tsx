@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Route, Redirect, useParams } from 'react-router-dom';
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
@@ -15,6 +15,7 @@ import { SupabaseProvider } from './context/SupabaseContext';
 import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineNotification from './components/OfflineNotification';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
+import AuthDebugPanel from './components/AuthDebugPanel';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -43,11 +44,28 @@ const RfpBidRedirect: React.FC = () => {
   return <Redirect to={`/bid/submit?rfp_id=${id}`} />;
 };
 
-const App: React.FC = () => (
-  <SupabaseProvider>
-    <IonApp>
-      <IonReactRouter>
-        <IonRouterOutlet>
+const App: React.FC = () => {
+  const [showAuthDebug, setShowAuthDebug] = useState(false);
+
+  useEffect(() => {
+    // Add global keyboard shortcut for auth debug panel (Ctrl+Shift+D)
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.ctrlKey && event.shiftKey && event.key === 'D') {
+        event.preventDefault();
+        setShowAuthDebug(true);
+        console.log('🔧 Auth debug panel opened');
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
+
+  return (
+    <SupabaseProvider>
+      <IonApp>
+        <IonReactRouter>
+          <IonRouterOutlet>
           <Route exact path="/home" component={Home} />
           <Route exact path="/bid/submit" component={BidSubmissionPage} />
           <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
@@ -63,8 +81,13 @@ const App: React.FC = () => (
       <PWAInstallPrompt />
       <OfflineNotification />
       <PWAUpdatePrompt />
+      <AuthDebugPanel 
+        isOpen={showAuthDebug} 
+        onClose={() => setShowAuthDebug(false)} 
+      />
     </IonApp>
   </SupabaseProvider>
-);
+  );
+};
 
 export default App;

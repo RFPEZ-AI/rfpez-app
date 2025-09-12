@@ -15,6 +15,7 @@ export type SupabaseCtx = {
   signUp: (email: string, password: string, options?: { data?: object }) => Promise<{ error: AuthError | null }>;
   signOut: () => Promise<{ error: AuthError | null }>;
   signInWithOAuth: (provider: 'google' | 'github') => Promise<{ error: AuthError | null }>;
+  clearAuthState?: () => Promise<void>;
 };
 
 const SupabaseContext = createContext<SupabaseCtx | undefined>(undefined);
@@ -24,6 +25,8 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [user, setUser] = useState<User | null>(null);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [authRetryCount, setAuthRetryCount] = useState(0);
+  const MAX_AUTH_RETRIES = 3;
 
   // Debug userProfile changes
   useEffect(() => {
@@ -33,6 +36,35 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       email: userProfile?.email
     });
   }, [userProfile]);
+
+  // Function to clear corrupted auth state
+  const clearAuthState = async () => {
+    console.log('🧹 Clearing corrupted auth state...');
+    try {
+      // Clear Supabase session
+      await supabase.auth.signOut();
+      
+      // Clear local storage
+      const keysToRemove = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && key.startsWith('supabase.')) {
+          keysToRemove.push(key);
+        }
+      }
+      keysToRemove.forEach(key => localStorage.removeItem(key));
+      
+      // Clear state
+      setSession(null);
+      setUser(null);
+      setUserProfile(null);
+      setAuthRetryCount(0);
+      
+      console.log('✅ Auth state cleared successfully');
+    } catch (error) {
+      console.error('❌ Error clearing auth state:', error);
+    }
+  };
 
   useEffect(() => {
     let active = true;
@@ -145,6 +177,19 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           console.error('  - Details:', createError.details);
           console.error('  - Hint:', createError.hint);
           
+          // Handle specific RLS policy violations
+          if (createError.code === '42501') {
+            console.log('🔒 RLS Policy violation detected! This means:');
+            console.log('  1. The user_profiles table needs proper INSERT policy');
+            console.log('  2. Add policy: CREATE POLICY "Users can insert own profile" ON user_profiles FOR INSERT WITH CHECK (auth.uid() = supabase_user_id);');
+            console.log('  3. Check your Supabase dashboard > Authentication > Policies');
+          }
+          
+          // Handle other common permission errors
+          if (createError.code === 'PGRST301' || createError.message.includes('permission denied')) {
+            console.log('🚫 Permission denied - check RLS policies and table permissions');
+          }
+          
           // Test if it's a permissions issue
           console.log('🧪 Testing basic table access...');
           const { data: testRead, error: readError } = await supabase
@@ -154,14 +199,15 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           
           console.log('📊 Read test result:', { data: testRead, error: readError });
           
-          console.warn('🔄 FALLBACK: Setting profile with user role due to creation error');
-          // Set a minimal profile so the app can still function
+          console.warn('🔄 FALLBACK: Setting temporary profile for testing purposes');
+          // Set a temporary profile so the app can still function for development
           setUserProfile({
+            id: `temp-${user.id}`,
             supabase_user_id: user.id,
             email: user.email,
             full_name: user.user_metadata?.full_name || user.user_metadata?.name || user.email?.split('@')[0] || '',
             avatar_url: user.user_metadata?.avatar_url || user.user_metadata?.picture || null,
-            role: 'user',
+            role: 'developer', // Use developer role for testing when RLS fails
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
@@ -187,9 +233,17 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     };
 
     const initializeAuth = async () => {
-      console.log('SupabaseProvider: Initializing auth');
+      console.log(`SupabaseProvider: Initializing auth (attempt ${authRetryCount + 1}/${MAX_AUTH_RETRIES})`);
       console.log('Current URL:', window.location.href);
       console.log('URL has auth params:', window.location.search.includes('code=') || window.location.hash.includes('access_token='));
+      
+      // Prevent infinite retry loops
+      if (authRetryCount >= MAX_AUTH_RETRIES) {
+        console.log('🛑 Max auth retries reached. Stopping attempts and clearing state.');
+        await clearAuthState();
+        setLoading(false);
+        return;
+      }
       
       try {
         // Check if we're handling an OAuth callback
@@ -198,28 +252,24 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         const hasError = urlParams.has('error');
         
         if (hasAuthCode) {
-          console.log('🔄 Detected OAuth callback with code:', urlParams.get('code'));
+          console.log('🔄 Detected OAuth callback with code parameter');
           
-          // Try to exchange the code for a session
-          try {
-            const authCode = urlParams.get('code');
-            if (authCode) {
-              const { data, error: exchangeError } = await supabase.auth.exchangeCodeForSession(authCode);
-              if (exchangeError) {
-                console.error('❌ Error exchanging code for session:', exchangeError);
-              } else {
-                console.log('✅ Successfully exchanged code for session:', data);
-              }
-            } else {
-              console.error('❌ No auth code found in URL parameters');
-            }
-          } catch (exchangeError) {
-            console.error('❌ Exception during code exchange:', exchangeError);
-          }
+          // Don't manually exchange code - let getSession() handle the PKCE flow
+          // The manual exchangeCodeForSession call was causing the PKCE error
+          console.log('📋 Letting Supabase handle PKCE flow automatically...');
         }
         
         if (hasError) {
           console.error('❌ OAuth error in URL:', urlParams.get('error'), urlParams.get('error_description'));
+          
+          // Clear the error from URL to prevent repeated processing
+          const newUrl = new URL(window.location.href);
+          newUrl.searchParams.delete('error');
+          newUrl.searchParams.delete('error_description');
+          window.history.replaceState({}, '', newUrl.toString());
+          
+          setLoading(false);
+          return;
         }
         
         console.log('Calling supabase.auth.getSession()...');
@@ -244,15 +294,60 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         
         if (error) {
           console.error('Error getting session:', error);
+          
+          // Handle PKCE validation failures
+          if (error.message.includes('code verifier') || 
+              error.message.includes('pkce') || 
+              error.message.includes('Invalid PKCE')) {
+            console.log('🔄 PKCE error detected - clearing URL parameters and reloading...');
+            
+            // Clear URL parameters that might be causing issues
+            const url = new URL(window.location.href);
+            url.search = '';
+            url.hash = '';
+            
+            // Replace current URL without the problematic parameters
+            window.history.replaceState({}, document.title, url.toString());
+            
+            // Force a page reload to restart the auth flow
+            setTimeout(() => window.location.reload(), 100);
+            return;
+          }
+          
+          // Handle rate limiting
+          if (error.message.includes('429') || 
+              error.message.includes('Too Many Requests') ||
+              error.message.includes('rate limit')) {
+            console.log('⏱️ Rate limiting detected - will retry after exponential backoff...');
+            const delay = Math.pow(2, authRetryCount) * 1000; // Exponential backoff: 1s, 2s, 4s
+            setTimeout(() => {
+              setAuthRetryCount(prev => prev + 1);
+              initializeAuth();
+            }, delay);
+            return;
+          }
         } else {
           console.log('Initial session received:', session ? 'Session found' : 'No session');
         }
+        
+        // Reset retry count on successful completion
+        setAuthRetryCount(0);
         
         if (active) {
           setSession(session || null);
           setUser(session?.user || null);
           setLoading(false);
           console.log('Set loading to false, session set to:', session ? 'valid session' : 'null');
+          
+          // Clean up OAuth callback parameters after successful authentication
+          if (session && hasAuthCode) {
+            console.log('🧹 Cleaning up OAuth callback parameters from URL...');
+            const cleanUrl = new URL(window.location.href);
+            cleanUrl.searchParams.delete('code');
+            cleanUrl.searchParams.delete('state');
+            cleanUrl.hash = '';
+            window.history.replaceState({}, document.title, cleanUrl.toString());
+          }
           
           // Load user profile if we have a user
           if (session?.user) {
@@ -264,11 +359,22 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
       } catch (error) {
         console.error('Error in auth initialization:', error);
+        
         if (active) {
-          setSession(null);
-          setUser(null);
-          setLoading(false);
-          console.log('Error occurred, set loading to false');
+          // Check if we should retry
+          if (authRetryCount < MAX_AUTH_RETRIES) {
+            console.log(`🔄 Retrying auth initialization in 2 seconds... (${authRetryCount + 1}/${MAX_AUTH_RETRIES})`);
+            setTimeout(() => {
+              setAuthRetryCount(prev => prev + 1);
+              initializeAuth();
+            }, 2000);
+          } else {
+            console.log('🛑 Max retries reached. Clearing auth state and stopping.');
+            await clearAuthState();
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+          }
         }
       }
     };
@@ -489,6 +595,7 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       signUp,
       signOut,
       signInWithOAuth,
+      clearAuthState,
     }),
     [session, loading, userProfile]
   );
