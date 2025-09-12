@@ -37,7 +37,7 @@ function GenericMenu<T extends { id: string | number }>({
 
   return (
     <>
-      <IonPopover isOpen={showPopover} onDidDismiss={() => setShowPopover(false)} style={{ '--width': '400px' }}>
+      <IonPopover isOpen={showPopover} onDidDismiss={() => setShowPopover(false)} style={{ '--width': 'min(90vw, 700px)', '--min-width': '500px' }}>
         <IonList>
           <IonItem button onClick={() => { setShowPopover(false); onNew(); }}>
             <IonIcon icon={add} slot="start" />
@@ -45,8 +45,9 @@ function GenericMenu<T extends { id: string | number }>({
           </IonItem>
           {items.map(item => (
             <IonItem key={item.id} style={{ '--padding-start': '16px', '--padding-end': '8px' }}>
-              <IonLabel style={{ marginRight: '12px', minWidth: '120px' }}>{getLabel(item)}</IonLabel>
-              <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', width: '100%', gap: '12px' }}>
+                <IonLabel style={{ flex: '1 1 auto', minWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{getLabel(item)}</IonLabel>
+                <div style={{ display: 'flex', gap: '4px', alignItems: 'center', flexShrink: 0 }}>
                 {onSetCurrent && (
                   <IonButton 
                     fill="clear" 
@@ -95,6 +96,7 @@ function GenericMenu<T extends { id: string | number }>({
                 >
                   <IonIcon icon={trash} />
                 </IonButton>
+                </div>
               </div>
             </IonItem>
           ))}
