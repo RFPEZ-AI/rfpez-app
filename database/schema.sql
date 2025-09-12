@@ -1,5 +1,14 @@
 -- =============================
--- RFP, Bid, Solicitation, Supplier Profile Schema
+-- RFPEZ.AI Database Schema
+-- =============================
+-- 
+-- AUTHENTICATION FIXES APPLIED (September 2025):
+-- - Fixed duplicate RLS policy conflicts on user_profiles table  
+-- - Standardized policy names to match working authentication solution
+-- - Added policy cleanup commands to prevent future conflicts
+-- - Resolved PKCE authentication flow and RLS permission issues
+--
+-- For troubleshooting authentication issues, see: AUTHENTICATION_FIXES.md
 -- =============================
 
 
@@ -125,11 +134,33 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_message_id ON public.artifacts(message_
 
 -- Row Level Security Policies
 
--- User Profiles
+-- User Profiles - UPDATED: Fixed policy names to match working solution
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "Users can view own profile" ON public.user_profiles FOR SELECT USING (auth.uid() = supabase_user_id);
-CREATE POLICY "Users can update own profile" ON public.user_profiles FOR UPDATE USING (auth.uid() = supabase_user_id);
-CREATE POLICY "Users can insert own profile" ON public.user_profiles FOR INSERT WITH CHECK (auth.uid() = supabase_user_id);
+
+-- Drop any existing policies to prevent conflicts
+DROP POLICY IF EXISTS "Users can view own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Users can update own profile" ON public.user_profiles;  
+DROP POLICY IF EXISTS "Users can insert own profile" ON public.user_profiles;
+DROP POLICY IF EXISTS "Users can delete own profile" ON public.user_profiles;
+
+-- Remove any duplicate "optimized" policies that may cause conflicts
+DROP POLICY IF EXISTS "user_profiles_insert_optimized" ON public.user_profiles;
+DROP POLICY IF EXISTS "user_profiles_select_optimized" ON public.user_profiles;
+DROP POLICY IF EXISTS "user_profiles_update_optimized" ON public.user_profiles;
+
+-- Create standardized policies that match working authentication solution
+CREATE POLICY "Users can read own profile" ON public.user_profiles 
+  FOR SELECT USING (auth.uid() = supabase_user_id);
+
+CREATE POLICY "Users can insert own profile" ON public.user_profiles 
+  FOR INSERT WITH CHECK (auth.uid() = supabase_user_id);
+
+CREATE POLICY "Users can update own profile" ON public.user_profiles 
+  FOR UPDATE USING (auth.uid() = supabase_user_id);
+
+-- Optional: Allow users to delete their own profile
+CREATE POLICY "Users can delete own profile" ON public.user_profiles 
+  FOR DELETE USING (auth.uid() = supabase_user_id);
 
 -- Sessions
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
