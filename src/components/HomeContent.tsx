@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React from 'react';
-import { Message, Session, Artifact } from '../types/home';
+import { Message, Session, Artifact, ArtifactReference } from '../types/home';
 import SessionHistory from './SessionHistory';
 import SessionDialog from './SessionDialog';
 import ArtifactWindow from './ArtifactWindow';
@@ -24,8 +24,10 @@ interface HomeContentProps {
   
   // Artifacts
   artifacts: Artifact[];
+  selectedArtifact?: Artifact | null;
   currentRfpId: number | null;
   onDownloadArtifact: (artifact: Artifact) => void;
+  onArtifactSelect?: (artifactRef: ArtifactReference) => void;
 }
 
 const HomeContent: React.FC<HomeContentProps> = ({
@@ -39,11 +41,13 @@ const HomeContent: React.FC<HomeContentProps> = ({
   onSendMessage,
   onAttachFile,
   artifacts,
+  selectedArtifact,
   currentRfpId,
-  onDownloadArtifact
+  onDownloadArtifact,
+  onArtifactSelect
 }) => {
-  // For singleton artifact display, show the most recent artifact
-  const currentArtifact = artifacts.length > 0 ? artifacts[artifacts.length - 1] : null;
+  // Use selected artifact or fall back to most recent
+  const displayedArtifact = selectedArtifact || (artifacts.length > 0 ? artifacts[artifacts.length - 1] : null);
 
   return (
     <div style={{ 
@@ -71,12 +75,13 @@ const HomeContent: React.FC<HomeContentProps> = ({
           onSendMessage={onSendMessage}
           onAttachFile={onAttachFile}
           promptPlaceholder="chat here..."
+          onArtifactSelect={onArtifactSelect}
         />
       </div>
 
       {/* Right Panel - Artifacts */}
       <ArtifactWindow
-        artifact={currentArtifact}
+        artifact={displayedArtifact}
         onDownload={onDownloadArtifact}
         currentRfpId={currentRfpId}
       />

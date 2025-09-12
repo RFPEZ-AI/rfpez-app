@@ -15,6 +15,7 @@ export interface ArtifactReference {
   artifactName: string;
   artifactType: 'document' | 'image' | 'pdf' | 'form' | 'other';
   isCreated?: boolean; // True if this message created the artifact
+  displayText?: string; // Optional custom display text for the reference
 }
 
 // Singleton artifact window props
@@ -25,6 +26,7 @@ export interface SingletonArtifactWindowProps {
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   currentRfpId?: number | null;
+  onArtifactSelect?: (artifact: Artifact) => void; // New function to handle artifact selection
 }
 
 export interface Session {

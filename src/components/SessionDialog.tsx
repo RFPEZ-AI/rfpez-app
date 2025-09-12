@@ -3,6 +3,8 @@
 import React, { useEffect, useRef } from 'react';
 import { IonCard, IonCardContent } from '@ionic/react';
 import PromptComponent from './PromptComponent';
+import ArtifactReferenceTag from './ArtifactReferenceTag';
+import { ArtifactReference } from '../types/home';
 
 interface Message {
   id: string;
@@ -10,6 +12,7 @@ interface Message {
   isUser: boolean;
   timestamp: Date;
   agentName?: string; // Agent name for assistant messages
+  artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
 }
 
 interface SessionDialogProps {
@@ -18,6 +21,7 @@ interface SessionDialogProps {
   onSendMessage: (message: string) => void;
   onAttachFile?: (file: File) => void;
   promptPlaceholder?: string;
+  onArtifactSelect?: (artifactRef: ArtifactReference) => void; // New prop for artifact selection
 }
 
 const SessionDialog: React.FC<SessionDialogProps> = ({ 
@@ -25,7 +29,8 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   isLoading = false,
   onSendMessage,
   onAttachFile,
-  promptPlaceholder = "Type your message here..."
+  promptPlaceholder = "Type your message here...",
+  onArtifactSelect
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
@@ -88,6 +93,38 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                 }}>
                   {message.content}
                 </div>
+                
+                {/* Artifact references */}
+                {message.artifactRefs && message.artifactRefs.length > 0 && (
+                  <div style={{
+                    marginTop: '12px',
+                    paddingTop: '8px',
+                    borderTop: `1px solid ${message.isUser ? 'rgba(255,255,255,0.2)' : 'var(--ion-color-light-shade)'}`,
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '4px',
+                    alignItems: 'center'
+                  }}>
+                    <span style={{
+                      fontSize: '0.8em',
+                      opacity: 0.8,
+                      marginRight: '8px',
+                      fontWeight: '500'
+                    }}>
+                      {message.artifactRefs.some(ref => ref.isCreated) ? '✨ Created:' : '📎 Referenced:'}
+                    </span>
+                    {message.artifactRefs.map((artifactRef) => (
+                      <ArtifactReferenceTag
+                        key={artifactRef.artifactId}
+                        artifactRef={artifactRef}
+                        onClick={onArtifactSelect}
+                        size="small"
+                        showTypeIcon={true}
+                      />
+                    ))}
+                  </div>
+                )}
+                
                 <div style={{ 
                   fontSize: '0.8em', 
                   opacity: 0.7, 
