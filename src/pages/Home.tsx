@@ -105,7 +105,7 @@ const Home: React.FC = () => {
     handleAttachFile,
     addClaudeArtifacts,
     clearArtifacts
-  } = useArtifactManagement(currentRfp, currentSessionId, isAuthenticated, user);
+  } = useArtifactManagement(currentRfp, currentSessionId, isAuthenticated, user, messages, setMessages);
 
   const { handleSendMessage } = useMessageHandling();
 

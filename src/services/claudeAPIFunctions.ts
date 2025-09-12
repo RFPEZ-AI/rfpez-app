@@ -9,6 +9,30 @@ import { AgentService } from './agentService';
 import { mcpClient } from './mcpClient';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages.mjs';
 
+// TypeScript interfaces for proposal generation
+interface SupplierInfo {
+  name?: string;
+  email?: string;
+  company?: string;
+  [key: string]: unknown;
+}
+
+interface QuestionnaireResponse {
+  supplier_info?: SupplierInfo;
+  form_data?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+interface RFPData {
+  id: string;
+  name: string;
+  description?: string;
+  specification?: string;
+  due_date: string;
+  buyer_questionnaire_response?: QuestionnaireResponse;
+  [key: string]: unknown;
+}
+
 // Claude API Function Definitions (Anthropic SDK format)
 export const claudeApiFunctions: Tool[] = [
   {
@@ -447,6 +471,69 @@ export const claudeApiFunctions: Tool[] = [
         }
       },
       "required": ["template_name", "template_type", "template_schema"]
+    }
+  },
+  {
+    "name": "create_text_artifact",
+    "description": "Create a text artifact that can be displayed in the artifact window",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Title for the text artifact"
+        },
+        "content": {
+          "type": "string",
+          "description": "The text content to display"
+        },
+        "content_type": {
+          "type": "string",
+          "enum": ["markdown", "plain", "html"],
+          "description": "Type of text content (default: markdown)",
+          "default": "markdown"
+        },
+        "description": {
+          "type": "string",
+          "description": "Brief description of the text artifact"
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Tags for categorizing the artifact"
+        }
+      },
+      "required": ["title", "content"]
+    }
+  },
+  {
+    "name": "generate_proposal_artifact",
+    "description": "Generate a proposal text artifact from RFP data and questionnaire responses",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "rfp_id": {
+          "type": "string",
+          "description": "ID of the RFP to generate proposal for"
+        },
+        "proposal_title": {
+          "type": "string",
+          "description": "Title for the proposal (default: 'Proposal for [RFP Name]')"
+        },
+        "sections": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific sections to include in the proposal",
+          "default": ["executive_summary", "technical_approach", "timeline", "pricing"]
+        },
+        "content_type": {
+          "type": "string",
+          "enum": ["markdown", "plain", "html"],
+          "description": "Type of text content (default: markdown)",
+          "default": "markdown"
+        }
+      },
+      "required": ["rfp_id"]
     }
   },
   {
@@ -890,6 +977,10 @@ export class ClaudeAPIFunctionHandler {
       // Artifact functions
       case 'create_form_artifact':
         return await this.createFormArtifact(parameters, userId);
+      case 'create_text_artifact':
+        return await this.createTextArtifact(parameters, userId);
+      case 'generate_proposal_artifact':
+        return await this.generateProposalArtifact(parameters, userId);
       case 'update_form_artifact':
         return await this.updateFormArtifact(parameters, userId);
       case 'get_form_submission':
@@ -1677,6 +1768,254 @@ export class ClaudeAPIFunctionHandler {
       console.error('❌ Error creating form artifact:', error);
       throw error;
     }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async createTextArtifact(params: any, userId: string) {
+    const { title, content, content_type = 'markdown', description, tags } = params;
+    
+    console.log('📝 Creating text artifact:', { title, content_type, userId });
+    
+    if (!title) {
+      throw new Error('Title is required for creating a text artifact');
+    }
+    
+    if (!content) {
+      throw new Error('Content is required for creating a text artifact');
+    }
+    
+    // Validate content_type
+    const validContentTypes = ['markdown', 'plain', 'html'];
+    if (!validContentTypes.includes(content_type)) {
+      throw new Error(`Content type must be one of: ${validContentTypes.join(', ')}`);
+    }
+    
+    try {
+      // Generate a unique artifact ID
+      const artifact_id = `text_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Store artifact in the database for persistence
+      const { error } = await supabase
+        .from('form_artifacts')
+        .insert({
+          id: artifact_id,
+          user_id: userId !== 'anonymous' ? userId : null,
+          type: 'text',
+          title,
+          description: description || null,
+          schema: {
+            type: 'text',
+            content_type,
+            content,
+            tags: tags || []
+          },
+          ui_schema: null,
+          data: { content, content_type },
+          submit_action: null,
+          status: 'active',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Failed to store text artifact in database:', error);
+        // Continue without database storage for anonymous users or fallback
+      }
+      
+      console.log('✅ Text artifact created successfully:', { artifact_id, title, content_type });
+      
+      return {
+        success: true,
+        artifact_id,
+        title,
+        description,
+        type: 'text',
+        content,
+        content_type,
+        tags: tags || [],
+        created_at: new Date().toISOString(),
+        message: `Text artifact "${title}" created successfully`
+      };
+    } catch (error) {
+      console.error('❌ Error creating text artifact:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async generateProposalArtifact(params: any, userId: string) {
+    const { rfp_id, proposal_title, sections = ['executive_summary', 'technical_approach', 'timeline', 'pricing'], content_type = 'markdown' } = params;
+    
+    console.log('📋 Generating proposal artifact:', { rfp_id, proposal_title, userId });
+    
+    if (!rfp_id) {
+      throw new Error('RFP ID is required for generating a proposal artifact');
+    }
+    
+    try {
+      // Fetch RFP data from database
+      const { data: rfp, error: rfpError } = await supabase
+        .from('rfps')
+        .select('*')
+        .eq('id', rfp_id)
+        .single();
+      
+      if (rfpError || !rfp) {
+        throw new Error(`Failed to fetch RFP data: ${rfpError?.message || 'RFP not found'}`);
+      }
+      
+      // Generate proposal content
+      const title = proposal_title || `Proposal for ${rfp.name}`;
+      const questionnaire_response = rfp.buyer_questionnaire_response as QuestionnaireResponse;
+      
+      const proposalContent = this.generateProposalContent(rfp, questionnaire_response, sections, content_type);
+      
+      // Create text artifact with the proposal content
+      const artifact_id = `proposal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      // Store artifact in the database
+      const { error } = await supabase
+        .from('form_artifacts')
+        .insert({
+          id: artifact_id,
+          user_id: userId !== 'anonymous' ? userId : null,
+          type: 'text',
+          title,
+          description: `Proposal generated for RFP: ${rfp.name}`,
+          schema: {
+            type: 'text',
+            content_type,
+            content: proposalContent,
+            tags: ['proposal', 'rfp', rfp_id],
+            rfp_id: rfp_id
+          },
+          ui_schema: null,
+          data: { content: proposalContent, content_type, rfp_id },
+          submit_action: null,
+          status: 'active',
+          created_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+      
+      if (error) {
+        console.error('❌ Failed to store proposal artifact in database:', error);
+        // Continue without database storage for anonymous users or fallback
+      }
+      
+      // Also update the RFP with the proposal content
+      await supabase
+        .from('rfps')
+        .update({ proposal: proposalContent })
+        .eq('id', rfp_id);
+      
+      console.log('✅ Proposal artifact created successfully:', { artifact_id, title });
+      
+      return {
+        success: true,
+        artifact_id,
+        title,
+        description: `Proposal generated for RFP: ${rfp.name}`,
+        type: 'text',
+        content: proposalContent,
+        content_type,
+        rfp_id,
+        tags: ['proposal', 'rfp', rfp_id],
+        created_at: new Date().toISOString(),
+        message: `Proposal artifact "${title}" generated successfully`
+      };
+    } catch (error) {
+      console.error('❌ Error generating proposal artifact:', error);
+      throw error;
+    }
+  }
+
+  // Helper method to generate proposal content
+  private generateProposalContent(rfp: RFPData, questionnaire_response: QuestionnaireResponse, sections: string[], content_type: string): string {
+    const supplier_info = questionnaire_response?.supplier_info || {};
+    const form_data = questionnaire_response?.form_data || {};
+    
+    let content = '';
+    
+    if (content_type === 'markdown') {
+      content = `# Proposal for ${rfp.name}
+
+## Executive Summary
+This proposal is submitted by ${supplier_info.name || 'the submitting organization'} ${supplier_info.company ? `from ${supplier_info.company}` : ''} in response to the Request for Proposal: "${rfp.name}".
+
+## Company Information
+- **Contact:** ${supplier_info.name || 'Not provided'}
+- **Email:** ${supplier_info.email || 'Not provided'}
+${supplier_info.company ? `- **Company:** ${supplier_info.company}` : ''}
+
+## Proposal Details
+Based on the requirements outlined in the RFP, we propose the following solution:
+
+### Requirements Analysis
+${rfp.description || 'No description provided'}
+
+### Technical Approach
+Our approach addresses the key specifications:
+${rfp.specification || 'No specification provided'}
+
+### Questionnaire Response Summary
+${this.formatQuestionnaireDataForProposal(form_data)}
+
+### Timeline and Deliverables
+We commit to delivering the proposed solution by the specified due date: ${new Date(rfp.due_date).toLocaleDateString()}.
+
+${sections.includes('pricing') ? `
+### Pricing
+Competitive pricing details will be provided based on the specific requirements and scope of work outlined in this proposal.
+` : ''}
+
+## Conclusion
+We believe our proposal offers the best value and meets all the requirements outlined in the RFP. We look forward to the opportunity to discuss this proposal further.
+
+---
+*Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*`;
+    } else {
+      // Plain text version
+      content = `Proposal for ${rfp.name}
+
+Executive Summary:
+This proposal is submitted by ${supplier_info.name || 'the submitting organization'} ${supplier_info.company ? `from ${supplier_info.company}` : ''} in response to the Request for Proposal: "${rfp.name}".
+
+Company Information:
+- Contact: ${supplier_info.name || 'Not provided'}
+- Email: ${supplier_info.email || 'Not provided'}
+${supplier_info.company ? `- Company: ${supplier_info.company}` : ''}
+
+Requirements Analysis:
+${rfp.description || 'No description provided'}
+
+Technical Approach:
+${rfp.specification || 'No specification provided'}
+
+Questionnaire Response Summary:
+${this.formatQuestionnaireDataForProposal(form_data)}
+
+Timeline and Deliverables:
+We commit to delivering the proposed solution by the specified due date: ${new Date(rfp.due_date).toLocaleDateString()}.
+
+Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`;
+    }
+    
+    return content.trim();
+  }
+
+  // Helper method to format questionnaire data for proposal
+  private formatQuestionnaireDataForProposal(form_data: Record<string, unknown>): string {
+    const entries = Object.entries(form_data);
+    if (entries.length === 0) {
+      return 'No questionnaire response data available.';
+    }
+    
+    return entries.map(([key, value]) => {
+      const label = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+      return `**${label}:** ${String(value)}`;
+    }).join('\n');
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any

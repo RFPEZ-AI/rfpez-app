@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React from 'react';
-import { IonButton, IonIcon } from '@ionic/react';
+import { IonIcon } from '@ionic/react';
 import { documentTextOutline, imageOutline, clipboardOutline } from 'ionicons/icons';
 import { ArtifactReference } from '../types/home';
 
@@ -50,61 +50,103 @@ const ArtifactReferenceTag: React.FC<ArtifactReferenceTagProps> = ({
   const displayText = artifactRef.displayText || artifactRef.artifactName;
 
   return (
-    <IonButton
-      fill="outline"
-      size={isSmall ? 'small' : 'default'}
+    <div
       onClick={() => onClick?.(artifactRef)}
       style={{
-        '--border-radius': '16px',
-        '--border-color': getTypeColor(artifactRef.artifactType),
-        '--color': getTypeColor(artifactRef.artifactType),
-        '--background': 'transparent',
-        '--background-hover': `${getTypeColor(artifactRef.artifactType)}15`,
-        '--background-activated': `${getTypeColor(artifactRef.artifactType)}25`,
-        '--padding-start': isSmall ? '8px' : '12px',
-        '--padding-end': isSmall ? '8px' : '12px',
-        '--padding-top': isSmall ? '4px' : '6px',
-        '--padding-bottom': isSmall ? '4px' : '6px',
-        margin: '2px 4px 2px 0',
-        fontSize: isSmall ? '0.8em' : '0.9em',
-        fontWeight: '500',
-        display: 'inline-flex',
-        alignItems: 'center',
-        gap: showTypeIcon ? '6px' : '0',
-        maxWidth: '200px',
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap',
+        display: 'inline-block',
+        borderRadius: '8px',
+        border: `1.5px solid ${getTypeColor(artifactRef.artifactType)}`,
+        background: 'var(--ion-color-light)',
+        padding: '8px 12px',
+        margin: '4px 8px 4px 0',
         cursor: onClick ? 'pointer' : 'default',
-        transition: 'all 0.2s ease'
+        transition: 'all 0.2s ease',
+        minWidth: isSmall ? '120px' : '160px',
+        maxWidth: isSmall ? '200px' : '280px',
+        aspectRatio: '3/2', // Landscape aspect ratio
+        position: 'relative',
+        overflow: 'hidden',
+        boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.transform = 'translateY(-1px)';
+        e.currentTarget.style.boxShadow = '0 4px 8px rgba(0,0,0,0.15)';
+        e.currentTarget.style.background = `${getTypeColor(artifactRef.artifactType)}05`;
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.transform = 'translateY(0)';
+        e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.1)';
+        e.currentTarget.style.background = 'var(--ion-color-light)';
       }}
     >
+      {/* Document icon in background */}
       {showTypeIcon && (
-        <IonIcon
-          icon={getTypeIcon(artifactRef.artifactType)}
-          style={{
-            fontSize: isSmall ? '14px' : '16px',
-            color: getTypeColor(artifactRef.artifactType)
-          }}
-        />
-      )}
-      <span style={{
-        overflow: 'hidden',
-        textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
-      }}>
-        {displayText}
-      </span>
-      {artifactRef.isCreated && (
-        <span style={{
-          fontSize: '0.7em',
-          opacity: 0.7,
-          marginLeft: '4px'
+        <div style={{
+          position: 'absolute',
+          top: '50%',
+          right: '8px',
+          transform: 'translateY(-50%)',
+          opacity: 0.1,
+          fontSize: isSmall ? '24px' : '32px',
+          color: getTypeColor(artifactRef.artifactType)
         }}>
-          ✨
-        </span>
+          <IonIcon icon={getTypeIcon(artifactRef.artifactType)} />
+        </div>
       )}
-    </IonButton>
+      
+      {/* Content */}
+      <div style={{
+        display: 'flex',
+        flexDirection: 'column',
+        height: '100%',
+        justifyContent: 'space-between',
+        position: 'relative',
+        zIndex: 1
+      }}>
+        {/* Title */}
+        <div style={{
+          fontSize: isSmall ? '0.85em' : '0.95em',
+          fontWeight: '600',
+          color: getTypeColor(artifactRef.artifactType),
+          lineHeight: '1.2',
+          overflow: 'hidden',
+          display: '-webkit-box',
+          WebkitLineClamp: 2,
+          WebkitBoxOrient: 'vertical',
+          textOverflow: 'ellipsis'
+        }}>
+          {displayText}
+        </div>
+        
+        {/* Bottom row with type and created indicator */}
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginTop: '4px'
+        }}>
+          <div style={{
+            fontSize: '0.7em',
+            color: 'var(--ion-color-medium)',
+            textTransform: 'uppercase',
+            fontWeight: '500',
+            letterSpacing: '0.5px'
+          }}>
+            {artifactRef.artifactType}
+          </div>
+          
+          {artifactRef.isCreated && (
+            <div style={{
+              fontSize: '0.7em',
+              color: 'var(--ion-color-success)',
+              fontWeight: '500'
+            }}>
+              ✨ New
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
   );
 };
 
