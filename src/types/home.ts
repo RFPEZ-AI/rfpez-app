@@ -8,6 +8,7 @@ export interface Message {
   timestamp: Date;
   agentName?: string; // Agent name for assistant messages
   artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
+  metadata?: Record<string, unknown>; // Additional metadata for the message
 }
 
 export interface ArtifactReference {

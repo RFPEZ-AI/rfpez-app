@@ -10,6 +10,7 @@ import type {
   UserProfile,
   UserRole
 } from '../types/database';
+import type { ArtifactReference } from '../types/home';
 
 export class DatabaseService {
   // Session operations
@@ -189,7 +190,8 @@ export class DatabaseService {
     agentId?: string,
     agentName?: string,
     metadata?: Record<string, unknown>,
-    aiMetadata?: Record<string, unknown>
+    aiMetadata?: Record<string, unknown>,
+    artifactRefs?: ArtifactReference[]
   ): Promise<Message | null> {
     console.log('DatabaseService.addMessage called with:', {
       sessionId,
@@ -239,7 +241,10 @@ export class DatabaseService {
         message_order: nextOrder,
         agent_id: agentId,
         agent_name: agentName,
-        metadata: metadata || {},
+        metadata: { 
+          ...(metadata || {}),
+          artifactRefs: artifactRefs || []
+        },
         ai_metadata: aiMetadata || {}
       })
       .select()
@@ -284,6 +289,21 @@ export class DatabaseService {
 
     if (error) {
       console.error('Error deleting message:', error);
+      return false;
+    }
+    return true;
+  }
+
+  static async updateMessage(sessionId: string, messageId: string, updates: { metadata?: Record<string, unknown>; content?: string }): Promise<boolean> {
+    console.log('Updating message:', messageId, 'with updates:', updates);
+    const { error } = await supabase
+      .from('messages')
+      .update(updates)
+      .eq('id', messageId)
+      .eq('session_id', sessionId);
+
+    if (error) {
+      console.error('Error updating message:', error);
       return false;
     }
     return true;

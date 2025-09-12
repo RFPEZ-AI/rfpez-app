@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import { useState, useEffect } from 'react';
-import { Message, Session } from '../types/home';
+import { Message, Session, ArtifactReference } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import DatabaseService from '../services/database';
 
@@ -49,7 +49,9 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
           content: msg.content,
           isUser: msg.role === 'user',
           timestamp: new Date(msg.created_at),
-          agentName: msg.agent_name
+          agentName: msg.agent_name,
+          // Restore artifact references from metadata
+          artifactRefs: (msg.metadata?.artifactRefs as ArtifactReference[]) || []
         }))
         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
       console.log('Formatted messages:', formattedMessages);

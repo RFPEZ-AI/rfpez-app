@@ -278,7 +278,8 @@ export const useMessageHandling = () => {
               agentForResponse.agent_id,
               agentForResponse.agent_name,
               {},
-              claudeResponse.metadata
+              claudeResponse.metadata,
+              artifactRefs // Pass the artifact references
             );
             console.log('AI message saved:', savedAiMessage);
             await loadUserSessions();

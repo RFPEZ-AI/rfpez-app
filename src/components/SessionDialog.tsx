@@ -113,9 +113,10 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                     }}>
                       {message.artifactRefs.some(ref => ref.isCreated) ? '✨ Created:' : '📎 Referenced:'}
                     </span>
-                    {message.artifactRefs.map((artifactRef) => (
+                    {/* Deduplicate artifact references by artifactId before rendering */}
+                    {Array.from(new Map(message.artifactRefs.map(ref => [ref.artifactId, ref])).values()).map((artifactRef, index) => (
                       <ArtifactReferenceTag
-                        key={artifactRef.artifactId}
+                        key={`${message.id}-${artifactRef.artifactId}-${index}`}
                         artifactRef={artifactRef}
                         onClick={onArtifactSelect}
                         size="small"

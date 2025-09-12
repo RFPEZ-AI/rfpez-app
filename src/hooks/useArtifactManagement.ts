@@ -2,11 +2,18 @@
 
 import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { Artifact } from '../types/home';
+import { Artifact, Message, ArtifactReference } from '../types/home';
 import { RFP } from '../types/rfp';
 import DatabaseService from '../services/database';
 
-export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?: string, isAuthenticated?: boolean, user?: User | null) => {
+export const useArtifactManagement = (
+  currentRfp: RFP | null, 
+  currentSessionId?: string, 
+  isAuthenticated?: boolean, 
+  user?: User | null,
+  messages?: Message[],
+  setMessages?: React.Dispatch<React.SetStateAction<Message[]>>
+) => {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
 
@@ -293,8 +300,11 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
     console.log('Has buyer_questionnaire in metadata:', !!claudeMetadata?.buyer_questionnaire);
     console.log('Has function_results in metadata:', !!claudeMetadata?.function_results);
     console.log('Message ID:', messageId);
+    console.log('Current artifacts count before processing:', artifacts.length);
     
     const metadata = claudeMetadata as Record<string, unknown>;
+    const newArtifactRefs: ArtifactReference[] = [];
+    const processedArtifactIds = new Set<string>(); // Track processed artifacts to prevent duplicates
     
     // Handle function results from Claude API calls
     if (metadata.function_results && Array.isArray(metadata.function_results)) {
@@ -331,8 +341,18 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
           if (result.success && result.form_schema) {
             console.log('Form artifact detected from function result:', result);
             
+            const artifactId = result.artifact_id || `form-${Date.now()}-${index}`;
+            
+            // Check if this artifact already exists or has been processed
+            if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
+              console.log('⚠️ Skipping duplicate form artifact:', artifactId);
+              return;
+            }
+            
+            processedArtifactIds.add(artifactId);
+            console.log('📝 Processing new form artifact:', artifactId);
             const formArtifact: Artifact = {
-              id: result.artifact_id || `form-${Date.now()}-${index}`,
+              id: artifactId,
               name: result.title || 'Generated Form',
               type: 'form',
               size: 'Interactive Form',
@@ -352,6 +372,113 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
             setArtifacts(prev => [...prev, formArtifact]);
             setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
             console.log('✅ Added form artifact from function result:', formArtifact);
+            
+            // Create artifact reference for the message
+            const artifactRef: ArtifactReference = {
+              artifactId: artifactId,
+              artifactName: result.title || 'Generated Form',
+              artifactType: 'form'
+            };
+            newArtifactRefs.push(artifactRef);
+          }
+        }
+        
+        // Handle create_text_artifact results
+        if (functionResult.function === 'create_text_artifact' && functionResult.result) {
+          const result = functionResult.result;
+          
+          if (result.success && result.content) {
+            console.log('Text artifact detected from function result:', result);
+            
+            const artifactId = result.artifact_id || `text-${Date.now()}-${index}`;
+            
+            // Check if this artifact already exists or has been processed
+            if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
+              console.log('⚠️ Skipping duplicate text artifact:', artifactId);
+              return;
+            }
+            
+            processedArtifactIds.add(artifactId);
+            console.log('📝 Processing new text artifact:', artifactId);
+            
+            const textArtifact: Artifact = {
+              id: artifactId,
+              name: result.title || 'Generated Text',
+              type: 'document', // Use 'document' type for text artifacts
+              size: `${(result.content as string)?.length || 0} characters`,
+              content: JSON.stringify({
+                title: result.title,
+                description: result.description,
+                content: result.content,
+                content_type: result.content_type || 'markdown',
+                tags: result.tags || []
+              }),
+              sessionId: currentSessionId,
+              messageId,
+              isReferencedInSession: true
+            };
+            
+            setArtifacts(prev => [...prev, textArtifact]);
+            setSelectedArtifactId(textArtifact.id); // Auto-select new artifact
+            console.log('✅ Added text artifact from function result:', textArtifact);
+            
+            // Create artifact reference for the message
+            const artifactRef: ArtifactReference = {
+              artifactId: artifactId,
+              artifactName: result.title || 'Generated Text',
+              artifactType: 'document'
+            };
+            newArtifactRefs.push(artifactRef);
+          }
+        }
+        
+        // Handle generate_proposal_artifact results
+        if (functionResult.function === 'generate_proposal_artifact' && functionResult.result) {
+          const result = functionResult.result;
+          
+          if (result.success && result.content) {
+            console.log('Proposal artifact detected from function result:', result);
+            
+            const artifactId = result.artifact_id || `proposal-${Date.now()}-${index}`;
+            
+            // Check if this artifact already exists or has been processed
+            if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
+              console.log('⚠️ Skipping duplicate proposal artifact:', artifactId);
+              return;
+            }
+            
+            processedArtifactIds.add(artifactId);
+            console.log('📝 Processing new proposal artifact:', artifactId);
+            
+            const proposalArtifact: Artifact = {
+              id: artifactId,
+              name: result.title || 'Generated Proposal',
+              type: 'document', // Use 'document' type for proposal artifacts
+              size: `${(result.content as string)?.length || 0} characters`,
+              content: JSON.stringify({
+                title: result.title,
+                description: result.description,
+                content: result.content,
+                content_type: result.content_type || 'markdown',
+                tags: result.tags || ['proposal'],
+                rfp_id: result.rfp_id
+              }),
+              sessionId: currentSessionId,
+              messageId,
+              isReferencedInSession: true
+            };
+            
+            setArtifacts(prev => [...prev, proposalArtifact]);
+            setSelectedArtifactId(proposalArtifact.id); // Auto-select new artifact
+            console.log('✅ Added proposal artifact from function result:', proposalArtifact);
+            
+            // Create artifact reference for the message
+            const artifactRef: ArtifactReference = {
+              artifactId: artifactId,
+              artifactName: result.title || 'Generated Proposal',
+              artifactType: 'document'
+            };
+            newArtifactRefs.push(artifactRef);
           }
         }
         
@@ -362,8 +489,19 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
           if (result.success && result.template_schema) {
             console.log('Template artifact detected from function result:', result);
             
+            const templateArtifactId = result.template_id || `template-${Date.now()}-${index}`;
+            
+            // Check if this artifact already exists or has been processed
+            if (processedArtifactIds.has(templateArtifactId) || artifacts.some(a => a.id === templateArtifactId)) {
+              console.log('⚠️ Skipping duplicate template artifact:', templateArtifactId);
+              return;
+            }
+            
+            processedArtifactIds.add(templateArtifactId);
+            console.log('📝 Processing new template artifact:', templateArtifactId);
+            
             const templateArtifact: Artifact = {
-              id: result.template_id || `template-${Date.now()}-${index}`,
+              id: templateArtifactId,
               name: result.template_name || 'Generated Template',
               type: result.template_type as 'document' | 'image' | 'pdf' | 'other' | 'form' || 'document',
               size: 'Template',
@@ -382,6 +520,14 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
             setArtifacts(prev => [...prev, templateArtifact]);
             setSelectedArtifactId(templateArtifact.id); // Auto-select new artifact
             console.log('✅ Added template artifact from function result:', templateArtifact);
+            
+            // Create artifact reference for the message
+            const artifactRef: ArtifactReference = {
+              artifactId: templateArtifactId,
+              artifactName: result.template_name || 'Generated Template',
+              artifactType: templateArtifact.type
+            };
+            newArtifactRefs.push(artifactRef);
           }
         }
       });
@@ -391,8 +537,26 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
     if (metadata.buyer_questionnaire) {
       console.log('Buyer questionnaire detected:', metadata.buyer_questionnaire);
       
+      const artifactId = `buyer-form-${Date.now()}`;
+      
+      // Check if we already processed a form artifact from function_results that might be the same
+      const existingFormArtifacts = artifacts.filter(a => a.type === 'form' && a.sessionId === currentSessionId);
+      const hasRecentFormArtifact = existingFormArtifacts.some(a => 
+        a.messageId === messageId || 
+        processedArtifactIds.has(a.id) ||
+        (Date.now() - parseInt(a.id.split('-').pop() || '0')) < 5000 // Created within last 5 seconds
+      );
+      
+      if (hasRecentFormArtifact) {
+        console.log('⚠️ Skipping buyer questionnaire artifact - recent form artifact already processed');
+        return;
+      }
+      
+      processedArtifactIds.add(artifactId);
+      console.log('📝 Processing buyer questionnaire artifact:', artifactId);
+      
       const formArtifact: Artifact = {
-        id: `buyer-form-${Date.now()}`,
+        id: artifactId,
         name: 'Buyer Questionnaire',
         type: 'form',
         size: 'Interactive Form',
@@ -405,6 +569,14 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
       setArtifacts(prev => [...prev, formArtifact]);
       setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
       console.log('Added buyer questionnaire to artifacts:', formArtifact);
+      
+      // Create artifact reference for the message
+      const artifactRef: ArtifactReference = {
+        artifactId: artifactId,
+        artifactName: 'Buyer Questionnaire',
+        artifactType: 'form'
+      };
+      newArtifactRefs.push(artifactRef);
     }
 
     // Handle any other artifacts from Claude response (legacy support)
@@ -419,17 +591,40 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
         url?: string;
       }
       
-      const newArtifacts: Artifact[] = (metadata.artifacts as ArtifactData[]).map((artifact, index) => ({
-        id: `claude-artifact-${Date.now()}-${index}`,
-        name: artifact.name || `Generated Artifact ${index + 1}`,
-        type: artifact.type as 'document' | 'image' | 'pdf' | 'other' || 'document',
-        size: artifact.size || 'Generated',
-        content: artifact.content,
-        url: artifact.url,
-        sessionId: currentSessionId,
-        messageId,
-        isReferencedInSession: true
-      }));
+      const newArtifacts: Artifact[] = (metadata.artifacts as ArtifactData[]).map((artifact, index) => {
+        const artifactId = `claude-artifact-${Date.now()}-${index}`;
+        const artifactName = artifact.name || `Generated Artifact ${index + 1}`;
+        const artifactType = artifact.type as 'document' | 'image' | 'pdf' | 'other' || 'document';
+        
+        // Check if this artifact already exists or has been processed
+        if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
+          console.log('⚠️ Skipping duplicate generic artifact:', artifactId);
+          return null;
+        }
+        
+        processedArtifactIds.add(artifactId);
+        console.log('📝 Processing new generic artifact:', artifactId);
+        
+        // Create artifact reference for the message
+        const artifactRef: ArtifactReference = {
+          artifactId: artifactId,
+          artifactName: artifactName,
+          artifactType: artifactType
+        };
+        newArtifactRefs.push(artifactRef);
+        
+        return {
+          id: artifactId,
+          name: artifactName,
+          type: artifactType,
+          size: artifact.size || 'Generated',
+          content: artifact.content,
+          url: artifact.url,
+          sessionId: currentSessionId,
+          messageId,
+          isReferencedInSession: true
+        };
+      }).filter(artifact => artifact !== null) as Artifact[]; // Filter out nulls from duplicates
       
       setArtifacts(prev => [...prev, ...newArtifacts]);
       
@@ -439,6 +634,58 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
       }
       
       console.log('Added Claude artifacts:', newArtifacts);
+    }
+    
+    // Update message with artifact references if we have any new artifacts
+    if (newArtifactRefs.length > 0 && messageId && messages && setMessages) {
+      console.log('Adding artifact references to message:', messageId, newArtifactRefs);
+      
+      setMessages(prevMessages => 
+        prevMessages.map(msg => {
+          if (msg.id === messageId) {
+            const existingArtifactIds = new Set(msg.artifactRefs?.map(ref => ref.artifactId) || []);
+            const uniqueNewRefs = newArtifactRefs.filter(ref => !existingArtifactIds.has(ref.artifactId));
+            
+            if (uniqueNewRefs.length === 0) {
+              console.log('⚠️ No new unique artifact references to add to message:', messageId);
+              return msg;
+            }
+            
+            const updatedArtifactRefs = [...(msg.artifactRefs || []), ...uniqueNewRefs];
+            const updatedMessage = { ...msg, artifactRefs: updatedArtifactRefs };
+            
+            console.log('✅ Adding', uniqueNewRefs.length, 'unique artifact references to message:', messageId);
+            
+            // Update database with new artifact references
+            if (currentSessionId && isAuthenticated && user) {
+              DatabaseService.updateMessage(currentSessionId, messageId, {
+                metadata: {
+                  ...msg.metadata,
+                  artifactRefs: updatedArtifactRefs
+                }
+              }).catch((error: unknown) => {
+                console.error('Failed to update message with artifact references:', error);
+              });
+            }
+            
+            return updatedMessage;
+          }
+          return msg;
+        })
+      );
+    }
+    
+    console.log('=== END CLAUDE RESPONSE DEBUG ===');
+    console.log('Total new artifact references created:', newArtifactRefs.length);
+    console.log('New artifact reference IDs:', newArtifactRefs.map(ref => ref.artifactId));
+    console.log('Processed artifact IDs:', Array.from(processedArtifactIds));
+    console.log('Current artifacts count after processing:', artifacts.length);
+    
+    // Check for duplicate artifact IDs in newArtifactRefs
+    const refIds = newArtifactRefs.map(ref => ref.artifactId);
+    const duplicateRefIds = refIds.filter((id, index) => refIds.indexOf(id) !== index);
+    if (duplicateRefIds.length > 0) {
+      console.error('⚠️ DUPLICATE ARTIFACT REFERENCES DETECTED:', duplicateRefIds);
     }
   };
 
