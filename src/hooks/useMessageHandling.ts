@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { Message } from '../types/home';
+import { Message, ArtifactReference } from '../types/home';
 import { RFP } from '../types/rfp';
 import { SessionActiveAgent, UserProfile } from '../types/database';
 import DatabaseService from '../services/database';
@@ -9,6 +9,56 @@ import { AgentService } from '../services/agentService';
 import { categorizeError } from '../components/APIErrorHandler';
 
 export const useMessageHandling = () => {
+  
+  // Helper function to generate artifact references from Claude metadata
+  const generateArtifactReferences = (metadata: Record<string, unknown>): ArtifactReference[] => {
+    const refs: ArtifactReference[] = [];
+    
+    // Handle function results that contain forms/templates
+    if (metadata.function_results && Array.isArray(metadata.function_results)) {
+      metadata.function_results.forEach((func: unknown) => {
+        if (typeof func === 'object' && func !== null) {
+          const funcObj = func as Record<string, unknown>;
+          const result = funcObj.result as Record<string, unknown>;
+          
+          // Handle form creation results
+          if (result && (result.artifact_id || result.template_schema)) {
+            refs.push({
+              artifactId: result.artifact_id as string || `template-${Date.now()}`,
+              artifactName: result.template_name as string || result.title as string || 'Generated Template',
+              artifactType: 'form',
+              isCreated: true,
+              displayText: result.template_name as string || result.title as string
+            });
+          }
+        }
+      });
+    }
+    
+    // Handle buyer questionnaire form (legacy support)
+    if (metadata.buyer_questionnaire) {
+      refs.push({
+        artifactId: `buyer-form-${Date.now()}`,
+        artifactName: 'Buyer Questionnaire',
+        artifactType: 'form',
+        isCreated: true
+      });
+    }
+
+    // Handle any other artifacts from Claude response (legacy support)
+    if (metadata.artifacts && Array.isArray(metadata.artifacts)) {
+      (metadata.artifacts as Array<Record<string, unknown>>).forEach((artifact, index) => {
+        refs.push({
+          artifactId: `claude-artifact-${Date.now()}-${index}`,
+          artifactName: artifact.name as string || `Generated Artifact ${index + 1}`,
+          artifactType: artifact.type as 'document' | 'image' | 'pdf' | 'form' | 'other' || 'document',
+          isCreated: true
+        });
+      });
+    }
+    
+    return refs;
+  };
   
   const handleSendMessage = async (
     content: string,
@@ -25,7 +75,7 @@ export const useMessageHandling = () => {
     currentAgent: SessionActiveAgent | null,
     userProfile: UserProfile | null,
     currentRfp: RFP | null,
-    addClaudeArtifacts: (metadata: Record<string, unknown>) => void,
+    addClaudeArtifacts: (metadata: Record<string, unknown>, messageId?: string) => void,
     loadSessionAgent: (sessionId: string) => Promise<void>,
     handleAgentChanged: (agent: SessionActiveAgent) => Message | null
   ) => {
@@ -169,11 +219,19 @@ export const useMessageHandling = () => {
           agentName: agentForResponse.agent_name
         };
         
+        // Process Claude response metadata for artifacts and create artifact references
+        console.log('Claude response metadata:', claudeResponse.metadata);
+        
+        // Generate artifact references for the AI message
+        const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
+        if (artifactRefs.length > 0) {
+          aiMessage.artifactRefs = artifactRefs;
+        }
+        
         setMessages(prev => [...prev, aiMessage]);
 
-        // Process Claude response metadata for artifacts
-        console.log('Claude response metadata:', claudeResponse.metadata);
-        addClaudeArtifacts(claudeResponse.metadata);
+        // Process Claude response metadata for artifacts with message ID
+        addClaudeArtifacts(claudeResponse.metadata, aiMessage.id);
 
         setIsLoading(false);
 

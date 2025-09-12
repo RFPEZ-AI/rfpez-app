@@ -4,7 +4,7 @@ import React, { useEffect } from 'react';
 import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
-import { Message } from '../types/home';
+import { Message, ArtifactReference } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 
 // Import all our custom hooks
@@ -99,6 +99,8 @@ const Home: React.FC = () => {
 
   const {
     artifacts,
+    selectedArtifact,
+    selectArtifact,
     loadSessionArtifacts,
     handleAttachFile,
     addClaudeArtifacts,
@@ -254,6 +256,16 @@ const Home: React.FC = () => {
     );
   };
 
+  const handleArtifactSelect = (artifactRef: ArtifactReference) => {
+    console.log('Artifact selected:', artifactRef);
+    // Find the artifact by ID and select it
+    const artifact = artifacts.find(a => a.id === artifactRef.artifactId);
+    if (artifact) {
+      selectArtifact(artifact.id);
+      console.log('Selected artifact for display:', artifact.name);
+    }
+  };
+
   const onAgentChanged = (newAgent: SessionActiveAgent) => {
     const agentMessage = handleAgentChanged(newAgent);
     if (agentMessage) {
@@ -311,8 +323,10 @@ const Home: React.FC = () => {
             onSendMessage={onSendMessage}
             onAttachFile={handleAttachFile}
             artifacts={artifacts}
+            selectedArtifact={selectedArtifact}
             currentRfpId={currentRfpId}
             onDownloadArtifact={(artifact) => console.log('Download:', artifact)}
+            onArtifactSelect={handleArtifactSelect}
           />
         </div>
 

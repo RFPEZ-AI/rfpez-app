@@ -8,6 +8,32 @@ import DatabaseService from '../services/database';
 
 export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?: string, isAuthenticated?: boolean, user?: User | null) => {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
+  const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+
+  // Get currently selected artifact
+  const selectedArtifact = artifacts.find(artifact => artifact.id === selectedArtifactId) || null;
+
+  // Function to select an artifact
+  const selectArtifact = (artifactId: string) => {
+    setSelectedArtifactId(artifactId);
+  };
+
+  // Function to add artifacts with message association
+  const addArtifactWithMessage = (artifact: Artifact, messageId?: string) => {
+    const artifactWithMessage: Artifact = {
+      ...artifact,
+      sessionId: currentSessionId,
+      messageId,
+      isReferencedInSession: true
+    };
+    
+    setArtifacts(prev => [...prev, artifactWithMessage]);
+    
+    // Auto-select the newly created artifact
+    setSelectedArtifactId(artifactWithMessage.id);
+    
+    return artifactWithMessage;
+  };
 
   // Load RFP-related artifacts when RFP context changes
   useEffect(() => {
@@ -214,6 +240,16 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
         const newArtifacts = formattedArtifacts.filter(a => !existingIds.has(a.id));
         return [...prev, ...newArtifacts];
       });
+
+      // Auto-select the most recent artifact for the session
+      if (formattedArtifacts.length > 0) {
+        // Find the most recent artifact by ID (assuming higher ID = more recent)
+        const mostRecentArtifact = formattedArtifacts.reduce((latest, current) => {
+          return parseInt(current.id) > parseInt(latest.id) ? current : latest;
+        });
+        
+        selectArtifact(mostRecentArtifact.id);
+      }
     } catch (error) {
       console.error('Failed to load session artifacts:', error);
     }
@@ -249,12 +285,14 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
     }
   };
 
-  const addClaudeArtifacts = (claudeMetadata: Record<string, unknown>) => {
+  // Claude artifacts handler
+  const addClaudeArtifacts = (claudeMetadata: Record<string, unknown>, messageId?: string) => {
     console.log('=== CLAUDE RESPONSE DEBUG ===');
     console.log('Response has metadata:', !!claudeMetadata);
     console.log('Metadata keys:', Object.keys(claudeMetadata || {}));
     console.log('Has buyer_questionnaire in metadata:', !!claudeMetadata?.buyer_questionnaire);
     console.log('Has function_results in metadata:', !!claudeMetadata?.function_results);
+    console.log('Message ID:', messageId);
     
     const metadata = claudeMetadata as Record<string, unknown>;
     
@@ -305,10 +343,14 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
                 uiSchema: result.ui_schema || {},
                 formData: result.form_data || {},
                 submitAction: result.submit_action || { type: 'save_session' }
-              })
+              }),
+              sessionId: currentSessionId,
+              messageId,
+              isReferencedInSession: true
             };
             
             setArtifacts(prev => [...prev, formArtifact]);
+            setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
             console.log('✅ Added form artifact from function result:', formArtifact);
           }
         }
@@ -331,10 +373,14 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
                 schema: result.template_schema,
                 uiConfig: result.template_ui || {},
                 tags: result.tags || []
-              })
+              }),
+              sessionId: currentSessionId,
+              messageId,
+              isReferencedInSession: true
             };
             
             setArtifacts(prev => [...prev, templateArtifact]);
+            setSelectedArtifactId(templateArtifact.id); // Auto-select new artifact
             console.log('✅ Added template artifact from function result:', templateArtifact);
           }
         }
@@ -350,10 +396,14 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
         name: 'Buyer Questionnaire',
         type: 'form',
         size: 'Interactive Form',
-        content: JSON.stringify(metadata.buyer_questionnaire)
+        content: JSON.stringify(metadata.buyer_questionnaire),
+        sessionId: currentSessionId,
+        messageId,
+        isReferencedInSession: true
       };
       
       setArtifacts(prev => [...prev, formArtifact]);
+      setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
       console.log('Added buyer questionnaire to artifacts:', formArtifact);
     }
 
@@ -375,21 +425,52 @@ export const useArtifactManagement = (currentRfp: RFP | null, currentSessionId?:
         type: artifact.type as 'document' | 'image' | 'pdf' | 'other' || 'document',
         size: artifact.size || 'Generated',
         content: artifact.content,
-        url: artifact.url
+        url: artifact.url,
+        sessionId: currentSessionId,
+        messageId,
+        isReferencedInSession: true
       }));
       
       setArtifacts(prev => [...prev, ...newArtifacts]);
+      
+      // Auto-select the first new artifact
+      if (newArtifacts.length > 0) {
+        setSelectedArtifactId(newArtifacts[0].id);
+      }
+      
       console.log('Added Claude artifacts:', newArtifacts);
     }
   };
 
   const clearArtifacts = () => {
     setArtifacts([]);
+    setSelectedArtifactId(null);
   };
+
+  // Auto-select most recent artifact when session changes
+  useEffect(() => {
+    if (currentSessionId && artifacts.length > 0) {
+      // Find the most recent artifact in this session
+      const sessionArtifacts = artifacts.filter(artifact => 
+        artifact.sessionId === currentSessionId || 
+        !artifact.sessionId // Include legacy artifacts without session ID
+      );
+      
+      if (sessionArtifacts.length > 0) {
+        // Select the most recently created artifact
+        const mostRecent = sessionArtifacts[sessionArtifacts.length - 1];
+        setSelectedArtifactId(mostRecent.id);
+      }
+    }
+  }, [currentSessionId, artifacts]);
 
   return {
     artifacts,
+    selectedArtifact,
+    selectedArtifactId,
     setArtifacts,
+    selectArtifact,
+    addArtifactWithMessage,
     loadSessionArtifacts,
     handleAttachFile,
     addClaudeArtifacts,
