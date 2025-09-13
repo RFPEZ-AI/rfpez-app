@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonContent,
   IonHeader,
@@ -17,13 +17,15 @@ import {
   IonIcon,
   IonItem,
   IonLabel,
-  IonSpinner
+  IonSpinner,
+  IonBadge
 } from '@ionic/react';
-import { colorPaletteOutline, flask } from 'ionicons/icons';
+import { colorPaletteOutline, flask, server, checkmarkCircle, closeCircle, refresh } from 'ionicons/icons';
 import ClaudeTestComponent from '../components/ClaudeTestComponent';
 import AuthDebugger from '../components/AuthDebugger';
 import RoleManagement from '../components/RoleManagement';
 import MCPTestComponent from '../components/MCPTestComponent';
+import { SimpleRateLimitStatus } from '../components/RateLimitStatus';
 import { useSupabase } from '../context/SupabaseContext';
 import { RoleService } from '../services/roleService';
 import { testClaudeMCPAvailability, MCPTestResult } from '../utils/mcpTestUtils';
@@ -34,6 +36,19 @@ const DebugPage: React.FC = () => {
   const [mcpTestResult, setMcpTestResult] = useState<MCPTestResult | null>(null);
   const [mcpTesting, setMcpTesting] = useState(false);
   const [mcpMonitor, setMcpMonitor] = useState<MCPMonitor | null>(null);
+  const [apiServerStatus, setApiServerStatus] = useState<{
+    isHealthy: boolean;
+    error: string | null;
+    responseTime: number | null;
+    timestamp: string | null;
+    checking: boolean;
+  }>({
+    isHealthy: false,
+    error: null,
+    responseTime: null,
+    timestamp: null,
+    checking: false
+  });
 
   const handleDirectMCPTest = async () => {
     setMcpTesting(true);
@@ -74,6 +89,53 @@ const DebugPage: React.FC = () => {
   const clearTestResults = () => {
     setMcpTestResult(null);
   };
+
+  const checkApiServerHealth = async () => {
+    setApiServerStatus(prev => ({ ...prev, checking: true }));
+    const startTime = Date.now();
+    
+    try {
+      const response = await fetch('http://localhost:3001/health', {
+        method: 'GET',
+        signal: AbortSignal.timeout(5000) // 5 second timeout
+      });
+      
+      const responseTime = Date.now() - startTime;
+      
+      if (response.ok) {
+        const data = await response.json();
+        setApiServerStatus({
+          isHealthy: true,
+          error: null,
+          responseTime,
+          timestamp: data.timestamp || new Date().toISOString(),
+          checking: false
+        });
+      } else {
+        setApiServerStatus({
+          isHealthy: false,
+          error: `HTTP ${response.status}: ${response.statusText}`,
+          responseTime,
+          timestamp: new Date().toISOString(),
+          checking: false
+        });
+      }
+    } catch (error) {
+      const responseTime = Date.now() - startTime;
+      setApiServerStatus({
+        isHealthy: false,
+        error: error instanceof Error ? error.message : 'Connection failed',
+        responseTime,
+        timestamp: new Date().toISOString(),
+        checking: false
+      });
+    }
+  };
+
+  // Check API server health on component mount
+  useEffect(() => {
+    checkApiServerHealth();
+  }, []);
 
   return (
     <IonPage>
@@ -232,6 +294,97 @@ const DebugPage: React.FC = () => {
             </IonCardContent>
           </IonCard>
         )}
+
+        {/* API Server Status */}
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>
+              <IonIcon icon={server} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              API Server Status
+              {apiServerStatus.isHealthy && (
+                <IonBadge color="success" style={{ marginLeft: '8px' }}>Ready</IonBadge>
+              )}
+              {!apiServerStatus.isHealthy && !apiServerStatus.checking && (
+                <IonBadge color="danger" style={{ marginLeft: '8px' }}>Offline</IonBadge>
+              )}
+            </IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            {/* Claude API Rate Limit Status */}
+            <div style={{ marginBottom: '16px' }}>
+              <h4 style={{ margin: '0 0 8px 0', fontSize: '14px' }}>Claude API Rate Limit Status</h4>
+              <SimpleRateLimitStatus />
+            </div>
+
+            <p>Monitor the API server health and connectivity for test automation.</p>
+            
+            <div style={{ marginBottom: '16px' }}>
+              <IonButton 
+                onClick={checkApiServerHealth}
+                disabled={apiServerStatus.checking}
+                color={apiServerStatus.isHealthy ? "success" : "primary"}
+                size="small"
+              >
+                {apiServerStatus.checking ? <IonSpinner name="crescent" /> : (
+                  <>
+                    <IonIcon icon={refresh} slot="start" />
+                    Check Health
+                  </>
+                )}
+              </IonButton>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <IonItem lines="none">
+                <IonIcon 
+                  icon={apiServerStatus.isHealthy ? checkmarkCircle : closeCircle} 
+                  color={apiServerStatus.isHealthy ? "success" : "danger"}
+                  slot="start"
+                />
+                <IonLabel>
+                  <h3>Connection Status</h3>
+                  <p>{apiServerStatus.isHealthy ? 'API Server is responding' : 'API Server is not accessible'}</p>
+                </IonLabel>
+              </IonItem>
+
+              {apiServerStatus.responseTime && (
+                <IonItem lines="none">
+                  <IonLabel>
+                    <h3>Response Time</h3>
+                    <p>{apiServerStatus.responseTime}ms</p>
+                  </IonLabel>
+                </IonItem>
+              )}
+
+              {apiServerStatus.timestamp && (
+                <IonItem lines="none">
+                  <IonLabel>
+                    <h3>Last Checked</h3>
+                    <p>{new Date(apiServerStatus.timestamp).toLocaleString()}</p>
+                  </IonLabel>
+                </IonItem>
+              )}
+
+              {apiServerStatus.error && (
+                <IonItem lines="none">
+                  <IonLabel>
+                    <h3 style={{ color: 'var(--ion-color-danger)' }}>Error Details</h3>
+                    <p style={{ color: 'var(--ion-color-danger)' }}>{apiServerStatus.error}</p>
+                  </IonLabel>
+                </IonItem>
+              )}
+
+              <IonItem lines="none">
+                <IonLabel>
+                  <h3>Endpoint</h3>
+                  <p style={{ fontFamily: 'monospace', fontSize: '12px' }}>
+                    GET http://localhost:3001/health
+                  </p>
+                </IonLabel>
+              </IonItem>
+            </div>
+          </IonCardContent>
+        </IonCard>
 
         {/* MCP Client Testing (existing component) */}
         <IonCard>

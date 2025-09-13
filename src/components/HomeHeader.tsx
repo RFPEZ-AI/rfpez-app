@@ -157,7 +157,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
           </div>
         </div>
         
-        {/* Right section - Rate limit status and Auth buttons */}
+        {/* Right section - Auth buttons */}
         <IonButtons slot="end">
           <div style={{ 
             display: 'flex', 
@@ -165,7 +165,6 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             gap: '8px',
             marginRight: '8px'
           }}>
-            <SimpleRateLimitStatus />
             <AuthButtons />
           </div>
         </IonButtons>
