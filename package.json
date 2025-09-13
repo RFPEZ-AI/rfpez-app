@@ -38,7 +38,10 @@
     "workbox-range-requests": "^5.1.4",
     "workbox-routing": "^5.1.4",
     "workbox-strategies": "^5.1.4",
-    "workbox-streams": "^5.1.4"
+    "workbox-streams": "^5.1.4",
+    "express": "^4.18.2",
+    "cors": "^2.8.5",
+    "uuid": "^9.0.1"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "^6.8.0",
@@ -54,10 +57,13 @@
     "eslint-plugin-react": "^7.32.2",
     "identity-obj-proxy": "^3.0.0",
     "node-fetch": "^2.6.7",
-    "sharp": "^0.34.3"
+    "sharp": "^0.34.3",
+    "concurrently": "^8.2.2"
   },
   "scripts": {
     "start": "cross-env GENERATE_SOURCEMAP=false react-scripts start",
+    "start:api": "node api-server/index.js",
+    "start:dev": "concurrently \"npm run start:api\" \"npm start\"",
     "build": "react-scripts build",
     "test": "react-scripts test",
     "mcp:deploy": "bash deploy-mcp.sh",

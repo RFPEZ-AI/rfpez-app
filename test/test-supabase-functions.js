@@ -1,5 +1,5 @@
 // Test script to verify the Supabase functions work
-const { claudeAPIHandler } = require('./src/services/claudeAPIFunctions.ts');
+const { claudeAPIHandler } = require('../src/services/claudeAPIFunctions.ts');
 
 async function testSupabaseFunctions() {
   console.log('🧪 Testing Supabase Functions...');
