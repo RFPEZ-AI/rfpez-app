@@ -10,7 +10,6 @@ import AgentsMenu from './AgentsMenu';
 import GenericMenu from './GenericMenu';
 import AgentIndicator from './AgentIndicator';
 import AuthButtons from './AuthButtons';
-import { SimpleRateLimitStatus } from './RateLimitStatus';
 import { RoleService } from '../services/roleService';
 import { useIsMobile } from '../utils/useMediaQuery';
 
