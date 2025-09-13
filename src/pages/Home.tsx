@@ -4,8 +4,10 @@ import React, { useEffect } from 'react';
 import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
-import { Message, ArtifactReference } from '../types/home';
+import { Message, ArtifactReference, Artifact } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
+import { DocxExporter } from '../utils/docxExporter';
+import type { FormSpec } from '../types/rfp';
 
 // Import all our custom hooks
 import { useHomeState } from '../hooks/useHomeState';
@@ -273,6 +275,115 @@ const Home: React.FC = () => {
     }
   };
 
+  // Download handler for artifacts
+  const handleDownloadArtifact = async (artifact: Artifact) => {
+    console.log('Download artifact:', artifact);
+    
+    try {
+      // Check if it's a form artifact
+      if (artifact.type === 'form' && artifact.content) {
+        const formData = JSON.parse(artifact.content);
+        
+        // Check if it's a buyer questionnaire with schema
+        if (formData.schema && typeof formData.schema === 'object') {
+          // Convert to FormSpec format expected by DocxExporter
+          const formSpec: FormSpec = {
+            version: 'rfpez-form@1',
+            schema: formData.schema,
+            uiSchema: formData.uiSchema || {},
+            defaults: formData.formData || {}
+          };
+          
+          // Get actual submitted response data from the current RFP
+          let responseData: Record<string, unknown> = {};
+          
+          if (currentRfp) {
+            // Check which type of form this is and get the appropriate response data
+            if (artifact.name.toLowerCase().includes('buyer') || 
+                artifact.name.toLowerCase().includes('questionnaire') ||
+                artifact.id.startsWith('buyer-form-')) {
+              // This is a buyer questionnaire - get buyer_questionnaire_response
+              responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || {};
+              console.log('Using buyer questionnaire response data:', responseData);
+            } else if (artifact.name.toLowerCase().includes('bid') || 
+                      artifact.name.toLowerCase().includes('supplier') ||
+                      artifact.id.startsWith('bid-form-')) {
+              // This is a bid form - check if we have bid responses (this would be in a separate table)
+              // For now, use the form defaults as bid responses aren't stored in the RFP record
+              responseData = formData.formData || {};
+              console.log('Using form defaults for bid form (no submitted responses available)');
+            } else {
+              // Unknown form type, try buyer response first, then defaults
+              responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
+              console.log('Unknown form type, using available response data:', responseData);
+            }
+          } else {
+            // No RFP context, use form defaults
+            responseData = formData.formData || {};
+            console.log('No RFP context, using form defaults');
+          }
+          
+          // If response data is empty, show a warning but still proceed
+          if (Object.keys(responseData).length === 0) {
+            console.warn('⚠️ No response data available for this form');
+            const proceed = confirm(
+              'This form has not been submitted yet or has no response data. ' +
+              'The downloaded document will contain empty fields. Do you want to continue?'
+            );
+            if (!proceed) {
+              return;
+            }
+          }
+          
+          // Set up export options
+          const exportOptions = {
+            title: formData.title || artifact.name || 'Form Response',
+            filename: `${artifact.name || 'form-response'}.docx`,
+            companyName: (responseData.companyName as string) || 'Your Company',
+            rfpName: currentRfp?.name || 'RFP Response',
+            submissionDate: new Date(),
+            includeHeaders: true
+          };
+          
+          // Download as DOCX
+          await DocxExporter.downloadBidDocx(formSpec, responseData, exportOptions);
+          console.log('✅ Form artifact downloaded as DOCX');
+          return;
+        }
+      }
+      
+      // For other artifact types, fall back to basic download
+      if (artifact.url) {
+        const link = document.createElement('a');
+        link.href = artifact.url;
+        link.download = artifact.name;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        console.log('✅ Artifact downloaded via URL');
+      } else if (artifact.content) {
+        // Create a blob from content and download
+        const blob = new Blob([artifact.content], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `${artifact.name}.txt`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+        console.log('✅ Artifact content downloaded as text file');
+      } else {
+        console.warn('⚠️ No downloadable content found in artifact');
+        alert('This artifact does not have downloadable content.');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error downloading artifact:', error);
+      alert('An error occurred while downloading the artifact. Please try again.');
+    }
+  };
+
   return (
     <IonPage>
       <HomeHeader
@@ -325,7 +436,7 @@ const Home: React.FC = () => {
             artifacts={artifacts}
             selectedArtifact={selectedArtifact}
             currentRfpId={currentRfpId}
-            onDownloadArtifact={(artifact) => console.log('Download:', artifact)}
+            onDownloadArtifact={handleDownloadArtifact}
             onArtifactSelect={handleArtifactSelect}
           />
         </div>
