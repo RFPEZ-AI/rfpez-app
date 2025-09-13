@@ -278,14 +278,25 @@ const Home: React.FC = () => {
   // Download handler for artifacts
   const handleDownloadArtifact = async (artifact: Artifact) => {
     console.log('Download artifact:', artifact);
+    console.log('Artifact type:', artifact.type);
+    console.log('Artifact content (first 200 chars):', typeof artifact.content === 'string' ? artifact.content.substring(0, 200) : artifact.content);
     
     try {
       // Check if it's a form artifact
       if (artifact.type === 'form' && artifact.content) {
+        console.log('Processing form artifact...');
         const formData = JSON.parse(artifact.content);
+        console.log('Form data structure:', {
+          hasSchema: !!formData.schema,
+          hasUiSchema: !!formData.uiSchema,
+          hasFormData: !!formData.formData,
+          title: formData.title,
+          keys: Object.keys(formData)
+        });
         
         // Check if it's a buyer questionnaire with schema
         if (formData.schema && typeof formData.schema === 'object') {
+          console.log('Valid form schema found, proceeding with document generation...');
           // Convert to FormSpec format expected by DocxExporter
           const formSpec: FormSpec = {
             version: 'rfpez-form@1',
@@ -349,21 +360,37 @@ const Home: React.FC = () => {
           await DocxExporter.downloadBidDocx(formSpec, responseData, exportOptions);
           console.log('✅ Form artifact downloaded as DOCX');
           return;
+        } else {
+          console.warn('⚠️ Form artifact does not have valid schema structure');
+          console.log('Form data keys:', Object.keys(formData));
+          console.log('Schema type:', typeof formData.schema);
+          
+          // Show user what we found instead of proper form schema
+          alert(
+            'This form artifact does not contain a valid form schema. ' +
+            'The artifact appears to contain metadata or raw form data instead of a structured form definition. ' +
+            'Please check that this is a properly formatted form artifact.'
+          );
+          return;
         }
+      } else {
+        console.warn('⚠️ Form artifact has no content or invalid JSON');
+        alert('This form artifact appears to be empty or contains invalid data.');
+        return;
       }
       
       // For other artifact types, fall back to basic download
       if (artifact.url) {
         const link = document.createElement('a');
-        link.href = artifact.url;
+        link.href = artifact.url as string; // We know it's defined from the if check
         link.download = artifact.name;
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
         console.log('✅ Artifact downloaded via URL');
-      } else if (artifact.content) {
+      } else if (artifact.content && typeof artifact.content === 'string') {
         // Create a blob from content and download
-        const blob = new Blob([artifact.content], { type: 'text/plain' });
+        const blob = new Blob([artifact.content as string], { type: 'text/plain' }); // We know it's a string from the if check
         const url = URL.createObjectURL(blob);
         const link = document.createElement('a');
         link.href = url;
