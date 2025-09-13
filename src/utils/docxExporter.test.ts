@@ -296,5 +296,70 @@ describe('DocxExporter', () => {
       const { Document } = require('docx');
       expect(Document).toHaveBeenCalled();
     });
+
+    it('handles nested object schemas correctly', () => {
+      const nestedFormSpec: FormSpec = {
+        version: 'rfpez-form@1',
+        schema: {
+          title: 'LED Lighting Upgrade RFP - Sample Bid Form',
+          type: 'object',
+          properties: {
+            deskTaskLighting: {
+              type: 'object',
+              title: 'Desk/Task Lighting Specifications',
+              properties: {
+                totalQuantity: {
+                  type: 'number',
+                  title: 'Total Quantity'
+                },
+                baseType: {
+                  type: 'string',
+                  title: 'Base Type'
+                }
+              }
+            },
+            recessedCanLighting: {
+              type: 'object',
+              title: 'Recessed Can Light Specifications',
+              properties: {
+                totalQuantity: {
+                  type: 'number',
+                  title: 'Total Quantity'
+                },
+                requiredBaseTypes: {
+                  type: 'array',
+                  title: 'Required Base Types'
+                }
+              }
+            },
+            generalRequirements: {
+              type: 'string',
+              title: 'General Requirements'
+            }
+          }
+        },
+        uiSchema: {},
+        defaults: {}
+      };
+
+      const emptyResponseData = {};
+      
+      const doc = DocxExporter.buildBidDocx(nestedFormSpec, emptyResponseData, {
+        title: 'LED Lighting Upgrade RFP - Sample Bid Form',
+        rfpName: 'LED Lighting Upgrade',
+        submissionDate: new Date('2024-01-01')
+      });
+
+      expect(doc).toBeDefined();
+      
+      const { Document } = require('docx');
+      expect(Document).toHaveBeenCalled();
+      
+      // Verify that sections were created for the nested objects
+      const documentCall = Document.mock.calls[Document.mock.calls.length - 1];
+      const sections = documentCall[0].sections;
+      expect(sections).toBeDefined();
+      expect(sections.length).toBeGreaterThan(0);
+    });
   });
 });

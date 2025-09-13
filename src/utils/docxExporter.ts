@@ -143,39 +143,89 @@ export class DocxExporter {
         responseData: Record<string, unknown>
       ): DocumentSection[] {
         const sections: DocumentSection[] = [];
-        const mainSection: DocumentSection = {
-          title: schema.title || 'Response Details',
-          paragraphs: [],
-          tables: []
-        };
+        
         if (schema.properties) {
+          // First, process all object-type properties as separate sections
           Object.entries(schema.properties).forEach(([key, fieldSchema]) => {
-            const value = responseData[key];
-            const label = fieldSchema.title || DocxExporter.formatFieldName(key);
-            
-            if (value !== undefined && value !== null && value !== '') {
-              // If we have actual response data, show it
-              const formattedValue = DocxExporter.formatFieldValue(value, fieldSchema);
-              mainSection.paragraphs.push(`${label}: ${formattedValue}`);
-            } else {
-              // If no response data, show the field as a blank form field
-              const fieldDescription = fieldSchema.description ? ` (${fieldSchema.description})` : '';
-              mainSection.paragraphs.push(`${label}${fieldDescription}: ___________________________`);
+            if (fieldSchema.type === 'object' && fieldSchema.properties) {
+              // Create a section for this object group
+              const objectSection = DocxExporter.buildObjectSchemaSection(key, fieldSchema, responseData[key] as Record<string, unknown>);
+              sections.push(objectSection);
             }
           });
-        }
-        sections.push(mainSection);
-        if (schema.properties) {
+          
+          // Then, create a main section for any remaining non-object properties
+          const nonObjectProperties = Object.entries(schema.properties).filter(([key, fieldSchema]) => 
+            fieldSchema.type !== 'object'
+          );
+          
+          if (nonObjectProperties.length > 0) {
+            const mainSection: DocumentSection = {
+              title: schema.title || 'Response Details',
+              paragraphs: [],
+              tables: []
+            };
+            
+            nonObjectProperties.forEach(([key, fieldSchema]) => {
+              const value = responseData[key];
+              const label = fieldSchema.title || DocxExporter.formatFieldName(key);
+              
+              if (value !== undefined && value !== null && value !== '') {
+                // If we have actual response data, show it
+                const formattedValue = DocxExporter.formatFieldValue(value, fieldSchema);
+                mainSection.paragraphs.push(`${label}: ${formattedValue}`);
+              } else {
+                // If no response data, show the field as a blank form field
+                const fieldDescription = fieldSchema.description ? ` (${fieldSchema.description})` : '';
+                mainSection.paragraphs.push(`${label}${fieldDescription}: ___________________________`);
+              }
+            });
+            
+            sections.push(mainSection);
+          }
+          
+          // Finally, handle arrays (existing logic)
           Object.entries(schema.properties).forEach(([key, fieldSchema]) => {
             const value = responseData[key];
             if (fieldSchema.type === 'array' && Array.isArray(value) && value.length > 0) {
               sections.push(DocxExporter.buildArraySection(key, fieldSchema, value));
-            } else if (fieldSchema.type === 'object' && value && typeof value === 'object') {
-              sections.push(DocxExporter.buildObjectSection(key, fieldSchema, value as Record<string, unknown>));
             }
           });
         }
+        
         return sections;
+      }
+
+      private static buildObjectSchemaSection(
+        key: string,
+        fieldSchema: FieldSchema,
+        responseData?: Record<string, unknown>
+      ): DocumentSection {
+        const title = fieldSchema.title || DocxExporter.formatFieldName(key);
+        const section: DocumentSection = {
+          title,
+          paragraphs: [],
+          tables: []
+        };
+        
+        if (fieldSchema.properties) {
+          Object.entries(fieldSchema.properties).forEach(([propKey, propSchema]) => {
+            const value = responseData?.[propKey];
+            const label = propSchema.title || DocxExporter.formatFieldName(propKey);
+            
+            if (value !== undefined && value !== null && value !== '') {
+              // If we have actual response data, show it
+              const formattedValue = DocxExporter.formatFieldValue(value, propSchema);
+              section.paragraphs.push(`${label}: ${formattedValue}`);
+            } else {
+              // If no response data, show the field as a blank form field
+              const fieldDescription = propSchema.description ? ` (${propSchema.description})` : '';
+              section.paragraphs.push(`${label}${fieldDescription}: ___________________________`);
+            }
+          });
+        }
+        
+        return section;
       }
 
       private static buildArraySection(
