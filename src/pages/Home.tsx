@@ -282,101 +282,111 @@ const Home: React.FC = () => {
     console.log('Artifact content (first 200 chars):', typeof artifact.content === 'string' ? artifact.content.substring(0, 200) : artifact.content);
     
     try {
-      // Check if it's a form artifact
-      if (artifact.type === 'form' && artifact.content) {
-        console.log('Processing form artifact...');
-        const formData = JSON.parse(artifact.content);
-        console.log('Form data structure:', {
-          hasSchema: !!formData.schema,
-          hasUiSchema: !!formData.uiSchema,
-          hasFormData: !!formData.formData,
-          title: formData.title,
-          keys: Object.keys(formData)
-        });
+      // Check if it's a form artifact or document with form-like content
+      if ((artifact.type === 'form' || artifact.type === 'document') && artifact.content) {
+        console.log('Processing potential form/document artifact...');
         
-        // Check if it's a buyer questionnaire with schema
-        if (formData.schema && typeof formData.schema === 'object') {
-          console.log('Valid form schema found, proceeding with document generation...');
-          // Convert to FormSpec format expected by DocxExporter
-          const formSpec: FormSpec = {
-            version: 'rfpez-form@1',
-            schema: formData.schema,
-            uiSchema: formData.uiSchema || {},
-            defaults: formData.formData || {}
-          };
+        try {
+          const formData = JSON.parse(artifact.content);
+          console.log('Form data structure:', {
+            hasSchema: !!formData.schema,
+            hasUiSchema: !!formData.uiSchema,
+            hasFormData: !!formData.formData,
+            title: formData.title,
+            keys: Object.keys(formData)
+          });
           
-          // Get actual submitted response data from the current RFP
-          let responseData: Record<string, unknown> = {};
-          
-          if (currentRfp) {
-            // Check which type of form this is and get the appropriate response data
-            if (artifact.name.toLowerCase().includes('buyer') || 
-                artifact.name.toLowerCase().includes('questionnaire') ||
-                artifact.id.startsWith('buyer-form-')) {
-              // This is a buyer questionnaire - get buyer_questionnaire_response
-              responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || {};
-              console.log('Using buyer questionnaire response data:', responseData);
-            } else if (artifact.name.toLowerCase().includes('bid') || 
-                      artifact.name.toLowerCase().includes('supplier') ||
-                      artifact.id.startsWith('bid-form-')) {
-              // This is a bid form - check if we have bid responses (this would be in a separate table)
-              // For now, use the form defaults as bid responses aren't stored in the RFP record
-              responseData = formData.formData || {};
-              console.log('Using form defaults for bid form (no submitted responses available)');
+          // Check if it's a buyer questionnaire with schema (structured form)
+          if (formData.schema && typeof formData.schema === 'object') {
+            console.log('Valid form schema found, proceeding with document generation...');
+            // Convert to FormSpec format expected by DocxExporter
+            const formSpec: FormSpec = {
+              version: 'rfpez-form@1',
+              schema: formData.schema,
+              uiSchema: formData.uiSchema || {},
+              defaults: formData.formData || {}
+            };
+            
+            // Get actual submitted response data from the current RFP
+            let responseData: Record<string, unknown> = {};
+            
+            if (currentRfp) {
+              // Check which type of form this is and get the appropriate response data
+              if (artifact.name.toLowerCase().includes('buyer') || 
+                  artifact.name.toLowerCase().includes('questionnaire') ||
+                  artifact.id.startsWith('buyer-form-')) {
+                // This is a buyer questionnaire - get buyer_questionnaire_response
+                responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || {};
+                console.log('Using buyer questionnaire response data:', responseData);
+              } else if (artifact.name.toLowerCase().includes('bid') || 
+                        artifact.name.toLowerCase().includes('supplier') ||
+                        artifact.id.startsWith('bid-form-')) {
+                // This is a bid form - check if we have bid responses (this would be in a separate table)
+                // For now, use the form defaults as bid responses aren't stored in the RFP record
+                responseData = formData.formData || {};
+                console.log('Using form defaults for bid form (no submitted responses available)');
+              } else {
+                // Unknown form type, try buyer response first, then defaults
+                responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
+                console.log('Unknown form type, using available response data:', responseData);
+              }
             } else {
-              // Unknown form type, try buyer response first, then defaults
-              responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
-              console.log('Unknown form type, using available response data:', responseData);
+              // No RFP context, use form defaults
+              responseData = formData.formData || {};
+              console.log('No RFP context, using form defaults');
             }
-          } else {
-            // No RFP context, use form defaults
-            responseData = formData.formData || {};
-            console.log('No RFP context, using form defaults');
-          }
-          
-          // If response data is empty, show a warning but still proceed
-          if (Object.keys(responseData).length === 0) {
-            console.warn('⚠️ No response data available for this form');
-            const proceed = confirm(
-              'This form has not been submitted yet or has no response data. ' +
-              'The downloaded document will contain empty fields. Do you want to continue?'
+            
+            // If response data is empty, show a warning but still proceed with empty fields
+            if (Object.keys(responseData).length === 0) {
+              console.warn('⚠️ No response data available for this form, will create document with empty fields');
+              const proceed = confirm(
+                'This form has not been submitted yet or has no response data. ' +
+                'The downloaded document will contain empty fields for you to fill out. Do you want to continue?'
+              );
+              if (!proceed) {
+                return;
+              }
+              // Use form defaults or empty object to create fillable form
+              responseData = formData.formData || {};
+            }
+            
+            // Set up export options
+            const exportOptions = {
+              title: formData.title || artifact.name || 'Form Response',
+              filename: `${artifact.name || 'form-response'}.docx`,
+              companyName: (responseData.companyName as string) || 'Your Company',
+              rfpName: currentRfp?.name || 'RFP Response',
+              submissionDate: new Date(),
+              includeHeaders: true
+            };
+            
+            // Download as DOCX
+            await DocxExporter.downloadBidDocx(formSpec, responseData, exportOptions);
+            console.log('✅ Form artifact downloaded as DOCX');
+            return;
+          } else if (artifact.type === 'form') {
+            // Only show this error for actual form artifacts without schema
+            console.warn('⚠️ Form artifact does not have valid schema structure');
+            console.log('Form data keys:', Object.keys(formData));
+            console.log('Schema type:', typeof formData.schema);
+            
+            alert(
+              'This form artifact does not contain a valid form schema. ' +
+              'The artifact appears to contain metadata or raw form data instead of a structured form definition. ' +
+              'Please check that this is a properly formatted form artifact.'
             );
-            if (!proceed) {
-              return;
-            }
+            return;
           }
-          
-          // Set up export options
-          const exportOptions = {
-            title: formData.title || artifact.name || 'Form Response',
-            filename: `${artifact.name || 'form-response'}.docx`,
-            companyName: (responseData.companyName as string) || 'Your Company',
-            rfpName: currentRfp?.name || 'RFP Response',
-            submissionDate: new Date(),
-            includeHeaders: true
-          };
-          
-          // Download as DOCX
-          await DocxExporter.downloadBidDocx(formSpec, responseData, exportOptions);
-          console.log('✅ Form artifact downloaded as DOCX');
-          return;
-        } else {
-          console.warn('⚠️ Form artifact does not have valid schema structure');
-          console.log('Form data keys:', Object.keys(formData));
-          console.log('Schema type:', typeof formData.schema);
-          
-          // Show user what we found instead of proper form schema
-          alert(
-            'This form artifact does not contain a valid form schema. ' +
-            'The artifact appears to contain metadata or raw form data instead of a structured form definition. ' +
-            'Please check that this is a properly formatted form artifact.'
-          );
-          return;
+        } catch (jsonError) {
+          // If JSON parsing fails and it's a form, show error
+          if (artifact.type === 'form') {
+            console.warn('⚠️ Form artifact has invalid JSON content');
+            alert('This form artifact appears to be empty or contains invalid data.');
+            return;
+          }
+          // If it's a document that's not JSON, fall through to basic download
+          console.log('Document artifact is not JSON, treating as regular document for download');
         }
-      } else {
-        console.warn('⚠️ Form artifact has no content or invalid JSON');
-        alert('This form artifact appears to be empty or contains invalid data.');
-        return;
       }
       
       // For other artifact types, fall back to basic download
