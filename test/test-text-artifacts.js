@@ -7,7 +7,7 @@ const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 // Import Claude API Functions
-const { ClaudeAPIFunctionHandler } = require('./src/services/claudeAPIFunctions.ts');
+const { ClaudeAPIFunctionHandler } = require('../src/services/claudeAPIFunctions.ts');
 
 async function testTextArtifacts() {
   console.log('=== TEXT ARTIFACT INTEGRATION TEST ===');

@@ -3,9 +3,9 @@
 // Test MCP Integration with Claude Sessions
 // This script tests the new MCP connection in Claude sessions
 
-const { ClaudeService } = require('./src/services/claudeService');
-const { claudeAPIHandler } = require('./src/services/claudeAPIFunctions');
-const { mcpClient } = require('./src/services/mcpClient');
+const { ClaudeService } = require('../src/services/claudeService');
+const { claudeAPIHandler } = require('../src/services/claudeAPIFunctions');
+const { mcpClient } = require('../src/services/mcpClient');
 
 async function testMCPIntegration() {
   console.log('🧪 Testing MCP Integration with Claude Sessions...\n');
