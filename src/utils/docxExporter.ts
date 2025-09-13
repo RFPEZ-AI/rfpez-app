@@ -22,6 +22,7 @@ interface JsonSchema {
 interface FieldSchema {
   type?: string;
   title?: string;
+  description?: string;
   items?: { enum?: unknown[] };
   properties?: { [key: string]: FieldSchema };
   format?: string;
@@ -151,9 +152,15 @@ export class DocxExporter {
           Object.entries(schema.properties).forEach(([key, fieldSchema]) => {
             const value = responseData[key];
             const label = fieldSchema.title || DocxExporter.formatFieldName(key);
+            
             if (value !== undefined && value !== null && value !== '') {
+              // If we have actual response data, show it
               const formattedValue = DocxExporter.formatFieldValue(value, fieldSchema);
               mainSection.paragraphs.push(`${label}: ${formattedValue}`);
+            } else {
+              // If no response data, show the field as a blank form field
+              const fieldDescription = fieldSchema.description ? ` (${fieldSchema.description})` : '';
+              mainSection.paragraphs.push(`${label}${fieldDescription}: ___________________________`);
             }
           });
         }
