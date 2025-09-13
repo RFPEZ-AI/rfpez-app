@@ -21,6 +21,7 @@ const ArtifactReferenceTag: React.FC<ArtifactReferenceTagProps> = ({
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'document':
+      case 'text':
       case 'pdf':
         return documentTextOutline;
       case 'image':
@@ -37,6 +38,7 @@ const ArtifactReferenceTag: React.FC<ArtifactReferenceTagProps> = ({
       case 'form':
         return 'var(--ion-color-success)';
       case 'document':
+      case 'text':
       case 'pdf':
         return 'var(--ion-color-primary)';
       case 'image':

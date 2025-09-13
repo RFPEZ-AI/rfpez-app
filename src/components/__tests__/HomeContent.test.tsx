@@ -176,7 +176,6 @@ describe('HomeContent', () => {
     expect(mainDiv).toBeInTheDocument();
     
     // Check individual style properties to better debug issues
-    const styles = window.getComputedStyle(mainDiv);
     expect(mainDiv.style.flex).toBe('1');
     expect(mainDiv.style.display).toBe('flex');
     expect(mainDiv.style.overflow).toBe('hidden');

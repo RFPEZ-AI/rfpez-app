@@ -53,11 +53,19 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
     }
   };
 
-  // Check if artifact is a form
+  // Check if artifact is a buyer questionnaire form (not a document/proposal)
   const isBuyerQuestionnaire = (artifact: Artifact): boolean => {
     try {
+      // Only check if it's explicitly marked as a form type or is named 'Buyer Questionnaire'
       if (artifact.content && (artifact.name === 'Buyer Questionnaire' || artifact.type === 'form')) {
         const parsed = JSON.parse(artifact.content);
+        
+        // If the parsed content has 'content' and 'content_type' properties, it's a document artifact
+        if (parsed.content !== undefined && parsed.content_type !== undefined) {
+          return false; // This is a document artifact, not a questionnaire
+        }
+        
+        // Must have a schema property (form schema) for it to be a questionnaire
         return parsed.schema && typeof parsed.schema === 'object';
       }
     } catch (e) {
@@ -247,7 +255,8 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
   const isTextArtifact = (artifact: Artifact): boolean => {
     if (!artifact.content) return false;
     
-    if (artifact.type === 'document' && typeof artifact.content === 'string') {
+    // Support both 'document' and 'text' types for text artifacts
+    if ((artifact.type === 'document' || artifact.type === 'text') && typeof artifact.content === 'string') {
       const content = artifact.content.trim();
       
       // First check if it looks like JSON before attempting to parse

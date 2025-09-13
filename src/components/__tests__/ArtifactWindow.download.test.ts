@@ -2,6 +2,8 @@
 
 import { DocxExporter } from '../../utils/docxExporter';
 import type { FormSpec } from '../../types/rfp';
+import { saveAs } from 'file-saver';
+import { Packer } from 'docx';
 
 // Mock file-saver
 jest.mock('file-saver', () => ({
@@ -94,14 +96,12 @@ describe('ArtifactWindow Download Integration', () => {
   });
 
   it('should download buyer questionnaire form as DOCX', async () => {
-    const { saveAs } = require('file-saver');
-    const { Packer } = require('docx');
     
     // Set up the mock before calling the function
     const mockBlob = new Blob(['mock docx content'], { 
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
     });
-    Packer.toBlob.mockResolvedValue(mockBlob);
+    (Packer.toBlob as jest.Mock).mockResolvedValue(mockBlob);
     
     // Parse the artifact content
     const formData = JSON.parse(mockBuyerQuestionnaireArtifact.content);
@@ -175,14 +175,12 @@ describe('ArtifactWindow Download Integration', () => {
       })
     };
 
-    const { saveAs } = require('file-saver');
-    const { Packer } = require('docx');
     
     // Set up the mock before calling the function
     const mockBlob = new Blob(['mock complex docx content'], { 
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
     });
-    Packer.toBlob.mockResolvedValue(mockBlob);
+    (Packer.toBlob as jest.Mock).mockResolvedValue(mockBlob);
     
     const formData = JSON.parse(complexFormArtifact.content);
     const formSpec: FormSpec = {
@@ -222,14 +220,12 @@ describe('ArtifactWindow Download Integration', () => {
       })
     };
 
-    const { saveAs } = require('file-saver');
-    const { Packer } = require('docx');
     
     // Set up the mock before calling the function
     const mockBlob = new Blob(['mock empty docx content'], { 
       type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
     });
-    Packer.toBlob.mockResolvedValue(mockBlob);
+    (Packer.toBlob as jest.Mock).mockResolvedValue(mockBlob);
     
     const formData = JSON.parse(emptyFormArtifact.content);
     const formSpec: FormSpec = {

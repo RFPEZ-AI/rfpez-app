@@ -3,6 +3,7 @@
 import { DocxExporter } from './docxExporter';
 import type { FormSpec } from '../types/rfp';
 import { saveAs } from 'file-saver';
+import { Document, Packer, Paragraph } from 'docx';
 
 // Mock file-saver
 jest.mock('file-saver', () => ({
@@ -125,7 +126,6 @@ describe('DocxExporter', () => {
       );
 
       // Check that Document was called with sections
-      const { Document } = require('docx');
       expect(Document).toHaveBeenCalledWith(
         expect.objectContaining({
           sections: expect.arrayContaining([
@@ -147,7 +147,6 @@ describe('DocxExporter', () => {
       expect(doc).toBeDefined();
       
       // Check that enough paragraphs were created (at least header + content paragraphs)
-      const { Paragraph } = require('docx');
       expect(Paragraph).toHaveBeenCalledTimes(8); // Based on the debug output we saw
     });
 
@@ -230,10 +229,9 @@ describe('DocxExporter', () => {
 
   describe('downloadBidDocx', () => {
     it('generates and downloads document', async () => {
-      const { Packer } = require('docx');
       
       // Explicitly set up the mock before calling the function
-      Packer.toBlob.mockResolvedValue(new Blob(['mock docx content'], { 
+      (Packer.toBlob as jest.Mock).mockResolvedValue(new Blob(['mock docx content'], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       }));
       
@@ -251,10 +249,9 @@ describe('DocxExporter', () => {
     });
 
     it('uses sanitized filename', async () => {
-      const { Packer } = require('docx');
       
       // Explicitly set up the mock before calling the function
-      Packer.toBlob.mockResolvedValue(new Blob(['mock docx content'], { 
+      (Packer.toBlob as jest.Mock).mockResolvedValue(new Blob(['mock docx content'], { 
         type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' 
       }));
       
@@ -279,8 +276,7 @@ describe('DocxExporter', () => {
     });
 
     it('handles packer error gracefully', async () => {
-      const { Packer } = require('docx');
-      Packer.toBlob.mockRejectedValueOnce(new Error('Packer error'));
+      (Packer.toBlob as jest.Mock).mockRejectedValueOnce(new Error('Packer error'));
       
       await expect(
         DocxExporter.downloadBidDocx(mockFormSpec, mockBidData, mockSupplierInfo)
@@ -293,7 +289,6 @@ describe('DocxExporter', () => {
       const doc = DocxExporter.buildBidDocx(mockFormSpec, mockBidData, mockSupplierInfo);
       expect(doc).toBeDefined();
       
-      const { Document } = require('docx');
       expect(Document).toHaveBeenCalled();
     });
 
@@ -352,14 +347,64 @@ describe('DocxExporter', () => {
 
       expect(doc).toBeDefined();
       
-      const { Document } = require('docx');
       expect(Document).toHaveBeenCalled();
       
       // Verify that sections were created for the nested objects
-      const documentCall = Document.mock.calls[Document.mock.calls.length - 1];
+      const documentCall = (Document as jest.Mock).mock.calls[(Document as jest.Mock).mock.calls.length - 1];
       const sections = documentCall[0].sections;
       expect(sections).toBeDefined();
       expect(sections.length).toBeGreaterThan(0);
+    });
+
+    it('converts markdown documents to DOCX correctly', () => {
+      const markdownContent = `# RFP Proposal Document
+
+## Executive Summary
+This is our proposal for the LED lighting upgrade project.
+
+### Key Benefits
+- Energy efficiency improvements
+- **Cost savings** of up to *30%*
+- Enhanced lighting quality
+
+## Technical Specifications
+1. LED fixtures with 50,000 hour lifespan
+2. Smart controls integration
+3. Emergency lighting compliance
+
+Thank you for considering our proposal.`;
+
+      const doc = DocxExporter.buildMarkdownDocx(markdownContent, {
+        title: 'RFP Proposal Document',
+        rfpName: 'LED Lighting Upgrade',
+        submissionDate: new Date('2024-01-01')
+      });
+
+      expect(doc).toBeDefined();
+      
+      expect(Document).toHaveBeenCalled();
+      
+      // Verify that the document was created with sections
+      const documentCall = (Document as jest.Mock).mock.calls[(Document as jest.Mock).mock.calls.length - 1];
+      const sections = documentCall[0].sections;
+      expect(sections).toBeDefined();
+      expect(sections.length).toBeGreaterThan(0);
+    });
+
+    it('downloads markdown documents as DOCX', async () => {
+      const markdownContent = '# Test Document\n\nThis is a test.';
+      const mockBlob = new Blob(['mock content'], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+      
+      (Packer.toBlob as jest.Mock).mockResolvedValue(mockBlob);
+      
+      await DocxExporter.downloadMarkdownDocx(markdownContent, {
+        title: 'Test Document',
+        filename: 'test-document.docx'
+      });
+
+      expect(Packer.toBlob).toHaveBeenCalled();
+      
+      expect(saveAs).toHaveBeenCalledWith(mockBlob, 'test-document.docx');
     });
   });
 });

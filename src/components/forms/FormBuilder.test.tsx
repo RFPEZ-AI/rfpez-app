@@ -65,7 +65,7 @@ jest.mock('@ionic/react', () => ({
   ),
   IonSpinner: () => <div data-testid="ion-spinner">Loading...</div>,
   IonText: ({ children }: any) => <div data-testid="ion-text">{children}</div>,
-  IonIcon: ({ icon }: any) => <div data-testid="ion-icon" />,
+  IonIcon: () => <div data-testid="ion-icon" />,
   IonAlert: ({ isOpen, onDidDismiss }: any) => 
     isOpen ? <div data-testid="ion-alert" onClick={onDidDismiss}>Alert</div> : null,
 }));

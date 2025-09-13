@@ -108,7 +108,7 @@ jest.mock('../supabaseClient', () => {
 });
 
 // Get the mocked supabase client for test expectations
-const getMockSupabase = () => require('../supabaseClient').supabase;
+const getMockSupabase = () => jest.requireMock('../supabaseClient').supabase;
 
 const mockRfp = {
   id: '123',
