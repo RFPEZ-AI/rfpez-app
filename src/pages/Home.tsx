@@ -384,8 +384,31 @@ const Home: React.FC = () => {
             alert('This form artifact appears to be empty or contains invalid data.');
             return;
           }
-          // If it's a document that's not JSON, fall through to basic download
-          console.log('Document artifact is not JSON, treating as regular document for download');
+          // If it's a document that's not JSON, check if it's markdown/text content
+          if (artifact.type === 'document' && typeof artifact.content === 'string') {
+            console.log('Document artifact contains text/markdown content, converting to DOCX...');
+            
+            // Handle markdown/text documents
+            const exportOptions = {
+              title: artifact.name || 'Document',
+              filename: `${artifact.name || 'document'}.docx`,
+              rfpName: currentRfp?.name || '',
+              submissionDate: new Date(),
+              includeHeaders: true
+            };
+            
+            try {
+              await DocxExporter.downloadMarkdownDocx(artifact.content, exportOptions);
+              console.log('✅ Markdown document downloaded as DOCX');
+              return;
+            } catch (docxError) {
+              console.error('❌ Error converting markdown to DOCX:', docxError);
+              alert('Error converting document to Word format. The document will be downloaded as a text file instead.');
+              // Fall through to basic download
+            }
+          } else {
+            console.log('Document artifact is not text content, treating as regular document for download');
+          }
         }
       }
       

@@ -51,7 +51,7 @@ export const useMessageHandling = () => {
         refs.push({
           artifactId: `claude-artifact-${Date.now()}-${index}`,
           artifactName: artifact.name as string || `Generated Artifact ${index + 1}`,
-          artifactType: artifact.type as 'document' | 'image' | 'pdf' | 'form' | 'other' || 'document',
+          artifactType: artifact.type as 'document' | 'text' | 'image' | 'pdf' | 'form' | 'other' || 'document',
           isCreated: true
         });
       });

@@ -594,7 +594,7 @@ export const useArtifactManagement = (
       const newArtifacts: Artifact[] = (metadata.artifacts as ArtifactData[]).map((artifact, index) => {
         const artifactId = `claude-artifact-${Date.now()}-${index}`;
         const artifactName = artifact.name || `Generated Artifact ${index + 1}`;
-        const artifactType = artifact.type as 'document' | 'image' | 'pdf' | 'other' || 'document';
+        const artifactType = artifact.type as 'document' | 'text' | 'image' | 'pdf' | 'other' || 'document';
         
         // Check if this artifact already exists or has been processed
         if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {

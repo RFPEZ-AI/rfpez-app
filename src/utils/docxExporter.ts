@@ -130,6 +130,172 @@ export class DocxExporter {
         saveAs(blob, filename);
       }
 
+      static buildMarkdownDocx(
+        markdownContent: string,
+        options: DocxExportOptions = {}
+      ): Document {
+        const {
+          title = 'Document',
+          companyName = '',
+          rfpName = '',
+          submissionDate = new Date(),
+          includeHeaders = true
+        } = options;
+
+        const children: (Paragraph | Table)[] = [];
+
+        if (includeHeaders) {
+          children.push(
+            new Paragraph({
+              text: title,
+              heading: HeadingLevel.HEADING_1,
+              alignment: AlignmentType.CENTER,
+              spacing: { after: 400 }
+            })
+          );
+
+          if (rfpName) {
+            children.push(
+              new Paragraph({
+                text: `RFP: ${rfpName}`,
+                heading: HeadingLevel.HEADING_2,
+                spacing: { after: 200 }
+              })
+            );
+          }
+
+          if (companyName) {
+            children.push(
+              new Paragraph({
+                text: `Company: ${companyName}`,
+                spacing: { after: 200 }
+              })
+            );
+          }
+
+          children.push(
+            new Paragraph({
+              text: `Date: ${submissionDate.toLocaleDateString()}`,
+              spacing: { after: 400 }
+            })
+          );
+        }
+
+        // Convert markdown to paragraphs
+        const markdownParagraphs = DocxExporter.parseMarkdownToParagraphs(markdownContent);
+        children.push(...markdownParagraphs);
+
+        return new Document({
+          sections: [
+            {
+              properties: {},
+              children
+            }
+          ]
+        });
+      }
+
+      static async downloadMarkdownDocx(
+        markdownContent: string,
+        options: DocxExportOptions = {}
+      ): Promise<void> {
+        const { filename = DocxExporter.sanitizeFilename(options.title || 'document') + '.docx' } = options;
+        const doc = DocxExporter.buildMarkdownDocx(markdownContent, options);
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, filename);
+      }
+
+      private static parseMarkdownToParagraphs(markdownContent: string): Paragraph[] {
+        const paragraphs: Paragraph[] = [];
+        const lines = markdownContent.split('\n');
+        
+        for (let i = 0; i < lines.length; i++) {
+          const line = lines[i].trim();
+          
+          if (line === '') {
+            // Empty line - add spacing
+            paragraphs.push(new Paragraph({
+              text: '',
+              spacing: { after: 200 }
+            }));
+            continue;
+          }
+          
+          // Handle headings
+          if (line.startsWith('# ')) {
+            paragraphs.push(new Paragraph({
+              text: line.substring(2),
+              heading: HeadingLevel.HEADING_1,
+              spacing: { before: 300, after: 200 }
+            }));
+          } else if (line.startsWith('## ')) {
+            paragraphs.push(new Paragraph({
+              text: line.substring(3),
+              heading: HeadingLevel.HEADING_2,
+              spacing: { before: 250, after: 150 }
+            }));
+          } else if (line.startsWith('### ')) {
+            paragraphs.push(new Paragraph({
+              text: line.substring(4),
+              heading: HeadingLevel.HEADING_3,
+              spacing: { before: 200, after: 100 }
+            }));
+          } else if (line.startsWith('- ') || line.startsWith('* ')) {
+            // Simple bullet points
+            paragraphs.push(new Paragraph({
+              children: [new TextRun(`• ${line.substring(2)}`)],
+              spacing: { after: 100 },
+              indent: { left: 360 } // Indent bullet points
+            }));
+          } else if (/^\d+\.\s/.test(line)) {
+            // Numbered lists
+            paragraphs.push(new Paragraph({
+              children: [new TextRun(line)],
+              spacing: { after: 100 },
+              indent: { left: 360 }
+            }));
+          } else {
+            // Regular paragraph - handle basic formatting
+            const textRuns = DocxExporter.parseInlineMarkdown(line);
+            paragraphs.push(new Paragraph({
+              children: textRuns,
+              spacing: { after: 150 }
+            }));
+          }
+        }
+        
+        return paragraphs;
+      }
+
+      private static parseInlineMarkdown(text: string): TextRun[] {
+        const runs: TextRun[] = [];
+        const currentText = text;
+        
+        // Simple inline formatting - handle **bold** and *italic*
+        const parts = currentText.split(/(\*\*.*?\*\*|\*.*?\*)/);
+        
+        for (const part of parts) {
+          if (part.startsWith('**') && part.endsWith('**')) {
+            // Bold text
+            runs.push(new TextRun({
+              text: part.substring(2, part.length - 2),
+              bold: true
+            }));
+          } else if (part.startsWith('*') && part.endsWith('*')) {
+            // Italic text
+            runs.push(new TextRun({
+              text: part.substring(1, part.length - 1),
+              italics: true
+            }));
+          } else if (part) {
+            // Regular text
+            runs.push(new TextRun(part));
+          }
+        }
+        
+        return runs.length > 0 ? runs : [new TextRun(text)];
+      }
+
       private static sanitizeFilename(filename: string): string {
         return filename
           .replace(/[\\/:*?"<>|]/g, '_')
@@ -155,7 +321,7 @@ export class DocxExporter {
           });
           
           // Then, create a main section for any remaining non-object properties
-          const nonObjectProperties = Object.entries(schema.properties).filter(([key, fieldSchema]) => 
+          const nonObjectProperties = Object.entries(schema.properties).filter(([, fieldSchema]) => 
             fieldSchema.type !== 'object'
           );
           

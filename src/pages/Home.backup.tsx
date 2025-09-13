@@ -45,7 +45,7 @@ interface Session {
 interface Artifact {
   id: string;
   name: string;
-  type: 'document' | 'image' | 'pdf' | 'form' | 'other';
+  type: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'other';
   size: string;
   url?: string;
   content?: string;
