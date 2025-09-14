@@ -53,7 +53,7 @@ export const useArtifactManagement = (
       const existingClaudeArtifacts = artifacts.filter(artifact => 
         !artifact.id.startsWith('buyer-form-') && 
         !artifact.id.startsWith('bid-form-') &&
-        !artifact.id.startsWith('proposal-')
+        !artifact.id.startsWith('request-')
       );
       console.log('Preserving existing Claude artifacts:', existingClaudeArtifacts);
       
@@ -129,19 +129,19 @@ export const useArtifactManagement = (
         }
       }
       
-      // Load proposal content if exists
-      if (currentRfp.proposal) {
-        console.log('🟢 Loading proposal content from RFP database');
-        const proposalArtifact: Artifact = {
-          id: `proposal-${currentRfp.id}`,
-          name: 'RFP Proposal',
+      // Load request content if exists
+      if (currentRfp.request) {
+        console.log('🟢 Loading request content from RFP database');
+        const requestArtifact: Artifact = {
+          id: `request-${currentRfp.id}`,
+          name: 'RFP Request',
           type: 'document',
           size: 'Generated Content',
-          content: currentRfp.proposal
+          content: currentRfp.request
         };
         
-        newArtifacts.push(proposalArtifact);
-        console.log('✅ Added proposal artifact:', proposalArtifact);
+        newArtifacts.push(requestArtifact);
+        console.log('✅ Added request artifact:', requestArtifact);
       }
     
       setArtifacts(newArtifacts);
@@ -432,35 +432,35 @@ export const useArtifactManagement = (
           }
         }
         
-        // Handle generate_proposal_artifact results
-        if (functionResult.function === 'generate_proposal_artifact' && functionResult.result) {
+        // Handle generate_request_artifact results
+        if (functionResult.function === 'generate_request_artifact' && functionResult.result) {
           const result = functionResult.result;
           
           if (result.success && result.content) {
-            console.log('Proposal artifact detected from function result:', result);
+            console.log('Request artifact detected from function result:', result);
             
-            const artifactId = result.artifact_id || `proposal-${Date.now()}-${index}`;
+            const artifactId = result.artifact_id || `request-${Date.now()}-${index}`;
             
             // Check if this artifact already exists or has been processed
             if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
-              console.log('⚠️ Skipping duplicate proposal artifact:', artifactId);
+              console.log('⚠️ Skipping duplicate request artifact:', artifactId);
               return;
             }
             
             processedArtifactIds.add(artifactId);
-            console.log('📝 Processing new proposal artifact:', artifactId);
+            console.log('📝 Processing new request artifact:', artifactId);
             
-            const proposalArtifact: Artifact = {
+            const requestArtifact: Artifact = {
               id: artifactId,
-              name: result.title || 'Generated Proposal',
-              type: 'document', // Use 'document' type for proposal artifacts
+              name: result.title || 'Generated Request',
+              type: 'document', // Use 'document' type for request artifacts
               size: `${(result.content as string)?.length || 0} characters`,
               content: JSON.stringify({
                 title: result.title,
                 description: result.description,
                 content: result.content,
                 content_type: result.content_type || 'markdown',
-                tags: result.tags || ['proposal'],
+                tags: result.tags || ['request'],
                 rfp_id: result.rfp_id
               }),
               sessionId: currentSessionId,
@@ -468,14 +468,14 @@ export const useArtifactManagement = (
               isReferencedInSession: true
             };
             
-            setArtifacts(prev => [...prev, proposalArtifact]);
-            setSelectedArtifactId(proposalArtifact.id); // Auto-select new artifact
-            console.log('✅ Added proposal artifact from function result:', proposalArtifact);
+            setArtifacts(prev => [...prev, requestArtifact]);
+            setSelectedArtifactId(requestArtifact.id); // Auto-select new artifact
+            console.log('✅ Added request artifact from function result:', requestArtifact);
             
             // Create artifact reference for the message
             const artifactRef: ArtifactReference = {
               artifactId: artifactId,
-              artifactName: result.title || 'Generated Proposal',
+              artifactName: result.title || 'Generated Request',
               artifactType: 'document'
             };
             newArtifactRefs.push(artifactRef);

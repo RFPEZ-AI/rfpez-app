@@ -287,22 +287,22 @@ export class RFPService {
     };
   }
 
-  // Proposal Methods
-  static async updateRfpProposal(rfpId: number, proposal: string): Promise<RFP | null> {
-    console.log('🔄 Updating RFP proposal for ID:', rfpId);
+  // Request Methods
+  static async updateRfpRequest(rfpId: number, request: string): Promise<RFP | null> {
+    console.log('🔄 Updating RFP request for ID:', rfpId);
     const { data, error } = await supabase
       .from('rfps')
-      .update({ proposal })
+      .update({ request })
       .eq('id', rfpId)
       .select()
       .single();
     
     if (error) {
-      console.error('❌ Error updating RFP proposal:', error);
+      console.error('❌ Error updating RFP request:', error);
       return null;
     }
     
-    console.log('✅ RFP proposal updated successfully');
+    console.log('✅ RFP request updated successfully');
     return data;
   }
 
@@ -348,54 +348,56 @@ export class RFPService {
     return data;
   }
 
-  // Generate a proposal based on bid data and RFP information
-  static async generateProposal(
+  // Generate a request for proposal based on bid data and RFP information
+  static async generateRequest(
     rfp: RFP, 
     bidData: Record<string, unknown>, 
-    supplierInfo: { name: string; email: string; company?: string }
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _supplierInfo: { name: string; email: string; company?: string }
   ): Promise<string> {
     // This is a mock implementation - in reality this would call Claude API
-    // to generate a comprehensive proposal based on the RFP spec and bid data
+    // to generate a comprehensive request for proposal based on the RFP spec and bid data
     
-    const proposalText = `
-# Proposal for ${rfp.name}
+    const requestText = `
+# Request for Proposal: ${rfp.name}
 
 ## Executive Summary
-This proposal is submitted by ${supplierInfo.name} from ${supplierInfo.company || 'the submitting organization'} in response to the Request for Proposal: "${rfp.name}".
+This is a request for proposal (RFP) for "${rfp.name}". We are seeking qualified suppliers to submit bids for this procurement opportunity.
 
-## Company Information
-- **Contact:** ${supplierInfo.name}
-- **Email:** ${supplierInfo.email}
-${supplierInfo.company ? `- **Company:** ${supplierInfo.company}` : ''}
-
-## Proposal Details
-Based on the requirements outlined in the RFP, we propose the following solution:
-
-### Requirements Analysis
+## Project Overview
 ${rfp.description}
 
-### Technical Approach
-Our approach addresses the key specifications:
+## Detailed Requirements
 ${rfp.specification}
 
-### Bid Response Summary
-${this.formatBidDataForProposal(bidData)}
+## Submission Instructions
+Please submit your bid through our online bid form or attached Word document. Your response should address all requirements outlined in this RFP.
+
+### Required Information
+${this.formatBidDataForRequest(bidData)}
 
 ### Timeline and Deliverables
-We commit to delivering the proposed solution by the specified due date: ${new Date(rfp.due_date).toLocaleDateString()}.
+Proposals must be submitted by: ${new Date(rfp.due_date).toLocaleDateString()}
 
-## Conclusion
-We believe our proposal offers the best value and meets all the requirements outlined in the RFP. We look forward to the opportunity to discuss this proposal further.
+## Evaluation Criteria
+Proposals will be evaluated based on:
+- Technical capability and approach
+- Cost effectiveness
+- Timeline and delivery schedule
+- Company qualifications and experience
+
+## Contact Information
+For questions about this RFP, please contact us through the RFPEZ.AI platform.
 
 ---
 *Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*
 `;
 
-    return proposalText.trim();
+    return requestText.trim();
   }
 
-  // Helper method to format bid data for inclusion in proposal
-  private static formatBidDataForProposal(bidData: Record<string, unknown>): string {
+  // Helper method to format bid data for inclusion in request
+  private static formatBidDataForRequest(bidData: Record<string, unknown>): string {
     const entries = Object.entries(bidData);
     if (entries.length === 0) {
       return 'No specific bid details provided.';
