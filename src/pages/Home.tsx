@@ -109,7 +109,7 @@ const Home: React.FC = () => {
     clearArtifacts
   } = useArtifactManagement(currentRfp, currentSessionId, isAuthenticated, user, messages, setMessages);
 
-  const { handleSendMessage } = useMessageHandling();
+  const { handleSendMessage, cancelRequest } = useMessageHandling();
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -498,6 +498,8 @@ const Home: React.FC = () => {
             currentRfpId={currentRfpId}
             onDownloadArtifact={handleDownloadArtifact}
             onArtifactSelect={handleArtifactSelect}
+            currentAgent={currentAgent}
+            onCancelRequest={cancelRequest}
           />
         </div>
 

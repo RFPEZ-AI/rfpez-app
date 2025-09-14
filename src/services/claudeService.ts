@@ -76,12 +76,18 @@ export class ClaudeService {
       name: string;
       description: string;
       specification: string;
-    } | null
+    } | null,
+    abortSignal?: AbortSignal
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
     const functionsExecuted: string[] = [];
     
     try {
+      // Check if request was already cancelled
+      if (abortSignal?.aborted) {
+        throw new Error('Request was cancelled');
+      }
+
       const client = this.getClient();
       
       // Build the conversation context
@@ -180,15 +186,21 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       });
 
       let response = await APIRetryHandler.executeWithRetry(
-        () => client.messages.create({
-          model: 'claude-3-5-sonnet-latest', // Use latest version automatically
-          max_tokens: 2000,
-          temperature: 0.7,
-          system: systemPrompt,
-          messages: messages,
-          tools: claudeApiFunctions, // Include MCP functions
-          tool_choice: { type: 'auto' } // Let Claude decide when to use functions
-        }),
+        async () => {
+          // Check for cancellation before each API call
+          if (abortSignal?.aborted) {
+            throw new Error('Request was cancelled');
+          }
+          return client.messages.create({
+            model: 'claude-3-5-sonnet-latest', // Use latest version automatically
+            max_tokens: 2000,
+            temperature: 0.7,
+            system: systemPrompt,
+            messages: messages,
+            tools: claudeApiFunctions, // Include MCP functions
+            tool_choice: { type: 'auto' } // Let Claude decide when to use functions
+          });
+        },
         {
           maxRetries: 3,
           baseDelay: 2000, // Start with 2 seconds
@@ -230,6 +242,11 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         
         for (const toolUse of toolUses) {
           try {
+            // Check for cancellation before each function execution
+            if (abortSignal?.aborted) {
+              throw new Error('Request was cancelled');
+            }
+            
             console.log(`Executing function: ${toolUse.name}`, toolUse.input);
             functionsExecuted.push(toolUse.name);
             
@@ -274,16 +291,22 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
 
         // Get Claude's response to the function results
         response = await APIRetryHandler.executeWithRetry(
-          () => client.messages.create({
-            model: 'claude-3-5-sonnet-latest',
-            max_tokens: 2000,
-            temperature: 0.7,
-            system: systemPrompt,
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            messages: messages as any,
-            tools: claudeApiFunctions,
-            tool_choice: { type: 'auto' }
-          }),
+          async () => {
+            // Check for cancellation before follow-up API call
+            if (abortSignal?.aborted) {
+              throw new Error('Request was cancelled');
+            }
+            return client.messages.create({
+              model: 'claude-3-5-sonnet-latest',
+              max_tokens: 2000,
+              temperature: 0.7,
+              system: systemPrompt,
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              messages: messages as any,
+              tools: claudeApiFunctions,
+              tool_choice: { type: 'auto' }
+            });
+          },
           {
             maxRetries: 3,
             baseDelay: 2000,

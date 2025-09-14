@@ -2,7 +2,7 @@
 
 // Agent Management Test Component - Demonstrates Phase 1 LLM-driven agent switching
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import {
   IonButton,
   IonCard,
@@ -43,6 +43,7 @@ const AgentManagementTest: React.FC = () => {
   const [sessionId] = useState(`test-session-${Date.now()}`);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   // Initialize with default agent
   React.useEffect(() => {
@@ -77,6 +78,9 @@ const AgentManagementTest: React.FC = () => {
   const handleSendMessage = async () => {
     if (!inputMessage.trim() || !currentAgent) return;
 
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
+
     const userMessage: TestMessage = {
       id: Date.now().toString(),
       content: inputMessage,
@@ -108,7 +112,9 @@ const AgentManagementTest: React.FC = () => {
           email: 'test@example.com',
           full_name: 'Test User',
           role: 'user'
-        }
+        },
+        null, // rfp context
+        abortControllerRef.current.signal
       );
 
       const aiMessage: TestMessage = {
@@ -149,6 +155,13 @@ const AgentManagementTest: React.FC = () => {
 
     } catch (error) {
       console.error('Error generating response:', error);
+      
+      // Check if this was a cancellation
+      if (error instanceof Error && error.message === 'Request was cancelled') {
+        console.log('Request was cancelled by user');
+        return; // Don't show error message for cancelled requests
+      }
+      
       const errorMessage: TestMessage = {
         id: (Date.now() + 1).toString(),
         content: `Error: ${error instanceof Error ? error.message : 'Failed to generate response'}`,
@@ -159,6 +172,15 @@ const AgentManagementTest: React.FC = () => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
+    }
+  };
+
+  const cancelRequest = () => {
+    if (abortControllerRef.current) {
+      console.log('Cancelling Claude request...');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
   };
 
@@ -247,7 +269,23 @@ const AgentManagementTest: React.FC = () => {
             {isLoading && (
               <div style={{ textAlign: 'center', padding: '16px' }}>
                 <IonSpinner />
-                <div style={{ marginTop: '8px' }}>AI is thinking...</div>
+                <div style={{ 
+                  marginTop: '8px', 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  gap: '8px' 
+                }}>
+                  <span>{currentAgent?.name || 'AI'} thinking...</span>
+                  <IonButton 
+                    size="small" 
+                    fill="outline" 
+                    color="danger"
+                    onClick={cancelRequest}
+                  >
+                    Cancel
+                  </IonButton>
+                </div>
               </div>
             )}
           </div>
