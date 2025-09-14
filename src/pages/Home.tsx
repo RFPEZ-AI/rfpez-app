@@ -396,7 +396,57 @@ const Home: React.FC = () => {
             await DocxExporter.downloadBidDocx(formSpec, responseData, exportOptions);
             console.log('✅ Form artifact downloaded as DOCX');
             return;
-          } else if (artifact.type === 'form') {
+          } 
+          // Check if it's a document artifact with structured content (from generate_text_artifact or generate_proposal_artifact)
+          else if (artifact.type === 'document' && formData.content && formData.content_type) {
+            console.log('Document artifact with structured content found, converting to DOCX...');
+            
+            // Extract the actual document content from the JSON structure
+            const documentContent = formData.content;
+            const contentType = formData.content_type || 'markdown';
+            
+            console.log('Document content type:', contentType);
+            console.log('Document content (first 200 chars):', documentContent.substring(0, 200));
+            
+            // Handle document conversion based on content type
+            const exportOptions = {
+              title: formData.title || artifact.name || 'Document',
+              filename: `${artifact.name || 'document'}.docx`,
+              rfpName: currentRfp?.name || '',
+              submissionDate: new Date(),
+              includeHeaders: true
+            };
+            
+            try {
+              if (contentType === 'markdown' || contentType === 'text') {
+                await DocxExporter.downloadMarkdownDocx(documentContent, exportOptions);
+                console.log('✅ Structured document downloaded as DOCX');
+                return;
+              } else {
+                // For other content types, try markdown conversion as fallback
+                console.log('⚠️ Unknown content type, attempting markdown conversion as fallback');
+                await DocxExporter.downloadMarkdownDocx(documentContent, exportOptions);
+                console.log('✅ Document downloaded as DOCX (fallback)');
+                return;
+              }
+            } catch (docxError) {
+              console.error('❌ Error converting structured document to DOCX:', docxError);
+              alert('Error converting document to Word format. The document will be downloaded as a text file instead.');
+              // Continue to fallback download with the extracted content
+              const blob = new Blob([documentContent], { type: 'text/plain' });
+              const url = URL.createObjectURL(blob);
+              const link = document.createElement('a');
+              link.href = url;
+              link.download = `${artifact.name || 'document'}.txt`;
+              document.body.appendChild(link);
+              link.click();
+              document.body.removeChild(link);
+              URL.revokeObjectURL(url);
+              console.log('✅ Document content downloaded as text file (fallback)');
+              return;
+            }
+          }
+          else if (artifact.type === 'form') {
             // Only show this error for actual form artifacts without schema
             console.warn('⚠️ Form artifact does not have valid schema structure');
             console.log('Form data keys:', Object.keys(formData));

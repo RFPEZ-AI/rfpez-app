@@ -23,15 +23,27 @@ export const useMessageHandling = () => {
           const funcObj = func as Record<string, unknown>;
           const result = funcObj.result as Record<string, unknown>;
           
-          // Handle form creation results
-          if (result && (result.artifact_id || result.template_schema)) {
-            refs.push({
-              artifactId: result.artifact_id as string || `template-${Date.now()}`,
-              artifactName: result.template_name as string || result.title as string || 'Generated Template',
-              artifactType: 'form',
-              isCreated: true,
-              displayText: result.template_name as string || result.title as string
-            });
+          // Handle different types of function results
+          if (result && result.success) {
+            if (funcObj.function === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
+              // Form artifacts
+              refs.push({
+                artifactId: result.artifact_id as string || `template-${Date.now()}`,
+                artifactName: result.template_name as string || result.title as string || 'Generated Template',
+                artifactType: 'form',
+                isCreated: true,
+                displayText: result.template_name as string || result.title as string
+              });
+            } else if ((funcObj.function === 'create_text_artifact' || funcObj.function === 'generate_proposal_artifact') && result.artifact_id) {
+              // Document artifacts
+              refs.push({
+                artifactId: result.artifact_id as string,
+                artifactName: result.title as string || 'Generated Document',
+                artifactType: 'document',
+                isCreated: true,
+                displayText: result.title as string
+              });
+            }
           }
         }
       });
