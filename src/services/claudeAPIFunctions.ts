@@ -9,7 +9,7 @@ import { AgentService } from './agentService';
 import { mcpClient } from './mcpClient';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages.mjs';
 
-// TypeScript interfaces for proposal generation
+// TypeScript interfaces for request generation
 interface SupplierInfo {
   name?: string;
   email?: string;
@@ -507,23 +507,23 @@ export const claudeApiFunctions: Tool[] = [
     }
   },
   {
-    "name": "generate_proposal_artifact",
-    "description": "Generate a proposal text artifact from RFP data and questionnaire responses",
+    "name": "generate_request_artifact",
+    "description": "Generate a request for proposal (RFP) text artifact from RFP data and questionnaire responses",
     "input_schema": {
       "type": "object",
       "properties": {
         "rfp_id": {
           "type": "string",
-          "description": "ID of the RFP to generate proposal for"
+          "description": "ID of the RFP to generate request for"
         },
-        "proposal_title": {
+        "request_title": {
           "type": "string",
-          "description": "Title for the proposal (default: 'Proposal for [RFP Name]')"
+          "description": "Title for the request (default: 'Request for Proposal: [RFP Name]')"
         },
         "sections": {
           "type": "array",
           "items": { "type": "string" },
-          "description": "Specific sections to include in the proposal",
+          "description": "Specific sections to include in the request",
           "default": ["executive_summary", "technical_approach", "timeline", "pricing"]
         },
         "content_type": {
@@ -1051,8 +1051,8 @@ export class ClaudeAPIFunctionHandler {
         return await this.createFormArtifact(parameters, userId);
       case 'create_text_artifact':
         return await this.createTextArtifact(parameters, userId);
-      case 'generate_proposal_artifact':
-        return await this.generateProposalArtifact(parameters, userId);
+      case 'generate_request_artifact':
+        return await this.generateRequestArtifact(parameters, userId);
       case 'update_form_artifact':
         return await this.updateFormArtifact(parameters, userId);
       case 'get_form_submission':
@@ -1922,13 +1922,11 @@ export class ClaudeAPIFunctionHandler {
   }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private async generateProposalArtifact(params: any, userId: string) {
-    const { rfp_id, proposal_title, sections = ['executive_summary', 'technical_approach', 'timeline', 'pricing'], content_type = 'markdown' } = params;
-    
-    console.log('📋 Generating proposal artifact:', { rfp_id, proposal_title, userId });
-    
-    if (!rfp_id) {
-      throw new Error('RFP ID is required for generating a proposal artifact');
+  private async generateRequestArtifact(params: any, userId: string) {
+    const { rfp_id, request_title, sections = ['executive_summary', 'requirements', 'timeline', 'evaluation_criteria'], content_type = 'markdown' } = params;
+
+    console.log('📋 Generating request artifact:', { rfp_id, request_title, userId });    if (!rfp_id) {
+      throw new Error('RFP ID is required for generating a request artifact');
     }
     
     try {
@@ -1943,14 +1941,14 @@ export class ClaudeAPIFunctionHandler {
         throw new Error(`Failed to fetch RFP data: ${rfpError?.message || 'RFP not found'}`);
       }
       
-      // Generate proposal content
-      const title = proposal_title || `Proposal for ${rfp.name}`;
+      // Generate request content
+      const title = request_title || `Request for Proposal: ${rfp.name}`;
       const questionnaire_response = rfp.buyer_questionnaire_response as QuestionnaireResponse;
       
-      const proposalContent = this.generateProposalContent(rfp, questionnaire_response, sections, content_type);
+      const requestContent = this.generateRequestContent(rfp, questionnaire_response, sections, content_type);
       
-      // Create text artifact with the proposal content
-      const artifact_id = `proposal_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Create text artifact with the request content
+      const artifact_id = `request_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
       // Store artifact in the database
       const { error } = await supabase
@@ -1964,12 +1962,12 @@ export class ClaudeAPIFunctionHandler {
           schema: {
             type: 'text',
             content_type,
-            content: proposalContent,
+            content: requestContent,
             tags: ['proposal', 'rfp', rfp_id],
             rfp_id: rfp_id
           },
           ui_schema: null,
-          data: { content: proposalContent, content_type, rfp_id },
+          data: { content: requestContent, content_type, rfp_id },
           submit_action: null,
           status: 'active',
           created_at: new Date().toISOString()
@@ -1985,7 +1983,7 @@ export class ClaudeAPIFunctionHandler {
       // Also update the RFP with the proposal content
       await supabase
         .from('rfps')
-        .update({ proposal: proposalContent })
+        .update({ request: requestContent })
         .eq('id', rfp_id);
       
       console.log('✅ Proposal artifact created successfully:', { artifact_id, title });
@@ -1996,7 +1994,7 @@ export class ClaudeAPIFunctionHandler {
         title,
         description: `Proposal generated for RFP: ${rfp.name}`,
         type: 'text',
-        content: proposalContent,
+        content: requestContent,
         content_type,
         rfp_id,
         tags: ['proposal', 'rfp', rfp_id],
@@ -2010,72 +2008,78 @@ export class ClaudeAPIFunctionHandler {
   }
 
   // Helper method to generate proposal content
-  private generateProposalContent(rfp: RFPData, questionnaire_response: QuestionnaireResponse, sections: string[], content_type: string): string {
-    const supplier_info = questionnaire_response?.supplier_info || {};
+  private generateRequestContent(rfp: RFPData, questionnaire_response: QuestionnaireResponse, sections: string[], content_type: string): string {
     const form_data = questionnaire_response?.form_data || {};
     
     let content = '';
     
     if (content_type === 'markdown') {
-      content = `# Proposal for ${rfp.name}
+      content = `# Request for Proposal: ${rfp.name}
 
-## Executive Summary
-This proposal is submitted by ${supplier_info.name || 'the submitting organization'} ${supplier_info.company ? `from ${supplier_info.company}` : ''} in response to the Request for Proposal: "${rfp.name}".
+## Project Overview
+We are seeking qualified suppliers to submit bids for "${rfp.name}". This Request for Proposal (RFP) outlines our requirements and provides information necessary for preparing a comprehensive bid.
 
-## Company Information
-- **Contact:** ${supplier_info.name || 'Not provided'}
-- **Email:** ${supplier_info.email || 'Not provided'}
-${supplier_info.company ? `- **Company:** ${supplier_info.company}` : ''}
-
-## Proposal Details
-Based on the requirements outlined in the RFP, we propose the following solution:
-
-### Requirements Analysis
+## Requirements
 ${rfp.description || 'No description provided'}
 
-### Technical Approach
-Our approach addresses the key specifications:
+## Detailed Specifications
 ${rfp.specification || 'No specification provided'}
 
-### Questionnaire Response Summary
-${this.formatQuestionnaireDataForProposal(form_data)}
+## Submission Instructions
+Please submit your bid through our online bid form or the attached Word document. Your response should address all requirements outlined in this RFP.
 
-### Timeline and Deliverables
-We commit to delivering the proposed solution by the specified due date: ${new Date(rfp.due_date).toLocaleDateString()}.
+### Required Information
+${this.formatQuestionnaireDataForRequest(form_data)}
 
-${sections.includes('pricing') ? `
-### Pricing
-Competitive pricing details will be provided based on the specific requirements and scope of work outlined in this proposal.
+## Timeline
+- **RFP Issue Date:** ${new Date().toLocaleDateString()}
+- **Proposal Due Date:** ${new Date(rfp.due_date).toLocaleDateString()}
+- **Project Start Date:** To be negotiated
+
+${sections.includes('evaluation_criteria') ? `
+## Evaluation Criteria
+Proposals will be evaluated based on:
+- Technical capability and approach
+- Cost effectiveness and value proposition
+- Timeline and delivery schedule
+- Company qualifications and experience
+- Compliance with RFP requirements
 ` : ''}
 
-## Conclusion
-We believe our proposal offers the best value and meets all the requirements outlined in the RFP. We look forward to the opportunity to discuss this proposal further.
+## Contact Information
+For questions about this RFP, please contact us through the RFPEZ.AI platform.
+
+## Terms and Conditions
+By responding to this RFP, suppliers agree to the terms and conditions outlined in the bid form questionnaire.
 
 ---
 *Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*`;
     } else {
       // Plain text version
-      content = `Proposal for ${rfp.name}
+      content = `Request for Proposal: ${rfp.name}
 
-Executive Summary:
-This proposal is submitted by ${supplier_info.name || 'the submitting organization'} ${supplier_info.company ? `from ${supplier_info.company}` : ''} in response to the Request for Proposal: "${rfp.name}".
+Project Overview:
+We are seeking qualified suppliers to submit bids for "${rfp.name}". This Request for Proposal (RFP) outlines our requirements and provides information necessary for preparing a comprehensive bid.
 
-Company Information:
-- Contact: ${supplier_info.name || 'Not provided'}
-- Email: ${supplier_info.email || 'Not provided'}
-${supplier_info.company ? `- Company: ${supplier_info.company}` : ''}
-
-Requirements Analysis:
+Requirements:
 ${rfp.description || 'No description provided'}
 
-Technical Approach:
+Detailed Specifications:
 ${rfp.specification || 'No specification provided'}
 
-Questionnaire Response Summary:
-${this.formatQuestionnaireDataForProposal(form_data)}
+Submission Instructions:
+Please submit your bid through our online bid form or the attached Word document. Your response should address all requirements outlined in this RFP.
 
-Timeline and Deliverables:
-We commit to delivering the proposed solution by the specified due date: ${new Date(rfp.due_date).toLocaleDateString()}.
+Required Information:
+${this.formatQuestionnaireDataForRequest(form_data)}
+
+Timeline:
+- RFP Issue Date: ${new Date().toLocaleDateString()}
+- Proposal Due Date: ${new Date(rfp.due_date).toLocaleDateString()}
+- Project Start Date: To be negotiated
+
+Contact Information:
+For questions about this RFP, please contact us through the RFPEZ.AI platform.
 
 Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`;
     }
@@ -2083,8 +2087,8 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
     return content.trim();
   }
 
-  // Helper method to format questionnaire data for proposal
-  private formatQuestionnaireDataForProposal(form_data: Record<string, unknown>): string {
+  // Helper method to format questionnaire data for request
+  private formatQuestionnaireDataForRequest(form_data: Record<string, unknown>): string {
     const entries = Object.entries(form_data);
     if (entries.length === 0) {
       return 'No questionnaire response data available.';

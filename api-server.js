@@ -203,15 +203,15 @@ function generateAgentResponse(prompt, context) {
   }
   
   // Email Generation
-  else if (promptLower.includes('proposal email') || promptLower.includes('email to send') ||
+  else if (promptLower.includes('request email') || promptLower.includes('email to send') ||
            promptLower.includes('draft a professional email')) {
-    response.text = "I'll draft a professional proposal email for your LED lighting suppliers that includes all the necessary RFP details and supplier bid form.";
+    response.text = "I'll draft a professional request email for your LED lighting suppliers that includes all the necessary RFP details and supplier bid form.";
     
     response.databaseOperations.push(
-      { type: 'update', table: 'rfps', field: 'proposal', success: true }
+      { type: 'update', table: 'rfps', field: 'request', success: true }
     );
     response.databaseCalls.push(
-      { operation: 'update', table: 'rfps', field: 'proposal', success: true }
+      { operation: 'update', table: 'rfps', field: 'request', success: true }
     );
     
     response.actions.push('supabase_update');

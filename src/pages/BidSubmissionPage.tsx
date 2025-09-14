@@ -146,13 +146,13 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
       const createdBid = await RFPService.createBid(bidData);
       
       if (createdBid) {
-        // Generate and store proposal in RFP record
+        // Generate and store request in RFP record
         try {
-          console.log('🔄 Generating proposal for RFP...');
-          const proposal = await RFPService.generateProposal(rfp, formData, supplierInfo);
+          console.log('🔄 Generating request for RFP...');
+          const proposal = await RFPService.generateRequest(rfp, formData, supplierInfo);
           
-          // Store the proposal in the RFP record
-          await RFPService.updateRfpProposal(rfp.id, proposal);
+          // Store the request in the RFP record
+          await RFPService.updateRfpRequest(rfp.id, proposal);
           
           // Store the questionnaire response (the form data that was used to generate the proposal)
           await RFPService.updateRfpBuyerQuestionnaireResponse(rfp.id, {

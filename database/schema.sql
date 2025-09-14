@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS rfps (
   due_date DATE NOT NULL,
   description TEXT NOT NULL CHECK (trim(description) != ''), -- Public description
   specification TEXT NOT NULL CHECK (trim(specification) != ''), -- Detailed specs for Claude
-  proposal TEXT, -- Generated proposal text
+  request TEXT, -- Generated request for proposal (RFP) content to send to suppliers
   buyer_questionnaire JSONB, -- Questionnaire structure for buyer requirements gathering
   buyer_questionnaire_response JSONB, -- Collected buyer questionnaire responses
   bid_form_questionaire JSONB, -- JSON Schema + RJSF form specification for bid submission
@@ -339,12 +339,12 @@ SELECT
     r.due_date,
     r.created_at,
     r.updated_at,
-    r.proposal,
+    r.request,
     r.is_template,
     r.is_public,
     -- Derive status from RFP completeness
     CASE 
-        WHEN r.proposal IS NOT NULL AND r.buyer_questionnaire_response IS NOT NULL THEN 'completed'
+        WHEN r.request IS NOT NULL AND r.buyer_questionnaire_response IS NOT NULL THEN 'completed'
         WHEN r.buyer_questionnaire IS NOT NULL THEN 'collecting_responses'
         WHEN r.description IS NOT NULL AND r.specification IS NOT NULL THEN 'generating_forms'
         WHEN r.name IS NOT NULL THEN 'gathering_requirements'

@@ -53,11 +53,11 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
   const [isGenerating, setIsGenerating] = useState(false);
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
-  const [localProposal, setLocalProposal] = useState(rfp.proposal || '');
+  const [localProposal, setLocalProposal] = useState(rfp.request || '');
 
   const handleGenerateProposal = async () => {
     if (!rfp.buyer_questionnaire_response) {
-      setAlertMessage('No questionnaire response data available to generate proposal.');
+      setAlertMessage('No questionnaire response data available to generate request.');
       setShowAlert(true);
       return;
     }
@@ -66,7 +66,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
 
     try {
       const response = rfp.buyer_questionnaire_response as BuyerQuestionnaireResponse | null;
-      const proposal = await RFPService.generateProposal(
+      const proposal = await RFPService.generateRequest(
         rfp,
         response?.form_data || {},
         response?.supplier_info || { name: 'Unknown', email: 'unknown@example.com' }
@@ -74,8 +74,8 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
 
       setLocalProposal(proposal);
       
-      // Update the RFP record with the new proposal
-      await RFPService.updateRfpProposal(rfp.id, proposal);
+      // Update the RFP record with the new request
+      await RFPService.updateRfpRequest(rfp.id, proposal);
       
       onProposalUpdate?.(proposal);
       setAlertMessage('Proposal generated successfully!');
@@ -91,13 +91,13 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
 
   const handleSaveProposal = async () => {
     try {
-      await RFPService.updateRfpProposal(rfp.id, localProposal);
+      await RFPService.updateRfpRequest(rfp.id, localProposal);
       onProposalUpdate?.(localProposal);
-      setAlertMessage('Proposal saved successfully!');
+      setAlertMessage('Request saved successfully!');
       setShowAlert(true);
     } catch (error) {
-      console.error('Error saving proposal:', error);
-      setAlertMessage('Error saving proposal. Please try again.');
+      console.error('Error saving request:', error);
+      setAlertMessage('Error saving request. Please try again.');
       setShowAlert(true);
     }
   };
