@@ -1,4 +1,5 @@
 ## Name: RFP Assistant
+**Database ID**: `a12243de-f8ed-4630-baff-762e0ca51aa1`
 
 ## Description:
 Specialized agent for RFP creation and management guidance

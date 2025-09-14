@@ -1,4 +1,5 @@
 ## Name: RFP Designer
+**Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
 
 ## Description:
 Sets up the RFP Bid used for this procurement process. Creates interactive proposal questionnaires to gather detailed requirements, analyzes responses, and generates comprehensive RFP designs. Users can download the completed template for free as a word file.
