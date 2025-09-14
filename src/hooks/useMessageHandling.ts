@@ -1,5 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
+import { useRef } from 'react';
 import { Message, ArtifactReference } from '../types/home';
 import { RFP } from '../types/rfp';
 import { SessionActiveAgent, UserProfile } from '../types/database';
@@ -9,6 +10,7 @@ import { AgentService } from '../services/agentService';
 import { categorizeError } from '../components/APIErrorHandler';
 
 export const useMessageHandling = () => {
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Helper function to generate artifact references from Claude metadata
   const generateArtifactReferences = (metadata: Record<string, unknown>): ArtifactReference[] => {
@@ -81,6 +83,9 @@ export const useMessageHandling = () => {
   ) => {
     console.log('=== SENDING MESSAGE ===');
     console.log('Message content:', content);
+    
+    // Create new abort controller for this request
+    abortControllerRef.current = new AbortController();
     
     const newMessage: Message = {
       id: Date.now().toString(),
@@ -204,7 +209,8 @@ export const useMessageHandling = () => {
             name: currentRfp.name,
             description: currentRfp.description,
             specification: currentRfp.specification
-          } : null
+          } : null,
+          abortControllerRef.current?.signal
         );
         
         console.log('=== CLAUDE RESPONSE DEBUG ===');
@@ -293,6 +299,12 @@ export const useMessageHandling = () => {
         console.error('Claude API Error:', claudeError);
         setIsLoading(false);
         
+        // Check if this was a cancellation
+        if (claudeError instanceof Error && claudeError.message === 'Request was cancelled') {
+          console.log('Request was cancelled by user');
+          return; // Don't show error message for cancelled requests
+        }
+        
         // Categorize the error for better user messaging
         const categorizedError = categorizeError(claudeError);
         
@@ -349,7 +361,16 @@ export const useMessageHandling = () => {
     }
   };
 
+  const cancelRequest = () => {
+    if (abortControllerRef.current) {
+      console.log('Cancelling Claude request...');
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
+
   return {
-    handleSendMessage
+    handleSendMessage,
+    cancelRequest
   };
 };

@@ -28,6 +28,10 @@ interface HomeContentProps {
   currentRfpId: number | null;
   onDownloadArtifact: (artifact: Artifact) => void;
   onArtifactSelect?: (artifactRef: ArtifactReference) => void;
+  
+  // Agent and cancel functionality
+  currentAgent?: { agent_name: string } | null;
+  onCancelRequest?: () => void;
 }
 
 const HomeContent: React.FC<HomeContentProps> = ({
@@ -44,7 +48,9 @@ const HomeContent: React.FC<HomeContentProps> = ({
   selectedArtifact,
   currentRfpId,
   onDownloadArtifact,
-  onArtifactSelect
+  onArtifactSelect,
+  currentAgent,
+  onCancelRequest
 }) => {
   // Use selected artifact or fall back to most recent
   const displayedArtifact = selectedArtifact || (artifacts.length > 0 ? artifacts[artifacts.length - 1] : null);
@@ -76,6 +82,8 @@ const HomeContent: React.FC<HomeContentProps> = ({
           onAttachFile={onAttachFile}
           promptPlaceholder="chat here..."
           onArtifactSelect={onArtifactSelect}
+          currentAgent={currentAgent}
+          onCancelRequest={onCancelRequest}
         />
       </div>
 

@@ -22,6 +22,8 @@ interface SessionDialogProps {
   onAttachFile?: (file: File) => void;
   promptPlaceholder?: string;
   onArtifactSelect?: (artifactRef: ArtifactReference) => void; // New prop for artifact selection
+  currentAgent?: { agent_name: string } | null; // Current agent for dynamic thinking message
+  onCancelRequest?: () => void; // Function to cancel the current request
 }
 
 const SessionDialog: React.FC<SessionDialogProps> = ({ 
@@ -30,7 +32,9 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   onSendMessage,
   onAttachFile,
   promptPlaceholder = "Type your message here...",
-  onArtifactSelect
+  onArtifactSelect,
+  currentAgent,
+  onCancelRequest
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
@@ -139,7 +143,25 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
           {isLoading && (
             <IonCard style={{ marginRight: '20%' }}>
               <IonCardContent>
-                <div>AI is thinking...</div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div>{currentAgent?.agent_name || 'AI'} thinking...</div>
+                  {onCancelRequest && (
+                    <button 
+                      onClick={onCancelRequest}
+                      style={{
+                        background: '#ff4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '4px 8px',
+                        fontSize: '12px',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
               </IonCardContent>
             </IonCard>
           )}
