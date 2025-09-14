@@ -8,7 +8,14 @@
 -- - Added policy cleanup commands to prevent future conflicts
 -- - Resolved PKCE authentication flow and RLS permission issues
 --
+-- SECURITY FIXES APPLIED (September 14, 2025):
+-- - Fixed rfp_status_summary view security vulnerability (CVE-level issue)
+-- - Converted view to use security_invoker = on to respect Row Level Security
+-- - Prevents privilege escalation and unauthorized data access through views
+-- - All views now properly enforce per-user data access restrictions
+--
 -- For troubleshooting authentication issues, see: AUTHENTICATION_FIXES.md
+-- For security vulnerability details, see: SECURITY-FIX-README.md
 -- =============================
 
 
@@ -133,6 +140,12 @@ CREATE INDEX IF NOT EXISTS idx_artifacts_session_id ON public.artifacts(session_
 CREATE INDEX IF NOT EXISTS idx_artifacts_message_id ON public.artifacts(message_id);
 
 -- Row Level Security Policies
+-- 
+-- SECURITY NOTE (September 14, 2025):
+-- All views must use WITH (security_invoker = on) to prevent privilege escalation
+-- Views with definer rights can bypass RLS policies and expose unauthorized data
+-- See SECURITY-FIX-README.md for details on the security vulnerability
+-- =============================
 
 -- User Profiles - UPDATED: Fixed policy names to match working solution
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
@@ -301,3 +314,72 @@ BEGIN
 END;
 $$ LANGUAGE plpgsql SECURITY DEFINER
 SET search_path = '';
+
+-- =============================
+-- SECURE VIEWS
+-- =============================
+-- 
+-- Views with security_invoker = on to ensure proper RLS enforcement
+-- Date: September 14, 2025
+-- Security Issue: Views with definer rights bypass Row Level Security
+-- Solution: All views use security_invoker = on to respect user permissions
+-- =============================
+
+-- RFP Status Summary View - SECURE VERSION
+-- This view provides a summary of RFPs with their status and bid counts
+-- IMPORTANT: Uses security_invoker = on to enforce Row Level Security policies
+CREATE OR REPLACE VIEW public.rfp_status_summary 
+WITH (security_invoker = on) 
+AS 
+SELECT 
+    r.id,
+    r.name,
+    r.description,
+    r.specification,
+    r.due_date,
+    r.created_at,
+    r.updated_at,
+    r.proposal,
+    r.is_template,
+    r.is_public,
+    -- Derive status from RFP completeness
+    CASE 
+        WHEN r.proposal IS NOT NULL AND r.buyer_questionnaire_response IS NOT NULL THEN 'completed'
+        WHEN r.buyer_questionnaire IS NOT NULL THEN 'collecting_responses'
+        WHEN r.description IS NOT NULL AND r.specification IS NOT NULL THEN 'generating_forms'
+        WHEN r.name IS NOT NULL THEN 'gathering_requirements'
+        ELSE 'draft'
+    END as status,
+    -- Count of bids for this RFP
+    COALESCE(bid_stats.bid_count, 0) as bid_count,
+    bid_stats.latest_bid_date
+FROM public.rfps r
+LEFT JOIN (
+    SELECT 
+        rfp_id,
+        COUNT(*) as bid_count,
+        MAX(created_at) as latest_bid_date
+    FROM public.bids
+    GROUP BY rfp_id
+) bid_stats ON r.id = bid_stats.rfp_id;
+
+-- Grant permissions to authenticated users
+GRANT SELECT ON public.rfp_status_summary TO authenticated;
+
+-- =============================
+-- VIEW SECURITY VERIFICATION
+-- =============================
+-- 
+-- To verify views are secure, run this query:
+-- 
+-- SELECT 
+--     c.relname as view_name,
+--     CASE 
+--         WHEN 'security_invoker=on' = ANY(c.reloptions) THEN 'SECURE ✅'
+--         ELSE 'VULNERABLE ❌'
+--     END as security_status
+-- FROM pg_class c
+-- WHERE c.relkind = 'v' AND c.relname LIKE '%rfp%';
+-- 
+-- All views should show 'SECURE ✅'
+-- =============================
