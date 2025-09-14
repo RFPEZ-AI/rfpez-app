@@ -1,4 +1,5 @@
 ## Name: Support
+**Database ID**: `2dbfa44a-a041-4167-8d3e-82aecd4d2424`
 
 ## Description:
 Technical assistance agent for platform usage and troubleshooting
