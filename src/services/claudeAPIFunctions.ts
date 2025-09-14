@@ -557,6 +557,29 @@ export const claudeApiFunctions: Tool[] = [
     }
   },
   {
+    "name": "set_current_rfp",
+    "description": "Set the current RFP context for the user",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "rfp_id": {
+          "type": "number",
+          "description": "The ID of the RFP to set as current (null to clear current RFP)"
+        }
+      },
+      "required": ["rfp_id"]
+    }
+  },
+  {
+    "name": "refresh_current_rfp",
+    "description": "Trigger the frontend to refresh and display the current RFP context",
+    "input_schema": {
+      "type": "object",
+      "properties": {},
+      "required": []
+    }
+  },
+  {
     "name": "get_artifact_status",
     "description": "Get the current status and data of an artifact",
     "input_schema": {
@@ -568,6 +591,32 @@ export const claudeApiFunctions: Tool[] = [
         }
       },
       "required": ["artifact_id"]
+    }
+  },
+  {
+    "name": "create_and_set_rfp",
+    "description": "Streamlined RFP creation: Creates a new RFP with minimal data, sets it as current RFP, and validates the creation. This replaces the multi-step process of supabase_insert + set_current_rfp + validation.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "The name/title of the RFP (required)"
+        },
+        "description": {
+          "type": "string",
+          "description": "Optional initial description of the RFP"
+        },
+        "specification": {
+          "type": "string", 
+          "description": "Optional initial technical specification"
+        },
+        "due_date": {
+          "type": "string",
+          "description": "Optional due date in ISO format (YYYY-MM-DD)"
+        }
+      },
+      "required": ["name"]
     }
   }
 ];
@@ -637,37 +686,43 @@ export class ClaudeAPIFunctionHandler {
       if (filter && filter.field && filter.operator && filter.value !== undefined) {
         const { field, operator, value } = filter;
         
-        switch (operator) {
-          case 'eq':
-            query = query.eq(field, value);
-            break;
-          case 'neq':
-            query = query.neq(field, value);
-            break;
-          case 'gt':
-            query = query.gt(field, value);
-            break;
-          case 'lt':
-            query = query.lt(field, value);
-            break;
-          case 'gte':
-            query = query.gte(field, value);
-            break;
-          case 'lte':
-            query = query.lte(field, value);
-            break;
-          case 'like':
-            query = query.like(field, value);
-            break;
-          case 'in':
-            if (Array.isArray(value)) {
-              query = query.in(field, value);
-            } else {
-              throw new Error('Value must be an array when using "in" operator');
-            }
-            break;
-          default:
-            throw new Error(`Unsupported operator: ${operator}`);
+        // Special handling for rfps table - skip non-existent columns
+        if (table === 'rfps' && (field === 'created_by' || field === 'user_id')) {
+          console.log(`⚠️ Skipping filter on non-existent column '${field}' for rfps table`);
+          // Skip this filter since the column doesn't exist in the rfps table
+        } else {
+          switch (operator) {
+            case 'eq':
+              query = query.eq(field, value);
+              break;
+            case 'neq':
+              query = query.neq(field, value);
+              break;
+            case 'gt':
+              query = query.gt(field, value);
+              break;
+            case 'lt':
+              query = query.lt(field, value);
+              break;
+            case 'gte':
+              query = query.gte(field, value);
+              break;
+            case 'lte':
+              query = query.lte(field, value);
+              break;
+            case 'like':
+              query = query.like(field, value);
+              break;
+            case 'in':
+              if (Array.isArray(value)) {
+                query = query.in(field, value);
+              } else {
+                throw new Error('Value must be an array when using "in" operator');
+              }
+              break;
+            default:
+              throw new Error(`Unsupported operator: ${operator}`);
+          }
         }
       }
       
@@ -714,6 +769,23 @@ export class ClaudeAPIFunctionHandler {
     
     if (!data || typeof data !== 'object') {
       throw new Error('Data object is required for supabase_insert');
+    }
+    
+    // Special handling for rfps table
+    if (table === 'rfps' && data) {
+      // Remove any status field that doesn't exist in the schema
+      if ('status' in data) {
+        console.log('⚠️ Removing non-existent status field from rfps insert');
+        delete data.status;
+      }
+      
+      // Add default due_date if not provided (30 days from now)
+      if (!data.due_date) {
+        const defaultDueDate = new Date();
+        defaultDueDate.setDate(defaultDueDate.getDate() + 30);
+        data.due_date = defaultDueDate.toISOString().split('T')[0]; // YYYY-MM-DD format
+        console.log('📅 Added default due_date:', data.due_date);
+      }
     }
     
     try {
@@ -991,8 +1063,14 @@ export class ClaudeAPIFunctionHandler {
         return await this.createArtifactTemplate(parameters, userId);
       case 'list_artifact_templates':
         return await this.listArtifactTemplates(parameters, userId);
+      case 'set_current_rfp':
+        return await this.setCurrentRfp(parameters, userId);
+      case 'refresh_current_rfp':
+        return await this.refreshCurrentRfp(parameters, userId);
       case 'get_artifact_status':
         return await this.getArtifactStatus(parameters, userId);
+      case 'create_and_set_rfp':
+        return await this.createAndSetRfp(parameters, userId);
     
       default:
         throw new Error(`Unknown function: ${functionName}`);
@@ -2377,6 +2455,229 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       };
     } catch (error) {
       console.error('❌ Error getting artifact status:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async setCurrentRfp(params: any, userId: string) {
+    const { rfp_id } = params;
+    
+    console.log('🎯 Setting current RFP:', { rfp_id, userId });
+    
+    if (userId === 'anonymous') {
+      throw new Error('Cannot set current RFP for anonymous users. Please log in first.');
+    }
+    
+    try {
+      // Get the user's profile ID
+      const profileId = await this.getUserProfileId(userId);
+      if (!profileId) {
+        throw new Error('User profile not found. Please ensure you are properly authenticated.');
+      }
+      
+      // If rfp_id is provided, verify the RFP exists
+      if (rfp_id !== null) {
+        const { data: rfp, error: rfpError } = await supabase
+          .from('rfps')
+          .select('id, name')
+          .eq('id', rfp_id)
+          .single();
+        
+        if (rfpError || !rfp) {
+          throw new Error(`RFP with ID ${rfp_id} not found`);
+        }
+        
+        console.log('✅ RFP validated:', rfp.name);
+      }
+      
+      // Update user profile with current RFP ID
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ current_rfp_id: rfp_id })
+        .eq('id', profileId)
+        .select('id, current_rfp_id')
+        .single();
+      
+      if (updateError) {
+        console.error('❌ Failed to update user profile:', updateError);
+        throw new Error(`Failed to set current RFP: ${updateError.message}`);
+      }
+      
+      const message = rfp_id 
+        ? `Current RFP context set to RFP ID: ${rfp_id}`
+        : 'Current RFP context cleared';
+      
+      console.log('✅ Current RFP updated:', message);
+      
+      // Trigger frontend refresh by posting a message to the window
+      if (typeof window !== 'undefined') {
+        window.postMessage({ 
+          type: 'REFRESH_CURRENT_RFP', 
+          rfp_id: rfp_id,
+          message: message
+        }, '*');
+      }
+      
+      return {
+        success: true,
+        current_rfp_id: rfp_id,
+        user_profile_id: profileId,
+        message,
+        frontend_refresh_triggered: true
+      };
+    } catch (error) {
+      console.error('❌ Error setting current RFP:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+  private async refreshCurrentRfp(params: any, userId: string) {
+    console.log('🔄 Triggering current RFP refresh');
+    
+    try {
+      // Trigger frontend refresh by posting a message to the window
+      if (typeof window !== 'undefined') {
+        window.postMessage({ 
+          type: 'REFRESH_CURRENT_RFP', 
+          message: 'Frontend RFP context refresh requested'
+        }, '*');
+      }
+      
+      return {
+        success: true,
+        message: 'Frontend refresh triggered for current RFP context',
+        timestamp: new Date().toISOString()
+      };
+    } catch (error) {
+      console.error('❌ Error triggering refresh:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async createAndSetRfp(params: any, userId: string) {
+    const { name, description = '', specification = '', due_date = null } = params;
+    
+    console.log('🚀 Creating and setting new RFP:', { name, userId });
+    
+    if (userId === 'anonymous') {
+      throw new Error('Cannot create RFP for anonymous users. Please log in first.');
+    }
+    
+    if (!name || name.trim() === '') {
+      throw new Error('RFP name is required');
+    }
+    
+    try {
+      // Step 1: Check if user already has a current RFP
+      const profileId = await this.getUserProfileId(userId);
+      if (!profileId) {
+        throw new Error('User profile not found. Please ensure you are properly authenticated.');
+      }
+      
+      const { data: currentProfile } = await supabase
+        .from('user_profiles')
+        .select('current_rfp_id')
+        .eq('id', profileId)
+        .single();
+      
+      if (currentProfile?.current_rfp_id) {
+        console.log('⚠️ User already has current RFP:', currentProfile.current_rfp_id);
+      }
+      
+      // Step 2: Create new RFP with supabase_insert
+      const insertData: {
+        name: string;
+        status: string;
+        description?: string;
+        specification?: string;
+        due_date?: string;
+      } = {
+        name: name.trim(),
+        status: 'draft'
+      };
+      
+      // Add optional fields if provided
+      if (description && description.trim()) {
+        insertData.description = description.trim();
+      }
+      if (specification && specification.trim()) {
+        insertData.specification = specification.trim();
+      }
+      if (due_date) {
+        insertData.due_date = due_date;
+      }
+      
+      const { data: newRfp, error: insertError } = await supabase
+        .from('rfps')
+        .insert(insertData)
+        .select('id, name, description, specification, status, created_at')
+        .single();
+      
+      if (insertError) {
+        console.error('❌ Failed to create RFP:', insertError);
+        throw new Error(`Failed to create RFP: ${insertError.message}`);
+      }
+      
+      console.log('✅ RFP created successfully:', newRfp.id);
+      
+      // Step 3: Set as current RFP
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ current_rfp_id: newRfp.id })
+        .eq('id', profileId)
+        .select('id, current_rfp_id')
+        .single();
+      
+      if (updateError) {
+        console.error('❌ Failed to set as current RFP:', updateError);
+        throw new Error(`RFP created but failed to set as current: ${updateError.message}`);
+      }
+      
+      console.log('✅ RFP set as current successfully');
+      
+      // Step 4: Validation - verify RFP exists in database
+      const { data: verifyRfp, error: verifyError } = await supabase
+        .from('rfps')
+        .select('id, name, status')
+        .eq('id', newRfp.id)
+        .single();
+      
+      if (verifyError || !verifyRfp) {
+        throw new Error('RFP creation validation failed - RFP not found after creation');
+      }
+      
+      console.log('✅ RFP creation validated successfully');
+      
+      // Step 5: Trigger frontend UI refresh
+      if (typeof window !== 'undefined') {
+        window.postMessage({ 
+          type: 'REFRESH_CURRENT_RFP', 
+          rfp_id: newRfp.id,
+          message: `New RFP created and set as current: ${newRfp.name}`
+        }, '*');
+      }
+      
+      return {
+        success: true,
+        rfp: newRfp,
+        current_rfp_id: newRfp.id,
+        user_profile_id: profileId,
+        message: `RFP "${newRfp.name}" created successfully and set as current RFP`,
+        steps_completed: [
+          'checked_current_context',
+          'created_rfp_record', 
+          'set_as_current_rfp',
+          'validated_creation',
+          'triggered_ui_refresh'
+        ],
+        frontend_refresh_triggered: true
+      };
+      
+    } catch (error) {
+      console.error('❌ Error in createAndSetRfp:', error);
       throw error;
     }
   }

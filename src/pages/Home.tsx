@@ -4,6 +4,7 @@ import React, { useEffect } from 'react';
 import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
+import { UserContextService } from '../services/userContextService';
 import { Message, ArtifactReference, Artifact } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import { DocxExporter } from '../utils/docxExporter';
@@ -165,6 +166,37 @@ const Home: React.FC = () => {
       });
     }
   }, [session, supabaseLoading]);
+
+  // Listen for RFP refresh messages from Claude functions
+  useEffect(() => {
+    const handleRfpRefreshMessage = (event: MessageEvent) => {
+      if (event.data?.type === 'REFRESH_CURRENT_RFP') {
+        console.log('🔄 Received RFP refresh request from Claude function');
+        // Trigger a refresh of the current RFP context
+        if (userId) {
+          // Force reload the current RFP context by calling the hook's load function
+          const refreshRfpContext = async () => {
+            try {
+              const currentRfp = await UserContextService.getCurrentRfp(userId);
+              if (currentRfp) {
+                handleSetCurrentRfp(currentRfp.id);
+                console.log('✅ RFP context refreshed from database:', currentRfp.name);
+              } else {
+                handleClearCurrentRfp();
+                console.log('✅ RFP context cleared (no current RFP in database)');
+              }
+            } catch (error) {
+              console.error('❌ Failed to refresh RFP context:', error);
+            }
+          };
+          refreshRfpContext();
+        }
+      }
+    };
+
+    window.addEventListener('message', handleRfpRefreshMessage);
+    return () => window.removeEventListener('message', handleRfpRefreshMessage);
+  }, [userId, handleSetCurrentRfp, handleClearCurrentRfp]);
 
   // Load active agent when session changes
   useEffect(() => {
@@ -503,8 +535,6 @@ const Home: React.FC = () => {
           />
         </div>
 
-        <HomeFooter currentRfp={currentRfp} />
-
         {/* Agent Selector Modal */}
         <AgentSelector
           isOpen={showAgentSelector}
@@ -517,6 +547,9 @@ const Home: React.FC = () => {
           isAuthenticated={isAuthenticated}
         />
       </IonContent>
+
+      {/* Footer outside of IonContent for better MCP browser compatibility */}
+      <HomeFooter currentRfp={currentRfp} />
 
       {/* Modals */}
       <AgentEditModal

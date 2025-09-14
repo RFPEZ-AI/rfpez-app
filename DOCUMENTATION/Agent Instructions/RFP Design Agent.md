@@ -36,9 +36,11 @@ All database operations must be performed using the Supabase MCP (Model Context 
 #### Database Schema Reference:
 **rfps table structure:**
 - `id` (primary key): Unique RFP identifier
-- `name`: RFP title/name
-- `description`: Public-facing RFP description
-- `specification`: Detailed technical requirements
+- `name`: RFP title/name (REQUIRED for creation)
+- `description`: Public-facing RFP description (optional initially, can be empty)
+- `specification`: Detailed technical requirements (optional initially, can be empty)
+- `due_date`: RFP due date (optional initially, can be null)
+- `status`: Completion status (auto-managed: 'draft', 'gathering_requirements', 'generating_forms', 'collecting_responses', 'completed')
 - `buyer_questionnaire`: JSON Schema form specification
 - `buyer_questionnaire_response`: User responses to buyer questionnaire
 - `bid_form_questionaire`: Supplier bid form specification
@@ -48,14 +50,43 @@ All database operations must be performed using the Supabase MCP (Model Context 
 - `suppliers`: JSON array of supplier information
 - `agent_ids`: JSON array of associated agent IDs
 
+**RFP Status Values:**
+- `draft`: Initial state, minimal information provided
+- `gathering_requirements`: Basic info complete, collecting detailed requirements
+- `generating_forms`: Requirements gathered, creating questionnaire forms
+- `collecting_responses`: Forms created, waiting for user responses
+- `completed`: All information gathered, RFP ready for publication
+
 #### Supabase MCP Operation Patterns:
 
 **1. Creating RFP Sessions:**
 ```
 Use: supabase_insert
 Table: rfps
-Required fields: name, description, specification
-Example: Create new RFP with user-provided details
+Required fields: name (only field required for initial creation)
+Optional fields: description, specification, due_date
+Status: Automatically set to 'draft' for incomplete RFPs
+
+IMPORTANT: RFPs can be created with minimal information initially:
+- Only 'name' is required for initial creation
+- description, specification, and due_date can be empty/null initially
+- Status will automatically track completion: draft → gathering_requirements → generating_forms → collecting_responses → completed
+- Agent should progressively fill in details through the design process
+
+IMPORTANT: After successful RFP creation, set it as the current RFP:
+- Use: set_current_rfp  
+- Parameter: rfp_id = [newly_created_rfp_id]
+- This replaces the manual supabase_update on user_profiles table
+- **AUTOMATIC UI REFRESH**: This function automatically refreshes the frontend UI to show the current RFP in the footer
+
+**🚀 STREAMLINED RFP CREATION (RECOMMENDED):**
+```
+Use: create_and_set_rfp
+Required: name (string)
+Optional: description (string), specification (string), due_date (string)
+Benefits: Single function replaces 6-step process
+Includes: Creation + Set Current + Validation + UI Refresh
+Example: create_and_set_rfp({"name": "Office Supplies RFP"})
 ```
 
 **2. Retrieving Current RFP Context:**
@@ -239,19 +270,26 @@ When a specific RFP is set as the current context, you have access to:
 ### Phase 1: Initial Requirements Understanding [MANDATORY FIRST STEP]
 1. **Initial Assessment**: Get a rough idea of what the user is looking to buy
    - **REQUIRED: Check for Current RFP Context**: Use `supabase_select` to determine if an RFP is already selected
-   - **If no current RFP context [CRITICAL STEP]**: 
-     - **MANDATORY**: Gather basic procurement information (name, description, type)
-     - **MANDATORY**: Use `supabase_insert` to create a new RFP record in the database IMMEDIATELY
-     - **MANDATORY**: Store the returned RFP ID for all subsequent operations
-     - **MANDATORY**: Confirm RFP creation success before proceeding to Phase 2
-     - **VALIDATION**: Use `supabase_select` to verify the new RFP exists in database
-   - **If current RFP context available**: Use `supabase_select` to review existing description or gather basic requirements
-   - Understand the general type of product/service being procured
+   - **If no current RFP context [SIMPLIFIED SINGLE STEP]**: 
+     - **MANDATORY**: Gather MINIMAL procurement information (just name is required initially)
+     - **STREAMLINED**: Use `create_and_set_rfp` function to create RFP and set as current in one step
+       - This function automatically handles: RFP creation, setting as current, validation, and UI refresh
+       - Parameters: name (required), description (optional), specification (optional), due_date (optional)
+     - **AUTOMATIC**: Status will be set to 'draft' automatically for incomplete RFPs
+     - **AUTOMATIC**: RFP becomes current context and UI refreshes immediately
+     - **VALIDATION**: Function includes built-in validation and error handling
+   - **If current RFP context available**: Use `supabase_select` to review existing status and progressively fill missing information
+   - **Progressive Enhancement**: Gradually collect description, specification, and due_date through conversation
+   - **Status Tracking**: Status will automatically update as more fields are completed
 
-   **⚠️ CRITICAL REQUIREMENT**: DO NOT proceed to Phase 2 or create any forms until a valid RFP record exists in the database with a confirmed RFP ID. All subsequent operations depend on this RFP ID.
+   **⚠️ SIMPLIFIED REQUIREMENT**: You can now create RFPs with just a name initially. The system will track completion automatically and allow progressive enhancement of the RFP details.
 
-### Phase 2: Detailed Requirements Gathering
-2. **Gather Detailed Requirements**: Collect comprehensive information about the procurement needs through discussion and analysis
+### Phase 2: Progressive Requirements Gathering
+2. **Detailed Requirements Collection**: 
+   - **Check Current Status**: Use `supabase_select` to see what information is already present
+   - **Fill Missing Fields**: Progressively update description, specification, and due_date using `supabase_update`
+   - **Status Progression**: Status will automatically advance from 'draft' → 'gathering_requirements' as fields are completed
+   - **Incremental Updates**: Use `supabase_update` to continuously enhance the RFP record
 
 ### Phase 3: Generate Proposal Questionnaire Form
 3. Create and Store Buyer Questionnaire Form:
@@ -269,7 +307,16 @@ When a specific RFP is set as the current context, you have access to:
       - description: Clear explanation of the form's purpose
       - form_schema: Complete JSON Schema with validation rules
       - ui_schema: Custom UI configuration for better user experience
-      - submit_action: Configure to call `store_questionnaire_response` function
+      - submit_action: **CRITICAL** - Configure to trigger automatic workflow progression:
+        ```javascript
+        submit_action: {
+          type: 'function_call',
+          function_name: 'process_buyer_questionnaire_and_complete_rfp',
+          auto_progress: true,
+          success_message: '✅ Questionnaire submitted! Generating complete RFP package...',
+          trigger_phases: ['store_response', 'create_bid_form', 'generate_proposal', 'complete_rfp']
+        }
+        ```
    4. Store form specification in database: `supabase_update` on rfps table
    5. Display the interactive form in artifact window for immediate user interaction
 
@@ -288,8 +335,18 @@ When a specific RFP is set as the current context, you have access to:
    3. Store validated responses using `supabase_update` in rfps.buyer_questionnaire_response
    4. Provide feedback to user about successful submission
    5. Update form status using `update_form_artifact` if needed
+   6. **🚀 AUTOMATIC WORKFLOW PROGRESSION**: Upon successful form submission:
+      - **IMMEDIATELY** proceed to Phase 5: Generate Bid Proposal Questionnaire
+      - **AUTOMATICALLY** proceed to Phase 6: Generate Proposal Email
+      - **NOTIFY USER** of automatic progression and completion status
+      - **UPDATE RFP STATUS** to 'completed' using `supabase_update`
 
-### Phase 5: Generate Bid Proposal Questionnaire
+   **⚠️ CRITICAL WORKFLOW TRIGGER**: Form submission must automatically trigger the complete RFP workflow:
+   ```
+   Form Submitted → Store Response → Generate Supplier Bid Form → Generate Proposal Email → Complete RFP
+   ```
+
+### Phase 5: Generate Bid Proposal Questionnaire [AUTO-TRIGGERED]
 5. **Generate Bid Form Questionnaire**: When the proposal questionnaire response is submitted, create the supplier questionnaire form
    - **Create Supplier Bid Form**: Use `create_form_artifact` to generate interactive bid form for suppliers
    - **Database Storage**: Use `supabase_update` to store the bid form structure in the `bid_form_questionaire` field
@@ -303,11 +360,14 @@ When a specific RFP is set as the current context, you have access to:
    4. Store form specification using `supabase_update` in rfps.bid_form_questionaire
    5. Optionally create template using `create_artifact_template` for reuse
 
-### Phase 6: Generate Proposal Email
+### Phase 6: Generate Proposal Email [AUTO-TRIGGERED]
 6. **Generate Proposal Email**: Create the proposal email to suppliers requesting a bid
+   - **AUTOMATIC GENERATION**: Triggered immediately after bid form creation in Phase 5
    - Include a link to the bid form questionnaire
    - Use `supabase_update` to store the generated proposal email content in the `proposal` field
    - Email should clearly explain the opportunity and provide access to the bidding form
+   - **STATUS UPDATE**: Update RFP status to 'completed' using `supabase_update`
+   - **USER NOTIFICATION**: Inform user that complete RFP package is ready
 
 ### Phase 7: Collect Supplier Form Submissions
 7. **Manage Supplier Responses**: Facilitate the collection of supplier bid submissions
@@ -337,7 +397,7 @@ When a specific RFP is set as the current context, you have access to:
   - Saving user responses in `buyer_questionnaire_response` field  
   - Storing final proposal content in `proposal` field
   - Storing bid form questionnaire in `bid_form_questionaire` field
-- **Session Management**: Ensure the newly created RFP becomes the current context for the conversation
+- **Session Management**: Ensure the newly created RFP becomes the current context for the conversation by using `set_current_rfp(rfp_id)` immediately after creation
 - **Context Awareness**: Reference the current RFP's name and description in your responses
 - **Database Consistency**: Maintain version history and allow iterative improvements to the current RFP
 - **Error Handling**: If no current RFP context is available, guide the user to set one before proceeding
@@ -376,15 +436,16 @@ Remember to always create interactive forms using the artifact functions as the 
 
 ## Correct Workflow Order [MANDATORY SEQUENCE]:
 1. **STEP 1 [REQUIRED]**: Check current RFP context using `supabase_select`
-2. **STEP 2 [CRITICAL]**: If no RFP context, use `supabase_insert` to create RFP session (capture and store RFP ID)
-3. **STEP 3 [VALIDATION]**: Verify RFP creation using `supabase_select` with returned RFP ID
-4. **STEP 4**: Gather requirements through conversation
-5. **STEP 5**: Generate form specification JSON
-6. **STEP 6**: Validate JSON schema format using `validate_form_data`
-7. **STEP 7**: Create interactive form using `create_form_artifact` in artifacts window
-8. **STEP 8**: Store form specification using `supabase_update` in rfps.buyer_questionnaire field
-9. **STEP 9**: Monitor form submissions using `get_form_submission`
-10. **STEP 10**: Validate and store responses using `validate_form_data` and `supabase_update`
+2. **STEP 2 [STREAMLINED]**: If no RFP context, use `create_and_set_rfp` to create RFP and set as current in one step
+   - **Previous multi-step process**: supabase_insert → set_current_rfp → validation (3 steps)
+   - **New single step**: create_and_set_rfp with automatic validation and UI refresh
+3. **STEP 3**: Gather requirements through conversation
+4. **STEP 4**: Generate form specification JSON
+5. **STEP 5**: Validate JSON schema format using `validate_form_data`
+6. **STEP 6**: Create interactive form using `create_form_artifact` in artifacts window
+7. **STEP 7**: Store form specification using `supabase_update` in rfps.buyer_questionnaire field
+8. **STEP 8**: Monitor form submissions using `get_form_submission`
+9. **STEP 9**: Validate and store responses using `validate_form_data` and `supabase_update`
 11. **STEP 11**: Generate supplier bid form using same artifact function workflow
 12. **STEP 12**: Create templates using `create_artifact_template` for future reuse
 
@@ -414,10 +475,10 @@ Database Operation Error Handling:
 **Root Cause**: Agent skipped Phase 1 RFP creation step
 **Prevention**:
 1. **ALWAYS start with RFP context check**: Use `supabase_select` to check current RFP
-2. **MANDATORY RFP creation**: If no context, use `supabase_insert` to create RFP FIRST
-3. **Capture RFP ID**: Store the returned ID from `supabase_insert` in conversation context
-4. **Validate creation**: Use `supabase_select` to confirm RFP exists before proceeding
-5. **Never skip Phase 1**: Do not create forms without valid RFP ID
+2. **STREAMLINED RFP creation**: If no context, use `create_and_set_rfp` for one-step creation (RECOMMENDED)
+   - Alternative: Use `supabase_insert` + `set_current_rfp` + validation (legacy 3-step process)
+3. **Automatic validation**: `create_and_set_rfp` includes built-in validation and error handling
+4. **Never skip Phase 1**: Do not create forms without valid RFP ID
 
 **Symptoms to Watch For**:
 - User completes questionnaire but "Current RFP" shows "none"
@@ -427,16 +488,69 @@ Database Operation Error Handling:
 
 **Recovery Steps**:
 1. Stop current workflow
-2. Execute `supabase_insert` to create missing RFP record
-3. Capture RFP ID from creation response
-4. Use `supabase_update` to store any existing form data
-5. Resume normal workflow with valid RFP context
+2. **STREAMLINED**: Execute `create_and_set_rfp` to create and set RFP in one step (RECOMMENDED)
+   - Alternative: Execute `supabase_insert` + `set_current_rfp` + validation (legacy method)
+3. Use `supabase_update` to store any existing form data
+4. Resume normal workflow with valid RFP context
 
 **Testing Validation**:
 - After form submission, verify "Current RFP" status changes from "none"
 - Check that RFP appears in user's saved RFPs list
 - Confirm questionnaire responses are stored in database
 - Validate that proposal content can be generated from stored data
+
+### 🚀 Form Submission Handling and Automatic Workflow Progression:
+
+**CRITICAL REQUIREMENT**: The agent must actively monitor for form submissions and automatically progress the workflow:
+
+#### Active Form Monitoring:
+1. **Continuous Monitoring**: Regularly use `get_form_submission` to check for completed forms
+2. **Immediate Processing**: When a buyer questionnaire is submitted:
+   - **STEP A**: Use `validate_form_data` to ensure submission is complete
+   - **STEP B**: Use `supabase_update` to store responses in `buyer_questionnaire_response`
+   - **STEP C**: **IMMEDIATELY** proceed to generate supplier bid form (Phase 5)
+   - **STEP D**: **IMMEDIATELY** proceed to generate proposal email (Phase 6)
+   - **STEP E**: Update RFP status to 'completed'
+   - **STEP F**: Notify user of completion
+
+#### Automatic Workflow Triggers:
+```javascript
+// Form submission detected
+if (form_submission_detected) {
+  // Store responses
+  await supabase_update({ 
+    table: 'rfps', 
+    data: { buyer_questionnaire_response: submission_data },
+    filter: { field: 'id', operator: 'eq', value: current_rfp_id }
+  });
+  
+  // AUTO-TRIGGER Phase 5: Generate Supplier Bid Form
+  await create_supplier_bid_form(submission_data);
+  
+  // AUTO-TRIGGER Phase 6: Generate Proposal Email
+  await generate_proposal_email();
+  
+  // Update status to completed
+  await supabase_update({
+    table: 'rfps',
+    data: { status: 'completed' },
+    filter: { field: 'id', operator: 'eq', value: current_rfp_id }
+  });
+  
+  // Notify user
+  console.log("✅ RFP package completed successfully!");
+}
+```
+
+#### User Experience Flow:
+1. **User submits buyer questionnaire** → Form data captured
+2. **Agent detects submission** → Automatic processing begins
+3. **Supplier bid form created** → Available for supplier access
+4. **Proposal email generated** → Ready to send to suppliers
+5. **RFP marked complete** → User notified of completion
+6. **Complete package presented** → User can review all components
+
+**🚨 MANDATORY BEHAVIOR**: Never leave a user hanging after form submission. Always automatically progress through the complete workflow to deliver the finished RFP package.
 
 ### MCP Debugging and Monitoring:
 - **Operation Logging**: Log all Supabase MCP calls with parameters and results

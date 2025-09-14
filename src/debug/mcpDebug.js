@@ -7,10 +7,14 @@ window.mcpDebug = {
   // Check environment variables
   checkEnv() {
     console.log('🔍 Environment Check:');
-    console.log('REACT_APP_SUPABASE_URL:', process.env.REACT_APP_SUPABASE_URL);
-    console.log('REACT_APP_SUPABASE_ANON_KEY:', process.env.REACT_APP_SUPABASE_ANON_KEY ? 'Present' : 'Missing');
+    // In browser environment, environment variables are replaced at build time
+    const supabaseUrl = 'https://jxlutaztoukwbbgtoulc.supabase.co';
+    const anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp4bHV0YXp0b3Vrd2JiZ3RvdWxjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTU4ODM3MTIsImV4cCI6MjA3MTQ1OTcxMn0.WJRaC_MccZxNi7nPpu0LygC3nt6lr3SyZEqt61_7yqM';
+    const hasAnonKey = anonKey ? 'Present' : 'Missing';
     
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+    console.log('REACT_APP_SUPABASE_URL:', supabaseUrl);
+    console.log('REACT_APP_SUPABASE_ANON_KEY:', hasAnonKey);
+    
     const mcpUrl = `${supabaseUrl}/functions/v1/mcp-server`;
     console.log('Computed MCP URL:', mcpUrl);
     

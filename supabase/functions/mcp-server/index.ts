@@ -147,6 +147,129 @@ const tools: MCPTool[] = [
       },
       required: ["query"]
     }
+  },
+  {
+    name: "supabase_select",
+    description: "Query and retrieve data from Supabase tables",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table: {
+          type: "string",
+          description: "The table name to query"
+        },
+        columns: {
+          type: "string",
+          description: "Columns to select (comma-separated or *)"
+        },
+        filter: {
+          type: "object",
+          description: "Filter conditions",
+          properties: {
+            field: { type: "string" },
+            operator: { type: "string", enum: ["eq", "neq", "gt", "lt", "gte", "lte", "like", "in"] },
+            value: { type: ["string", "number", "boolean", "array"] }
+          }
+        },
+        limit: {
+          type: "number",
+          description: "Maximum number of rows to return"
+        },
+        order: {
+          type: "object",
+          properties: {
+            field: { type: "string" },
+            ascending: { type: "boolean", default: true }
+          }
+        }
+      },
+      required: ["table"]
+    }
+  },
+  {
+    name: "supabase_insert",
+    description: "Insert new records into Supabase tables",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table: {
+          type: "string",
+          description: "The table name to insert into"
+        },
+        data: {
+          type: "object",
+          description: "Data object to insert"
+        },
+        returning: {
+          type: "string",
+          description: "Columns to return after insert",
+          default: "*"
+        }
+      },
+      required: ["table", "data"]
+    }
+  },
+  {
+    name: "supabase_update",
+    description: "Update existing records in Supabase tables",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table: {
+          type: "string",
+          description: "The table name to update"
+        },
+        data: {
+          type: "object",
+          description: "Data object with fields to update"
+        },
+        filter: {
+          type: "object",
+          description: "Filter conditions to identify records",
+          properties: {
+            field: { type: "string" },
+            operator: { type: "string", enum: ["eq", "neq", "gt", "lt", "gte", "lte"] },
+            value: { type: ["string", "number", "boolean"] }
+          },
+          required: ["field", "operator", "value"]
+        },
+        returning: {
+          type: "string",
+          description: "Columns to return after update",
+          default: "*"
+        }
+      },
+      required: ["table", "data", "filter"]
+    }
+  },
+  {
+    name: "supabase_delete",
+    description: "Delete records from Supabase tables",
+    inputSchema: {
+      type: "object",
+      properties: {
+        table: {
+          type: "string",
+          description: "The table name to delete from"
+        },
+        filter: {
+          type: "object",
+          description: "Filter conditions to identify records",
+          properties: {
+            field: { type: "string" },
+            operator: { type: "string", enum: ["eq", "neq", "gt", "lt", "gte", "lte"] },
+            value: { type: ["string", "number", "boolean"] }
+          },
+          required: ["field", "operator", "value"]
+        },
+        returning: {
+          type: "string",
+          description: "Columns to return after delete",
+          default: "*"
+        }
+      },
+      required: ["table", "filter"]
+    }
   }
 ]
 
@@ -355,6 +478,256 @@ async function executeSearchMessages(params: any, userId: string) {
   }
 }
 
+// Supabase CRUD operations
+async function executeSupabaseSelect(params: any, userId: string) {
+  const { table, columns = "*", filter, limit, order } = params
+  
+  console.log('🔍 Supabase select:', { table, columns, filter, limit, order, userId })
+  
+  let query = supabase.from(table).select(columns)
+  
+  // Apply filters
+  if (filter) {
+    const { field, operator, value } = filter
+    switch (operator) {
+      case "eq":
+        query = query.eq(field, value)
+        break
+      case "neq":
+        query = query.neq(field, value)
+        break
+      case "gt":
+        query = query.gt(field, value)
+        break
+      case "lt":
+        query = query.lt(field, value)
+        break
+      case "gte":
+        query = query.gte(field, value)
+        break
+      case "lte":
+        query = query.lte(field, value)
+        break
+      case "like":
+        query = query.like(field, value)
+        break
+      case "in":
+        query = query.in(field, value)
+        break
+    }
+  }
+  
+  // Apply ordering
+  if (order) {
+    query = query.order(order.field, { ascending: order.ascending ?? true })
+  }
+  
+  // Apply limit
+  if (limit) {
+    query = query.limit(limit)
+  }
+  
+  const { data, error } = await query
+  
+  if (error) {
+    throw new Error(`Failed to select from ${table}: ${error.message}`)
+  }
+  
+  return {
+    table,
+    data: data || [],
+    count: data?.length || 0
+  }
+}
+
+async function executeSupabaseInsert(params: any, userId: string) {
+  const { table, data, returning = "*" } = params
+  
+  console.log('📝 Supabase insert:', { table, data, returning, userId })
+  
+  // For certain tables, automatically add user_id if not present
+  if (['rfps', 'sessions', 'messages'].includes(table) && data && !data.user_id) {
+    data.user_id = userId
+  }
+  
+  // Special handling for rfps table
+  if (table === 'rfps' && data) {
+    // Allow incomplete RFPs to be created initially
+    console.log('🔧 Processing RFP insert with incomplete data handling')
+    
+    // Add default values for incomplete RFPs
+    if (!data.description || data.description.trim() === '') {
+      data.description = '' // Allow empty description initially
+      console.log('📝 Set empty description for incomplete RFP')
+    }
+    
+    if (!data.specification || data.specification.trim() === '') {
+      data.specification = '' // Allow empty specification initially
+      console.log('📋 Set empty specification for incomplete RFP')
+    }
+    
+    // Add status field to track RFP completion (will be added to schema later)
+    if (!data.status) {
+      data.status = 'draft' // Mark as draft initially
+      console.log('🏷️ Set status to draft for new RFP')
+    }
+    
+    // Add default due_date if not provided (30 days from now) - but allow null
+    if (!data.due_date) {
+      // For incomplete RFPs, don't auto-add due_date, let it be null
+      console.log('📅 Leaving due_date null for incomplete RFP')
+    }
+    
+    // Calculate completion percentage based on provided fields
+    const completionFields = [
+      data.name && data.name.trim() !== '',
+      data.description && data.description.trim() !== '',
+      data.specification && data.specification.trim() !== '',
+      data.due_date,
+      data.buyer_questionnaire,
+      data.buyer_questionnaire_response,
+      data.bid_form_questionaire
+    ]
+    
+    const completedFields = completionFields.filter(Boolean).length
+    const completionPercentage = Math.round((completedFields / completionFields.length) * 100)
+    
+    console.log(`� RFP completion: ${completedFields}/${completionFields.length} fields (${completionPercentage}%)`)
+    
+    // Update status based on completion
+    if (completionPercentage >= 90) {
+      data.status = 'completed'
+    } else if (completionPercentage >= 70) {
+      data.status = 'collecting_responses'
+    } else if (completionPercentage >= 50) {
+      data.status = 'generating_forms'
+    } else if (completionPercentage >= 30) {
+      data.status = 'gathering_requirements'
+    } else {
+      data.status = 'draft'
+    }
+    
+    console.log(`🎯 Set RFP status to: ${data.status}`)
+  }
+  
+  const { data: result, error } = await supabase
+    .from(table)
+    .insert(data)
+    .select(returning)
+  
+  if (error) {
+    throw new Error(`Failed to insert into ${table}: ${error.message}`)
+  }
+  
+  return {
+    table,
+    inserted: result,
+    count: result?.length || 0
+  }
+}
+
+async function executeSupabaseUpdate(params: any, userId: string) {
+  const { table, data, filter, returning = "*" } = params
+  
+  console.log('✏️ Supabase update:', { table, data, filter, returning, userId })
+  
+  if (!filter) {
+    throw new Error('Filter is required for update operations')
+  }
+  
+  let query = supabase.from(table).update(data)
+  
+  // Apply filter
+  const { field, operator, value } = filter
+  switch (operator) {
+    case "eq":
+      query = query.eq(field, value)
+      break
+    case "neq":
+      query = query.neq(field, value)
+      break
+    case "gt":
+      query = query.gt(field, value)
+      break
+    case "lt":
+      query = query.lt(field, value)
+      break
+    case "gte":
+      query = query.gte(field, value)
+      break
+    case "lte":
+      query = query.lte(field, value)
+      break
+    default:
+      throw new Error(`Unsupported filter operator: ${operator}`)
+  }
+  
+  query = query.select(returning)
+  
+  const { data: result, error } = await query
+  
+  if (error) {
+    throw new Error(`Failed to update ${table}: ${error.message}`)
+  }
+  
+  return {
+    table,
+    updated: result,
+    count: result?.length || 0
+  }
+}
+
+async function executeSupabaseDelete(params: any, userId: string) {
+  const { table, filter, returning = "*" } = params
+  
+  console.log('🗑️ Supabase delete:', { table, filter, returning, userId })
+  
+  if (!filter) {
+    throw new Error('Filter is required for delete operations')
+  }
+  
+  let query = supabase.from(table)
+  
+  // Apply filter
+  const { field, operator, value } = filter
+  switch (operator) {
+    case "eq":
+      query = query.delete().eq(field, value)
+      break
+    case "neq":
+      query = query.delete().neq(field, value)
+      break
+    case "gt":
+      query = query.delete().gt(field, value)
+      break
+    case "lt":
+      query = query.delete().lt(field, value)
+      break
+    case "gte":
+      query = query.delete().gte(field, value)
+      break
+    case "lte":
+      query = query.delete().lte(field, value)
+      break
+    default:
+      throw new Error(`Unsupported filter operator: ${operator}`)
+  }
+  
+  query = query.select(returning)
+  
+  const { data: result, error } = await query
+  
+  if (error) {
+    throw new Error(`Failed to delete from ${table}: ${error.message}`)
+  }
+  
+  return {
+    table,
+    deleted: result,
+    count: result?.length || 0
+  }
+}
+
 // Main MCP handler
 async function handleMCPRequest(request: MCPRequest, userId: string): Promise<MCPResponse> {
   const { method, params, id } = request
@@ -406,6 +779,18 @@ async function handleMCPRequest(request: MCPRequest, userId: string): Promise<MC
             break
           case "search_messages":
             result = await executeSearchMessages(toolArgs, userId)
+            break
+          case "supabase_select":
+            result = await executeSupabaseSelect(toolArgs, userId)
+            break
+          case "supabase_insert":
+            result = await executeSupabaseInsert(toolArgs, userId)
+            break
+          case "supabase_update":
+            result = await executeSupabaseUpdate(toolArgs, userId)
+            break
+          case "supabase_delete":
+            result = await executeSupabaseDelete(toolArgs, userId)
             break
           default:
             throw new Error(`Unknown tool: ${toolName}`)
@@ -468,14 +853,14 @@ async function handleMCPRequest(request: MCPRequest, userId: string): Promise<MC
       id,
       error: {
         code: -32603,
-        message: error.message || "Internal error"
+        message: (error as Error).message || "Internal error"
       }
     }
   }
 }
 
 // Main serve handler
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS
   if (req.method === 'OPTIONS') {
     return new Response(null, {

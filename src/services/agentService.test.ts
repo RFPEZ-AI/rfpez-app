@@ -114,10 +114,10 @@ describe('AgentService', () => {
       
       mockSupabase.from.mockReturnValue({
         select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockImplementation((field, _value) => {
+          eq: jest.fn().mockImplementation((field) => {
             if (field === 'is_active') {
               return {
-                eq: jest.fn().mockImplementation((field2, _value2) => {
+                eq: jest.fn().mockImplementation((field2) => {
                   if (field2 === 'is_free') {
                     return {
                       order: jest.fn().mockResolvedValue({
@@ -208,10 +208,10 @@ describe('AgentService', () => {
       
       mockSupabase.from.mockReturnValue({
         select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockImplementation((field, _value) => {
+          eq: jest.fn().mockImplementation((field) => {
             if (field === 'is_active') {
               return {
-                eq: jest.fn().mockImplementation((field2, _value2) => {
+                eq: jest.fn().mockImplementation((field2) => {
                   if (field2 === 'is_default') {
                     return {
                       single: jest.fn().mockResolvedValue({
