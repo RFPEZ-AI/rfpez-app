@@ -381,8 +381,54 @@ export const useMessageHandling = () => {
     }
   };
 
+  // Helper function to send auto-prompt messages after form submissions
+  const sendAutoPrompt = async (
+    formName: string,
+    messages: Message[],
+    setMessages: (updater: (prev: Message[]) => Message[]) => void,
+    setIsLoading: (loading: boolean) => void,
+    currentSessionId: string | undefined,
+    setCurrentSessionId: (id: string) => void,
+    setSelectedSessionId: (id: string) => void,
+    createNewSession: (agent: SessionActiveAgent | null) => Promise<string | null>,
+    loadUserSessions: () => Promise<void>,
+    isAuthenticated: boolean,
+    userId: string | undefined,
+    currentAgent: SessionActiveAgent | null,
+    userProfile: UserProfile | null,
+    currentRfp: RFP | null,
+    addClaudeArtifacts: (metadata: Record<string, unknown>, messageId?: string) => void,
+    loadSessionAgent: (sessionId: string) => Promise<void>,
+    handleAgentChanged: (agent: SessionActiveAgent) => Message | null
+  ) => {
+    const autoPromptMessage = `I submitted form "${formName}"`;
+    console.log('Sending auto-prompt:', autoPromptMessage);
+    
+    // Use the existing handleSendMessage function to send the auto-prompt
+    await handleSendMessage(
+      autoPromptMessage,
+      messages,
+      setMessages,
+      setIsLoading,
+      currentSessionId,
+      setCurrentSessionId,
+      setSelectedSessionId,
+      createNewSession,
+      loadUserSessions,
+      isAuthenticated,
+      userId,
+      currentAgent,
+      userProfile,
+      currentRfp,
+      addClaudeArtifacts,
+      loadSessionAgent,
+      handleAgentChanged
+    );
+  };
+
   return {
     handleSendMessage,
+    sendAutoPrompt,
     cancelRequest
   };
 };

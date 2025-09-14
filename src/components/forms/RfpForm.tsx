@@ -15,6 +15,7 @@ interface RfpFormProps {
   onSubmit?: (data: Record<string, unknown>) => void;
   onChange?: (data: Record<string, unknown>) => void;
   onError?: (errors: unknown[]) => void;
+  onSubmitSuccess?: (formName: string) => void; // Callback for successful submissions to trigger auto-prompts
   disabled?: boolean;
   readonly?: boolean;
   title?: string;
@@ -31,6 +32,7 @@ export const RfpForm: React.FC<RfpFormProps> = ({
   onSubmit,
   onChange,
   onError,
+  onSubmitSuccess,
   disabled = false,
   readonly = false,
   title,
@@ -47,9 +49,21 @@ export const RfpForm: React.FC<RfpFormProps> = ({
     return { ...defaults, ...formData };
   }, [defaults, formData]);
 
-  const handleSubmit = (data: IChangeEvent<Record<string, unknown>>) => {
+  const handleSubmit = async (data: IChangeEvent<Record<string, unknown>>) => {
     if (data.formData) {
-      onSubmit?.(data.formData);
+      try {
+        // Call the original onSubmit handler
+        await onSubmit?.(data.formData);
+        
+        // If submission was successful, trigger auto-prompt
+        if (onSubmitSuccess) {
+          const formName = title || schema.title || 'Form';
+          onSubmitSuccess(formName);
+        }
+      } catch (error) {
+        console.error('Form submission failed:', error);
+        // Don't trigger auto-prompt if submission failed
+      }
     }
   };
 
