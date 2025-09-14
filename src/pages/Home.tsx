@@ -110,7 +110,7 @@ const Home: React.FC = () => {
     clearArtifacts
   } = useArtifactManagement(currentRfp, currentSessionId, isAuthenticated, user, messages, setMessages);
 
-  const { handleSendMessage, cancelRequest } = useMessageHandling();
+  const { handleSendMessage, sendAutoPrompt, cancelRequest } = useMessageHandling();
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -304,6 +304,69 @@ const Home: React.FC = () => {
     const agentMessage = handleAgentChanged(newAgent);
     if (agentMessage) {
       setMessages((prev: Message[]) => [...prev, agentMessage]);
+    }
+  };
+
+  // Form submission handler with auto-prompt
+  const handleFormSubmissionWithAutoPrompt = async (artifact: Artifact, formData: Record<string, unknown>) => {
+    console.log('=== FORM SUBMISSION WITH AUTO-PROMPT ===');
+    console.log('Artifact name:', artifact.name);
+    console.log('Form data:', formData);
+    
+    try {
+      // Use currentRfpId from props
+      if (!currentRfpId) {
+        console.error('❌ No RFP context available');
+        alert('No RFP context available. Please select an RFP first.');
+        return;
+      }
+
+      console.log('📤 Updating RFP using RFPService...');
+      
+      // Save the form response to the database using RFP service
+      const { RFPService } = await import('../services/rfpService');
+      const updatedRfp = await RFPService.update(currentRfpId, {
+        buyer_questionnaire_response: formData
+      });
+
+      if (updatedRfp) {
+        console.log('✅ Form response saved successfully');
+        alert('Questionnaire submitted successfully!');
+        
+        // Send auto-prompt after successful submission
+        const formName = artifact.name || 'Form';
+        console.log('📤 Sending auto-prompt for form:', formName);
+        
+        await sendAutoPrompt(
+          formName,
+          messages,
+          setMessages,
+          setIsLoading,
+          currentSessionId,
+          setCurrentSessionId,
+          setSelectedSessionId,
+          createNewSession,
+          loadUserSessions,
+          isAuthenticated,
+          userId,
+          currentAgent,
+          userProfile,
+          currentRfp,
+          addClaudeArtifacts,
+          loadSessionAgent,
+          (agent) => {
+            const agentMessage = handleAgentChanged(agent);
+            return agentMessage;
+          }
+        );
+      } else {
+        console.error('❌ Failed to save form response - RFPService.update returned null');
+        alert('Failed to save questionnaire response. Please try again.');
+      }
+      
+    } catch (error) {
+      console.error('❌ Error submitting form:', error);
+      alert('An error occurred while submitting the questionnaire.');
     }
   };
 
@@ -580,6 +643,7 @@ const Home: React.FC = () => {
             currentRfpId={currentRfpId}
             onDownloadArtifact={handleDownloadArtifact}
             onArtifactSelect={handleArtifactSelect}
+            onFormSubmit={handleFormSubmissionWithAutoPrompt}
             currentAgent={currentAgent}
             onCancelRequest={cancelRequest}
           />

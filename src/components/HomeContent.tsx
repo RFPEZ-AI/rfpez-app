@@ -28,6 +28,7 @@ interface HomeContentProps {
   currentRfpId: number | null;
   onDownloadArtifact: (artifact: Artifact) => void;
   onArtifactSelect?: (artifactRef: ArtifactReference) => void;
+  onFormSubmit?: (artifact: Artifact, formData: Record<string, unknown>) => void;
   
   // Agent and cancel functionality
   currentAgent?: { agent_name: string } | null;
@@ -49,6 +50,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
   currentRfpId,
   onDownloadArtifact,
   onArtifactSelect,
+  onFormSubmit,
   currentAgent,
   onCancelRequest
 }) => {
@@ -91,6 +93,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
       <ArtifactWindow
         artifact={displayedArtifact}
         onDownload={onDownloadArtifact}
+        onFormSubmit={onFormSubmit}
         currentRfpId={currentRfpId}
       />
     </div>
