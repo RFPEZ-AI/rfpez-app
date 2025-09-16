@@ -2241,7 +2241,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
     
     try {
       // First check if the artifact exists
-      const { data: existingArtifact, error: checkError } = await supabase
+      const { error: checkError } = await supabase
         .from('form_artifacts')
         .select('id')
         .eq('id', artifact_id)
@@ -2251,7 +2251,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
         // Artifact doesn't exist - create it instead
         console.log('📝 Artifact does not exist, creating new artifact:', artifact_id);
         
-        const { data: newArtifact, error: createError } = await supabase
+        const { error: createError } = await supabase
           .from('form_artifacts')
           .insert({
             id: artifact_id,
@@ -2313,7 +2313,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       }
       
       // Artifact exists - proceed with update
-      const { data: updatedArtifact, error: updateError } = await supabase
+      const { error: updateError } = await supabase
         .from('form_artifacts')
         .update({
           title: updates.title,
