@@ -79,7 +79,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
         {/* Left section - Logo and title */}
         <div slot="start" style={{ display: 'flex', alignItems: 'center', padding: '0 8px' }}>
           <img 
-            src="/assets/logo.svg" 
+            src="/assets/logo.svg?v=2" 
             alt="RFPEZ.AI" 
             style={{ height: '32px', marginRight: isMobile ? '6px' : '12px' }}
           />
