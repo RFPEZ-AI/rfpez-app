@@ -358,11 +358,17 @@ export class RFPService {
     // This is a mock implementation - in reality this would call Claude API
     // to generate a comprehensive request for proposal based on the RFP spec and bid data
     
+    // Generate the bid form URL using the same route as the RFP Design Agent
+    const bidFormUrl = `/rfp/${rfp.id}/bid`;
+    
     const requestText = `
 # Request for Proposal: ${rfp.name}
 
 ## Executive Summary
 This is a request for proposal (RFP) for "${rfp.name}". We are seeking qualified suppliers to submit bids for this procurement opportunity.
+
+**IMPORTANT: Bid Submission**
+To submit your bid for this RFP, please access our [Bid Submission Form](${bidFormUrl})
 
 ## Project Overview
 ${rfp.description}
@@ -371,7 +377,13 @@ ${rfp.description}
 ${rfp.specification}
 
 ## Submission Instructions
-Please submit your bid through our online bid form or attached Word document. Your response should address all requirements outlined in this RFP.
+Please submit your bid through our online bid form. Your response should address all requirements outlined in this RFP.
+
+**How to Submit Your Bid:**
+1. Review all requirements above
+2. Access our online [Bid Submission Form](${bidFormUrl})
+3. Complete all required fields
+4. Submit before the deadline: ${new Date(rfp.due_date).toLocaleDateString()}
 
 ### Required Information
 ${this.formatBidDataForRequest(bidData)}
@@ -388,6 +400,9 @@ Proposals will be evaluated based on:
 
 ## Contact Information
 For questions about this RFP, please contact us through the RFPEZ.AI platform.
+
+**Important Links:**
+- [Bid Submission Form](${bidFormUrl})
 
 ---
 *Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*

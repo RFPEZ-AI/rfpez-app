@@ -26,7 +26,8 @@ export class FunctionStatusVerifier {
       'supabase_update',
       'supabase_delete',
       'create_form_artifact',
-      'validate_form_data'
+      'validate_form_data',
+      'generate_rfp_bid_url'
     ];
 
     const results: Record<string, { available: boolean; error?: string }> = {};

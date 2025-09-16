@@ -286,7 +286,8 @@ const Home: React.FC = () => {
       (agent) => {
         const agentMessage = handleAgentChanged(agent);
         return agentMessage;
-      }
+      },
+      selectedArtifact // Add current artifact context
     );
   };
 

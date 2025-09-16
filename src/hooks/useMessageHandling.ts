@@ -7,6 +7,7 @@ import { SessionActiveAgent, UserProfile } from '../types/database';
 import DatabaseService from '../services/database';
 import { ClaudeService } from '../services/claudeService';
 import { AgentService } from '../services/agentService';
+import { SmartAutoPromptManager } from '../utils/smartAutoPromptManager';
 import { categorizeError } from '../components/APIErrorHandler';
 
 export const useMessageHandling = () => {
@@ -91,10 +92,18 @@ export const useMessageHandling = () => {
     currentRfp: RFP | null,
     addClaudeArtifacts: (metadata: Record<string, unknown>, messageId?: string) => void,
     loadSessionAgent: (sessionId: string) => Promise<void>,
-    handleAgentChanged: (agent: SessionActiveAgent) => Message | null
+    handleAgentChanged: (agent: SessionActiveAgent) => Message | null,
+    currentArtifact?: {
+      id: string;
+      name: string;
+      type: string;
+      content?: string;
+    } | null
   ) => {
     console.log('=== SENDING MESSAGE ===');
     console.log('Message content:', content);
+    console.log('=== CURRENT ARTIFACT DEBUG ===');
+    console.log('currentArtifact:', currentArtifact);
     
     // Create new abort controller for this request
     abortControllerRef.current = new AbortController();
@@ -222,6 +231,7 @@ export const useMessageHandling = () => {
             description: currentRfp.description,
             specification: currentRfp.specification
           } : null,
+          currentArtifact || null,
           abortControllerRef.current?.signal
         );
         
@@ -401,9 +411,23 @@ export const useMessageHandling = () => {
     loadSessionAgent: (sessionId: string) => Promise<void>,
     handleAgentChanged: (agent: SessionActiveAgent) => Message | null
   ) => {
-    const autoPromptMessage = `I submitted form "${formName}"`;
-    console.log('Sending auto-prompt:', autoPromptMessage);
     
+    // Use smart auto-prompt manager to decide if we should send
+    const decision = SmartAutoPromptManager.shouldSendAutoPrompt(
+      formName,
+      {}, // form data not available here, but could be passed if needed
+      currentRfp ? { status: 'unknown', phase: 'unknown' } : undefined,
+      messages
+    );
+
+    if (!decision.shouldSend) {
+      console.log(`⏭️ Skipping auto-prompt: ${decision.reason}`);
+      return;
+    }
+
+    const autoPromptMessage = decision.prompt || `I submitted form "${formName}"`;
+    console.log('🤖 Sending smart auto-prompt:', autoPromptMessage);
+
     // Use the existing handleSendMessage function to send the auto-prompt
     await handleSendMessage(
       autoPromptMessage,
@@ -422,11 +446,10 @@ export const useMessageHandling = () => {
       currentRfp,
       addClaudeArtifacts,
       loadSessionAgent,
-      handleAgentChanged
+      handleAgentChanged,
+      null // currentArtifact - not available in auto-prompt context
     );
-  };
-
-  return {
+  };  return {
     handleSendMessage,
     sendAutoPrompt,
     cancelRequest
