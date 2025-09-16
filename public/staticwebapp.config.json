@@ -1,6 +1,10 @@
 {
   "routes": [
     {
+      "route": "/",
+      "rewrite": "/index.html"
+    },
+    {
       "route": "/service-worker.js",
       "headers": {
         "cache-control": "no-cache, no-store, must-revalidate",
