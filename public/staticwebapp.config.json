@@ -4,13 +4,13 @@
       "route": "/static/*"
     },
     {
-      "route": "/assets/*"
-    },
-    {
       "route": "/assets/manifest.json",
       "headers": {
         "Content-Type": "application/json"
       }
+    },
+    {
+      "route": "/assets/*"
     },
     {
       "route": "/*",
