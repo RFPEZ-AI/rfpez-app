@@ -27,8 +27,8 @@ export class SmartAutoPromptManager {
   private static autoPromptRules: AutoPromptRule[] = [
     {
       // High priority: Critical workflow transitions
-      condition: (ctx) => ctx.formType === 'buyer_questionnaire' && ctx.rfpStatus === 'gathering_requirements',
-      prompt: (ctx) => `I completed the buyer questionnaire with project details. Please proceed to Phase 5-6 auto-generation.`,
+      condition: () => false, // Disabled for now
+      prompt: () => `I completed the buyer questionnaire with project details. Please proceed to Phase 5-6 auto-generation.`,
       priority: 100,
       skipIfRecentSimilar: false
     },
@@ -87,7 +87,7 @@ export class SmartAutoPromptManager {
     const context: AutoPromptContext = {
       formType: this.normalizeFormType(formName),
       formData,
-      currentPhase: this.detectCurrentPhase(formName, formData),
+      currentPhase: this.detectCurrentPhase(formName),
       rfpStatus: rfpContext?.status || 'unknown',
       lastAgentAction: this.getLastAgentAction(lastMessages)
     };
@@ -139,7 +139,7 @@ export class SmartAutoPromptManager {
   /**
    * Detect current workflow phase based on form
    */
-  private static detectCurrentPhase(formName: string, formData: Record<string, unknown>): string {
+  private static detectCurrentPhase(formName: string): string {
     const normalizedName = formName.toLowerCase();
     
     if (normalizedName.includes('buyer') || normalizedName.includes('questionnaire')) {
