@@ -1,20 +1,6 @@
 {
   "routes": [
     {
-      "route": "/manifest.json",
-      "headers": {
-        "cache-control": "public, max-age=3600",
-        "content-type": "application/json"
-      }
-    },
-    {
-      "route": "/logo.svg",
-      "headers": {
-        "cache-control": "public, max-age=3600",
-        "content-type": "image/svg+xml"
-      }
-    },
-    {
       "route": "/service-worker.js",
       "headers": {
         "cache-control": "no-cache, no-store, must-revalidate",
@@ -31,13 +17,6 @@
       "route": "/static/*",
       "headers": {
         "cache-control": "public, max-age=31536000, immutable"
-      }
-    },
-    {
-      "route": "*.svg",
-      "headers": {
-        "cache-control": "public, max-age=3600",
-        "content-type": "image/svg+xml"
       }
     },
     {
