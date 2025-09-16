@@ -31,23 +31,23 @@ ALTER TABLE public.form_artifacts ENABLE ROW LEVEL SECURITY;
 -- Allow users to see their own form artifacts
 CREATE POLICY "Users can view their own form artifacts" ON public.form_artifacts
   FOR SELECT
-  USING (auth.uid() = user_id OR user_id IS NULL);
+  USING ((select auth.uid()) = user_id OR user_id IS NULL);
 
 -- Allow users to insert their own form artifacts
 CREATE POLICY "Users can insert their own form artifacts" ON public.form_artifacts
   FOR INSERT
-  WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+  WITH CHECK ((select auth.uid()) = user_id OR user_id IS NULL);
 
 -- Allow users to update their own form artifacts
 CREATE POLICY "Users can update their own form artifacts" ON public.form_artifacts
   FOR UPDATE
-  USING (auth.uid() = user_id OR user_id IS NULL)
-  WITH CHECK (auth.uid() = user_id OR user_id IS NULL);
+  USING ((select auth.uid()) = user_id OR user_id IS NULL)
+  WITH CHECK ((select auth.uid()) = user_id OR user_id IS NULL);
 
 -- Allow users to delete their own form artifacts
 CREATE POLICY "Users can delete their own form artifacts" ON public.form_artifacts
   FOR DELETE
-  USING (auth.uid() = user_id OR user_id IS NULL);
+  USING ((select auth.uid()) = user_id OR user_id IS NULL);
 
 -- Grant necessary permissions
 GRANT ALL ON public.form_artifacts TO authenticated;
