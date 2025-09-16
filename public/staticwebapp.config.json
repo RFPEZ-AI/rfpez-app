@@ -8,6 +8,13 @@
       }
     },
     {
+      "route": "/logo.svg",
+      "headers": {
+        "cache-control": "public, max-age=3600",
+        "content-type": "image/svg+xml"
+      }
+    },
+    {
       "route": "/service-worker.js",
       "headers": {
         "cache-control": "no-cache, no-store, must-revalidate",
