@@ -42,11 +42,37 @@ export const RfpForm: React.FC<RfpFormProps> = ({
   loading = false,
   className
 }) => {
+  // Add defensive checks for formSpec structure
+  if (!formSpec) {
+    return (
+      <IonCard className={className}>
+        <IonCardContent>
+          <IonText color="danger">
+            <p>Form specification is missing</p>
+          </IonText>
+        </IonCardContent>
+      </IonCard>
+    );
+  }
+
   const { schema, uiSchema, defaults } = formSpec;
+
+  // Add defensive check for schema
+  if (!schema) {
+    return (
+      <IonCard className={className}>
+        <IonCardContent>
+          <IonText color="danger">
+            <p>Form schema is missing</p>
+          </IonText>
+        </IonCardContent>
+      </IonCard>
+    );
+  }
 
   // Merge defaults with formData
   const effectiveFormData = React.useMemo(() => {
-    return { ...defaults, ...formData };
+    return { ...(defaults || {}), ...formData };
   }, [defaults, formData]);
 
   const handleSubmit = async (data: IChangeEvent<Record<string, unknown>>) => {
@@ -85,10 +111,10 @@ export const RfpForm: React.FC<RfpFormProps> = ({
 
   return (
     <IonCard className={className}>
-      {showTitle && (title || schema.title) && (
+      {showTitle && (title || schema?.title) && (
         <IonCardHeader>
-          <IonCardTitle>{title || schema.title}</IonCardTitle>
-          {schema.description && (
+          <IonCardTitle>{title || schema?.title}</IonCardTitle>
+          {schema?.description && (
             <IonText color="medium">
               <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem' }}>
                 {schema.description}
@@ -101,7 +127,7 @@ export const RfpForm: React.FC<RfpFormProps> = ({
       <IonCardContent>
         <Form
           schema={schema}
-          uiSchema={uiSchema}
+          uiSchema={uiSchema || {}}
           formData={effectiveFormData}
           widgets={ionicWidgets}
           templates={templates}

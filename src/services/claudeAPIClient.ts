@@ -68,11 +68,11 @@ export class ClaudeAPIClient {
       logger.debug('Sending Claude API request', {
         component: 'ClaudeAPIClient',
         messageCount: messages.length,
-        model: options?.model || 'claude-3-5-sonnet-20241022'
+        model: options?.model || 'claude-sonnet-4-20250514'
       });
 
       const response = await client.messages.create({
-        model: options?.model || 'claude-3-5-sonnet-20241022',
+        model: options?.model || 'claude-sonnet-4-20250514',
         max_tokens: options?.maxTokens || 2000,
         temperature: options?.temperature || 0.7,
         system: systemPrompt,

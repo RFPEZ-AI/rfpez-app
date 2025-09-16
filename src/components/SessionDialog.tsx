@@ -144,7 +144,7 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
             <IonCard style={{ marginRight: '20%' }}>
               <IonCardContent>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>{currentAgent?.agent_name || 'AI'} thinking...</div>
+                  <div>{currentAgent?.agent_name || 'AI'} Agent is working...</div>
                   {onCancelRequest && (
                     <button 
                       onClick={onCancelRequest}

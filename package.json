@@ -15,7 +15,7 @@
     "cors": "^2.8.5",
     "cross-env": "^7.0.3",
     "docx": "^9.5.1",
-    "dotenv": "^17.2.1",
+    "dotenv": "^17.2.2",
     "express": "^4.18.2",
     "file-saver": "^2.0.5",
     "history": "^4.9.0",

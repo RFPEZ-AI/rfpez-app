@@ -77,6 +77,12 @@ export class ClaudeService {
       description: string;
       specification: string;
     } | null,
+    currentArtifact?: {
+      id: string;
+      name: string;
+      type: string;
+      content?: string;
+    } | null,
     abortSignal?: AbortSignal
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
@@ -126,7 +132,20 @@ CURRENT RFP CONTEXT:
 
 You are currently working with this specific RFP. When creating questionnaires, generating proposals, or managing RFP data, use this RFP ID (${currentRfp.id}) for database operations. You can reference the RFP details above to provide context-aware assistance.` : '';
 
-      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}
+      console.log('=== CLAUDE SERVICE ARTIFACT DEBUG ===');
+      console.log('currentArtifact received:', currentArtifact);
+
+      const artifactContext = currentArtifact ? `
+
+CURRENT ARTIFACT CONTEXT:
+- Artifact ID: ${currentArtifact.id}
+- Artifact Name: ${currentArtifact.name}
+- Artifact Type: ${currentArtifact.type}
+${currentArtifact.type === 'form' ? `
+This is the form currently displayed in the artifact window. When users ask you to "fill out the form" or "update the form", they are referring to this specific form artifact. Use the update_form_artifact function with this artifact ID (${currentArtifact.id}) to populate or modify the form data.` : `
+This is the ${currentArtifact.type} currently displayed in the artifact window.`}` : '';
+
+      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}${artifactContext}
 
 You are part of a multi-agent system with integrated MCP (Model Context Protocol) support and have access to several powerful functions:
 

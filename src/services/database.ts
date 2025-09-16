@@ -12,6 +12,9 @@ import type {
 } from '../types/database';
 import type { ArtifactReference } from '../types/home';
 
+// Import AgentService statically - circular dependency should be resolved by module system
+import { AgentService } from './agentService';
+
 export class DatabaseService {
   // Session operations
   static async createSession(supabaseUserId: string, title: string, description?: string): Promise<Session | null> {
@@ -68,7 +71,6 @@ export class DatabaseService {
     }
 
     // Initialize with agent (use default if none specified)
-    const { AgentService } = await import('./agentService');
     if (agentId) {
       await AgentService.setSessionAgent(session.id, agentId, supabaseUserId);
     } else {
@@ -122,7 +124,6 @@ export class DatabaseService {
     const sessionStats: SessionWithStats[] = await Promise.all(
       (sessions || []).map(async (session) => {
         // Get the active agent for this session
-        const { AgentService } = await import('./agentService');
         const activeAgent = await AgentService.getSessionActiveAgent(session.id);
         
         return {
@@ -517,32 +518,62 @@ export class DatabaseService {
 
       console.log('✅ Form artifacts table exists, proceeding with query...');
 
-      let query = supabase
-        .from('form_artifacts')
-        .select('*')
-        .eq('status', 'active')
-        .order('created_at', { ascending: false });
-
       // If user is authenticated, get their artifacts + anonymous ones
       // If not authenticated, only get anonymous ones
+      let formArtifacts: unknown[] = [];
+      
       if (userId) {
-        query = query.or(`user_id.eq.${userId},user_id.is.null`);
+        // Get user's artifacts
+        const { data: userArtifacts, error: userError } = await supabase
+          .from('form_artifacts')
+          .select('*')
+          .eq('status', 'active')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false });
+
+        if (userError) {
+          console.error('❌ Error loading user form artifacts:', userError);
+        } else {
+          formArtifacts = [...formArtifacts, ...(userArtifacts || [])];
+        }
+
+        // Get anonymous artifacts
+        const { data: anonArtifacts, error: anonError } = await supabase
+          .from('form_artifacts')
+          .select('*')
+          .eq('status', 'active')
+          .is('user_id', null)
+          .order('created_at', { ascending: false });
+
+        if (anonError) {
+          console.error('❌ Error loading anonymous form artifacts:', anonError);
+        } else {
+          formArtifacts = [...formArtifacts, ...(anonArtifacts || [])];
+        }
       } else {
-        query = query.is('user_id', null);
+        // Only get anonymous artifacts
+        const { data: anonArtifacts, error: anonError } = await supabase
+          .from('form_artifacts')
+          .select('*')
+          .eq('status', 'active')
+          .is('user_id', null)
+          .order('created_at', { ascending: false });
+
+        if (anonError) {
+          console.error('❌ Error loading anonymous form artifacts:', anonError);
+          return [];
+        }
+        formArtifacts = anonArtifacts || [];
       }
 
-      const { data: formArtifacts, error } = await query;
-
-      if (error) {
-        console.error('❌ Error loading form artifacts:', error);
-        console.error('❌ Error details:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code
-        });
-        return [];
-      }
+      // Sort combined results by created_at descending
+      formArtifacts.sort((a: unknown, b: unknown) => {
+        const itemA = a as { created_at: string };
+        const itemB = b as { created_at: string };
+        const dateA = new Date(itemA.created_at).getTime();
+        const dateB = new Date(itemB.created_at).getTime();
+        return dateB - dateA;
+      });
 
       console.log(`✅ Loaded ${formArtifacts?.length || 0} form artifacts from database`);
       return formArtifacts || [];

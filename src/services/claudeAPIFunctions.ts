@@ -329,7 +329,7 @@ export const claudeApiFunctions: Tool[] = [
   // Add Artifact Functions for presenting content in the artifacts window
   {
     "name": "create_form_artifact",
-    "description": "Create and display a form in the artifacts window for user interaction",
+    "description": "Create and display a form in the artifacts window for user interaction. CRITICAL: You must ALWAYS provide the form_schema parameter - this is a complete JSON Schema object with type: 'object', properties defining all form fields, and required fields array. Never call this function with only title and description.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -343,7 +343,7 @@ export const claudeApiFunctions: Tool[] = [
         },
         "form_schema": {
           "type": "object",
-          "description": "JSON Schema defining the form structure and validation",
+          "description": "REQUIRED: Complete JSON Schema object defining form structure. Must include: type:'object', properties:{} with field definitions (name, type, title, description), and required:[] array. Example: {type:'object', properties:{name:{type:'string',title:'Name'}}, required:['name']}",
           "properties": {
             "type": { "type": "string", "enum": ["object"] },
             "properties": { "type": "object" },
@@ -617,6 +617,25 @@ export const claudeApiFunctions: Tool[] = [
         }
       },
       "required": ["name"]
+    }
+  },
+  {
+    "name": "generate_rfp_bid_url",
+    "description": "Generate a public-facing URL for suppliers to access the RFP bid form. Returns the URL in format /rfp/{id}/bid that suppliers can use to submit bids.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "rfp_id": {
+          "type": "number",
+          "description": "The ID of the RFP to generate bid URL for"
+        },
+        "include_domain": {
+          "type": "boolean",
+          "description": "Whether to include the full domain (default: false, returns relative URL)",
+          "default": false
+        }
+      },
+      "required": ["rfp_id"]
     }
   }
 ];
@@ -955,6 +974,8 @@ export class ClaudeAPIFunctionHandler {
   async executeFunction(functionName: string, parameters: any) {
     const userId = await this.getCurrentUserId();
     
+    console.log(`🚀 executeFunction called with:`, { functionName, parameters: JSON.stringify(parameters, null, 2), userId });
+    
     // MCP-enabled conversation functions - use MCP client for these
     try {
       console.log(`🔗 Attempting MCP client for function: ${functionName}`);
@@ -1071,6 +1092,8 @@ export class ClaudeAPIFunctionHandler {
         return await this.getArtifactStatus(parameters, userId);
       case 'create_and_set_rfp':
         return await this.createAndSetRfp(parameters, userId);
+      case 'generate_rfp_bid_url':
+        return await this.generateRfpBidUrl(parameters, userId);
     
       default:
         throw new Error(`Unknown function: ${functionName}`);
@@ -1779,18 +1802,56 @@ export class ClaudeAPIFunctionHandler {
   // Artifact Functions Implementation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createFormArtifact(params: any, userId: string) {
-    const { title, description, form_schema, ui_schema, form_data, submit_action } = params;
+    console.log('🎨 Starting createFormArtifact with params:', JSON.stringify(params, null, 2));
+    
+    const { title, description, ui_schema, form_data, submit_action } = params;
+    const { form_schema } = params;
     
     console.log('🎨 Creating form artifact:', { title, userId });
+    console.log('🔍 Destructured values:');
+    console.log('  - title:', title, '(type:', typeof title, ')');
+    console.log('  - description:', description, '(type:', typeof description, ')');
+    console.log('  - form_schema:', form_schema, '(type:', typeof form_schema, ')');
+    console.log('  - ui_schema:', ui_schema, '(type:', typeof ui_schema, ')');
+    console.log('  - form_data:', form_data, '(type:', typeof form_data, ')');
+    console.log('  - submit_action:', submit_action, '(type:', typeof submit_action, ')');
     
     if (!title) {
       throw new Error('Title is required for creating a form artifact');
     }
     
     if (!form_schema || typeof form_schema !== 'object') {
-      throw new Error('Valid form_schema is required for creating a form artifact');
+      // Enhanced debugging to understand what we received
+      console.error('🚨 MISSING FORM_SCHEMA ANALYSIS:');
+      console.error('  📦 Full params object:', JSON.stringify(params, null, 2));
+      console.error('  🔍 form_schema value:', form_schema);
+      console.error('  📝 Available keys in params:', Object.keys(params || {}));
+      console.error('  🎯 Expected: form_schema should be a JSON Schema object');
+      console.error('  📖 Example: {type:"object", properties:{name:{type:"string",title:"Name"}}, required:["name"]}');
+      
+      // Instead of auto-generation, throw an error to force Claude to retry correctly
+      throw new Error(`CRITICAL ERROR: form_schema parameter is required for create_form_artifact.
+
+You must provide a complete JSON Schema object with:
+- type: "object"
+- properties: { /* field definitions */ }
+- required: ["field1", "field2"]
+
+Example:
+{
+  "type": "object",
+  "title": "Procurement Requirements",
+  "properties": {
+    "company_name": {"type": "string", "title": "Company Name"},
+    "contact_email": {"type": "string", "format": "email", "title": "Contact Email"},
+    "product_type": {"type": "string", "title": "Product/Service Type"},
+    "delivery_date": {"type": "string", "format": "date", "title": "Required Delivery Date"}
+  },
+  "required": ["company_name", "contact_email", "product_type", "delivery_date"]
+}
+
+Please retry the create_form_artifact call with the complete form_schema parameter.`);
     }
-    
     if (!form_schema.type || form_schema.type !== 'object') {
       throw new Error('Form schema must have type "object"');
     }
@@ -1803,22 +1864,47 @@ export class ClaudeAPIFunctionHandler {
       // Generate a unique artifact ID
       const artifact_id = `form_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
+      // For form_artifacts table: use Supabase Auth User ID directly (references auth.users)
+      // For RLS policies: they will handle the user_profiles lookup internally
+      const dbUserId = userId !== 'anonymous' ? userId : null;
+      
+      console.log('🔧 User ID for form_artifacts database:', {
+        receivedUserId: userId,
+        dbUserId: dbUserId,
+        isAnonymous: userId === 'anonymous',
+        note: 'Using auth.users ID directly for foreign key constraint'
+      });
+      
+      const insertData = {
+        id: artifact_id,
+        user_id: dbUserId, // Use Supabase Auth User ID for auth.users foreign key
+        type: 'form',
+        title,
+        description: description || null,
+        schema: form_schema,
+        ui_schema: ui_schema || null,
+        data: form_data || null,
+        submit_action: submit_action || null,
+        status: 'active',
+        created_at: new Date().toISOString()
+      };
+      
+      console.log('🔍 INSERT DATA DEBUG:', {
+        id: insertData.id,
+        user_id: insertData.user_id,
+        type: insertData.type,
+        title: insertData.title,
+        dbUserIdType: typeof dbUserId,
+        dbUserIdValue: dbUserId,
+        isAnonymousUser: userId === 'anonymous',
+        originalUserId: userId,
+        tableConstraint: 'References auth.users(id)'
+      });
+      
       // Store artifact in the database for persistence
       const { error } = await supabase
         .from('form_artifacts')
-        .insert({
-          id: artifact_id,
-          user_id: userId !== 'anonymous' ? userId : null,
-          type: 'form',
-          title,
-          description: description || null,
-          schema: form_schema,
-          ui_schema: ui_schema || null,
-          data: form_data || null,
-          submit_action: submit_action || null,
-          status: 'active',
-          created_at: new Date().toISOString()
-        })
+        .insert(insertData)
         .select()
         .single();
       
@@ -2011,6 +2097,9 @@ export class ClaudeAPIFunctionHandler {
   private generateRequestContent(rfp: RFPData, questionnaire_response: QuestionnaireResponse, sections: string[], content_type: string): string {
     const form_data = questionnaire_response?.form_data || {};
     
+    // Generate the bid form URL
+    const bidFormUrl = `/rfp/${rfp.id}/bid`;
+    
     let content = '';
     
     if (content_type === 'markdown') {
@@ -2019,6 +2108,9 @@ export class ClaudeAPIFunctionHandler {
 ## Project Overview
 We are seeking qualified suppliers to submit bids for "${rfp.name}". This Request for Proposal (RFP) outlines our requirements and provides information necessary for preparing a comprehensive bid.
 
+**IMPORTANT: Bid Submission**
+To submit your bid for this RFP, please access our [Bid Submission Form](${bidFormUrl})
+
 ## Requirements
 ${rfp.description || 'No description provided'}
 
@@ -2026,7 +2118,13 @@ ${rfp.description || 'No description provided'}
 ${rfp.specification || 'No specification provided'}
 
 ## Submission Instructions
-Please submit your bid through our online bid form or the attached Word document. Your response should address all requirements outlined in this RFP.
+Please submit your bid through our online bid form. Your response should address all requirements outlined in this RFP.
+
+**How to Submit Your Bid:**
+1. Review all requirements above
+2. Access our online [Bid Submission Form](${bidFormUrl})
+3. Complete all required fields
+4. Submit before the deadline
 
 ### Required Information
 ${this.formatQuestionnaireDataForRequest(form_data)}
@@ -2052,6 +2150,9 @@ For questions about this RFP, please contact us through the RFPEZ.AI platform.
 ## Terms and Conditions
 By responding to this RFP, suppliers agree to the terms and conditions outlined in the bid form questionnaire.
 
+**Important Links:**
+- [Bid Submission Form](${bidFormUrl})
+
 ---
 *Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}*`;
     } else {
@@ -2061,6 +2162,9 @@ By responding to this RFP, suppliers agree to the terms and conditions outlined 
 Project Overview:
 We are seeking qualified suppliers to submit bids for "${rfp.name}". This Request for Proposal (RFP) outlines our requirements and provides information necessary for preparing a comprehensive bid.
 
+IMPORTANT: Bid Submission
+To submit your bid for this RFP, please access our Bid Submission Form at: ${bidFormUrl}
+
 Requirements:
 ${rfp.description || 'No description provided'}
 
@@ -2068,7 +2172,13 @@ Detailed Specifications:
 ${rfp.specification || 'No specification provided'}
 
 Submission Instructions:
-Please submit your bid through our online bid form or the attached Word document. Your response should address all requirements outlined in this RFP.
+Please submit your bid through our online bid form. Your response should address all requirements outlined in this RFP.
+
+How to Submit Your Bid:
+1. Review all requirements above
+2. Access our online Bid Submission Form at: ${bidFormUrl}
+3. Complete all required fields
+4. Submit before the deadline
 
 Required Information:
 ${this.formatQuestionnaireDataForRequest(form_data)}
@@ -2080,6 +2190,9 @@ Timeline:
 
 Contact Information:
 For questions about this RFP, please contact us through the RFPEZ.AI platform.
+
+Important Links:
+- Bid Submission Form: ${bidFormUrl}
 
 Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeString()}`;
     }
@@ -2114,9 +2227,93 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       throw new Error('Updates object is required');
     }
     
+    // For form_artifacts table: use Supabase Auth User ID directly (references auth.users)
+    // For RLS policies: they will handle the user_profiles lookup internally
+    const isAnonymous = !userId || userId === 'anonymous';
+    const dbUserId = isAnonymous ? null : userId;
+    
+    console.log('🔄 UPDATE FORM ARTIFACT - User ID for database:', {
+      receivedUserId: userId,
+      dbUserId,
+      isAnonymous,
+      note: 'Using auth.users ID directly for foreign key constraint'
+    });
+    
     try {
-      // Update artifact in database
-      const { error } = await supabase
+      // First check if the artifact exists
+      const { data: existingArtifact, error: checkError } = await supabase
+        .from('form_artifacts')
+        .select('id')
+        .eq('id', artifact_id)
+        .single();
+      
+      if (checkError && checkError.code === 'PGRST116') {
+        // Artifact doesn't exist - create it instead
+        console.log('📝 Artifact does not exist, creating new artifact:', artifact_id);
+        
+        const { data: newArtifact, error: createError } = await supabase
+          .from('form_artifacts')
+          .insert({
+            id: artifact_id,
+            user_id: dbUserId,
+            type: 'form',
+            title: updates.title || 'Untitled Form',
+            description: updates.description || 'Form created via update operation',
+            schema: updates.form_schema || {
+              type: "object",
+              properties: {
+                name: { type: "string", title: "Name" },
+                email: { type: "string", format: "email", title: "Email" }
+              },
+              required: ["name", "email"]
+            },
+            ui_schema: updates.ui_schema || {},
+            data: updates.form_data || {},
+            submit_action: updates.submit_action || 'save',
+            status: 'active',
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single();
+        
+        if (createError) {
+          console.error('❌ Failed to create artifact:', createError);
+          
+          // If it's an RLS policy error, handle gracefully for anonymous users
+          if (createError.code === '42501') {
+            console.log('⚠️ RLS policy prevented artifact creation, continuing without database storage');
+            return {
+              success: true,
+              artifact_id,
+              created: true,
+              updated_fields: Object.keys(updates),
+              created_at: new Date().toISOString(),
+              message: `Artifact "${artifact_id}" created in memory (database storage restricted)`,
+              warning: 'Database storage not available - form will not persist between sessions'
+            };
+          }
+          
+          throw new Error(`Failed to create artifact: ${createError.message}`);
+        }
+        
+        console.log('✅ Form artifact created successfully:', { artifact_id });
+        
+        return {
+          success: true,
+          artifact_id,
+          created: true,
+          updated_fields: Object.keys(updates),
+          created_at: new Date().toISOString(),
+          message: `Artifact "${artifact_id}" created successfully (was missing)`
+        };
+      } else if (checkError) {
+        console.error('❌ Error checking artifact existence:', checkError);
+        throw new Error(`Failed to check artifact: ${checkError.message}`);
+      }
+      
+      // Artifact exists - proceed with update
+      const { data: updatedArtifact, error: updateError } = await supabase
         .from('form_artifacts')
         .update({
           title: updates.title,
@@ -2131,9 +2328,9 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
         .select()
         .single();
       
-      if (error) {
-        console.error('❌ Failed to update artifact in database:', error);
-        throw new Error(`Failed to update artifact: ${error.message}`);
+      if (updateError) {
+        console.error('❌ Failed to update artifact in database:', updateError);
+        throw new Error(`Failed to update artifact: ${updateError.message}`);
       }
       
       console.log('✅ Form artifact updated successfully:', { artifact_id });
@@ -2141,6 +2338,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       return {
         success: true,
         artifact_id,
+        updated: true,
         updated_fields: Object.keys(updates),
         updated_at: new Date().toISOString(),
         message: `Artifact "${artifact_id}" updated successfully`
@@ -2170,6 +2368,33 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
         .single();
       
       if (artifactError) {
+        if (artifactError.code === 'PGRST116') {
+          console.warn('⚠️ Artifact not found:', artifact_id);
+          
+          // Provide helpful guidance based on the artifact ID pattern
+          let helpMessage = `Form artifact "${artifact_id}" does not exist.`;
+          
+          if (artifact_id.includes('_requirements_questionnaire') || 
+              artifact_id.includes('_rfp_') || 
+              artifact_id.match(/^[a-z_]+$/)) {
+            helpMessage += ' This appears to be a buyer requirements form. ';
+            helpMessage += 'The form may not have been properly created due to database permissions. ';
+            helpMessage += 'Please ensure the RLS policies allow form creation, or try creating the form again.';
+          }
+          
+          return {
+            artifact_id,
+            artifact: null,
+            latest_submission: null,
+            error: 'artifact_not_found',
+            message: helpMessage,
+            suggestions: [
+              'Check if the form was created successfully',
+              'Verify database permissions for form creation',
+              'Try re-creating the form with proper authentication'
+            ]
+          };
+        }
         console.error('❌ Failed to get artifact:', artifactError);
         throw new Error(`Failed to get artifact: ${artifactError.message}`);
       }
@@ -2682,6 +2907,52 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       
     } catch (error) {
       console.error('❌ Error in createAndSetRfp:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars
+  private async generateRfpBidUrl(params: any, _userId: string) {
+    const { rfp_id, include_domain = false } = params;
+    
+    console.log('🔗 Generating RFP bid URL:', { rfp_id, include_domain });
+    
+    if (!rfp_id || typeof rfp_id !== 'number') {
+      throw new Error('Valid rfp_id is required to generate bid URL');
+    }
+    
+    try {
+      // Verify RFP exists
+      const { data: rfp, error } = await supabase
+        .from('rfps')
+        .select('id, name')
+        .eq('id', rfp_id)
+        .single();
+      
+      if (error || !rfp) {
+        throw new Error(`RFP with ID ${rfp_id} not found`);
+      }
+      
+      // Generate the public-facing bid URL
+      // Use the correct route that matches our router configuration
+      const relativeUrl = `/rfp/${rfp_id}/bid`;
+      const fullUrl = include_domain 
+        ? `${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3000'}${relativeUrl}`
+        : relativeUrl;
+      
+      console.log('✅ RFP bid URL generated successfully:', { rfp_id, url: fullUrl });
+      
+      return {
+        success: true,
+        rfp_id,
+        rfp_name: rfp.name,
+        bid_url: fullUrl,
+        relative_url: relativeUrl,
+        message: `Bid URL generated for RFP "${rfp.name}"`
+      };
+      
+    } catch (error) {
+      console.error('❌ Error generating RFP bid URL:', error);
       throw error;
     }
   }

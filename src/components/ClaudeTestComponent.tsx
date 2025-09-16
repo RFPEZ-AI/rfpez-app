@@ -100,7 +100,9 @@ const ClaudeTestComponent: React.FC = () => {
           email: userProfile.email,
           full_name: userProfile.full_name,
           role: userProfile.role
-        } : undefined
+        } : undefined,
+        null, // No current RFP context for test
+        null  // No current artifact context for test
       );
       
       setResponse(claudeResponse.content);

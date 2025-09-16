@@ -383,6 +383,64 @@ export const useArtifactManagement = (
           }
         }
         
+        // Handle update_form_artifact results
+        if (functionResult.function === 'update_form_artifact' && functionResult.result) {
+          const result = functionResult.result;
+          
+          if (result.success && result.artifact_id) {
+            console.log('Form artifact update detected from function result:', result);
+            
+            const artifactId = result.artifact_id;
+            
+            // Find the existing artifact
+            const existingArtifactIndex = artifacts.findIndex(a => a.id === artifactId);
+            
+            if (existingArtifactIndex !== -1) {
+              console.log('📝 Updating existing form artifact:', artifactId);
+              
+              // Parse existing content
+              let existingContent;
+              try {
+                const contentStr = artifacts[existingArtifactIndex].content;
+                existingContent = contentStr ? JSON.parse(contentStr) : {};
+              } catch (e) {
+                console.error('Failed to parse existing artifact content:', e);
+                existingContent = {};
+              }
+              
+              // Update the artifact with new form data
+              const updatedArtifact: Artifact = {
+                ...artifacts[existingArtifactIndex],
+                name: result.title || existingContent.title || artifacts[existingArtifactIndex].name,
+                content: JSON.stringify({
+                  ...existingContent,
+                  title: result.title || existingContent.title,
+                  description: result.description || existingContent.description,
+                  schema: result.form_schema || existingContent.schema,
+                  uiSchema: result.ui_schema || existingContent.uiSchema || {},
+                  formData: result.form_data || existingContent.formData || {},
+                  submitAction: result.submit_action || existingContent.submitAction || { type: 'save_session' }
+                })
+              };
+              
+              // Update the artifacts array
+              setArtifacts(prev => {
+                const newArtifacts = [...prev];
+                newArtifacts[existingArtifactIndex] = updatedArtifact;
+                return newArtifacts;
+              });
+              
+              // Auto-select the updated artifact to show the changes
+              setSelectedArtifactId(artifactId);
+              console.log('✅ Updated form artifact from function result:', updatedArtifact);
+            } else {
+              console.log('⚠️ Could not find existing form artifact to update:', artifactId);
+              // Optionally, try to fetch the artifact from the database
+              console.log('ℹ️ Available artifacts:', artifacts.map(a => a.id));
+            }
+          }
+        }
+        
         // Handle create_text_artifact results
         if (functionResult.function === 'create_text_artifact' && functionResult.result) {
           const result = functionResult.result;

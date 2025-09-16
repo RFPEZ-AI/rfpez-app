@@ -114,6 +114,7 @@ const AgentManagementTest: React.FC = () => {
           role: 'user'
         },
         null, // rfp context
+        null, // artifact context
         abortControllerRef.current.signal
       );
 
@@ -276,7 +277,7 @@ const AgentManagementTest: React.FC = () => {
                   alignItems: 'center', 
                   gap: '8px' 
                 }}>
-                  <span>{currentAgent?.name || 'AI'} thinking...</span>
+                  <span>{currentAgent?.name || 'AI'} Agent is working...</span>
                   <IonButton 
                     size="small" 
                     fill="outline" 
