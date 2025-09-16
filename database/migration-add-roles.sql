@@ -55,15 +55,15 @@ GRANT EXECUTE ON FUNCTION get_users_by_role(TEXT) TO authenticated;
 -- Ensure users can insert their own profiles (required for new user registration)
 DROP POLICY IF EXISTS "Users can insert own profile" ON public.user_profiles;
 CREATE POLICY "Enable insert for users to create their own profile" ON public.user_profiles
-    FOR INSERT WITH CHECK (auth.uid() = supabase_user_id);
+    FOR INSERT WITH CHECK ((select auth.uid()) = supabase_user_id);
 
 -- Basic policies: users can view and update their own profiles
 DROP POLICY IF EXISTS "Users can view own profile" ON public.user_profiles;
 DROP POLICY IF EXISTS "Users can view profiles based on role" ON public.user_profiles;
 CREATE POLICY "Enable read access for users to their own profile" ON public.user_profiles
-    FOR SELECT USING (auth.uid() = supabase_user_id);
+    FOR SELECT USING ((select auth.uid()) = supabase_user_id);
 
 DROP POLICY IF EXISTS "Users can update own profile" ON public.user_profiles;
 DROP POLICY IF EXISTS "Users can update profiles based on role" ON public.user_profiles;
 CREATE POLICY "Enable update for users to update their own profile" ON public.user_profiles
-    FOR UPDATE USING (auth.uid() = supabase_user_id);
+    FOR UPDATE USING ((select auth.uid()) = supabase_user_id);

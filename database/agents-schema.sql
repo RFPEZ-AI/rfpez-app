@@ -88,11 +88,11 @@ DROP POLICY IF EXISTS "Users can create session agents in own sessions" ON publi
 DROP POLICY IF EXISTS "Users can update session agents in own sessions" ON public.session_agents;
 
 CREATE POLICY "Users can view session agents from own sessions" ON public.session_agents FOR SELECT 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING ((select auth.uid()) IN (SELECT user_id FROM public.sessions WHERE id = session_id));
 CREATE POLICY "Users can create session agents in own sessions" ON public.session_agents FOR INSERT 
-  WITH CHECK (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  WITH CHECK ((select auth.uid()) IN (SELECT user_id FROM public.sessions WHERE id = session_id));
 CREATE POLICY "Users can update session agents in own sessions" ON public.session_agents FOR UPDATE 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING ((select auth.uid()) IN (SELECT user_id FROM public.sessions WHERE id = session_id));
 
 -- Trigger for automatic timestamp updates on agents
 DROP TRIGGER IF EXISTS update_agents_updated_at ON public.agents;

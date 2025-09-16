@@ -14,15 +14,16 @@ DROP POLICY IF EXISTS "Users can insert own profile" ON public.user_profiles;
 -- Re-enable RLS
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 
--- Create simple, non-recursive policies
+-- Create simple, non-recursive policies with performance optimization
+-- Using subqueries for auth.uid() to prevent re-evaluation for each row
 CREATE POLICY "Enable read access for users to their own profile" ON public.user_profiles
-    FOR SELECT USING (auth.uid() = supabase_user_id);
+    FOR SELECT USING ((select auth.uid()) = supabase_user_id);
 
 CREATE POLICY "Enable insert for users to create their own profile" ON public.user_profiles
-    FOR INSERT WITH CHECK (auth.uid() = supabase_user_id);
+    FOR INSERT WITH CHECK ((select auth.uid()) = supabase_user_id);
 
 CREATE POLICY "Enable update for users to update their own profile" ON public.user_profiles
-    FOR UPDATE USING (auth.uid() = supabase_user_id);
+    FOR UPDATE USING ((select auth.uid()) = supabase_user_id);
 
 -- Verify the table structure and add role column if needed
 ALTER TABLE public.user_profiles 

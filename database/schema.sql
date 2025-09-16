@@ -162,18 +162,19 @@ DROP POLICY IF EXISTS "user_profiles_select_optimized" ON public.user_profiles;
 DROP POLICY IF EXISTS "user_profiles_update_optimized" ON public.user_profiles;
 
 -- Create standardized policies that match working authentication solution
+-- Using subqueries for auth.uid() to prevent re-evaluation per row for better performance
 CREATE POLICY "Users can read own profile" ON public.user_profiles 
-  FOR SELECT USING (auth.uid() = supabase_user_id);
+  FOR SELECT USING ((select auth.uid()) = supabase_user_id);
 
 CREATE POLICY "Users can insert own profile" ON public.user_profiles 
-  FOR INSERT WITH CHECK (auth.uid() = supabase_user_id);
+  FOR INSERT WITH CHECK ((select auth.uid()) = supabase_user_id);
 
 CREATE POLICY "Users can update own profile" ON public.user_profiles 
-  FOR UPDATE USING (auth.uid() = supabase_user_id);
+  FOR UPDATE USING ((select auth.uid()) = supabase_user_id);
 
 -- Optional: Allow users to delete their own profile
 CREATE POLICY "Users can delete own profile" ON public.user_profiles 
-  FOR DELETE USING (auth.uid() = supabase_user_id);
+  FOR DELETE USING ((select auth.uid()) = supabase_user_id);
 
 -- Sessions
 ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
@@ -243,11 +244,11 @@ CREATE POLICY "Users can delete artifacts from own sessions" ON public.artifacts
 -- Session Artifacts (junction table)
 ALTER TABLE public.session_artifacts ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Users can view session artifacts from own sessions" ON public.session_artifacts FOR SELECT 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING ((select auth.uid()) IN (SELECT user_id FROM public.sessions WHERE id = session_id));
 CREATE POLICY "Users can create session artifacts in own sessions" ON public.session_artifacts FOR INSERT 
-  WITH CHECK (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  WITH CHECK ((select auth.uid()) IN (SELECT user_id FROM public.sessions WHERE id = session_id));
 CREATE POLICY "Users can delete session artifacts from own sessions" ON public.session_artifacts FOR DELETE 
-  USING (auth.uid() IN (SELECT user_id FROM public.sessions WHERE id = session_id));
+  USING ((select auth.uid()) IN (SELECT user_id FROM public.sessions WHERE id = session_id));
 
 -- Functions for automatic timestamp updates
 CREATE OR REPLACE FUNCTION update_updated_at_column()
