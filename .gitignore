@@ -30,3 +30,7 @@ yarn-error.log*
 # Optional eslint cache
 .eslintcache
 test-automation/led-bulb-test-report-1757738266071.json
+
+# Temporary files
+/temp
+temp/
