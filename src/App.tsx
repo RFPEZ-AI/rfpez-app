@@ -61,6 +61,29 @@ const App: React.FC = () => {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
 
+  // Fix ARIA accessibility issue - prevent aria-hidden on focused elements
+  useEffect(() => {
+    const handleFocusIn = (event: FocusEvent) => {
+      const target = event.target as HTMLElement;
+      if (target && (target.matches('button, input, textarea, select') || target.classList.contains('button-native'))) {
+        // Find any ancestor with aria-hidden="true"
+        let ancestor = target.parentElement;
+        while (ancestor) {
+          if (ancestor.getAttribute('aria-hidden') === 'true') {
+            console.log('🔧 Removing aria-hidden from ancestor due to focused element:', target);
+            ancestor.removeAttribute('aria-hidden');
+            break;
+          }
+          ancestor = ancestor.parentElement;
+        }
+      }
+    };
+
+    // Listen for focus events on the document
+    document.addEventListener('focusin', handleFocusIn);
+    return () => document.removeEventListener('focusin', handleFocusIn);
+  }, []);
+
   return (
     <SupabaseProvider>
       <IonApp>

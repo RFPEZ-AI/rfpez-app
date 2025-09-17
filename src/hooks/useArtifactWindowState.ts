@@ -5,6 +5,7 @@ import { useIsMobile } from '../utils/useMediaQuery';
 
 const ARTIFACT_WINDOW_STATE_KEY = 'artifactWindowState';
 const LAST_SESSION_KEY = 'lastSessionId';
+const SESSION_ARTIFACTS_KEY = 'sessionArtifacts';
 
 interface ArtifactWindowState {
   isOpen: boolean;
@@ -133,6 +134,47 @@ export const useArtifactWindowState = () => {
     }
   }, []);
 
+  // Save last selected artifact for a session
+  const saveSessionArtifact = useCallback((sessionId: string, artifactId: string | null) => {
+    try {
+      const sessionArtifacts = JSON.parse(localStorage.getItem(SESSION_ARTIFACTS_KEY) || '{}');
+      if (artifactId) {
+        sessionArtifacts[sessionId] = artifactId;
+      } else {
+        delete sessionArtifacts[sessionId];
+      }
+      localStorage.setItem(SESSION_ARTIFACTS_KEY, JSON.stringify(sessionArtifacts));
+    } catch (error) {
+      console.warn('Failed to save session artifact:', error);
+    }
+  }, []);
+
+  // Get last selected artifact for a session
+  const getSessionArtifact = useCallback((sessionId: string): string | null => {
+    try {
+      const sessionArtifacts = JSON.parse(localStorage.getItem(SESSION_ARTIFACTS_KEY) || '{}');
+      return sessionArtifacts[sessionId] || null;
+    } catch (error) {
+      console.warn('Failed to get session artifact:', error);
+      return null;
+    }
+  }, []);
+
+  // Restore artifact for session
+  const restoreSessionArtifact = useCallback((sessionId: string) => {
+    const lastArtifactId = getSessionArtifact(sessionId);
+    if (lastArtifactId) {
+      setState(prev => ({
+        ...prev,
+        selectedArtifactId: lastArtifactId,
+        isOpen: true, // Open window if we have an artifact to show
+        isCollapsed: false // Expand to show the artifact
+      }));
+      return lastArtifactId;
+    }
+    return null;
+  }, [getSessionArtifact]);
+
   return {
     // State
     isOpen: state.isOpen,
@@ -152,6 +194,9 @@ export const useArtifactWindowState = () => {
     
     // Session persistence
     saveLastSession,
-    getLastSession
+    getLastSession,
+    saveSessionArtifact,
+    getSessionArtifact,
+    restoreSessionArtifact
   };
 };

@@ -48,6 +48,7 @@ class WebSocketDebugger {
       if (
         message.includes('TextareaWidget: Support for defaultProps will be removed') ||
         message.includes('Support for defaultProps will be removed from function components') ||
+        message.includes('TextareaWidget using deprecated defaultProps') ||
         (message.includes('defaultProps') && message.includes('TextareaWidget'))
       ) {
         // Only show the first occurrence, then suppress

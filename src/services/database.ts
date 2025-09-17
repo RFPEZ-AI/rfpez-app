@@ -16,6 +16,12 @@ import type { ArtifactReference } from '../types/home';
 import { AgentService } from './agentService';
 
 export class DatabaseService {
+  // Helper function to validate UUID format
+  private static isValidUuid(str: string): boolean {
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    return uuidRegex.test(str);
+  }
+
   // Session operations
   static async createSession(supabaseUserId: string, title: string, description?: string): Promise<Session | null> {
     console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description });
@@ -296,6 +302,13 @@ export class DatabaseService {
   }
 
   static async updateMessage(sessionId: string, messageId: string, updates: { metadata?: Record<string, unknown>; content?: string }): Promise<boolean> {
+    // Validate that messageId is a UUID format (messages table uses UUID primary key)
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+    if (!uuidRegex.test(messageId)) {
+      console.warn('⚠️ Skipping message update - messageId is not UUID format:', messageId, '(expected for frontend-generated messages)');
+      return true; // Return true to prevent error cascading
+    }
+
     console.log('Updating message:', messageId, 'with updates:', updates);
     const { error } = await supabase
       .from('messages')
@@ -389,6 +402,105 @@ export class DatabaseService {
       return null;
     }
     return data;
+  }
+
+  // Artifact Submission operations
+  static async getLatestSubmission(artifactId: string, sessionId?: string): Promise<Record<string, unknown> | null> {
+    try {
+      // Only query if artifactId is a valid UUID - form artifacts have string IDs that aren't UUIDs
+      if (!this.isValidUuid(artifactId)) {
+        console.log('📋 Artifact ID is not a UUID format, skipping submission lookup:', artifactId);
+        return null;
+      }
+
+      let query = supabase
+        .from('artifact_submissions')
+        .select('submission_data')
+        .eq('artifact_id', artifactId)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      // Add session filter if provided
+      if (sessionId) {
+        query = query.eq('session_id', sessionId);
+      }
+
+      const { data, error } = await query;
+
+      if (error) {
+        // Check for specific error types
+        if (error.code === '42P01') {
+          // Table does not exist
+          console.log('📋 artifact_submissions table does not exist yet - this is expected in development');
+          return null;
+        } else if (error.code === '42501') {
+          // Insufficient privileges (RLS policy issue)
+          console.log('📋 Insufficient privileges to read artifact submissions - this may be expected for anonymous users');
+          return null;
+        } else {
+          console.warn('Could not retrieve artifact submission:', error.message, 'Code:', error.code);
+        }
+        return null;
+      }
+
+      if (data && data.length > 0) {
+        console.log('📋 Found submission data for artifact:', artifactId);
+        return data[0].submission_data as Record<string, unknown>;
+      }
+
+      console.log('📋 No submission data found for artifact:', artifactId);
+      return null;
+    } catch (err) {
+      console.warn('Error fetching artifact submission:', err);
+      return null;
+    }
+  }
+
+  static async saveArtifactSubmission(
+    artifactId: string, 
+    submissionData: Record<string, unknown>,
+    sessionId?: string,
+    userId?: string
+  ): Promise<boolean> {
+    try {
+      // Only save if artifactId is a valid UUID - form artifacts have string IDs that aren't UUIDs
+      if (!this.isValidUuid(artifactId)) {
+        console.log('📋 Artifact ID is not a UUID format, skipping submission save:', artifactId);
+        return true; // Return true to indicate "successful" operation (no error)
+      }
+
+      const { error } = await supabase
+        .from('artifact_submissions')
+        .insert({
+          artifact_id: artifactId,
+          session_id: sessionId || 'current',
+          user_id: userId || null,
+          submission_data: submissionData,
+          status: 'submitted'
+        });
+
+      if (error) {
+        // Check for specific error types and provide appropriate handling
+        if (error.code === '42P01') {
+          // Table does not exist
+          console.warn('⚠️ artifact_submissions table does not exist yet - skipping submission save');
+          return true; // Return true to prevent error cascading
+        } else if (error.code === '42501') {
+          // Insufficient privileges (RLS policy issue)
+          console.warn('⚠️ Insufficient privileges to save artifact submission - this may be expected for anonymous users');
+          return true; // Return true to prevent error cascading
+        } else {
+          console.warn('Could not save artifact submission:', error.message, 'Code:', error.code);
+        }
+        return false;
+      }
+
+      console.log('✅ Artifact submission saved successfully for:', artifactId);
+      return true;
+    } catch (err) {
+      console.warn('Error saving artifact submission:', err);
+      return false;
+    }
   }
 
   static async deleteArtifact(artifactId: string): Promise<boolean> {

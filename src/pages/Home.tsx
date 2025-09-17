@@ -5,6 +5,7 @@ import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
 import { UserContextService } from '../services/userContextService';
+import DatabaseService from '../services/database';
 import { Message, ArtifactReference, Artifact } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import { DocxExporter } from '../utils/docxExporter';
@@ -105,6 +106,7 @@ const Home: React.FC = () => {
     artifacts,
     selectedArtifact,
     selectArtifact,
+    setSelectedArtifactFromState,
     loadSessionArtifacts,
     handleAttachFile,
     addClaudeArtifacts,
@@ -123,6 +125,12 @@ const Home: React.FC = () => {
       if (window.innerWidth <= 768) {
         setForceSessionHistoryCollapsed(true);
       }
+    },
+    // Add callback to save artifact selections
+    (sessionId: string, artifactId: string | null) => {
+      artifactWindowState.saveSessionArtifact(sessionId, artifactId);
+      // Also update the artifact window state
+      artifactWindowState.selectArtifact(artifactId);
     }
   );
 
@@ -296,12 +304,32 @@ const Home: React.FC = () => {
     artifactWindowState.saveLastSession(sessionId);
     
     await loadSessionMessages(sessionId);
-    await loadSessionArtifacts(sessionId);
+    const sessionArtifacts = await loadSessionArtifacts(sessionId);
     
-    // If we have artifacts in this session, open the artifact window
-    if (artifacts.length > 0) {
-      artifactWindowState.openWindow();
-      artifactWindowState.expandWindow();
+    // Try to restore the last selected artifact for this session
+    const restoredArtifactId = artifactWindowState.restoreSessionArtifact(sessionId);
+    
+    if (restoredArtifactId && sessionArtifacts?.some(a => a.id === restoredArtifactId)) {
+      // If we found a valid saved artifact, use it
+      setSelectedArtifactFromState(restoredArtifactId);
+      console.log('Restored saved artifact:', restoredArtifactId);
+    } else if (sessionArtifacts && sessionArtifacts.length > 0) {
+      // Otherwise, fall back to the most recent artifact
+      const mostRecentArtifact = sessionArtifacts.reduce((latest, current) => {
+        return parseInt(current.id) > parseInt(latest.id) ? current : latest;
+      });
+      selectArtifact(mostRecentArtifact.id);
+      console.log('Selected most recent artifact:', mostRecentArtifact.id);
+    }
+    
+    // If we have artifacts, ensure the window is properly shown
+    if (sessionArtifacts && sessionArtifacts.length > 0) {
+      if (!artifactWindowState.isOpen) {
+        artifactWindowState.openWindow();
+      }
+      if (artifactWindowState.isCollapsed) {
+        artifactWindowState.expandWindow();
+      }
     }
   };
 
@@ -385,6 +413,22 @@ const Home: React.FC = () => {
 
       if (updatedRfp) {
         console.log('✅ Form response saved successfully');
+        
+        // Also save to artifact_submissions table for persistence across sessions
+        console.log('💾 Saving form submission to artifact_submissions table...');
+        try {
+          await DatabaseService.saveArtifactSubmission(
+            artifact.id,
+            formData,
+            currentSessionId,
+            user?.id
+          );
+          console.log('✅ Form submission saved to artifact_submissions table');
+        } catch (submissionError) {
+          console.warn('⚠️ Could not save to artifact_submissions table:', submissionError);
+          // Continue - this is not critical for the main functionality
+        }
+        
         alert('Questionnaire submitted successfully!');
         
         // Send auto-prompt after successful submission
