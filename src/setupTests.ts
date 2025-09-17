@@ -152,7 +152,10 @@ beforeAll(() => {
       'ion-toggle now requires',
       '[Ionicons Warning]',
       'Could not load icon with name',
-      'Ensure that the icon is registered'
+      'Ensure that the icon is registered',
+      // RJSF (React JSON Schema Form) library warnings
+      'TextareaWidget: Support for defaultProps will be removed',
+      'Support for defaultProps will be removed from function components'
     ];
     
     if (filteredWarnings.some(filter => message.includes(filter))) {

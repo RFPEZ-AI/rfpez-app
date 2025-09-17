@@ -385,7 +385,7 @@ export const useArtifactManagement = (
         
         // Handle update_form_artifact results
         if (functionResult.function === 'update_form_artifact' && functionResult.result) {
-          const result = functionResult.result;
+          const result = functionResult.result as any; // Type cast for function result
           
           if (result.success && result.artifact_id) {
             console.log('Form artifact update detected from function result:', result);
@@ -398,30 +398,20 @@ export const useArtifactManagement = (
             if (existingArtifactIndex !== -1) {
               console.log('📝 Updating existing form artifact:', artifactId);
               
-              // Parse existing content
-              let existingContent;
-              try {
-                const contentStr = artifacts[existingArtifactIndex].content;
-                existingContent = contentStr ? JSON.parse(contentStr) : {};
-              } catch (e) {
-                console.error('Failed to parse existing artifact content:', e);
-                existingContent = {};
-              }
-              
-              // Update the artifact with new form data
+              // The updateFormArtifact function returns the complete content with populated formData
+              // Use the returned content directly instead of trying to reconstruct it
               const updatedArtifact: Artifact = {
                 ...artifacts[existingArtifactIndex],
-                name: result.title || existingContent.title || artifacts[existingArtifactIndex].name,
-                content: JSON.stringify({
-                  ...existingContent,
-                  title: result.title || existingContent.title,
-                  description: result.description || existingContent.description,
-                  schema: result.form_schema || existingContent.schema,
-                  uiSchema: result.ui_schema || existingContent.uiSchema || {},
-                  formData: result.form_data || existingContent.formData || {},
-                  submitAction: result.submit_action || existingContent.submitAction || { type: 'save_session' }
-                })
+                name: result.title || artifacts[existingArtifactIndex].name,
+                content: result.content as string // This contains the complete artifact content with populated formData
               };
+              
+              console.log('🎯 ARTIFACT UPDATE DEBUG:', {
+                artifactId,
+                resultContent: result.content,
+                contentLength: (result.content as string)?.length || 0,
+                updatedArtifact
+              });
               
               // Update the artifacts array
               setArtifacts(prev => {
@@ -752,9 +742,10 @@ export const useArtifactManagement = (
     setSelectedArtifactId(null);
   };
 
-  // Auto-select most recent artifact when session changes
+  // Auto-select most recent artifact when session changes, but not if already selected
   useEffect(() => {
-    if (currentSessionId && artifacts.length > 0) {
+    if (currentSessionId && artifacts.length > 0 && !selectedArtifactId) {
+      // Only auto-select if no artifact is currently selected
       // Find the most recent artifact in this session
       const sessionArtifacts = artifacts.filter(artifact => 
         artifact.sessionId === currentSessionId || 
@@ -767,7 +758,7 @@ export const useArtifactManagement = (
         setSelectedArtifactId(mostRecent.id);
       }
     }
-  }, [currentSessionId, artifacts]);
+  }, [currentSessionId, artifacts, selectedArtifactId]);
 
   return {
     artifacts,
