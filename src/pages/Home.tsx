@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
@@ -16,6 +16,7 @@ import { useSessionState } from '../hooks/useSessionState';
 import { useAgentManagement } from '../hooks/useAgentManagement';
 import { useRFPManagement } from '../hooks/useRFPManagement';
 import { useArtifactManagement } from '../hooks/useArtifactManagement';
+import { useArtifactWindowState } from '../hooks/useArtifactWindowState';
 import { useMessageHandling } from '../hooks/useMessageHandling';
 
 // Import layout components
@@ -108,7 +109,26 @@ const Home: React.FC = () => {
     handleAttachFile,
     addClaudeArtifacts,
     clearArtifacts
-  } = useArtifactManagement(currentRfp, currentSessionId, isAuthenticated, user, messages, setMessages);
+  } = useArtifactManagement(
+    currentRfp, 
+    currentSessionId, 
+    isAuthenticated, 
+    user, 
+    messages, 
+    setMessages,
+    // Add callback to trigger artifact window auto-open
+    (artifactId: string) => {
+      artifactWindowState.autoOpenForArtifact(artifactId);
+      // Force session history to collapse on mobile if needed
+      if (window.innerWidth <= 768) {
+        setForceSessionHistoryCollapsed(true);
+      }
+    }
+  );
+
+  // Artifact window state management
+  const artifactWindowState = useArtifactWindowState();
+  const [forceSessionHistoryCollapsed, setForceSessionHistoryCollapsed] = useState(false);
 
   const { handleSendMessage, sendAutoPrompt, cancelRequest } = useMessageHandling();
 
@@ -152,6 +172,21 @@ const Home: React.FC = () => {
       loadUserSessions();
     }
   }, [isAuthenticated, supabaseLoading, user, userProfile]);
+
+  // Separate useEffect to handle session restoration after sessions are loaded
+  useEffect(() => {
+    if (isAuthenticated && sessions.length > 0 && !currentSessionId) {
+      // Try to restore last session if available
+      const lastSessionId = artifactWindowState.getLastSession();
+      if (lastSessionId) {
+        const session = sessions.find(s => s.id === lastSessionId);
+        if (session) {
+          console.log('Restoring last session:', lastSessionId);
+          handleSelectSession(lastSessionId);
+        }
+      }
+    }
+  }, [sessions, isAuthenticated, currentSessionId]);
 
   // Monitor session changes specifically for logout detection
   useEffect(() => {
@@ -219,6 +254,11 @@ const Home: React.FC = () => {
     setSelectedSessionId(undefined);
     setCurrentSessionId(undefined);
     
+    // Reset artifact window for new session (blank state, closed)
+    artifactWindowState.resetForNewSession();
+    artifactWindowState.saveLastSession(null);
+    setForceSessionHistoryCollapsed(false);
+    
     // Use the currently selected agent, or default if none selected
     if (isAuthenticated && userId) {
       if (currentAgent) {
@@ -251,8 +291,18 @@ const Home: React.FC = () => {
     console.log('Session selected:', sessionId);
     setSelectedSessionId(sessionId);
     setCurrentSessionId(sessionId);
+    
+    // Save as last session for persistence
+    artifactWindowState.saveLastSession(sessionId);
+    
     await loadSessionMessages(sessionId);
     await loadSessionArtifacts(sessionId);
+    
+    // If we have artifacts in this session, open the artifact window
+    if (artifacts.length > 0) {
+      artifactWindowState.openWindow();
+      artifactWindowState.expandWindow();
+    }
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -297,6 +347,9 @@ const Home: React.FC = () => {
     const artifact = artifacts.find(a => a.id === artifactRef.artifactId);
     if (artifact) {
       selectArtifact(artifact.id);
+      artifactWindowState.selectArtifact(artifact.id);
+      artifactWindowState.openWindow();
+      artifactWindowState.expandWindow();
       console.log('Selected artifact for display:', artifact.name);
     }
   };
@@ -647,6 +700,18 @@ const Home: React.FC = () => {
             onFormSubmit={handleFormSubmissionWithAutoPrompt}
             currentAgent={currentAgent}
             onCancelRequest={cancelRequest}
+            // New artifact window state props
+            artifactWindowOpen={artifactWindowState.isOpen}
+            artifactWindowCollapsed={artifactWindowState.isCollapsed}
+            onToggleArtifactWindow={artifactWindowState.toggleWindow}
+            onToggleArtifactCollapse={artifactWindowState.toggleCollapse}
+            forceSessionHistoryCollapsed={forceSessionHistoryCollapsed}
+            onSessionHistoryToggle={(expanded) => {
+              // If session history is being expanded and we're on mobile, collapse artifact window
+              if (expanded && window.innerWidth <= 768 && artifactWindowState.isOpen) {
+                artifactWindowState.closeWindow();
+              }
+            }}
           />
         </div>
 

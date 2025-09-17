@@ -32,14 +32,15 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
   artifact,
   onDownload, 
   onFormSubmit,
-  isCollapsed = false,
-  onToggleCollapse,
+  isCollapsed: externalCollapsed,
+  onToggleCollapse: externalToggleCollapse,
   currentRfpId
 }) => {
   const [internalCollapsed, setInternalCollapsed] = useState(true);
 
-  const collapsed = onToggleCollapse ? isCollapsed : internalCollapsed;
-  const toggleCollapse = onToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
+  // Use external collapsed state if provided, otherwise use internal state
+  const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
+  const toggleCollapse = externalToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
   const getTypeIcon = (type: string) => {
     switch (type) {

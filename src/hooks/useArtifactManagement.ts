@@ -12,7 +12,8 @@ export const useArtifactManagement = (
   isAuthenticated?: boolean, 
   user?: User | null,
   messages?: Message[],
-  setMessages?: React.Dispatch<React.SetStateAction<Message[]>>
+  setMessages?: React.Dispatch<React.SetStateAction<Message[]>>,
+  onArtifactAdded?: (artifactId: string) => void // New callback for when artifacts are added
 ) => {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
@@ -38,6 +39,9 @@ export const useArtifactManagement = (
     
     // Auto-select the newly created artifact
     setSelectedArtifactId(artifactWithMessage.id);
+    
+    // Notify parent that an artifact was added (triggers auto-open)
+    onArtifactAdded?.(artifactWithMessage.id);
     
     return artifactWithMessage;
   };
@@ -270,6 +274,10 @@ export const useArtifactManagement = (
       size: `${(file.size / 1024).toFixed(1)} KB`
     };
     setArtifacts(prev => [...prev, newArtifact]);
+    
+    // Auto-select and trigger auto-open for attached files
+    setSelectedArtifactId(newArtifact.id);
+    onArtifactAdded?.(newArtifact.id);
 
     // Save to Supabase if authenticated and session exists
     if (isAuthenticated && user && currentSessionId) {
@@ -372,6 +380,10 @@ export const useArtifactManagement = (
             
             setArtifacts(prev => [...prev, formArtifact]);
             setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
+            
+            // Notify parent that an artifact was added (triggers auto-open)
+            onArtifactAdded?.(formArtifact.id);
+            
             console.log('✅ Added form artifact from function result:', formArtifact);
             
             // Create artifact reference for the message
@@ -469,6 +481,10 @@ export const useArtifactManagement = (
             
             setArtifacts(prev => [...prev, textArtifact]);
             setSelectedArtifactId(textArtifact.id); // Auto-select new artifact
+            
+            // Notify parent that an artifact was added (triggers auto-open)
+            onArtifactAdded?.(textArtifact.id);
+            
             console.log('✅ Added text artifact from function result:', textArtifact);
             
             // Create artifact reference for the message
@@ -519,6 +535,10 @@ export const useArtifactManagement = (
             
             setArtifacts(prev => [...prev, requestArtifact]);
             setSelectedArtifactId(requestArtifact.id); // Auto-select new artifact
+            
+            // Notify parent that an artifact was added (triggers auto-open)
+            onArtifactAdded?.(requestArtifact.id);
+            
             console.log('✅ Added request artifact from function result:', requestArtifact);
             
             // Create artifact reference for the message
@@ -568,6 +588,10 @@ export const useArtifactManagement = (
             
             setArtifacts(prev => [...prev, templateArtifact]);
             setSelectedArtifactId(templateArtifact.id); // Auto-select new artifact
+            
+            // Notify parent that an artifact was added (triggers auto-open)
+            onArtifactAdded?.(templateArtifact.id);
+            
             console.log('✅ Added template artifact from function result:', templateArtifact);
             
             // Create artifact reference for the message

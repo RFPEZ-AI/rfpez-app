@@ -33,6 +33,14 @@ interface HomeContentProps {
   // Agent and cancel functionality
   currentAgent?: { agent_name: string } | null;
   onCancelRequest?: () => void;
+  
+  // New props for artifact window state and responsive behavior
+  artifactWindowOpen?: boolean;
+  artifactWindowCollapsed?: boolean;
+  onToggleArtifactWindow?: () => void;
+  onToggleArtifactCollapse?: () => void;
+  forceSessionHistoryCollapsed?: boolean;
+  onSessionHistoryToggle?: (expanded: boolean) => void;
 }
 
 const HomeContent: React.FC<HomeContentProps> = ({
@@ -52,9 +60,15 @@ const HomeContent: React.FC<HomeContentProps> = ({
   onArtifactSelect,
   onFormSubmit,
   currentAgent,
-  onCancelRequest
+  onCancelRequest,
+  artifactWindowOpen = false,
+  artifactWindowCollapsed = true,
+  onToggleArtifactWindow, // eslint-disable-line @typescript-eslint/no-unused-vars
+  onToggleArtifactCollapse,
+  forceSessionHistoryCollapsed = false,
+  onSessionHistoryToggle
 }) => {
-  // Use selected artifact or fall back to most recent
+  // Use selected artifact based on window state if available, otherwise fall back to most recent
   const displayedArtifact = selectedArtifact || (artifacts.length > 0 ? artifacts[artifacts.length - 1] : null);
 
   return (
@@ -73,6 +87,8 @@ const HomeContent: React.FC<HomeContentProps> = ({
         onSelectSession={onSelectSession}
         onDeleteSession={onDeleteSession}
         selectedSessionId={selectedSessionId}
+        forceCollapsed={forceSessionHistoryCollapsed}
+        onToggleExpanded={onSessionHistoryToggle}
       />
 
       {/* Center Panel - Dialog with integrated prompt */}
@@ -90,12 +106,16 @@ const HomeContent: React.FC<HomeContentProps> = ({
       </div>
 
       {/* Right Panel - Artifacts */}
-      <ArtifactWindow
-        artifact={displayedArtifact}
-        onDownload={onDownloadArtifact}
-        onFormSubmit={onFormSubmit}
-        currentRfpId={currentRfpId}
-      />
+      {artifactWindowOpen && (
+        <ArtifactWindow
+          artifact={displayedArtifact}
+          onDownload={onDownloadArtifact}
+          onFormSubmit={onFormSubmit}
+          currentRfpId={currentRfpId}
+          isCollapsed={artifactWindowCollapsed}
+          onToggleCollapse={onToggleArtifactCollapse}
+        />
+      )}
     </div>
   );
 };
