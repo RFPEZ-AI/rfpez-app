@@ -1823,19 +1823,25 @@ export class ClaudeAPIFunctionHandler {
   }
 
   // Helper method to intelligently map flat form data to nested schema structures
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private mapFlatDataToNestedSchema(flatData: any, schemaProperties: any): any {
-    const mappedData: any = {};
+  private mapFlatDataToNestedSchema(flatData: Record<string, unknown>, schemaProperties: Record<string, unknown>): Record<string, unknown> {
+    const mappedData: Record<string, unknown> = {};
+    
+    // Type guard for schema property
+    const isSchemaProperty = (prop: unknown): prop is { type: string; properties?: Record<string, unknown> } => {
+      return typeof prop === 'object' && prop !== null && 'type' in prop;
+    };
     
     // Identify schema fields that are objects (nested structures)
-    const objectFields = Object.keys(schemaProperties).filter(key => 
-      schemaProperties[key].type === 'object'
-    );
+    const objectFields = Object.keys(schemaProperties).filter(key => {
+      const prop = schemaProperties[key];
+      return isSchemaProperty(prop) && prop.type === 'object';
+    });
     
     // Identify simple fields that match exactly
-    const simpleFields = Object.keys(schemaProperties).filter(key => 
-      schemaProperties[key].type !== 'object' && Object.prototype.hasOwnProperty.call(flatData, key)
-    );
+    const simpleFields = Object.keys(schemaProperties).filter(key => {
+      const prop = schemaProperties[key];
+      return isSchemaProperty(prop) && prop.type !== 'object' && Object.prototype.hasOwnProperty.call(flatData, key);
+    });
     
     console.log('🔧 Smart mapping analysis:', {
       objectFields,
@@ -1850,7 +1856,7 @@ export class ClaudeAPIFunctionHandler {
     
     // For object fields, try to group related flat fields
     objectFields.forEach(objectField => {
-      const relatedData: any = {};
+      const relatedData: Record<string, unknown> = {};
       
       // Extract any flat fields that might belong to this object based on naming patterns
       const flatKeys = Object.keys(flatData);
@@ -1928,7 +1934,8 @@ export class ClaudeAPIFunctionHandler {
     // Ensure ALL schema fields have values (RJSF requirement)
     Object.keys(schemaProperties).forEach(schemaField => {
       if (!Object.prototype.hasOwnProperty.call(mappedData, schemaField)) {
-        const fieldType = schemaProperties[schemaField].type;
+        const prop = schemaProperties[schemaField];
+        const fieldType = isSchemaProperty(prop) ? prop.type : 'string';
         
         // Provide appropriate default values based on field type
         switch (fieldType) {
@@ -2705,9 +2712,14 @@ Please retry with form_data using the correct field names.`;
           field_names: Object.keys(artifact.schema?.properties || {}),
           required_fields: artifact.schema?.required || [],
           field_types: Object.fromEntries(
-            Object.entries(artifact.schema?.properties || {}).map(([key, prop]: [string, any]) => 
-              [key, { type: prop.type, enum: prop.enum, format: prop.format }]
-            )
+            Object.entries(artifact.schema?.properties || {}).map(([key, prop]: [string, unknown]) => {
+              const schemaProperty = prop as { type?: string; enum?: unknown[]; format?: string };
+              return [key, { 
+                type: schemaProperty.type, 
+                enum: schemaProperty.enum, 
+                format: schemaProperty.format 
+              }];
+            })
           ),
           update_instructions: "When updating this form with update_form_artifact, use these exact field names in form_data. For enum fields, use values from the enum array. For object fields, provide nested objects matching the schema structure."
         },
