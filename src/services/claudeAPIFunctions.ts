@@ -377,7 +377,7 @@ export const claudeApiFunctions: Tool[] = [
   },
   {
     "name": "update_form_artifact",
-    "description": "Update an existing form artifact with new data or schema",
+    "description": "Update an existing form artifact with new data or schema. CRITICAL: When updating form_data, you MUST use the exact field names from the existing form schema. Call get_form_submission first to see the current schema structure.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -387,14 +387,32 @@ export const claudeApiFunctions: Tool[] = [
         },
         "updates": {
           "type": "object",
-          "description": "Updates to apply to the artifact",
+          "description": "Updates to apply to the artifact. For form_data, field names must EXACTLY match the schema properties.",
           "properties": {
-            "title": { "type": "string" },
-            "description": { "type": "string" },
-            "form_schema": { "type": "object" },
-            "ui_schema": { "type": "object" },
-            "form_data": { "type": "object" },
-            "submit_action": { "type": "object" }
+            "title": { 
+              "type": "string",
+              "description": "New title for the form" 
+            },
+            "description": { 
+              "type": "string",
+              "description": "New description for the form" 
+            },
+            "form_schema": { 
+              "type": "object",
+              "description": "JSON Schema object defining form structure" 
+            },
+            "ui_schema": { 
+              "type": "object",
+              "description": "UI Schema for form rendering customization" 
+            },
+            "form_data": { 
+              "type": "object",
+              "description": "Form data with field names EXACTLY matching the schema properties. For enum fields, values must match enum options exactly. For object fields (like project_timeline), provide nested objects with proper structure. IMPORTANT: Check existing schema first with get_form_submission to see required field names and formats."
+            },
+            "submit_action": { 
+              "type": "object",
+              "description": "Action to take when form is submitted" 
+            }
           }
         }
       },
@@ -403,7 +421,7 @@ export const claudeApiFunctions: Tool[] = [
   },
   {
     "name": "get_form_submission",
-    "description": "Retrieve form submission data from a specific artifact",
+    "description": "Retrieve form submission data and schema from a specific artifact. Use this BEFORE update_form_artifact to understand the current schema structure and field names.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -414,6 +432,11 @@ export const claudeApiFunctions: Tool[] = [
         "session_id": {
           "type": "string",
           "description": "Session ID to associate with the submission"
+        },
+        "include_schema": {
+          "type": "boolean",
+          "description": "Whether to include the complete schema structure in the response (default: true). Use this to understand field names and types before updating.",
+          "default": true
         }
       },
       "required": ["artifact_id"]
@@ -1799,6 +1822,149 @@ export class ClaudeAPIFunctionHandler {
     };
   }
 
+  // Helper method to intelligently map flat form data to nested schema structures
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private mapFlatDataToNestedSchema(flatData: any, schemaProperties: any): any {
+    const mappedData: any = {};
+    
+    // Identify schema fields that are objects (nested structures)
+    const objectFields = Object.keys(schemaProperties).filter(key => 
+      schemaProperties[key].type === 'object'
+    );
+    
+    // Identify simple fields that match exactly
+    const simpleFields = Object.keys(schemaProperties).filter(key => 
+      schemaProperties[key].type !== 'object' && Object.prototype.hasOwnProperty.call(flatData, key)
+    );
+    
+    console.log('🔧 Smart mapping analysis:', {
+      objectFields,
+      simpleFields,
+      flatDataKeys: Object.keys(flatData)
+    });
+    
+    // First, map simple fields that match exactly
+    simpleFields.forEach(field => {
+      mappedData[field] = flatData[field];
+    });
+    
+    // For object fields, try to group related flat fields
+    objectFields.forEach(objectField => {
+      const relatedData: any = {};
+      
+      // Extract any flat fields that might belong to this object based on naming patterns
+      const flatKeys = Object.keys(flatData);
+      
+      // Common mapping patterns for procurement forms
+      switch (objectField) {
+        case 'project_timeline':
+          // Map timeline-related fields
+          if (flatData.delivery_timeline) relatedData.delivery_timeline = flatData.delivery_timeline;
+          if (flatData.project_duration) relatedData.project_duration = flatData.project_duration;
+          if (flatData.delivery_location) relatedData.delivery_location = flatData.delivery_location;
+          break;
+          
+        case 'nail_specifications':
+        case 'product_specifications':
+          // Map product/specification fields
+          if (flatData.product_type) relatedData.product_type = flatData.product_type;
+          if (flatData.nail_type) relatedData.nail_type = flatData.nail_type;
+          if (flatData.nail_size) relatedData.nail_size = flatData.nail_size;
+          if (flatData.material) relatedData.material = flatData.material;
+          if (flatData.quantity_needed) relatedData.quantity_needed = flatData.quantity_needed;
+          if (flatData.unit_of_measure) relatedData.unit_of_measure = flatData.unit_of_measure;
+          break;
+          
+        case 'delivery_requirements':
+          // Map delivery-related fields
+          if (flatData.delivery_location) relatedData.delivery_location = flatData.delivery_location;
+          if (flatData.delivery_timeline) relatedData.delivery_timeline = flatData.delivery_timeline;
+          if (flatData.packaging_requirements) relatedData.packaging_requirements = flatData.packaging_requirements;
+          break;
+          
+        case 'quality_requirements':
+          // Map quality-related fields - keep exact matches
+          if (flatData.quality_requirements) relatedData.quality_requirements = flatData.quality_requirements;
+          break;
+          
+        default:
+          // For unknown object fields, try to find fields with similar names
+          flatKeys.forEach(flatKey => {
+            if (flatKey.includes(objectField.split('_')[0]) || objectField.includes(flatKey.split('_')[0])) {
+              relatedData[flatKey] = flatData[flatKey];
+            }
+          });
+      }
+      
+      // Only add the object if it has content
+      if (Object.keys(relatedData).length > 0) {
+        mappedData[objectField] = relatedData;
+      }
+    });
+    
+    // Add any remaining flat fields that weren't mapped as additional_requirements if that field exists
+    const unmappedFields = Object.keys(flatData).filter(key => {
+      // Check if this field was already mapped to a simple field
+      if (simpleFields.includes(key)) return false;
+      
+      // Check if this field was mapped into any object
+      for (const objField of objectFields) {
+        if (mappedData[objField] && Object.prototype.hasOwnProperty.call(mappedData[objField], key)) {
+          return false;
+        }
+      }
+      
+      return true;
+    });
+    
+    if (unmappedFields.length > 0 && schemaProperties.additional_information) {
+      const additionalInfo = unmappedFields.map(field => 
+        `${field}: ${flatData[field]}`
+      ).join('\n');
+      
+      mappedData.additional_information = additionalInfo;
+    }
+    
+    // Ensure ALL schema fields have values (RJSF requirement)
+    Object.keys(schemaProperties).forEach(schemaField => {
+      if (!Object.prototype.hasOwnProperty.call(mappedData, schemaField)) {
+        const fieldType = schemaProperties[schemaField].type;
+        
+        // Provide appropriate default values based on field type
+        switch (fieldType) {
+          case 'string':
+            mappedData[schemaField] = '';
+            break;
+          case 'number':
+            mappedData[schemaField] = 0;
+            break;
+          case 'array':
+            mappedData[schemaField] = [];
+            break;
+          case 'object':
+            mappedData[schemaField] = {};
+            break;
+          case 'boolean':
+            mappedData[schemaField] = false;
+            break;
+          default:
+            mappedData[schemaField] = '';
+        }
+        
+        console.log(`🔧 Added default value for missing schema field: ${schemaField} (${fieldType})`);
+      }
+    });
+    
+    console.log('🎯 Smart mapping result:', {
+      originalKeys: Object.keys(flatData),
+      mappedKeys: Object.keys(mappedData),
+      unmappedFields,
+      mappedData
+    });
+    
+    return mappedData;
+  }
+
   // Artifact Functions Implementation
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createFormArtifact(params: any, userId: string) {
@@ -2240,18 +2406,90 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
     });
     
     try {
-      // First check if the artifact exists
-      const { error: checkError } = await supabase
+      // Get the existing artifact to validate schema compatibility
+      const { data: existingArtifact, error: checkError } = await supabase
         .from('form_artifacts')
-        .select('id')
+        .select('*')
         .eq('id', artifact_id)
         .single();
+      
+      // Smart form data mapping (if providing form_data)
+      let finalFormData = updates.form_data;
+      
+      console.log('🔧 Smart mapping condition check:', {
+        hasFormData: !!updates.form_data,
+        hasExistingArtifact: !!existingArtifact,
+        hasSchema: !!(existingArtifact?.schema),
+        formDataKeys: updates.form_data ? Object.keys(updates.form_data) : [],
+        updatesKeys: Object.keys(updates)
+      });
+      
+      if (updates.form_data && existingArtifact && existingArtifact.schema) {
+        console.log('🔍 Processing form_data against existing schema...');
+        console.log('🔍 ENTRY: Smart mapping logic started successfully');
+        
+        const existingSchema = existingArtifact.schema;
+        const schemaProperties = existingSchema.properties || {};
+        const formDataFields = Object.keys(updates.form_data);
+        const schemaFields = Object.keys(schemaProperties);
+        
+        console.log('📋 Schema mapping details:', {
+          artifact_id,
+          schemaFields,
+          formDataFields,
+          schemaProperties: Object.keys(schemaProperties).map(key => ({
+            field: key,
+            type: schemaProperties[key].type,
+            title: schemaProperties[key].title
+          }))
+        });
+        
+        // Check if we have exact matches (preferred)
+        const exactMatches = formDataFields.filter(field => Object.prototype.hasOwnProperty.call(schemaProperties, field));
+        const unmatchedFields = formDataFields.filter(field => !Object.prototype.hasOwnProperty.call(schemaProperties, field));
+        
+        if (exactMatches.length === formDataFields.length) {
+          // Perfect match - use as-is
+          console.log('✅ All form data fields match schema exactly');
+          finalFormData = updates.form_data;
+        } else if (unmatchedFields.length > 0) {
+          // Try smart mapping for nested object schemas
+          console.log('🔄 Attempting smart mapping for nested schema structures...');
+          
+          const mappedData = this.mapFlatDataToNestedSchema(updates.form_data, schemaProperties);
+          
+          if (Object.keys(mappedData).length > 0) {
+            console.log('✅ Successfully mapped flat data to nested schema structure');
+            console.log('🔧 Mapped data:', mappedData);
+            finalFormData = mappedData;
+          } else {
+            // Fall back to detailed error for guidance
+            const errorMessage = `❌ FORM DATA FIELD MISMATCH: The following fields in form_data do not exist in the form schema: ${unmatchedFields.join(', ')}
+
+🎯 Expected Schema Fields: ${schemaFields.join(', ')}
+📝 Provided Data Fields: ${formDataFields.join(', ')}
+
+🔧 SOLUTION: Use the exact field names from the schema when populating form data.
+
+Expected field definitions:
+${schemaFields.map(field => {
+  const prop = schemaProperties[field];
+  return `- ${field}: ${prop.title || field} (${prop.type}${prop.enum ? `, options: ${prop.enum.join(', ')}` : ''})`;
+}).join('\n')}
+
+Please retry with form_data using the correct field names.`;
+            
+            console.error(errorMessage);
+            throw new Error(errorMessage);
+          }
+        }
+      }
       
       if (checkError && checkError.code === 'PGRST116') {
         // Artifact doesn't exist - create it instead
         console.log('📝 Artifact does not exist, creating new artifact:', artifact_id);
         
-        const { error: createError } = await supabase
+        const { data: createdArtifact, error: createError } = await supabase
           .from('form_artifacts')
           .insert({
             id: artifact_id,
@@ -2268,7 +2506,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
               required: ["name", "email"]
             },
             ui_schema: updates.ui_schema || {},
-            data: updates.form_data || {},
+            data: finalFormData || updates.form_data || {},
             submit_action: updates.submit_action || 'save',
             status: 'active',
             created_at: new Date().toISOString(),
@@ -2299,12 +2537,24 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
         
         console.log('✅ Form artifact created successfully:', { artifact_id });
         
+        // Return the created artifact content so frontend can refresh the form
+        const artifactContent = {
+          schema: createdArtifact.schema,
+          uiSchema: createdArtifact.ui_schema || {},
+          formData: createdArtifact.data || {},
+          submitAction: createdArtifact.submit_action || { type: 'save_session' }
+        };
+        
         return {
           success: true,
           artifact_id,
           created: true,
           updated_fields: Object.keys(updates),
           created_at: new Date().toISOString(),
+          title: createdArtifact.title,
+          description: createdArtifact.description,
+          type: 'form',
+          content: JSON.stringify(artifactContent),
           message: `Artifact "${artifact_id}" created successfully (was missing)`
         };
       } else if (checkError) {
@@ -2313,14 +2563,14 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       }
       
       // Artifact exists - proceed with update
-      const { error: updateError } = await supabase
+      const { data: updatedArtifact, error: updateError } = await supabase
         .from('form_artifacts')
         .update({
           title: updates.title,
           description: updates.description,
           schema: updates.form_schema,
           ui_schema: updates.ui_schema,
-          data: updates.form_data,
+          data: finalFormData,
           submit_action: updates.submit_action,
           updated_at: new Date().toISOString()
         })
@@ -2335,12 +2585,32 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       
       console.log('✅ Form artifact updated successfully:', { artifact_id });
       
+      // Return the updated artifact content so frontend can refresh the form
+      const artifactContent = {
+        schema: updatedArtifact.schema,
+        uiSchema: updatedArtifact.ui_schema || {},
+        formData: updatedArtifact.data || {},
+        submitAction: updatedArtifact.submit_action || { type: 'save_session' }
+      };
+      
+      console.log('🎯 ARTIFACT CONTENT DEBUG:', {
+        artifactId: artifact_id,
+        schemaKeys: Object.keys(updatedArtifact.schema?.properties || {}),
+        formDataKeys: Object.keys(updatedArtifact.data || {}),
+        formDataContent: updatedArtifact.data,
+        fullContent: artifactContent
+      });
+      
       return {
         success: true,
         artifact_id,
         updated: true,
         updated_fields: Object.keys(updates),
         updated_at: new Date().toISOString(),
+        title: updatedArtifact.title,
+        description: updatedArtifact.description,
+        type: 'form',
+        content: JSON.stringify(artifactContent),
         message: `Artifact "${artifact_id}" updated successfully`
       };
     } catch (error) {
@@ -2399,20 +2669,26 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
         throw new Error(`Failed to get artifact: ${artifactError.message}`);
       }
       
-      // Get any submissions for this artifact
-      const { data: submissions, error: submissionError } = await supabase
-        .from('artifact_submissions')
-        .select('*')
-        .eq('artifact_id', artifact_id)
-        .eq('session_id', session_id || 'current')
-        .order('created_at', { ascending: false })
-        .limit(1);
-      
-      if (submissionError) {
-        console.warn('⚠️ Could not retrieve submissions:', submissionError);
+      // Get any submissions for this artifact (optional - table may not exist yet)
+      let latestSubmission = null;
+      try {
+        const { data: submissions, error: submissionError } = await supabase
+          .from('artifact_submissions')
+          .select('*')
+          .eq('artifact_id', artifact_id)
+          .eq('session_id', session_id || 'current')
+          .order('created_at', { ascending: false })
+          .limit(1);
+        
+        if (submissionError) {
+          console.warn('⚠️ Could not retrieve submissions (table may not exist):', submissionError.message);
+        } else {
+          latestSubmission = submissions?.[0] || null;
+        }
+      } catch (submissionQueryError) {
+        console.warn('⚠️ Artifact submissions table not available:', submissionQueryError);
+        // Continue without submissions - this is not a critical error
       }
-      
-      const latestSubmission = submissions?.[0] || null;
       
       console.log('✅ Form submission retrieved:', { artifact_id, has_submission: !!latestSubmission });
       
@@ -2424,6 +2700,16 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
           form_schema: artifact.schema,
           ui_schema: artifact.ui_schema,
           form_data: artifact.data
+        },
+        schema_guidance: {
+          field_names: Object.keys(artifact.schema?.properties || {}),
+          required_fields: artifact.schema?.required || [],
+          field_types: Object.fromEntries(
+            Object.entries(artifact.schema?.properties || {}).map(([key, prop]: [string, any]) => 
+              [key, { type: prop.type, enum: prop.enum, format: prop.format }]
+            )
+          ),
+          update_instructions: "When updating this form with update_form_artifact, use these exact field names in form_data. For enum fields, use values from the enum array. For object fields, provide nested objects matching the schema structure."
         },
         latest_submission: latestSubmission ? {
           submission_id: latestSubmission.id,

@@ -21,7 +21,7 @@ class WebSocketDebugger {
    * Initialize WebSocket error suppression for known issues
    */
   init() {
-    // Override console.error to filter out known WebSocket issues
+    // Override console.error to filter out known WebSocket issues and React warnings
     const originalConsoleError = console.error;
     
     console.error = (...args: unknown[]) => {
@@ -42,6 +42,21 @@ class WebSocketDebugger {
           console.warn('   This error is coming from browser extensions or dev tools and can be safely ignored.');
         }
         return; // Suppress the error
+      }
+      
+      // Filter out RJSF (React JSON Schema Form) deprecation warnings
+      if (
+        message.includes('TextareaWidget: Support for defaultProps will be removed') ||
+        message.includes('Support for defaultProps will be removed from function components') ||
+        (message.includes('defaultProps') && message.includes('TextareaWidget'))
+      ) {
+        // Only show the first occurrence, then suppress
+        if (!this.suppressedConnections.has('rjsf-defaultProps')) {
+          this.suppressedConnections.add('rjsf-defaultProps');
+          console.warn('📝 RJSF Library Warning: TextareaWidget using deprecated defaultProps (this is a library issue and can be safely ignored)');
+          console.warn('   This will be resolved when the RJSF library updates to use JavaScript default parameters.');
+        }
+        return; // Suppress the warning
       }
       
       // Pass through all other errors

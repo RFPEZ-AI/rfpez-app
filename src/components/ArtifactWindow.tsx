@@ -85,7 +85,10 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
     const formRef = useRef<any>(null);
 
     try {
+      console.log('🎯 FormRenderer: parsing artifact content:', artifact.content);
       const formSpec: BuyerQuestionnaireData = JSON.parse(artifact.content || '{}');
+      console.log('🎯 FormRenderer: parsed formSpec:', formSpec);
+      console.log('🎯 FormRenderer: formData being used:', formSpec.formData);
       
       const handleSubmit = (data: FormSubmissionData) => {
         console.log('Form submitted:', data.formData);
