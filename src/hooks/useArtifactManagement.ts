@@ -13,16 +13,97 @@ export const useArtifactManagement = (
   user?: User | null,
   messages?: Message[],
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>,
-  onArtifactAdded?: (artifactId: string) => void // New callback for when artifacts are added
+  onArtifactAdded?: (artifactId: string) => void, // New callback for when artifacts are added
+  onArtifactSelected?: (sessionId: string, artifactId: string | null) => void // New callback for artifact selection
 ) => {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
+  const [selectedArtifactWithSubmission, setSelectedArtifactWithSubmission] = useState<Artifact | null>(null);
 
-  // Get currently selected artifact
-  const selectedArtifact = artifacts.find(artifact => artifact.id === selectedArtifactId) || null;
+  // Get currently selected artifact from the list
+  const selectedArtifact = selectedArtifactWithSubmission || artifacts.find(artifact => artifact.id === selectedArtifactId) || null;
+
+  // Effect to load submission data when artifact is selected
+  useEffect(() => {
+    const loadArtifactWithSubmission = async () => {
+      if (!selectedArtifactId) {
+        setSelectedArtifactWithSubmission(null);
+        return;
+      }
+
+      const baseArtifact = artifacts.find(artifact => artifact.id === selectedArtifactId);
+      if (!baseArtifact) {
+        setSelectedArtifactWithSubmission(null);
+        return;
+      }
+
+      // For form artifacts, try to load submission data
+      // Check for various form indicators: type, name patterns, or content structure
+      const isFormArtifact = (
+        baseArtifact.type === 'form' || 
+        baseArtifact.name === 'Buyer Questionnaire' ||
+        baseArtifact.name?.toLowerCase().includes('form') ||
+        baseArtifact.name?.toLowerCase().includes('questionnaire') ||
+        (baseArtifact.content && baseArtifact.content.includes('"schema"') && baseArtifact.content.includes('"uiSchema"'))
+      );
+      
+      if (isFormArtifact) {
+        console.log('📋 Loading submission data for form artifact:', selectedArtifactId, 'name:', baseArtifact.name, 'type:', baseArtifact.type);
+        
+        try {
+          const submissionData = await DatabaseService.getLatestSubmission(
+            selectedArtifactId, 
+            currentSessionId || 'current'
+          );
+
+          if (submissionData) {
+            // Parse the existing form content and merge with submission data
+            let enhancedContent = baseArtifact.content || '{}';
+            try {
+              const formSpec = JSON.parse(enhancedContent);
+              // Merge submission data as formData
+              formSpec.formData = submissionData;
+              enhancedContent = JSON.stringify(formSpec);
+              
+              console.log('✅ Enhanced form artifact with submission data:', submissionData);
+              console.log('📋 Final enhanced content preview:', enhancedContent.substring(0, 200) + '...');
+              setSelectedArtifactWithSubmission({
+                ...baseArtifact,
+                content: enhancedContent
+              });
+            } catch (parseError) {
+              console.warn('Failed to parse form content for artifact:', baseArtifact.name, parseError);
+              console.log('📋 Original content was:', enhancedContent);
+              setSelectedArtifactWithSubmission(baseArtifact);
+            }
+          } else {
+            console.log('📋 No submission data found for:', baseArtifact.name, '- using base artifact');
+            setSelectedArtifactWithSubmission(baseArtifact);
+          }
+        } catch (error) {
+          console.warn('Error loading submission data:', error);
+          setSelectedArtifactWithSubmission(baseArtifact);
+        }
+      } else {
+        // For non-form artifacts, use as-is
+        setSelectedArtifactWithSubmission(baseArtifact);
+      }
+    };
+
+    loadArtifactWithSubmission();
+  }, [selectedArtifactId, artifacts, currentSessionId]);
 
   // Function to select an artifact
   const selectArtifact = (artifactId: string) => {
+    setSelectedArtifactId(artifactId);
+    // Save selection for current session if we have a callback and session
+    if (currentSessionId && onArtifactSelected) {
+      onArtifactSelected(currentSessionId, artifactId);
+    }
+  };
+
+  // Function to set selected artifact without persisting (for restoration)
+  const setSelectedArtifactFromState = (artifactId: string | null) => {
     setSelectedArtifactId(artifactId);
   };
 
@@ -252,15 +333,8 @@ export const useArtifactManagement = (
         return [...prev, ...newArtifacts];
       });
 
-      // Auto-select the most recent artifact for the session
-      if (formattedArtifacts.length > 0) {
-        // Find the most recent artifact by ID (assuming higher ID = more recent)
-        const mostRecentArtifact = formattedArtifacts.reduce((latest, current) => {
-          return parseInt(current.id) > parseInt(latest.id) ? current : latest;
-        });
-        
-        selectArtifact(mostRecentArtifact.id);
-      }
+      // Return the artifacts so the caller can handle selection
+      return formattedArtifacts;
     } catch (error) {
       console.error('Failed to load session artifacts:', error);
     }
@@ -791,6 +865,7 @@ export const useArtifactManagement = (
     selectedArtifactId,
     setArtifacts,
     selectArtifact,
+    setSelectedArtifactFromState,
     addArtifactWithMessage,
     loadSessionArtifacts,
     handleAttachFile,

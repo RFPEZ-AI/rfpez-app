@@ -2678,23 +2678,36 @@ Please retry with form_data using the correct field names.`;
       
       // Get any submissions for this artifact (optional - table may not exist yet)
       let latestSubmission = null;
-      try {
-        const { data: submissions, error: submissionError } = await supabase
-          .from('artifact_submissions')
-          .select('*')
-          .eq('artifact_id', artifact_id)
-          .eq('session_id', session_id || 'current')
-          .order('created_at', { ascending: false })
-          .limit(1);
-        
-        if (submissionError) {
-          console.warn('⚠️ Could not retrieve submissions (table may not exist):', submissionError.message);
-        } else {
-          latestSubmission = submissions?.[0] || null;
+      
+      // Skip submission query if artifact_id looks like a form artifact ID
+      // Form artifacts use TEXT IDs like 'form_1758145774362_oqqw23h0t'
+      // which may cause UUID casting errors in older database schemas
+      if (String(artifact_id).startsWith('form_')) {
+        console.log('ℹ️ Skipping submission query for form artifact:', artifact_id);
+      } else {
+        try {
+          const { data: submissions, error: submissionError } = await supabase
+            .from('artifact_submissions')
+            .select('*')
+            .eq('artifact_id', String(artifact_id)) // Ensure string type
+            .eq('session_id', String(session_id || 'current')) // Ensure string type
+            .order('created_at', { ascending: false })
+            .limit(1);
+          
+          if (submissionError) {
+            console.warn('⚠️ Could not retrieve submissions (table may not exist):', submissionError.message);
+          } else {
+            latestSubmission = submissions?.[0] || null;
+          }
+        } catch (submissionQueryError) {
+          const errorMessage = submissionQueryError instanceof Error ? submissionQueryError.message : String(submissionQueryError);
+          if (errorMessage.includes('invalid input syntax for type uuid')) {
+            console.warn('⚠️ UUID casting error for artifact_id:', artifact_id, '- this is expected for form artifacts with TEXT IDs');
+          } else {
+            console.warn('⚠️ Could not retrieve submissions (table may not exist):', submissionQueryError);
+          }
+          // Continue without submissions - this is not a critical error
         }
-      } catch (submissionQueryError) {
-        console.warn('⚠️ Artifact submissions table not available:', submissionQueryError);
-        // Continue without submissions - this is not a critical error
       }
       
       console.log('✅ Form submission retrieved:', { artifact_id, has_submission: !!latestSubmission });

@@ -150,6 +150,12 @@ export class RFPService {
   }
 
   static async update(id: number, updates: Partial<RFP>): Promise<RFP | null> {
+    // Validate RFP ID
+    if (!id || id <= 0) {
+      console.warn('⚠️ Invalid RFP ID for update:', id);
+      return null;
+    }
+
     console.log('🔄 Updating RFP', id, 'with data:', JSON.stringify(updates, null, 2));
     
     try {
@@ -188,7 +194,11 @@ export class RFPService {
       const { data, error } = await supabase.from('rfps').update(updateData).eq('id', id).select().single();
       
       if (error) {
-        console.error('❌ Supabase error updating RFP:', JSON.stringify(error, null, 2));
+        if (error.code === 'PGRST116') {
+          console.warn('⚠️ RFP not found or no permission to update RFP:', id);
+        } else {
+          console.error('❌ Supabase error updating RFP:', JSON.stringify(error, null, 2));
+        }
         return null;
       }
       
@@ -289,6 +299,12 @@ export class RFPService {
 
   // Request Methods
   static async updateRfpRequest(rfpId: number, request: string): Promise<RFP | null> {
+    // Validate RFP ID
+    if (!rfpId || rfpId <= 0) {
+      console.warn('⚠️ Invalid RFP ID for update:', rfpId);
+      return null;
+    }
+
     console.log('🔄 Updating RFP request for ID:', rfpId);
     const { data, error } = await supabase
       .from('rfps')
@@ -298,7 +314,11 @@ export class RFPService {
       .single();
     
     if (error) {
-      console.error('❌ Error updating RFP request:', error);
+      if (error.code === 'PGRST116') {
+        console.warn('⚠️ RFP not found or no permission to update RFP:', rfpId);
+      } else {
+        console.error('❌ Error updating RFP request:', error);
+      }
       return null;
     }
     

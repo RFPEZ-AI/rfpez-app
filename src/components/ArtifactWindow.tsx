@@ -111,6 +111,27 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         }}>
           {/* Custom styles for form inputs */}
           <style>{`
+            /* Fix ARIA accessibility issue - prevent aria-hidden on router outlet when forms are focused */
+            ion-router-outlet[aria-hidden="true"]:has(.form-group input:focus),
+            ion-router-outlet[aria-hidden="true"]:has(.form-group textarea:focus),
+            ion-router-outlet[aria-hidden="true"]:has(.form-group select:focus),
+            ion-router-outlet[aria-hidden="true"]:has(.form-group button:focus),
+            ion-router-outlet[aria-hidden="true"]:has(.button-native:focus),
+            ion-router-outlet[aria-hidden="true"]:has(ion-button:focus) {
+              aria-hidden: false !important;
+            }
+            
+            /* Ensure focused form elements are always accessible */
+            .form-group input:focus,
+            .form-group textarea:focus,
+            .form-group select:focus,
+            .form-group button:focus,
+            .button-native:focus,
+            ion-button:focus {
+              outline: 2px solid var(--ion-color-primary);
+              outline-offset: 2px;
+            }
+            
             .form-group input[type="text"],
             .form-group input[type="email"],
             .form-group input[type="number"],
