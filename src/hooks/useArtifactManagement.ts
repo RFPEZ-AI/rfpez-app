@@ -327,6 +327,7 @@ export const useArtifactManagement = (
           template_schema?: Record<string, unknown>;
           template_ui?: Record<string, unknown>;
           tags?: string[];
+          content?: string; // Add content property for update_form_artifact results
           [key: string]: unknown; // Allow additional properties
         };
       }
@@ -385,7 +386,7 @@ export const useArtifactManagement = (
         
         // Handle update_form_artifact results
         if (functionResult.function === 'update_form_artifact' && functionResult.result) {
-          const result = functionResult.result as any; // Type cast for function result
+          const result = functionResult.result; // Now properly typed through FunctionResult interface
           
           if (result.success && result.artifact_id) {
             console.log('Form artifact update detected from function result:', result);
@@ -403,13 +404,13 @@ export const useArtifactManagement = (
               const updatedArtifact: Artifact = {
                 ...artifacts[existingArtifactIndex],
                 name: result.title || artifacts[existingArtifactIndex].name,
-                content: result.content as string // This contains the complete artifact content with populated formData
+                content: result.content || artifacts[existingArtifactIndex].content // This contains the complete artifact content with populated formData
               };
               
               console.log('🎯 ARTIFACT UPDATE DEBUG:', {
                 artifactId,
                 resultContent: result.content,
-                contentLength: (result.content as string)?.length || 0,
+                contentLength: result.content?.length || 0,
                 updatedArtifact
               });
               
