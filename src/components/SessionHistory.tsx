@@ -18,6 +18,9 @@ interface SessionHistoryProps {
   onSelectSession: (sessionId: string) => void;
   onDeleteSession: (sessionId: string) => void;
   selectedSessionId?: string;
+  // New props for responsive behavior
+  forceCollapsed?: boolean; // Force collapse when artifact window needs space
+  onToggleExpanded?: (expanded: boolean) => void; // Callback when expansion state changes
 }
 
 const SessionHistory: React.FC<SessionHistoryProps> = ({
@@ -25,21 +28,33 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   onNewSession,
   onSelectSession,
   onDeleteSession,
-  selectedSessionId
+  selectedSessionId,
+  forceCollapsed = false,
+  onToggleExpanded
 }) => {
   const isMobile = useIsMobile();
-  const [isExpanded, setIsExpanded] = useState(true);
+  const [internalExpanded, setInternalExpanded] = useState(true);
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedSessionForAction, setSelectedSessionForAction] = useState<string | null>(null);
+
+  // Determine actual expanded state based on forceCollapsed prop
+  const isExpanded = !forceCollapsed && internalExpanded;
 
   // Set initial collapsed state based on screen size
   // On mobile/narrow screens (≤768px), start collapsed for better space utilization
   useEffect(() => {
-    setIsExpanded(!isMobile);
+    setInternalExpanded(!isMobile);
   }, [isMobile]);
 
+  // Notify parent when expansion state changes
+  useEffect(() => {
+    onToggleExpanded?.(isExpanded);
+  }, [isExpanded, onToggleExpanded]);
+
   const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
+    if (!forceCollapsed) {
+      setInternalExpanded(!internalExpanded);
+    }
   };
 
   const handleSessionRightClick = (e: React.MouseEvent, sessionId: string) => {
