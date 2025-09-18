@@ -48,4 +48,7 @@ export interface Artifact {
   sessionId?: string;
   messageId?: string;
   isReferencedInSession?: boolean;
+  // Metadata for RFP-linked artifacts (new schema)
+  rfpId?: number;
+  role?: 'buyer' | 'supplier' | 'system';
 }

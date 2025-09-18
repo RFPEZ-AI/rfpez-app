@@ -58,17 +58,30 @@ export interface Message {
 
 export interface Artifact {
   id: string; // UUID
-  session_id: string; // UUID
+  user_id?: string; // UUID
+  session_id?: string; // UUID
   message_id?: string; // UUID - optional, linked to specific message
   name: string;
-  file_type: string; // 'pdf', 'docx', 'txt', etc.
+  description?: string;
+  type: string; // 'form', 'document', 'image', etc.
+  file_type?: string; // 'pdf', 'docx', 'txt', etc.
   file_size?: number; // in bytes
   storage_path?: string; // Supabase storage path
   mime_type?: string;
-  created_at: string;
-  metadata?: Record<string, unknown>;
+  schema?: Record<string, unknown>; // JSON schema for forms
+  ui_schema?: Record<string, unknown>; // UI schema for forms
+  form_data?: Record<string, unknown>; // Form data for forms
+  submit_action?: Record<string, unknown>; // Submit action for forms
+  is_template?: boolean;
+  template_category?: string;
+  template_tags?: string[];
+  artifact_role: string;
+  status?: string;
+  processing_status?: 'pending' | 'processing' | 'completed' | 'failed';
   processed_content?: string; // Extracted text content
-  processing_status: 'pending' | 'processing' | 'completed' | 'failed';
+  metadata?: Record<string, unknown>;
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface SessionArtifact {

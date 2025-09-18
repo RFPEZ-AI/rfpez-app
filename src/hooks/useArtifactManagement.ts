@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import type { User } from '@supabase/supabase-js';
-import { Artifact, Message, ArtifactReference } from '../types/home';
+import { Artifact as DatabaseArtifact } from '../types/database';
+import { Artifact, ArtifactReference, Message } from '../types/home';
 import { RFP } from '../types/rfp';
 import DatabaseService from '../services/database';
 
@@ -48,41 +49,59 @@ export const useArtifactManagement = (
       );
       
       if (isFormArtifact) {
-        console.log('📋 Loading submission data for form artifact:', selectedArtifactId, 'name:', baseArtifact.name, 'type:', baseArtifact.type);
+        console.log('📋 Loading form artifact:', selectedArtifactId, 'name:', baseArtifact.name, 'type:', baseArtifact.type);
         
+        // First check if the artifact content already has form data
+        let hasFormData = false;
         try {
-          const submissionData = await DatabaseService.getLatestSubmission(
-            selectedArtifactId, 
-            currentSessionId || 'current'
-          );
+          const formSpec = JSON.parse(baseArtifact.content || '{}');
+          hasFormData = formSpec.formData && Object.keys(formSpec.formData).length > 0;
+          console.log('📋 Artifact already has form data:', hasFormData);
+        } catch (parseError) {
+          console.log('📋 Could not parse artifact content, assuming no form data');
+        }
 
-          if (submissionData) {
-            // Parse the existing form content and merge with submission data
-            let enhancedContent = baseArtifact.content || '{}';
-            try {
-              const formSpec = JSON.parse(enhancedContent);
-              // Merge submission data as formData
-              formSpec.formData = submissionData;
-              enhancedContent = JSON.stringify(formSpec);
-              
-              console.log('✅ Enhanced form artifact with submission data:', submissionData);
-              console.log('📋 Final enhanced content preview:', enhancedContent.substring(0, 200) + '...');
-              setSelectedArtifactWithSubmission({
-                ...baseArtifact,
-                content: enhancedContent
-              });
-            } catch (parseError) {
-              console.warn('Failed to parse form content for artifact:', baseArtifact.name, parseError);
-              console.log('📋 Original content was:', enhancedContent);
+        if (hasFormData) {
+          // Use the artifact as-is since it already has form data
+          console.log('✅ Using artifact with existing form data');
+          setSelectedArtifactWithSubmission(baseArtifact);
+        } else {
+          // Only try to load from submissions table if no form data exists
+          console.log('📋 No form data in artifact, checking submission table');
+          try {
+            const submissionData = await DatabaseService.getLatestSubmission(
+              selectedArtifactId, 
+              currentSessionId || 'current'
+            );
+
+            if (submissionData) {
+              // Parse the existing form content and merge with submission data
+              let enhancedContent = baseArtifact.content || '{}';
+              try {
+                const formSpec = JSON.parse(enhancedContent);
+                // Merge submission data as formData
+                formSpec.formData = submissionData;
+                enhancedContent = JSON.stringify(formSpec);
+                
+                console.log('✅ Enhanced form artifact with submission data:', submissionData);
+                console.log('📋 Final enhanced content preview:', enhancedContent.substring(0, 200) + '...');
+                setSelectedArtifactWithSubmission({
+                  ...baseArtifact,
+                  content: enhancedContent
+                });
+              } catch (parseError) {
+                console.warn('Failed to parse form content for artifact:', baseArtifact.name, parseError);
+                console.log('📋 Original content was:', enhancedContent);
+                setSelectedArtifactWithSubmission(baseArtifact);
+              }
+            } else {
+              console.log('📋 No submission data found for:', baseArtifact.name, '- using base artifact');
               setSelectedArtifactWithSubmission(baseArtifact);
             }
-          } else {
-            console.log('📋 No submission data found for:', baseArtifact.name, '- using base artifact');
+          } catch (error) {
+            console.warn('Error loading submission data:', error);
             setSelectedArtifactWithSubmission(baseArtifact);
           }
-        } catch (error) {
-          console.warn('Error loading submission data:', error);
-          setSelectedArtifactWithSubmission(baseArtifact);
         }
       } else {
         // For non-form artifacts, use as-is
@@ -163,8 +182,8 @@ export const useArtifactManagement = (
             // Check if it looks like a form artifact ID (starts with 'form_')
             if (questionnaireStr.startsWith('form_')) {
               console.log('⚠️ buyer_questionnaire contains artifact ID instead of form data:', questionnaireStr);
-              console.log('⚠️ Skipping buyer questionnaire loading - need to fetch from form_artifacts table');
-              // Skip this for now, we need to fetch the actual form data from the form_artifacts table
+              console.log('⚠️ Skipping buyer questionnaire loading - need to fetch from artifacts table');
+              // Skip this for now, we need to fetch the actual form data from the artifacts table
               return;
             } else {
               // Try to parse as JSON
@@ -306,8 +325,8 @@ export const useArtifactManagement = (
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : String(error);
         console.warn('⚠️ Failed to load form artifacts:', errorMessage);
-        console.log('💡 This is normal if the form_artifacts table has not been created yet.');
-        console.log('💡 To fix this, run the migration: database/migration-add-form-artifacts-table.sql');
+        console.log('💡 This is normal if the artifacts table has not been properly set up.');
+        console.log('💡 To fix this, ensure the schema consolidation migration has been run.');
         // Don't throw - just continue without form artifacts
       }
     };
@@ -318,13 +337,40 @@ export const useArtifactManagement = (
   // Load session artifacts when session changes
   const loadSessionArtifacts = async (sessionId: string) => {
     try {
-      const artifactsData = await DatabaseService.getSessionArtifacts(sessionId);
-      const formattedArtifacts: Artifact[] = artifactsData.map(artifact => ({
-        id: artifact.id,
-        name: artifact.name,
-        type: artifact.file_type as 'document' | 'image' | 'pdf' | 'other',
-        size: artifact.file_size ? `${(artifact.file_size / 1024).toFixed(1)} KB` : 'Unknown'
-      }));
+      const artifactsData: DatabaseArtifact[] = await DatabaseService.getSessionArtifacts(sessionId);
+      const formattedArtifacts: Artifact[] = artifactsData.map(artifact => {
+        let content: string | undefined;
+        
+        // For form artifacts, construct the content from separate database fields
+        if (artifact.type === 'form' && (artifact.schema || artifact.form_data)) {
+          const formSpec = {
+            schema: artifact.schema || {},
+            uiSchema: artifact.ui_schema || {},
+            formData: artifact.form_data || {},
+            submitAction: artifact.submit_action || { type: 'save_session' }
+          };
+          content = JSON.stringify(formSpec);
+          console.log('📋 Constructed form content for artifact:', artifact.id, 'with formData keys:', Object.keys(artifact.form_data || {}));
+        }
+        
+        // Map database type to frontend type
+        let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'other' = 'other';
+        if (artifact.type === 'form') frontendType = 'form';
+        else if (artifact.type === 'document') frontendType = 'document';
+        else if (artifact.type === 'text') frontendType = 'text';
+        else if (artifact.type === 'image') frontendType = 'image';
+        else if (artifact.type === 'pdf') frontendType = 'pdf';
+        
+        return {
+          id: artifact.id,
+          name: artifact.name,
+          type: frontendType,
+          size: artifact.file_size ? `${(artifact.file_size / 1024).toFixed(1)} KB` : 'Unknown',
+          content: content,
+          sessionId: artifact.session_id,
+          messageId: artifact.message_id
+        };
+      });
       
       // Merge with existing artifacts, avoiding duplicates
       setArtifacts(prev => {

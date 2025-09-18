@@ -79,14 +79,17 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
 
         setRfp(rfpData);
 
-        // Check if RFP has a form spec
-        if (!rfpData.bid_form_questionaire) {
+        // Load the bid form for this RFP
+        console.log('🔍 Loading bid form for RFP:', rfpId);
+        const bidFormSpec = await RFPService.getBidFormForRfp(rfpId);
+        if (!bidFormSpec) {
           setError('This RFP does not have a bid form configured');
           setLoading(false);
           return;
         }
 
-        setFormSpec(rfpData.bid_form_questionaire);
+        console.log('✅ Found bid form for RFP:', rfpId);
+        setFormSpec(bidFormSpec);
 
         // Pre-fill supplier info if provided in URL
         if (supplierName || supplierEmail) {
