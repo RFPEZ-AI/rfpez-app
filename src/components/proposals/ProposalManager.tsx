@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   IonCard,
   IonCardContent,
@@ -54,9 +54,27 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
   const [showAlert, setShowAlert] = useState(false);
   const [alertMessage, setAlertMessage] = useState('');
   const [localProposal, setLocalProposal] = useState(rfp.request || '');
+  const [questionnaireResponse, setQuestionnaireResponse] = useState<BuyerQuestionnaireResponse | null>(null);
+
+  // Load questionnaire response when component mounts or RFP changes
+  useEffect(() => {
+    const loadQuestionnaireResponse = async () => {
+      try {
+        const response = await RFPService.getRfpBuyerQuestionnaireResponse(rfp.id);
+        setQuestionnaireResponse(response);
+      } catch (error) {
+        console.warn('Failed to load questionnaire response:', error);
+        // Fallback to legacy approach
+        const legacyResponse = rfp.buyer_questionnaire_response as BuyerQuestionnaireResponse | null;
+        setQuestionnaireResponse(legacyResponse);
+      }
+    };
+
+    loadQuestionnaireResponse();
+  }, [rfp.id, rfp.buyer_questionnaire_response]);
 
   const handleGenerateProposal = async () => {
-    if (!rfp.buyer_questionnaire_response) {
+    if (!questionnaireResponse) {
       setAlertMessage('No questionnaire response data available to generate request.');
       setShowAlert(true);
       return;
@@ -65,11 +83,10 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
     setIsGenerating(true);
 
     try {
-      const response = rfp.buyer_questionnaire_response as BuyerQuestionnaireResponse | null;
       const proposal = await RFPService.generateRequest(
         rfp,
-        response?.form_data || {},
-        response?.supplier_info || { name: 'Unknown', email: 'unknown@example.com' }
+        questionnaireResponse?.form_data || {},
+        questionnaireResponse?.supplier_info || { name: 'Unknown', email: 'unknown@example.com' }
       );
 
       setLocalProposal(proposal);
@@ -140,7 +157,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
           <IonText color="medium">
             <p>
               Generate a comprehensive proposal based on the submitted bid data and RFP requirements.
-              {rfp.buyer_questionnaire_response 
+              {questionnaireResponse 
                 ? ' Proposal will be generated from the collected questionnaire responses.'
                 : ' No questionnaire responses available yet.'
               }
@@ -151,7 +168,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
             <IonButton
               expand="block"
               onClick={handleGenerateProposal}
-              disabled={isGenerating || !rfp.buyer_questionnaire_response}
+              disabled={isGenerating || !questionnaireResponse}
               fill="outline"
             >
               {isGenerating && <IonSpinner name="crescent" slot="start" />}
@@ -222,7 +239,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
       )}
 
       {/* Questionnaire Response Data */}
-      {rfp.buyer_questionnaire_response && (
+      {questionnaireResponse && (
         <IonCard>
           <IonCardHeader>
             <IonCardTitle>Questionnaire Response Data</IonCardTitle>
@@ -245,7 +262,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
                 whiteSpace: 'pre-wrap',
                 wordBreak: 'break-word'
               }}>
-                {JSON.stringify(rfp.buyer_questionnaire_response, null, 2)}
+                {JSON.stringify(questionnaireResponse, null, 2)}
               </pre>
             </div>
           </IonCardContent>

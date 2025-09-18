@@ -42,8 +42,8 @@ export class FunctionStatusVerifier {
         if (functionName === 'supabase_update') {
           try {
             await this.handler.executeFunction(functionName, {
-              table: 'form_artifacts',
-              data: { title: 'test' },
+              table: 'artifacts',
+              data: { name: 'test' },
               filter: { field: 'id', operator: 'eq', value: 'nonexistent_test_id_12345' }
             });
             // If we get here, function is working (even if no rows were updated)

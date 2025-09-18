@@ -7,6 +7,7 @@
 import { supabase } from '../supabaseClient';
 import { AgentService } from './agentService';
 import { mcpClient } from './mcpClient';
+import { v4 as uuidv4 } from 'uuid';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages.mjs';
 
 // TypeScript interfaces for request generation
@@ -333,6 +334,10 @@ export const claudeApiFunctions: Tool[] = [
     "input_schema": {
       "type": "object",
       "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "Current session ID for linking the artifact to the session"
+        },
         "title": {
           "type": "string",
           "description": "Title for the form artifact"
@@ -370,9 +375,15 @@ export const claudeApiFunctions: Tool[] = [
             "success_message": { "type": "string" }
           },
           "required": ["type"]
+        },
+        "artifact_role": {
+          "type": "string",
+          "description": "Role/type of the form artifact",
+          "enum": ["buyer_questionnaire", "bid_form", "request_document", "template"],
+          "default": "buyer_questionnaire"
         }
       },
-      "required": ["title", "form_schema"]
+      "required": ["session_id", "title", "form_schema"]
     }
   },
   {
@@ -502,6 +513,10 @@ export const claudeApiFunctions: Tool[] = [
     "input_schema": {
       "type": "object",
       "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "Session ID to associate the artifact with"
+        },
         "title": {
           "type": "string",
           "description": "Title for the text artifact"
@@ -526,7 +541,7 @@ export const claudeApiFunctions: Tool[] = [
           "description": "Tags for categorizing the artifact"
         }
       },
-      "required": ["title", "content"]
+      "required": ["session_id", "title", "content"]
     }
   },
   {
@@ -1977,17 +1992,26 @@ export class ClaudeAPIFunctionHandler {
   private async createFormArtifact(params: any, userId: string) {
     console.log('🎨 Starting createFormArtifact with params:', JSON.stringify(params, null, 2));
     
-    const { title, description, ui_schema, form_data, submit_action } = params;
+    const { session_id, title, description, ui_schema, form_data, submit_action, artifact_role } = params;
     const { form_schema } = params;
     
-    console.log('🎨 Creating form artifact:', { title, userId });
+    // Default artifact_role to 'buyer_questionnaire' if not provided
+    const effectiveArtifactRole = artifact_role || 'buyer_questionnaire';
+    
+    console.log('🎨 Creating form artifact:', { title, userId, session_id, artifact_role: effectiveArtifactRole });
     console.log('🔍 Destructured values:');
+    console.log('  - session_id:', session_id, '(type:', typeof session_id, ')');
     console.log('  - title:', title, '(type:', typeof title, ')');
     console.log('  - description:', description, '(type:', typeof description, ')');
     console.log('  - form_schema:', form_schema, '(type:', typeof form_schema, ')');
     console.log('  - ui_schema:', ui_schema, '(type:', typeof ui_schema, ')');
     console.log('  - form_data:', form_data, '(type:', typeof form_data, ')');
     console.log('  - submit_action:', submit_action, '(type:', typeof submit_action, ')');
+    console.log('  - artifact_role:', effectiveArtifactRole, '(type:', typeof effectiveArtifactRole, ')');
+    
+    if (!session_id) {
+      throw new Error('Session ID is required for creating a form artifact');
+    }
     
     if (!title) {
       throw new Error('Title is required for creating a form artifact');
@@ -2034,59 +2058,103 @@ Please retry the create_form_artifact call with the complete form_schema paramet
     }
     
     try {
-      // Generate a unique artifact ID
-      const artifact_id = `form_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      // Generate a unique artifact ID using UUID for consistency with artifacts table
+      const artifact_id = uuidv4();
       
-      // For form_artifacts table: use Supabase Auth User ID directly (references auth.users)
+      // For artifacts table: use Supabase Auth User ID directly (references auth.users)
       // For RLS policies: they will handle the user_profiles lookup internally
       const dbUserId = userId !== 'anonymous' ? userId : null;
       
-      console.log('🔧 User ID for form_artifacts database:', {
+      console.log('🔧 Database preparation:', {
         receivedUserId: userId,
         dbUserId: dbUserId,
+        session_id: session_id,
+        artifact_id: artifact_id,
         isAnonymous: userId === 'anonymous',
-        note: 'Using auth.users ID directly for foreign key constraint'
+        note: 'Using consolidated artifacts table with proper session linking'
       });
-      
-      const insertData = {
+
+      // Prepare artifact data for consolidated artifacts table
+      const artifactData = {
         id: artifact_id,
-        user_id: dbUserId, // Use Supabase Auth User ID for auth.users foreign key
-        type: 'form',
-        title,
-        description: description || null,
-        schema: form_schema,
-        ui_schema: ui_schema || null,
-        data: form_data || null,
-        submit_action: submit_action || null,
-        status: 'active',
-        created_at: new Date().toISOString()
+        session_id: session_id, // Required for artifacts table
+        message_id: null, // Will be linked when message is stored
+        name: title,
+        file_type: 'form', // Required field in artifacts table
+        artifact_role: effectiveArtifactRole, // Required field specifying the role of this artifact
+        file_size: null,
+        storage_path: null,
+        mime_type: 'application/json',
+        metadata: {
+          type: 'form',
+          description: description || null,
+          schema: form_schema,
+          ui_schema: ui_schema || {},
+          form_data: form_data || {},
+          submit_action: submit_action || { type: 'save_session' },
+          user_id: dbUserId,
+          status: 'active',
+          artifact_role: effectiveArtifactRole
+        },
+        processed_content: JSON.stringify({
+          schema: form_schema,
+          ui_schema: ui_schema || {},
+          form_data: form_data || {},
+          submit_action: submit_action || { type: 'save_session' }
+        }),
+        processing_status: 'completed'
       };
       
-      console.log('🔍 INSERT DATA DEBUG:', {
-        id: insertData.id,
-        user_id: insertData.user_id,
-        type: insertData.type,
-        title: insertData.title,
-        dbUserIdType: typeof dbUserId,
-        dbUserIdValue: dbUserId,
-        isAnonymousUser: userId === 'anonymous',
-        originalUserId: userId,
-        tableConstraint: 'References auth.users(id)'
+      console.log('🔍 ARTIFACT INSERT DATA:', {
+        id: artifactData.id,
+        session_id: artifactData.session_id,
+        name: artifactData.name,
+        file_type: artifactData.file_type,
+        metadataSize: JSON.stringify(artifactData.metadata).length,
+        note: 'Ready for artifacts table insertion'
       });
       
-      // Store artifact in the database for persistence
-      const { error } = await supabase
-        .from('form_artifacts')
-        .insert(insertData)
+      // Store artifact in the consolidated artifacts table
+      const { data: insertedArtifact, error } = await supabase
+        .from('artifacts')
+        .insert(artifactData)
         .select()
         .single();
       
       if (error) {
         console.error('❌ Failed to store artifact in database:', error);
-        // Continue without database storage for anonymous users or fallback
+        console.error('❌ Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        // Continue without database storage for fallback
+      } else {
+        console.log('✅ Form artifact stored in database successfully:', insertedArtifact);
+        
+        // Link artifact to session via session_artifacts table if needed
+        // (This might be automatic via the session_id foreign key, but let's ensure it)
+        try {
+          const { error: linkError } = await supabase
+            .from('session_artifacts')
+            .insert({
+              session_id: session_id,
+              artifact_id: artifact_id
+            });
+          
+          if (linkError && !linkError.message.includes('duplicate')) {
+            console.warn('⚠️ Failed to link artifact to session (may already exist):', linkError);
+          } else {
+            console.log('✅ Artifact linked to session successfully');
+          }
+        } catch (linkError) {
+          console.warn('⚠️ Session-artifact linking failed:', linkError);
+          // Not critical - the artifact still exists with session_id
+        }
       }
       
-      console.log('✅ Form artifact created successfully:', { artifact_id, title });
+      console.log('✅ Form artifact created successfully:', { artifact_id, title, session_id });
       
       return {
         success: true,
@@ -2098,8 +2166,9 @@ Please retry the create_form_artifact call with the complete form_schema paramet
         ui_schema: ui_schema || {},
         form_data: form_data || {},
         submit_action: submit_action || { type: 'save_session' },
+        session_id: session_id,
         created_at: new Date().toISOString(),
-        message: `Form artifact "${title}" created successfully`
+        message: `Form artifact "${title}" created successfully and stored in database`
       };
     } catch (error) {
       console.error('❌ Error creating form artifact:', error);
@@ -2109,9 +2178,13 @@ Please retry the create_form_artifact call with the complete form_schema paramet
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createTextArtifact(params: any, userId: string) {
-    const { title, content, content_type = 'markdown', description, tags } = params;
+    const { session_id, title, content, content_type = 'markdown', description, tags } = params;
     
-    console.log('📝 Creating text artifact:', { title, content_type, userId });
+    console.log('📝 Creating text artifact:', { title, content_type, userId, session_id });
+    
+    if (!session_id) {
+      throw new Error('Session ID is required for creating a text artifact');
+    }
     
     if (!title) {
       throw new Error('Title is required for creating a text artifact');
@@ -2131,33 +2204,96 @@ Please retry the create_form_artifact call with the complete form_schema paramet
       // Generate a unique artifact ID
       const artifact_id = `text_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
-      // Store artifact in the database for persistence
-      const { error } = await supabase
-        .from('form_artifacts')
-        .insert({
-          id: artifact_id,
-          user_id: userId !== 'anonymous' ? userId : null,
+      // For artifacts table: use Supabase Auth User ID directly (references auth.users)
+      const dbUserId = userId !== 'anonymous' ? userId : null;
+      
+      // Prepare artifact data for consolidated artifacts table
+      const artifactData = {
+        id: artifact_id,
+        user_id: dbUserId,
+        session_id: session_id, // Required for artifacts table
+        message_id: null, // Will be linked when message is stored
+        name: title,
+        description: description || null,
+        type: 'text', // Use 'text' type for text artifacts
+        file_type: null, // Not a file-based artifact
+        file_size: content.length,
+        storage_path: null,
+        mime_type: 'text/markdown',
+        schema: {
           type: 'text',
-          title,
+          content_type,
+          tags: tags || []
+        },
+        ui_schema: null,
+        form_data: {
+          content,
+          content_type,
+          tags: tags || []
+        },
+        submit_action: null,
+        is_template: false,
+        template_category: null,
+        template_tags: null,
+        artifact_role: 'document',
+        status: 'active',
+        processing_status: 'completed',
+        processed_content: content,
+        metadata: {
+          type: 'text',
+          content_type,
           description: description || null,
-          schema: {
-            type: 'text',
-            content_type,
-            content,
-            tags: tags || []
-          },
-          ui_schema: null,
-          data: { content, content_type },
-          submit_action: null,
-          status: 'active',
-          created_at: new Date().toISOString()
-        })
+          tags: tags || [],
+          user_id: dbUserId
+        }
+      };
+      
+      console.log('🔍 TEXT ARTIFACT INSERT DATA:', {
+        id: artifactData.id,
+        session_id: artifactData.session_id,
+        name: artifactData.name,
+        type: artifactData.type,
+        contentLength: content.length,
+        note: 'Ready for artifacts table insertion'
+      });
+      
+      // Store artifact in the database for persistence
+      const { data: insertedArtifact, error } = await supabase
+        .from('artifacts')
+        .insert(artifactData)
         .select()
         .single();
       
       if (error) {
         console.error('❌ Failed to store text artifact in database:', error);
-        // Continue without database storage for anonymous users or fallback
+        console.error('❌ Error details:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code
+        });
+        throw error; // Don't continue without database storage for text artifacts
+      }
+      
+      console.log('✅ Text artifact stored in database successfully:', insertedArtifact);
+      
+      // Link artifact to session via session_artifacts table if needed
+      try {
+        const { error: linkError } = await supabase
+          .from('session_artifacts')
+          .insert({
+            session_id: session_id,
+            artifact_id: artifact_id
+          });
+        
+        if (linkError && !linkError.message.includes('duplicate')) {
+          console.warn('⚠️ Failed to link text artifact to session (may already exist):', linkError);
+        } else {
+          console.log('✅ Text artifact linked to session successfully');
+        }
+      } catch (linkError) {
+        console.warn('⚠️ Session-artifact linking failed:', linkError);
+        // Not critical - the artifact still exists with session_id
       }
       
       console.log('✅ Text artifact created successfully:', { artifact_id, title, content_type });
@@ -2211,12 +2347,12 @@ Please retry the create_form_artifact call with the complete form_schema paramet
       
       // Store artifact in the database
       const { error } = await supabase
-        .from('form_artifacts')
+        .from('artifacts')
         .insert({
           id: artifact_id,
           user_id: userId !== 'anonymous' ? userId : null,
           type: 'text',
-          title,
+          name: title,
           description: `Proposal generated for RFP: ${rfp.name}`,
           schema: {
             type: 'text',
@@ -2226,7 +2362,7 @@ Please retry the create_form_artifact call with the complete form_schema paramet
             rfp_id: rfp_id
           },
           ui_schema: null,
-          data: { content: requestContent, content_type, rfp_id },
+          form_data: { content: requestContent, content_type, rfp_id },
           submit_action: null,
           status: 'active',
           created_at: new Date().toISOString()
@@ -2400,7 +2536,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
       throw new Error('Updates object is required');
     }
     
-    // For form_artifacts table: use Supabase Auth User ID directly (references auth.users)
+    // For artifacts table: use Supabase Auth User ID directly (references auth.users)
     // For RLS policies: they will handle the user_profiles lookup internally
     const isAnonymous = !userId || userId === 'anonymous';
     const dbUserId = isAnonymous ? null : userId;
@@ -2415,7 +2551,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
     try {
       // Get the existing artifact to validate schema compatibility
       const { data: existingArtifact, error: checkError } = await supabase
-        .from('form_artifacts')
+        .from('artifacts')
         .select('*')
         .eq('id', artifact_id)
         .single();
@@ -2497,12 +2633,12 @@ Please retry with form_data using the correct field names.`;
         console.log('📝 Artifact does not exist, creating new artifact:', artifact_id);
         
         const { data: createdArtifact, error: createError } = await supabase
-          .from('form_artifacts')
+          .from('artifacts')
           .insert({
             id: artifact_id,
             user_id: dbUserId,
             type: 'form',
-            title: updates.title || 'Untitled Form',
+            name: updates.title || 'Untitled Form',
             description: updates.description || 'Form created via update operation',
             schema: updates.form_schema || {
               type: "object",
@@ -2513,7 +2649,7 @@ Please retry with form_data using the correct field names.`;
               required: ["name", "email"]
             },
             ui_schema: updates.ui_schema || {},
-            data: finalFormData || updates.form_data || {},
+            form_data: finalFormData || updates.form_data || {},
             submit_action: updates.submit_action || 'save',
             status: 'active',
             created_at: new Date().toISOString(),
@@ -2548,7 +2684,7 @@ Please retry with form_data using the correct field names.`;
         const artifactContent = {
           schema: createdArtifact.schema,
           uiSchema: createdArtifact.ui_schema || {},
-          formData: createdArtifact.data || {},
+          formData: createdArtifact.form_data || {},
           submitAction: createdArtifact.submit_action || { type: 'save_session' }
         };
         
@@ -2558,7 +2694,7 @@ Please retry with form_data using the correct field names.`;
           created: true,
           updated_fields: Object.keys(updates),
           created_at: new Date().toISOString(),
-          title: createdArtifact.title,
+          title: createdArtifact.name,
           description: createdArtifact.description,
           type: 'form',
           content: JSON.stringify(artifactContent),
@@ -2571,13 +2707,13 @@ Please retry with form_data using the correct field names.`;
       
       // Artifact exists - proceed with update
       const { data: updatedArtifact, error: updateError } = await supabase
-        .from('form_artifacts')
+        .from('artifacts')
         .update({
-          title: updates.title,
+          name: updates.title,
           description: updates.description,
           schema: updates.form_schema,
           ui_schema: updates.ui_schema,
-          data: finalFormData,
+          form_data: finalFormData,
           submit_action: updates.submit_action,
           updated_at: new Date().toISOString()
         })
@@ -2596,15 +2732,15 @@ Please retry with form_data using the correct field names.`;
       const artifactContent = {
         schema: updatedArtifact.schema,
         uiSchema: updatedArtifact.ui_schema || {},
-        formData: updatedArtifact.data || {},
+        formData: updatedArtifact.form_data || {},
         submitAction: updatedArtifact.submit_action || { type: 'save_session' }
       };
       
       console.log('🎯 ARTIFACT CONTENT DEBUG:', {
         artifactId: artifact_id,
         schemaKeys: Object.keys(updatedArtifact.schema?.properties || {}),
-        formDataKeys: Object.keys(updatedArtifact.data || {}),
-        formDataContent: updatedArtifact.data,
+        formDataKeys: Object.keys(updatedArtifact.form_data || {}),
+        formDataContent: updatedArtifact.form_data,
         fullContent: artifactContent
       });
       
@@ -2614,7 +2750,7 @@ Please retry with form_data using the correct field names.`;
         updated: true,
         updated_fields: Object.keys(updates),
         updated_at: new Date().toISOString(),
-        title: updatedArtifact.title,
+        title: updatedArtifact.name,
         description: updatedArtifact.description,
         type: 'form',
         content: JSON.stringify(artifactContent),
@@ -2635,11 +2771,25 @@ Please retry with form_data using the correct field names.`;
     if (!artifact_id) {
       throw new Error('Artifact ID is required');
     }
+
+    // Get the current session ID from user profile if not provided
+    let effectiveSessionId = session_id;
+    if (!effectiveSessionId) {
+      try {
+        const { data: currentSessionData } = await supabase
+          .rpc('get_user_current_session', { user_uuid: userId });
+        effectiveSessionId = currentSessionData;
+        console.log('📋 Using current session from user profile:', effectiveSessionId);
+      } catch (error) {
+        console.warn('⚠️ Could not get current session from user profile:', error);
+        // Continue without session ID - this is not critical
+      }
+    }
     
     try {
       // Get the artifact
       const { data: artifact, error: artifactError } = await supabase
-        .from('form_artifacts')
+        .from('artifacts')
         .select('*')
         .eq('id', artifact_id)
         .single();
@@ -2686,13 +2836,19 @@ Please retry with form_data using the correct field names.`;
         console.log('ℹ️ Skipping submission query for form artifact:', artifact_id);
       } else {
         try {
-          const { data: submissions, error: submissionError } = await supabase
+          // Build query with optional session filter
+          let query = supabase
             .from('artifact_submissions')
             .select('*')
-            .eq('artifact_id', String(artifact_id)) // Ensure string type
-            .eq('session_id', String(session_id || 'current')) // Ensure string type
+            .eq('artifact_id', String(artifact_id))
             .order('created_at', { ascending: false })
             .limit(1);
+            
+          if (effectiveSessionId) {
+            query = query.eq('session_id', String(effectiveSessionId));
+          }
+          
+          const { data: submissions, error: submissionError } = await query;
           
           if (submissionError) {
             console.warn('⚠️ Could not retrieve submissions (table may not exist):', submissionError.message);
@@ -2715,11 +2871,11 @@ Please retry with form_data using the correct field names.`;
       return {
         artifact_id,
         artifact: {
-          title: artifact.title,
+          title: artifact.name,
           description: artifact.description,
           form_schema: artifact.schema,
           ui_schema: artifact.ui_schema,
-          form_data: artifact.data
+          form_data: artifact.form_data
         },
         schema_guidance: {
           field_names: Object.keys(artifact.schema?.properties || {}),
@@ -2857,11 +3013,11 @@ Please retry with form_data using the correct field names.`;
         .from('artifact_templates')
         .insert({
           id: template_id,
-          user_id: userId !== 'anonymous' ? userId : null,
-          name: template_name,
-          type: template_type,
-          schema: template_schema,
-          ui_config: template_ui || null,
+          created_by: userId !== 'anonymous' ? userId : null,
+          template_name,
+          template_type,
+          template_schema,
+          template_ui: template_ui || null,
           description: description || null,
           tags: tags || [],
           is_public: false, // Private by default
@@ -2959,7 +3115,7 @@ Please retry with form_data using the correct field names.`;
     try {
       // Get artifact details
       const { data: artifact, error: artifactError } = await supabase
-        .from('form_artifacts')
+        .from('artifacts')
         .select('*')
         .eq('id', artifact_id)
         .single();
@@ -2985,13 +3141,13 @@ Please retry with form_data using the correct field names.`;
         artifact_id,
         status: artifact.status || 'active',
         type: artifact.type,
-        title: artifact.title,
+        title: artifact.name,
         description: artifact.description,
         created_at: artifact.created_at,
         updated_at: artifact.updated_at,
         submission_count: submissionCount || 0,
         last_activity: artifact.updated_at || artifact.created_at,
-        message: `Artifact status for "${artifact.title}"`
+        message: `Artifact status for "${artifact.name}"`
       };
     } catch (error) {
       console.error('❌ Error getting artifact status:', error);

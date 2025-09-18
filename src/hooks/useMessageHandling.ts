@@ -134,6 +134,14 @@ export const useMessageHandling = () => {
             setCurrentSessionId(newSessionId);
             setSelectedSessionId(newSessionId);
             console.log('New session created with ID:', newSessionId);
+            
+            // Update user profile with current session ID for database persistence
+            try {
+              await DatabaseService.setUserCurrentSession(newSessionId);
+              console.log('✅ Current session saved to user profile:', newSessionId);
+            } catch (error) {
+              console.warn('⚠️ Failed to save current session to user profile:', error);
+            }
           }
         }
 

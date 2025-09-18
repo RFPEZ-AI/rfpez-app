@@ -404,54 +404,78 @@ export class DatabaseService {
     return data;
   }
 
-  // Artifact Submission operations
+  // Get latest submission for an artifact (updated for consolidated schema)
   static async getLatestSubmission(artifactId: string, sessionId?: string): Promise<Record<string, unknown> | null> {
     try {
-      // Only query if artifactId is a valid UUID - form artifacts have string IDs that aren't UUIDs
-      if (!this.isValidUuid(artifactId)) {
-        console.log('📋 Artifact ID is not a UUID format, skipping submission lookup:', artifactId);
-        return null;
+      console.log('📥 Getting latest submission for artifact:', artifactId);
+      
+      // Try using the RPC function first (new consolidated schema)
+      try {
+        const { data, error } = await supabase
+          .rpc('get_latest_submission', { 
+            artifact_id_param: artifactId,
+            session_id_param: sessionId || null
+          });
+
+        if (!error && data) {
+          console.log('✅ Got submission data from RPC function');
+          return data as Record<string, unknown>;
+        }
+      } catch (rpcError) {
+        console.log('📝 RPC function not available, falling back to manual query...');
       }
 
+      // Fallback: Try new artifact_submissions table
+      const tableName = 'artifact_submissions';
       let query = supabase
-        .from('artifact_submissions')
+        .from(tableName)
         .select('submission_data')
         .eq('artifact_id', artifactId)
-        .order('created_at', { ascending: false })
+        .order('submitted_at', { ascending: false })
         .limit(1);
 
-      // Add session filter if provided
       if (sessionId) {
         query = query.eq('session_id', sessionId);
       }
 
-      const { data, error } = await query;
+      let { data, error } = await query;
+
+      // If new table doesn't exist or no data found, try legacy approach
+      if (error || !data || data.length === 0) {
+        console.log('📝 New submission table not found or empty, trying legacy artifact_submissions...');
+        
+        // Only query if artifactId is a valid UUID format for legacy table
+        if (!this.isValidUuid(artifactId)) {
+          console.log('📋 Artifact ID is not a UUID format, skipping legacy submission lookup:', artifactId);
+          return null;
+        }
+
+        query = supabase
+          .from('artifact_submissions')
+          .select('submission_data')
+          .eq('artifact_id', artifactId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (sessionId) {
+          query = query.eq('session_id', sessionId);
+        }
+
+        const result = await query;
+        data = result.data;
+        error = result.error;
+      }
 
       if (error) {
-        // Check for specific error types
-        if (error.code === '42P01') {
-          // Table does not exist
-          console.log('📋 artifact_submissions table does not exist yet - this is expected in development');
-          return null;
-        } else if (error.code === '42501') {
-          // Insufficient privileges (RLS policy issue)
-          console.log('📋 Insufficient privileges to read artifact submissions - this may be expected for anonymous users');
-          return null;
-        } else {
-          console.warn('Could not retrieve artifact submission:', error.message, 'Code:', error.code);
-        }
+        console.error('❌ Error loading submission:', error);
         return null;
       }
 
-      if (data && data.length > 0) {
-        console.log('📋 Found submission data for artifact:', artifactId);
-        return data[0].submission_data as Record<string, unknown>;
-      }
-
-      console.log('📋 No submission data found for artifact:', artifactId);
-      return null;
-    } catch (err) {
-      console.warn('Error fetching artifact submission:', err);
+      const submissionData = data && data.length > 0 ? data[0].submission_data : null;
+      console.log('✅ Found submission data:', !!submissionData);
+      return submissionData as Record<string, unknown> | null;
+    } catch (error) {
+      console.error('❌ Exception loading submission:', error);
       return null;
     }
   }
@@ -473,7 +497,7 @@ export class DatabaseService {
         .from('artifact_submissions')
         .insert({
           artifact_id: artifactId,
-          session_id: sessionId || 'current',
+          session_id: sessionId || null, // Use null instead of 'current'
           user_id: userId || null,
           submission_data: submissionData,
           status: 'submitted'
@@ -573,6 +597,40 @@ export class DatabaseService {
     return data;
   }
 
+  // Current session management for user profiles
+  static async setUserCurrentSession(sessionId: string): Promise<boolean> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return false;
+
+    const { error } = await supabase
+      .rpc('set_user_current_session', {
+        user_uuid: user.id,
+        session_uuid: sessionId
+      });
+
+    if (error) {
+      console.error('Error setting current session:', error);
+      return false;
+    }
+    return true;
+  }
+
+  static async getUserCurrentSession(): Promise<string | null> {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return null;
+
+    const { data, error } = await supabase
+      .rpc('get_user_current_session', {
+        user_uuid: user.id
+      });
+
+    if (error) {
+      console.error('Error getting current session:', error);
+      return null;
+    }
+    return data;
+  }
+
   // File storage operations (for artifacts)
   static async uploadFile(file: File, sessionId: string): Promise<string | null> {
     const fileExt = file.name.split('.').pop();
@@ -609,26 +667,25 @@ export class DatabaseService {
     return data.publicUrl;
   }
 
-  // Form Artifacts Management
+  // Form Artifacts Management - Updated for consolidated schema
   static async getFormArtifacts(userId?: string | null): Promise<unknown[]> {
     console.log('📥 Loading form artifacts from database for user:', userId || 'anonymous');
     
     try {
-      // First check if the table exists by doing a simple query
-      const { error: tableError } = await supabase
-        .from('form_artifacts')
+      // Try new consolidated artifacts table first
+      const { error: newTableError } = await supabase
+        .from('artifacts')
         .select('id', { count: 'exact', head: true })
+        .eq('type', 'form')
         .limit(1);
 
-      if (tableError) {
-        console.warn('⚠️ Form artifacts table not found:', tableError.message);
-        console.log('📝 This likely means the form_artifacts table does not exist yet.');
-        console.log('📝 Please run the migration: database/migration-add-form-artifacts-table.sql');
-        console.log('📝 Falling back to empty artifacts array for now.');
+      if (newTableError) {
+        console.warn('⚠️ Artifacts table not found:', newTableError.message);
+        console.log('📝 Please ensure the schema migration has been applied: database/migration-consolidate-schema.sql');
         return [];
       }
 
-      console.log('✅ Form artifacts table exists, proceeding with query...');
+      console.log('✅ Using artifacts table for form artifacts...');
 
       // If user is authenticated, get their artifacts + anonymous ones
       // If not authenticated, only get anonymous ones
@@ -637,8 +694,9 @@ export class DatabaseService {
       if (userId) {
         // Get user's artifacts
         const { data: userArtifacts, error: userError } = await supabase
-          .from('form_artifacts')
+          .from('artifacts')
           .select('*')
+          .eq('type', 'form')
           .eq('status', 'active')
           .eq('user_id', userId)
           .order('created_at', { ascending: false });
@@ -651,8 +709,9 @@ export class DatabaseService {
 
         // Get anonymous artifacts
         const { data: anonArtifacts, error: anonError } = await supabase
-          .from('form_artifacts')
+          .from('artifacts')
           .select('*')
+          .eq('type', 'form')
           .eq('status', 'active')
           .is('user_id', null)
           .order('created_at', { ascending: false });
@@ -665,8 +724,9 @@ export class DatabaseService {
       } else {
         // Only get anonymous artifacts
         const { data: anonArtifacts, error: anonError } = await supabase
-          .from('form_artifacts')
+          .from('artifacts')
           .select('*')
+          .eq('type', 'form')
           .eq('status', 'active')
           .is('user_id', null)
           .order('created_at', { ascending: false });
@@ -692,6 +752,113 @@ export class DatabaseService {
     } catch (error) {
       console.error('❌ Exception loading form artifacts:', error);
       return [];
+    }
+  }
+
+  // RFP-Artifacts relationship management (new consolidated schema)
+  static async getRFPArtifacts(rfpId: number): Promise<unknown[]> {
+    console.log('📥 Loading artifacts for RFP:', rfpId);
+    
+    try {
+      // Try using the new consolidated schema first
+      const { data, error } = await supabase
+        .rpc('get_rfp_artifacts', { rfp_id_param: rfpId });
+
+      if (error) {
+        console.warn('⚠️ RPC function not found, falling back to manual query...');
+        
+        // Fallback to manual join query
+        const { data: artifactData, error: joinError } = await supabase
+          .from('rfp_artifacts')
+          .select(`
+            role,
+            artifacts:artifact_id (
+              id,
+              name,
+              type,
+              schema,
+              ui_schema,
+              form_data,
+              created_at
+            )
+          `)
+          .eq('rfp_id', rfpId);
+
+        if (joinError) {
+          console.error('❌ Error loading RFP artifacts:', joinError);
+          return [];
+        }
+
+        return artifactData || [];
+      }
+
+      console.log(`✅ Loaded ${data?.length || 0} artifacts for RFP ${rfpId}`);
+      return data || [];
+    } catch (error) {
+      console.error('❌ Exception loading RFP artifacts:', error);
+      return [];
+    }
+  }
+
+  // Get artifacts by role for an RFP
+  static async getRFPArtifactsByRole(rfpId: number, role: string): Promise<unknown[]> {
+    console.log('📥 Loading artifacts for RFP:', rfpId, 'with role:', role);
+    
+    try {
+      const { data, error } = await supabase
+        .from('rfp_artifacts')
+        .select(`
+          role,
+          artifacts:artifact_id (
+            id,
+            name,
+            type,
+            schema,
+            ui_schema,
+            form_data,
+            submit_action,
+            created_at
+          )
+        `)
+        .eq('rfp_id', rfpId)
+        .eq('role', role);
+
+      if (error) {
+        console.error('❌ Error loading RFP artifacts by role:', error);
+        return [];
+      }
+
+      console.log(`✅ Loaded ${data?.length || 0} artifacts for RFP ${rfpId} with role ${role}`);
+      return data || [];
+    } catch (error) {
+      console.error('❌ Exception loading RFP artifacts by role:', error);
+      return [];
+    }
+  }
+
+  // Link an artifact to an RFP with a specific role
+  static async linkArtifactToRFP(rfpId: number, artifactId: string, role: string): Promise<boolean> {
+    console.log('🔗 Linking artifact', artifactId, 'to RFP', rfpId, 'with role', role);
+    
+    try {
+      const { error } = await supabase
+        .from('rfp_artifacts')
+        .insert({
+          rfp_id: rfpId,
+          artifact_id: artifactId,
+          role: role
+        });
+
+      if (error) {
+        console.error('❌ Error linking artifact to RFP:', error);
+        return false;
+      }
+
+      console.log('✅ Successfully linked artifact to RFP');
+      return true;
+    } catch (error) {
+      console.error('❌ Exception linking artifact to RFP:', error);
+      return false;
     }
   }
 }

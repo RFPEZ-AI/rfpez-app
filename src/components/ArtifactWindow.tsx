@@ -780,19 +780,31 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         return;
       }
 
-      console.log('📤 Updating RFP using RFPService...');
+      console.log('📤 Updating RFP questionnaire response using RFPService...');
       
-      // Save the form response to the database using RFP service
-      const updatedRfp = await RFPService.update(currentRfpId, {
-        buyer_questionnaire_response: formData
-      });
+      // Prepare the questionnaire response data
+      const questionnaireResponse = {
+        form_data: formData,
+        supplier_info: {
+          name: 'Anonymous User', // Default for anonymous submissions
+          email: 'anonymous@example.com'
+        },
+        submitted_at: new Date().toISOString(),
+        form_version: '1.0'
+      };
+
+      // Save the questionnaire response using the new RFPService method
+      const updatedRfp = await RFPService.updateRfpBuyerQuestionnaireResponse(
+        currentRfpId, 
+        questionnaireResponse
+      );
 
       if (updatedRfp) {
-        console.log('✅ Form response saved successfully');
+        console.log('✅ Questionnaire response saved successfully');
         console.log('Updated RFP:', updatedRfp);
         alert('Questionnaire submitted successfully!');
       } else {
-        console.error('❌ Failed to save form response - RFPService.update returned null');
+        console.error('❌ Failed to save questionnaire response - RFPService returned null');
         alert('Failed to save questionnaire response. Please try again.');
       }
       

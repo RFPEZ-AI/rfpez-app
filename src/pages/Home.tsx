@@ -303,6 +303,14 @@ const Home: React.FC = () => {
     // Save as last session for persistence
     artifactWindowState.saveLastSession(sessionId);
     
+    // Update user profile with current session ID for database persistence
+    try {
+      await DatabaseService.setUserCurrentSession(sessionId);
+      console.log('✅ Current session saved to user profile:', sessionId);
+    } catch (error) {
+      console.warn('⚠️ Failed to save current session to user profile:', error);
+    }
+    
     await loadSessionMessages(sessionId);
     const sessionArtifacts = await loadSessionArtifacts(sessionId);
     
@@ -371,6 +379,8 @@ const Home: React.FC = () => {
 
   const handleArtifactSelect = (artifactRef: ArtifactReference) => {
     console.log('Artifact selected:', artifactRef);
+    console.log('Available artifacts:', artifacts.map(a => ({ id: a.id, name: a.name, type: a.type })));
+    
     // Find the artifact by ID and select it
     const artifact = artifacts.find(a => a.id === artifactRef.artifactId);
     if (artifact) {
@@ -379,6 +389,12 @@ const Home: React.FC = () => {
       artifactWindowState.openWindow();
       artifactWindowState.expandWindow();
       console.log('Selected artifact for display:', artifact.name);
+    } else {
+      console.warn('❌ Artifact not found in artifacts array:', artifactRef.artifactId);
+      console.log('🔍 This suggests the artifact reference exists but the actual artifact data was not created/stored properly');
+      
+      // Try to show a helpful message to the user
+      alert(`Artifact "${artifactRef.artifactName}" could not be loaded. Please try recreating it.`);
     }
   };
 
@@ -403,13 +419,25 @@ const Home: React.FC = () => {
         return;
       }
 
-      console.log('📤 Updating RFP using RFPService...');
+      console.log('📤 Updating RFP questionnaire response using RFPService...');
       
-      // Save the form response to the database using RFP service
+      // Prepare the questionnaire response data
+      const questionnaireResponse = {
+        form_data: formData,
+        supplier_info: {
+          name: 'Anonymous User', // Default for anonymous submissions
+          email: 'anonymous@example.com'
+        },
+        submitted_at: new Date().toISOString(),
+        form_version: '1.0'
+      };
+
+      // Save the questionnaire response using the new RFPService method
       const { RFPService } = await import('../services/rfpService');
-      const updatedRfp = await RFPService.update(currentRfpId, {
-        buyer_questionnaire_response: formData
-      });
+      const updatedRfp = await RFPService.updateRfpBuyerQuestionnaireResponse(
+        currentRfpId, 
+        questionnaireResponse
+      );
 
       if (updatedRfp) {
         console.log('✅ Form response saved successfully');
@@ -508,9 +536,16 @@ const Home: React.FC = () => {
               if (artifact.name.toLowerCase().includes('buyer') || 
                   artifact.name.toLowerCase().includes('questionnaire') ||
                   artifact.id.startsWith('buyer-form-')) {
-                // This is a buyer questionnaire - get buyer_questionnaire_response
-                responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || {};
-                console.log('Using buyer questionnaire response data:', responseData);
+                // This is a buyer questionnaire - get response using new method
+                try {
+                  const { RFPService } = await import('../services/rfpService');
+                  const questionnaireResponse = await RFPService.getRfpBuyerQuestionnaireResponse(currentRfp.id);
+                  responseData = questionnaireResponse?.form_data || {};
+                  console.log('Using buyer questionnaire response data from new method:', responseData);
+                } catch (error) {
+                  console.warn('Failed to load questionnaire response, falling back to legacy:', error);
+                  responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || {};
+                }
               } else if (artifact.name.toLowerCase().includes('bid') || 
                         artifact.name.toLowerCase().includes('supplier') ||
                         artifact.id.startsWith('bid-form-')) {
@@ -519,8 +554,14 @@ const Home: React.FC = () => {
                 responseData = formData.formData || {};
                 console.log('Using form defaults for bid form (no submitted responses available)');
               } else {
-                // Unknown form type, try buyer response first, then defaults
-                responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
+                // Unknown form type, try new method first, then legacy, then defaults
+                try {
+                  const { RFPService } = await import('../services/rfpService');
+                  const questionnaireResponse = await RFPService.getRfpBuyerQuestionnaireResponse(currentRfp.id);
+                  responseData = questionnaireResponse?.form_data || (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
+                } catch (error) {
+                  responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
+                }
                 console.log('Unknown form type, using available response data:', responseData);
               }
             } else {
