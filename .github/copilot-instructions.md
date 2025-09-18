@@ -22,6 +22,8 @@ RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend
 - Agent switching via `session_agents` junction table tracking active agent per session
 - All messages linked to agent_id for conversation attribution
 - Three access tiers: public, free (authenticated), premium (billing required)
+- Default agents: Solutions (sales), RFP Design (free), Technical Support, RFP Assistant
+- Agent switching via Claude function calls now properly updates UI in real-time
 
 ## Critical Workflows
 
@@ -34,9 +36,15 @@ npm run start:dev  # Runs both frontend and API server concurrently
 npm test           # Jest tests with watch mode
 npm run test:coverage  # Coverage reports
 
-# MCP Integration
+# Supabase Edge Functions
+supabase functions deploy mcp-server    # Deploy MCP server
+supabase functions deploy claude-api    # Deploy Claude API function
 npm run mcp:test   # Test MCP server connection
-npm run mcp:deploy # Deploy edge functions
+
+# Available VS Code tasks
+# - "Run Tests (Watch Mode)" - Auto-running Jest tests
+# - "Test MCP Connection" - Validate MCP integration
+# - "Setup MCP Environment" - Configure MCP dependencies
 ```
 
 ### Database Operations
@@ -44,6 +52,14 @@ npm run mcp:deploy # Deploy edge functions
 - All tables use RLS policies - ensure proper user context
 - Agent operations require session_id parameter for context
 - Form artifacts stored in `form_artifacts` table with JSON schema
+- Two Edge Functions: `mcp-server` (MCP protocol) and `claude-api` (HTTP REST)
+
+### MCP Integration Architecture
+- **MCP Server**: `supabase/functions/mcp-server/index.ts` - JSON-RPC 2.0 protocol
+- **MCP Client**: `src/services/mcpClient.ts` - TypeScript client for React app
+- **Protocol**: Model Context Protocol 2024-11-05 for Claude Desktop integration
+- **Tools**: get_conversation_history, store_message, create_session, search_messages
+- **Testing**: MCPTestComponent for browser-based MCP debugging
 
 ### Testing Patterns
 - Custom render wrapper in `src/test-utils.tsx` with SupabaseProvider
@@ -113,6 +129,8 @@ export default Component;
 - `src/hooks/useMessageHandling.ts` - Message processing workflow
 - `database/agents-schema.sql` - Multi-agent database structure
 - `DOCUMENTATION/AGENTS.md` - Agent system documentation
+- `supabase/functions/mcp-server/index.ts` - MCP protocol implementation
+- `supabase/functions/claude-api/index.ts` - HTTP REST API for Claude integration
 
 ## Environment Configuration
 Required environment variables:
@@ -121,8 +139,57 @@ Required environment variables:
 - `REACT_APP_SUPABASE_ANON_KEY` - Supabase anonymous key
 - `REACT_APP_ENABLE_MCP` - Enable MCP integration
 
+## Test Automation Integration
+- Separate repository: `rfpez-test-automation` for comprehensive testing
+- LED bulb procurement test suite validates end-to-end RFP workflows
+- MCP integration testing with browser automation
+- Health check utilities for API server validation
+- Cross-project test execution via VS Code tasks
+
+## Browser MCP Connector Usage
+The project includes comprehensive browser automation through MCP (Model Context Protocol) tools for end-to-end testing and validation.
+
+### Prerequisites for Browser MCP Testing
+```bash
+# Ensure the main application is running
+npm run start:dev  # Starts app on http://localhost:3000
+
+# For authentication tests, use test account:
+# Email: mskiba@esphere.com
+# Password: thisisatest
+```
+
+### Available MCP Browser Tools
+- **Navigation**: `mcp_browser_navigate`, `mcp_browser_go_back`, `mcp_browser_go_forward`
+- **Interaction**: `mcp_browser_click`, `mcp_browser_hover`, `mcp_browser_form_input_fill`, `mcp_browser_press_key`
+- **Content**: `mcp_browser_get_text`, `mcp_browser_get_markdown`, `mcp_browser_read_links`
+- **Visual**: `mcp_browser_screenshot`, `mcp_browser_scroll`
+- **Elements**: `mcp_browser_get_clickable_elements`
+- **Downloads**: `mcp_browser_get_download_list`
+
+### Test File Examples
+- `nail-procurement/real-browser-mcp-test.js` - Live browser automation with real MCP calls
+- `nail-procurement/active-mcp-test.js` - Full test suite with mock and real modes
+- `nail-procurement/mcp-browser-demo.js` - Demonstration of MCP capabilities
+
+### Activating Real Browser Tools
+```javascript
+// Activate MCP browser tool categories
+await activate_mcp_browser_navigation_tools();
+await activate_mcp_browser_interaction_tools();
+await activate_mcp_browser_content_tools();
+await activate_mcp_browser_visual_tools();
+
+// Example usage
+await mcp_browser_navigate({ url: 'http://localhost:3000' });
+await mcp_browser_screenshot({ name: 'homepage' });
+const elements = await mcp_browser_get_clickable_elements();
+await mcp_browser_click({ index: elements[0].index });
+```
+
 ## Testing Notes
 - Tests expect Supabase mocks in test environment
 - Console warnings for Ionic/Stencil components are expected
 - Use `test-utils.tsx` render wrapper for component tests
 - MCP tests in separate automation project for integration testing
+- VS Code tasks available for automated test execution and MCP validation
