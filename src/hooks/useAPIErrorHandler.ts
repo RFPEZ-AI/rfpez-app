@@ -5,7 +5,7 @@ import { APIError, categorizeError } from '../components/APIErrorHandler';
 
 interface UseAPIErrorHandlerReturn {
   error: APIError | null;
-  showError: (error: Error | any) => void;
+  showError: (error: Error | unknown) => void;
   clearError: () => void;
   retryFunction: (() => void) | null;
   setRetryFunction: (fn: (() => void) | null) => void;
@@ -15,7 +15,7 @@ export const useAPIErrorHandler = (): UseAPIErrorHandlerReturn => {
   const [error, setError] = useState<APIError | null>(null);
   const [retryFunction, setRetryFunction] = useState<(() => void) | null>(null);
 
-  const showError = useCallback((errorInput: Error | any) => {
+  const showError = useCallback((errorInput: Error | unknown) => {
     const categorizedError = categorizeError(errorInput);
     setError(categorizedError);
   }, []);

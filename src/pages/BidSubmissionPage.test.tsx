@@ -11,6 +11,7 @@ jest.mock('../services/rfpService', () => ({
   RFPService: {
     getById: jest.fn(),
     createBid: jest.fn(),
+    getBidFormForRfp: jest.fn(),
   },
 }));
 
@@ -139,6 +140,7 @@ describe('BidSubmissionPage', () => {
     getMockSupabase().single.mockResolvedValue({ data: mockRfp, error: null });
     getMockRFPService().getById.mockResolvedValue(mockRfp);
     getMockRFPService().createBid.mockResolvedValue({ id: 1 });
+    getMockRFPService().getBidFormForRfp.mockResolvedValue(mockRfp.bid_form_questionaire);
   });
 
   const renderComponent = () => {
@@ -171,6 +173,7 @@ describe('BidSubmissionPage', () => {
     });
   });  it('shows error when RFP not found', async () => {
     getMockRFPService().getById.mockResolvedValue(null);
+    getMockRFPService().getBidFormForRfp.mockResolvedValue(null);
     
     renderComponent();
     

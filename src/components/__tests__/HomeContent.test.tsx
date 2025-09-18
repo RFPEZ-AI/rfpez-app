@@ -108,6 +108,7 @@ describe('HomeContent', () => {
     artifacts: mockArtifacts,
     currentRfpId: 123,
     onDownloadArtifact: jest.fn(),
+    artifactWindowOpen: true,
   };
 
   beforeEach(() => {
