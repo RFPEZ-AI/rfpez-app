@@ -4,6 +4,13 @@ import { Document, Packer, Paragraph, Table, TableCell, TableRow, TextRun, Headi
 import { saveAs } from 'file-saver';
 import type { FormSpec } from '../types/rfp';
 
+// Helper type for schema objects with optional properties
+interface SchemaWithTitle {
+  title?: string;
+  description?: string;
+  [key: string]: unknown;
+}
+
 interface DocxExportOptions {
   title?: string;
   filename?: string;
@@ -124,7 +131,7 @@ export class DocxExporter {
         responseData: Record<string, unknown>,
         options: DocxExportOptions = {}
       ): Promise<void> {
-        const { filename = DocxExporter.sanitizeFilename(formSpec.schema.title || 'bid-response') + '.docx' } = options;
+        const { filename = DocxExporter.sanitizeFilename((formSpec.schema as SchemaWithTitle).title || 'bid-response') + '.docx' } = options;
         const doc = DocxExporter.buildBidDocx(formSpec, responseData, options);
         const blob = await Packer.toBlob(doc);
         saveAs(blob, filename);

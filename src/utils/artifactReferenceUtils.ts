@@ -1,7 +1,16 @@
 import { ArtifactReference } from '../types/home';
 
+interface TestArtifact {
+  type?: string;
+  content?: string;
+  content_type?: string;
+  name?: string;
+  tags?: string[];
+  [key: string]: unknown;
+}
+
 // Test utility to simulate artifact reference creation from proposal artifacts
-export const createArtifactReference = (artifact: any): ArtifactReference => {
+export const createArtifactReference = (artifact: TestArtifact): ArtifactReference => {
   // This simulates the logic that would create an artifact reference from the artifact data
   // Based on your JSON structure: { "type": "text", "content": "...", "content_type": "markdown" }
   

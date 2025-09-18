@@ -135,7 +135,7 @@ export const FormBuilder: React.FC<FormBuilderProps> = ({
         title: 'Sample Bid Response',
         filename: 'sample-bid-response.docx',
         companyName: 'Your Company',
-        rfpName: generatedFormSpec.schema.title || 'Sample RFP',
+        rfpName: (generatedFormSpec.schema as { title?: string }).title || 'Sample RFP',
         submissionDate: new Date()
       });
     } catch (error) {

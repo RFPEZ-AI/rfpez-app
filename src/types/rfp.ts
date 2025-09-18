@@ -3,9 +3,9 @@
 // Form Spec Types for RJSF
 interface FormSpec {
   version: string; // e.g., "rfpez-form@1"
-  schema: Record<string, any>; // JSON Schema (draft-07)
-  uiSchema: Record<string, any>; // RJSF uiSchema
-  defaults?: Record<string, any>; // Optional default values
+  schema: Record<string, unknown>; // JSON Schema (draft-07)
+  uiSchema: Record<string, unknown>; // RJSF uiSchema
+  defaults?: Record<string, unknown>; // Optional default values
 }
 
 // RFP Entity
@@ -16,8 +16,8 @@ type RFP = {
   description: string; // Public description - what the RFP is about
   specification: string; // Detailed requirements for Claude to generate forms
   request?: string | null; // Generated request for proposal (RFP) content to send to suppliers
-  buyer_questionnaire?: Record<string, any> | null; // Questionnaire structure for buyer requirements gathering
-  buyer_questionnaire_response?: Record<string, any> | null; // Collected buyer questionnaire responses
+  buyer_questionnaire?: Record<string, unknown> | null; // Questionnaire structure for buyer requirements gathering
+  buyer_questionnaire_response?: Record<string, unknown> | null; // Collected buyer questionnaire responses
   bid_form_questionaire?: FormSpec | null; // JSON Schema + RJSF form specification for bid submission
   is_template: boolean;
   is_public: boolean;

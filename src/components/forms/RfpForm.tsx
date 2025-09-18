@@ -83,7 +83,7 @@ export const RfpForm: React.FC<RfpFormProps> = ({
         
         // If submission was successful, trigger auto-prompt
         if (onSubmitSuccess) {
-          const formName = title || schema.title || 'Form';
+          const formName = title || (schema as { title?: string }).title || 'Form';
           onSubmitSuccess(formName);
         }
       } catch (error) {
@@ -111,13 +111,13 @@ export const RfpForm: React.FC<RfpFormProps> = ({
 
   return (
     <IonCard className={className}>
-      {showTitle && (title || schema?.title) && (
+      {showTitle && (title || (schema as { title?: string })?.title) && (
         <IonCardHeader>
-          <IonCardTitle>{title || schema?.title}</IonCardTitle>
-          {schema?.description && (
+          <IonCardTitle>{title || (schema as { title?: string })?.title}</IonCardTitle>
+          {(schema as { description?: string })?.description && (
             <IonText color="medium">
               <p style={{ margin: '8px 0 0 0', fontSize: '0.9rem' }}>
-                {schema.description}
+                {(schema as { description?: string }).description}
               </p>
             </IonText>
           )}

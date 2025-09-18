@@ -121,7 +121,7 @@ export class ClaudeResponseCache {
   /**
    * Check if a message should be cached
    */
-  static shouldCache(userMessage: string, agentId: string): boolean {
+  static shouldCache(userMessage: string): boolean {
     const message = userMessage.toLowerCase().trim();
 
     // Don't cache unique/timestamped messages

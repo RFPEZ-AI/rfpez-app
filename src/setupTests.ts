@@ -111,7 +111,7 @@ const originalConsoleWarn = console.warn;
 
 // Enhanced console filtering
 beforeAll(() => {
-  console.error = (...args: any[]) => {
+  console.error = (...args: unknown[]) => {
     const message = args.join(' ');
     
     // Filter out known test-specific errors that are expected
@@ -141,7 +141,7 @@ beforeAll(() => {
     originalConsoleError(...args);
   };
 
-  console.warn = (...args: any[]) => {
+  console.warn = (...args: unknown[]) => {
     const message = args.join(' ');
     
     // Filter out Ionic warnings that we've addressed
@@ -165,7 +165,7 @@ beforeAll(() => {
   };
 
   // Mock console.log for cleaner test output but allow specific logs
-  console.log = (...args: any[]) => {
+  console.log = (...args: unknown[]) => {
     const message = args.join(' ');
     
     // Allow some important logs to show through

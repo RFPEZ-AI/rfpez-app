@@ -8,16 +8,6 @@ interface BatchedFunction {
   id: string;
 }
 
-interface BatchExecutionResult {
-  success: boolean;
-  results: Array<{
-    id: string;
-    success: boolean;
-    result?: unknown;
-    error?: string;
-  }>;
-}
-
 export class FunctionBatchExecutor {
   private static batchQueue: BatchedFunction[] = [];
   private static batchTimeout: NodeJS.Timeout | null = null;

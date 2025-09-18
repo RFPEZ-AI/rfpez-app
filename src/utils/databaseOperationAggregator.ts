@@ -10,12 +10,6 @@ interface DatabaseOperation {
   id?: string;
 }
 
-interface AggregatedTransaction {
-  operations: DatabaseOperation[];
-  priority: number;
-  timestamp: number;
-}
-
 export class DatabaseOperationAggregator {
   private static pendingOperations: DatabaseOperation[] = [];
   private static aggregationTimeout: NodeJS.Timeout | null = null;

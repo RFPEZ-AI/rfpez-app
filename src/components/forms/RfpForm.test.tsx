@@ -36,7 +36,7 @@ jest.mock('@rjsf/core', () => {
 
     return (
       <form onSubmit={handleSubmit} data-testid="rjsf-form">
-        <div data-testid="form-title">{schema.title}</div>
+        <div data-testid="form-title">{(schema as { title?: string }).title}</div>
         <input
           data-testid="test-input"
           value={formData?.testField || ''}

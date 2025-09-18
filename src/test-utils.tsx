@@ -54,7 +54,7 @@ const customRender = async (
   ui: React.ReactElement,
   options?: Omit<RenderOptions, 'wrapper'>,
 ) => {
-  let result: any;
+  let result: unknown;
   await act(async () => {
     result = render(ui, { wrapper: TestWrapper, ...options });
     // Allow any pending state updates to complete

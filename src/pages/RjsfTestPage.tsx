@@ -106,7 +106,7 @@ const RjsfTestPage: React.FC = () => {
 
   const handleFormGenerated = (formSpec: FormSpec) => {
     setGeneratedFormSpec(formSpec);
-    addTestResult(`AI Form generated: ${formSpec.schema.title}`);
+    addTestResult(`AI Form generated: ${(formSpec.schema as { title?: string }).title || 'Untitled Form'}`);
   };
 
   const testDocxExport = async () => {
