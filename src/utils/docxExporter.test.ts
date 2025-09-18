@@ -166,7 +166,7 @@ describe('DocxExporter', () => {
         schema: {
           ...mockFormSpec.schema,
           properties: {
-            ...mockFormSpec.schema.properties,
+            ...(mockFormSpec.schema.properties as Record<string, unknown> || {}),
             services: {
               type: 'array',
               title: 'Services Offered',
@@ -196,7 +196,7 @@ describe('DocxExporter', () => {
         schema: {
           ...mockFormSpec.schema,
           properties: {
-            ...mockFormSpec.schema.properties,
+            ...(mockFormSpec.schema.properties as Record<string, unknown> || {}),
             contact: {
               type: 'object',
               title: 'Contact Information',
