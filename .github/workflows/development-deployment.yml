@@ -1,0 +1,142 @@
+# Development Branch Deployment Workflow
+# This workflow deploys to development environment for testing
+
+name: Development Deployment
+
+on:
+  push:
+    branches: [ develop ]
+  pull_request:
+    branches: [ develop ]
+  workflow_dispatch:
+
+env:
+  NODE_VERSION: '18.x'
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    name: Build and Test Development
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm run mcp:install
+
+    - name: Run linting
+      run: |
+        npx eslint src/ --ext .ts,.tsx,.js,.jsx
+
+    - name: Run type checking
+      run: |
+        npx tsc --noEmit
+
+    - name: Run tests with coverage
+      run: |
+        npm test -- --coverage --watchAll=false --passWithNoTests
+      env:
+        CI: true
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      if: always()
+      with:
+        file: ./coverage/lcov.info
+        flags: unittests
+
+    - name: Build application
+      run: npm run build
+      env:
+        CI: true
+        REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL_DEV }}
+        REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY_DEV }}
+        REACT_APP_CLAUDE_API_KEY: ${{ secrets.REACT_APP_CLAUDE_API_KEY_DEV }}
+        REACT_APP_PRODUCTION_URL: https://dev.rfpez.ai
+        GENERATE_SOURCEMAP: false
+
+  deploy-development:
+    runs-on: ubuntu-latest
+    name: Deploy to Development
+    needs: build-and-test
+    if: github.ref == 'refs/heads/develop'
+    
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+      with:
+        submodules: true
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      run: |
+        npm ci
+        npm run mcp:install
+
+    - name: Build application
+      run: npm run build
+      env:
+        CI: true
+        REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL_DEV }}
+        REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY_DEV }}
+        REACT_APP_CLAUDE_API_KEY: ${{ secrets.REACT_APP_CLAUDE_API_KEY_DEV }}
+        REACT_APP_PRODUCTION_URL: https://dev.rfpez.ai
+        GENERATE_SOURCEMAP: false
+
+    - name: Deploy to Azure Static Web Apps (Development)
+      id: builddeploy
+      uses: Azure/static-web-apps-deploy@v1
+      with:
+        azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_DEV }}
+        repo_token: ${{ secrets.GITHUB_TOKEN }}
+        action: "upload"
+        app_location: "/" 
+        api_location: ""
+        output_location: "build"
+        skip_app_build: true
+
+    - name: Deploy Supabase Edge Functions (Development)
+      run: |
+        npm install -g @supabase/cli
+        supabase functions deploy mcp-server --project-ref ${{ secrets.SUPABASE_PROJECT_REF_DEV }}
+        supabase functions deploy claude-api --project-ref ${{ secrets.SUPABASE_PROJECT_REF_DEV }}
+      env:
+        SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN_DEV }}
+
+    - name: Run smoke tests
+      run: |
+        # Wait for deployment
+        sleep 30
+        
+        # Basic health check
+        curl -f https://dev.rfpez.ai || exit 1
+        
+        echo "Development deployment successful"
+
+    - name: Comment on PR
+      if: github.event_name == 'pull_request'
+      uses: actions/github-script@v6
+      with:
+        script: |
+          github.rest.issues.createComment({
+            issue_number: context.issue.number,
+            owner: context.repo.owner,
+            repo: context.repo.repo,
+            body: '🚀 Development deployment successful! View at: https://dev.rfpez.ai'
+          })
