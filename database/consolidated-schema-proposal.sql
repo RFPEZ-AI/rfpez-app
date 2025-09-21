@@ -71,7 +71,7 @@ CREATE TABLE IF NOT EXISTS artifacts (
   -- Form artifacts (for interactive forms)
   schema JSONB, -- JSON Schema for forms (replaces form_schema)
   ui_schema JSONB DEFAULT '{}'::jsonb, -- UI Schema for form rendering
-  form_data JSONB DEFAULT '{}'::jsonb, -- Default/submitted form data
+  default_values JSONB DEFAULT '{}'::jsonb, -- Default/submitted form data
   submit_action JSONB DEFAULT '{"type": "save_session"}'::jsonb, -- Action on form submission
   
   -- Template support
@@ -211,7 +211,7 @@ RETURNS TABLE (
   artifact_role TEXT,
   schema JSONB,
   ui_schema JSONB,
-  form_data JSONB,
+  default_values JSONB,
   created_at TIMESTAMP WITH TIME ZONE
 ) AS $$
 BEGIN
@@ -223,7 +223,7 @@ BEGIN
     ra.artifact_role,
     a.schema,
     a.ui_schema,
-    a.form_data,
+    a.default_values,
     a.created_at
   FROM artifacts a
   JOIN rfp_artifacts ra ON a.id = ra.artifact_id

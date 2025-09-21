@@ -26,9 +26,13 @@ export class SmartAutoPromptManager {
    */
   private static autoPromptRules: AutoPromptRule[] = [
     {
-      // High priority: Critical workflow transitions
-      condition: () => false, // Disabled for now
-      prompt: () => `I completed the buyer questionnaire with project details. Please proceed to Phase 5-6 auto-generation.`,
+      // High priority: Buyer questionnaire completion should trigger next phase
+      condition: (ctx) => ctx.formType.includes('questionnaire') || ctx.formType.includes('buyer'),
+      prompt: (ctx) => {
+        const fieldCount = Object.keys(ctx.formData).length;
+        const hasRequiredData = fieldCount > 0;
+        return `I completed the buyer questionnaire with ${fieldCount} fields of project details. The artifact data is now available${hasRequiredData ? ' with submitted requirements' : ''} - please analyze the submitted requirements and proceed to the next phase.`;
+      },
       priority: 100,
       skipIfRecentSimilar: false
     },
@@ -36,7 +40,7 @@ export class SmartAutoPromptManager {
     {
       // Medium priority: Form submissions that should trigger actions
       condition: (ctx) => ctx.formType.includes('questionnaire') && !ctx.lastAgentAction.includes('create_form'),
-      prompt: (ctx) => `I submitted the ${ctx.formType.replace('_', ' ')} form. Please process this and continue the workflow.`,
+      prompt: (ctx) => `I submitted the ${ctx.formType.replace('_', ' ')} form. Please process this data and continue the workflow.`,
       priority: 50,
       skipIfRecentSimilar: true
     },
@@ -44,7 +48,7 @@ export class SmartAutoPromptManager {
     {
       // Low priority: General form completions
       condition: (ctx) => ctx.formType !== 'test' && !ctx.formType.includes('preview'),
-      prompt: (ctx) => `I completed the ${ctx.formType.replace('_', ' ')} form.`,
+      prompt: (ctx) => `I completed the ${ctx.formType.replace('_', ' ')} form. The artifact data is available for analysis.`,
       priority: 10,
       skipIfRecentSimilar: true
     }

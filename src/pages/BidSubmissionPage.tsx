@@ -22,6 +22,8 @@ import {
 import { documentTextOutline, checkmarkCircleOutline } from 'ionicons/icons';
 import { RfpForm } from '../components/forms/RfpForm';
 import { RFPService } from '../services/rfpService';
+import { UserContextService } from '../services/userContextService';
+import { supabase } from '../supabaseClient';
 import type { RFP, FormSpec, Bid } from '../types/rfp';
 
 // Empty interface serves as a base for future extension
@@ -79,8 +81,20 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
 
         setRfp(rfpData);
 
+        // Get current session ID for better artifact matching
+        let currentSessionId: string | null = null;
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (user) {
+            currentSessionId = await UserContextService.getCurrentSession(user.id);
+            console.log('Current session ID for bid form search:', currentSessionId);
+          }
+        } catch (error) {
+          console.warn('Could not get current session ID:', error);
+        }
+
         // Load the bid form for this RFP
-        console.log('🔍 Loading bid form for RFP:', rfpId);
+        console.log('🔍 Loading bid form for RFP:', rfpId, 'with session context:', currentSessionId);
         const bidFormSpec = await RFPService.getBidFormForRfp(rfpId);
         if (!bidFormSpec) {
           setError('This RFP does not have a bid form configured');
@@ -138,7 +152,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
         agent_id: 0, // Use 0 as default for system-generated bids
         response: {
           supplier_info: supplierInfo,
-          form_data: formData, // Form response data
+          default_values: formData, // Form response data
           submitted_at: new Date().toISOString(),
           form_version: formSpec.version
         }
@@ -160,7 +174,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
           // Store the questionnaire response (the form data that was used to generate the proposal)
           await RFPService.updateRfpBuyerQuestionnaireResponse(rfp.id, {
             supplier_info: supplierInfo,
-            form_data: formData,
+            default_values: formData,
             generated_at: new Date().toISOString(),
             bid_id: createdBid.id
           });

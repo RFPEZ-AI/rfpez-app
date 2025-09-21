@@ -8,11 +8,17 @@ interface BatchedFunction {
   id: string;
 }
 
+interface PromiseHandlers {
+  resolve: (value: unknown) => void;
+  reject: (reason?: unknown) => void;
+}
+
 export class FunctionBatchExecutor {
   private static batchQueue: BatchedFunction[] = [];
   private static batchTimeout: NodeJS.Timeout | null = null;
   private static readonly BATCH_DELAY = 100; // ms
   private static readonly MAX_BATCH_SIZE = 5;
+  private static promiseHandlers = new Map<string, PromiseHandlers>();
 
   /**
    * Add a function to the batch queue
@@ -28,8 +34,7 @@ export class FunctionBatchExecutor {
       });
 
       // Store resolve/reject for this specific function
-      (this as any)[`resolve_${id}`] = resolve;
-      (this as any)[`reject_${id}`] = reject;
+      this.promiseHandlers.set(id, { resolve, reject });
 
       this.scheduleBatchExecution();
     });
@@ -88,32 +93,29 @@ export class FunctionBatchExecutor {
       // Resolve/reject individual promises
       results.forEach((result, index) => {
         const func = currentBatch[index];
-        const resolveKey = `resolve_${func.id}`;
-        const rejectKey = `reject_${func.id}`;
+        const handlers = this.promiseHandlers.get(func.id);
 
         if (result.status === 'fulfilled') {
           const funcResult = result.value;
           if (funcResult.success) {
-            (this as any)[resolveKey]?.(funcResult.result);
+            handlers?.resolve(funcResult.result);
           } else {
-            (this as any)[rejectKey]?.(new Error(funcResult.error));
+            handlers?.reject(new Error(funcResult.error));
           }
         } else {
-          (this as any)[rejectKey]?.(result.reason);
+          handlers?.reject(result.reason);
         }
 
         // Cleanup
-        delete (this as any)[resolveKey];
-        delete (this as any)[rejectKey];
+        this.promiseHandlers.delete(func.id);
       });
 
     } catch (error) {
       // Reject all functions in batch
       currentBatch.forEach(func => {
-        const rejectKey = `reject_${func.id}`;
-        (this as any)[rejectKey]?.(error);
-        delete (this as any)[rejectKey];
-        delete (this as any)[`resolve_${func.id}`];
+        const handlers = this.promiseHandlers.get(func.id);
+        handlers?.reject(error);
+        this.promiseHandlers.delete(func.id);
       });
     }
   }

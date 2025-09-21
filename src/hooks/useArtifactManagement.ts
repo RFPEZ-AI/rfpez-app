@@ -6,6 +6,7 @@ import { Artifact as DatabaseArtifact } from '../types/database';
 import { Artifact, ArtifactReference, Message } from '../types/home';
 import { RFP } from '../types/rfp';
 import DatabaseService from '../services/database';
+import { supabase } from '../supabaseClient';
 
 export const useArtifactManagement = (
   currentRfp: RFP | null, 
@@ -15,7 +16,9 @@ export const useArtifactManagement = (
   messages?: Message[],
   setMessages?: React.Dispatch<React.SetStateAction<Message[]>>,
   onArtifactAdded?: (artifactId: string) => void, // New callback for when artifacts are added
-  onArtifactSelected?: (sessionId: string, artifactId: string | null) => void // New callback for artifact selection
+  onArtifactSelected?: (sessionId: string, artifactId: string | null) => void, // New callback for artifact selection
+  currentRfpId?: number | null, // Add current RFP ID
+  handleSetCurrentRfp?: (rfpId: number) => Promise<void> // Add RFP setter function
 ) => {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);
@@ -113,11 +116,24 @@ export const useArtifactManagement = (
   }, [selectedArtifactId, artifacts, currentSessionId]);
 
   // Function to select an artifact
-  const selectArtifact = (artifactId: string) => {
+  const selectArtifact = async (artifactId: string) => {
     setSelectedArtifactId(artifactId);
+    
     // Save selection for current session if we have a callback and session
     if (currentSessionId && onArtifactSelected) {
       onArtifactSelected(currentSessionId, artifactId);
+    }
+
+    // Update session context in database
+    if (currentSessionId) {
+      try {
+        await DatabaseService.updateSessionContext(currentSessionId, { 
+          current_artifact_id: artifactId 
+        });
+        console.log('✅ Artifact context saved to session:', currentSessionId, artifactId);
+      } catch (error) {
+        console.warn('⚠️ Failed to save artifact context to session:', error);
+      }
     }
   };
 
@@ -304,7 +320,7 @@ export const useArtifactManagement = (
               content: JSON.stringify({
                 schema: artifact.schema,
                 ui_schema: artifact.ui_schema || {},
-                form_data: artifact.data || {},
+                default_values: artifact.data || {},
                 submit_action: artifact.submit_action || { type: 'save_session' },
                 description: artifact.description
               })
@@ -341,16 +357,50 @@ export const useArtifactManagement = (
       const formattedArtifacts: Artifact[] = artifactsData.map(artifact => {
         let content: string | undefined;
         
-        // For form artifacts, construct the content from separate database fields
-        if (artifact.type === 'form' && (artifact.schema || artifact.form_data)) {
-          const formSpec = {
-            schema: artifact.schema || {},
-            uiSchema: artifact.ui_schema || {},
-            formData: artifact.form_data || {},
-            submitAction: artifact.submit_action || { type: 'save_session' }
-          };
-          content = JSON.stringify(formSpec);
-          console.log('📋 Constructed form content for artifact:', artifact.id, 'with formData keys:', Object.keys(artifact.form_data || {}));
+        // For form artifacts, we need to handle two storage methods:
+        // 1. New method: separate fields (schema, ui_schema, default_values, submit_action)
+        // 2. Legacy method: everything in processed_content
+        if (artifact.type === 'form') {
+          console.log('📋 Processing form artifact:', {
+            id: artifact.id,
+            name: artifact.name,
+            hasSchema: !!artifact.schema,
+            hasProcessedContent: !!artifact.processed_content,
+            schemaKeys: artifact.schema ? Object.keys(artifact.schema) : [],
+            processedContentPreview: artifact.processed_content?.substring(0, 100)
+          });
+          
+          // Try to use separate fields first (new method)
+          if (artifact.schema || artifact.default_values) {
+            const formSpec = {
+              schema: artifact.schema || {},
+              uiSchema: artifact.ui_schema || {},
+              formData: artifact.default_values || {},
+              submitAction: artifact.submit_action || { type: 'save_session' }
+            };
+            content = JSON.stringify(formSpec);
+            console.log('📋 Using separate fields for form content');
+          }
+          // Fall back to processed_content (legacy method)
+          else if (artifact.processed_content) {
+            content = artifact.processed_content;
+            console.log('📋 Using processed_content for form content');
+          }
+          // Default fallback
+          else {
+            console.warn('⚠️ Form artifact has no schema or processed_content, creating minimal form');
+            const formSpec = {
+              schema: { type: 'object', properties: {}, required: [] },
+              uiSchema: {},
+              formData: {},
+              submitAction: { type: 'save_session' }
+            };
+            content = JSON.stringify(formSpec);
+          }
+        }
+        // For non-form artifacts, use processed_content
+        else {
+          content = artifact.processed_content;
         }
         
         // Map database type to frontend type
@@ -360,6 +410,14 @@ export const useArtifactManagement = (
         else if (artifact.type === 'text') frontendType = 'text';
         else if (artifact.type === 'image') frontendType = 'image';
         else if (artifact.type === 'pdf') frontendType = 'pdf';
+        
+        console.log('📋 Formatted artifact:', {
+          id: artifact.id,
+          name: artifact.name,
+          type: frontendType,
+          hasContent: !!content,
+          contentLength: content?.length || 0
+        });
         
         return {
           id: artifact.id,
@@ -430,6 +488,15 @@ export const useArtifactManagement = (
     console.log('Message ID:', messageId);
     console.log('Current artifacts count before processing:', artifacts.length);
     
+    // Utility function to check if a string is a valid UUID
+    const isValidUUID = (str: string): boolean => {
+      const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+      return uuidRegex.test(str);
+    };
+    
+    // Only include message_id if it's a valid UUID
+    const validMessageId = messageId && isValidUUID(messageId) ? messageId : undefined;
+    
     const metadata = claudeMetadata as Record<string, unknown>;
     const newArtifactRefs: ArtifactReference[] = [];
     const processedArtifactIds = new Set<string>(); // Track processed artifacts to prevent duplicates
@@ -447,7 +514,7 @@ export const useArtifactManagement = (
           description?: string;
           form_schema?: Record<string, unknown>;
           ui_schema?: Record<string, unknown>;
-          form_data?: Record<string, unknown>;
+          default_values?: Record<string, unknown>;
           submit_action?: Record<string, unknown>;
           template_id?: string;
           template_name?: string;
@@ -490,7 +557,7 @@ export const useArtifactManagement = (
                 description: result.description,
                 schema: result.form_schema,
                 uiSchema: result.ui_schema || {},
-                formData: result.form_data || {},
+                formData: result.default_values || {},
                 submitAction: result.submit_action || { type: 'save_session' }
               }),
               sessionId: currentSessionId,
@@ -499,7 +566,116 @@ export const useArtifactManagement = (
             };
             
             setArtifacts(prev => [...prev, formArtifact]);
-            setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
+            selectArtifact(formArtifact.id); // Auto-select new artifact
+            
+            // Auto-create placeholder RFP for the form if no RFP context exists
+            (async () => {
+              try {
+                if (!currentRfpId) {
+                  console.log('🏗️ Auto-creating placeholder RFP for form artifact:', formArtifact.name);
+                  
+                  const { RFPService } = await import('../services/rfpService');
+                  const placeholderRfp = await RFPService.create({
+                    name: `RFP for ${formArtifact.name}`,
+                    description: result.description || `Auto-generated RFP for ${formArtifact.name}`,
+                    due_date: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
+                    specification: 'Please complete the attached form. Responses will be evaluated based on completeness and relevance.',
+                    is_template: false,
+                    is_public: false
+                  });
+                  
+                  if (placeholderRfp && handleSetCurrentRfp) {
+                    console.log('✅ Created placeholder RFP:', placeholderRfp.name, 'ID:', placeholderRfp.id);
+                    await handleSetCurrentRfp(placeholderRfp.id);
+                    
+                    // Now create the bid form artifact in the database with the correct role
+                    console.log('🔗 Creating bid form artifact in database for RFP:', placeholderRfp.id);
+                    const artifactData: Omit<DatabaseArtifact, 'created_at' | 'updated_at'> = {
+                      id: formArtifact.id, // Use the same ID as the memory artifact
+                      session_id: currentSessionId,
+                      name: formArtifact.name,
+                      description: result.description,
+                      type: 'form',
+                      artifact_role: 'bid_form', // This is the key field!
+                      schema: result.form_schema,
+                      ui_schema: result.ui_schema || {},
+                      default_values: result.default_values || {},
+                      submit_action: result.submit_action || { type: 'save_session' },
+                      metadata: {
+                        rfp_id: placeholderRfp.id,
+                        auto_created: true,
+                        created_for_rfp: placeholderRfp.name
+                      },
+                      processing_status: 'completed'
+                    };
+                    
+                    // Only include message_id if it's a valid UUID
+                    if (validMessageId) {
+                      artifactData.message_id = validMessageId;
+                    }
+                    
+                    const { data, error } = await supabase
+                      .from('artifacts')
+                      .upsert(artifactData, {
+                        onConflict: 'id',
+                        ignoreDuplicates: false
+                      })
+                      .select()
+                      .single();
+                    
+                    if (error) {
+                      console.warn('⚠️ Could not save bid form artifact to database:', error);
+                    } else {
+                      console.log('✅ Bid form artifact saved to database with role:', data.artifact_role);
+                    }
+                  }
+                } else {
+                  console.log('ℹ️ RFP context already exists, saving bid form artifact to database for existing RFP:', currentRfpId);
+                  
+                  // Save bid form artifact to database for existing RFP
+                  const artifactDataExisting: Omit<DatabaseArtifact, 'created_at' | 'updated_at'> = {
+                    id: formArtifact.id,
+                    session_id: currentSessionId,
+                    name: formArtifact.name,
+                    description: result.description,
+                    type: 'form',
+                    artifact_role: 'bid_form', // Critical field for RFP system lookup
+                    schema: result.form_schema,
+                    ui_schema: result.ui_schema || {},
+                    default_values: result.default_values || {},
+                    submit_action: result.submit_action || { type: 'save_session' },
+                    metadata: {
+                      rfp_id: currentRfpId,
+                      created_for_existing_rfp: true
+                    },
+                    processing_status: 'completed'
+                  };
+                  
+                  // Only include message_id if it's a valid UUID
+                  if (validMessageId) {
+                    artifactDataExisting.message_id = validMessageId;
+                  }
+                  
+                  const { data, error } = await supabase
+                    .from('artifacts')
+                    .upsert(artifactDataExisting, {
+                      onConflict: 'id',
+                      ignoreDuplicates: false
+                    })
+                    .select()
+                    .single();
+                  
+                  if (error) {
+                    console.warn('⚠️ Could not save bid form artifact to database:', error);
+                  } else {
+                    console.log('✅ Bid form artifact saved to database with role for existing RFP:', data.artifact_role);
+                  }
+                }
+              } catch (error) {
+                console.warn('⚠️ Failed to create placeholder RFP:', error);
+                // This is not critical - forms can still work without RFP context
+              }
+            })();
             
             // Notify parent that an artifact was added (triggers auto-open)
             onArtifactAdded?.(formArtifact.id);
@@ -600,7 +776,7 @@ export const useArtifactManagement = (
             };
             
             setArtifacts(prev => [...prev, textArtifact]);
-            setSelectedArtifactId(textArtifact.id); // Auto-select new artifact
+            selectArtifact(textArtifact.id); // Auto-select new artifact
             
             // Notify parent that an artifact was added (triggers auto-open)
             onArtifactAdded?.(textArtifact.id);
@@ -654,7 +830,7 @@ export const useArtifactManagement = (
             };
             
             setArtifacts(prev => [...prev, requestArtifact]);
-            setSelectedArtifactId(requestArtifact.id); // Auto-select new artifact
+            selectArtifact(requestArtifact.id); // Auto-select new artifact
             
             // Notify parent that an artifact was added (triggers auto-open)
             onArtifactAdded?.(requestArtifact.id);
@@ -707,7 +883,7 @@ export const useArtifactManagement = (
             };
             
             setArtifacts(prev => [...prev, templateArtifact]);
-            setSelectedArtifactId(templateArtifact.id); // Auto-select new artifact
+            selectArtifact(templateArtifact.id); // Auto-select new artifact
             
             // Notify parent that an artifact was added (triggers auto-open)
             onArtifactAdded?.(templateArtifact.id);

@@ -17,7 +17,7 @@ export interface BuyerQuestionnaire {
 
 // Type for buyer questionnaire response
 export interface BuyerQuestionnaireResponse {
-  form_data: Record<string, unknown>;
+  default_values: Record<string, unknown>;
   supplier_info: {
     name: string;
     email: string;
@@ -512,7 +512,7 @@ export class RFPService {
     try {
       // First try the new schema approach - create/update as an artifact submission
       const submissionData = {
-        form_data: response.form_data,
+        default_values: response.default_values,
         supplier_info: response.supplier_info,
         submitted_at: response.submitted_at || new Date().toISOString(),
         form_version: response.form_version,
@@ -521,20 +521,25 @@ export class RFPService {
       };
 
       // Look for the buyer questionnaire artifact for this RFP
-      const { data: artifactData } = await supabase
+      const { data: artifactData, error: artifactError } = await supabase
         .from('rfp_artifacts')
         .select('artifact_id')
         .eq('rfp_id', rfpId)
         .eq('role', 'buyer')
-        .limit(1)
-        .single();
+        .limit(1);
 
-      if (artifactData?.artifact_id) {
+      if (artifactError) {
+        console.error('❌ Error querying rfp_artifacts:', artifactError);
+        return null;
+      }
+
+      const artifact = artifactData?.[0];
+      if (artifact?.artifact_id) {
         // Save as artifact submission (new schema)
         const { error: submissionError } = await supabase
           .from('artifact_submissions')
           .upsert({
-            artifact_id: artifactData.artifact_id,
+            artifact_id: artifact.artifact_id,
             submission_data: submissionData,
             user_id: response.supplier_info?.user_id || null,
             session_id: response.supplier_info?.session_id || null,
@@ -550,25 +555,16 @@ export class RFPService {
             .eq('id', rfpId)
             .single();
           return rfpData;
+        } else {
+          console.error('❌ Error saving artifact submission:', submissionError);
+          return null;
         }
       }
 
-      // Fallback to old schema if new schema fails
-      console.log('🔄 Falling back to legacy questionnaire response storage');
-      const { data, error } = await supabase
-        .from('rfps')
-        .update({ buyer_questionnaire_response: response })
-        .eq('id', rfpId)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('❌ Error updating RFP buyer questionnaire response:', error);
-        return null;
-      }
-      
-      console.log('✅ RFP buyer questionnaire response updated successfully (legacy)');
-      return data;
+      // No buyer questionnaire artifact found for this RFP
+      console.log('❌ No buyer questionnaire artifact found for RFP ID:', rfpId);
+      console.log('💡 A buyer questionnaire artifact must be created before responses can be saved');
+      return null;
     } catch (err) {
       console.error('❌ Exception updating buyer questionnaire response:', err);
       return null;
@@ -628,43 +624,42 @@ export class RFPService {
     
     try {
       // First try the new schema approach - look for questionnaire response submission
-      const { data: artifactData } = await supabase
+      const { data: artifactData, error: artifactError } = await supabase
         .from('rfp_artifacts')
         .select('artifact_id')
         .eq('rfp_id', rfpId)
         .eq('role', 'buyer')
-        .limit(1)
-        .single();
+        .limit(1);
 
-      if (artifactData?.artifact_id) {
-        const { data: submissionData } = await supabase
+      if (artifactError) {
+        console.error('❌ Error querying rfp_artifacts:', artifactError);
+        return null;
+      }
+
+      const artifact = artifactData?.[0];
+      if (artifact?.artifact_id) {
+        const { data: submissionData, error: submissionError } = await supabase
           .from('artifact_submissions')
           .select('submission_data, submitted_at')
-          .eq('artifact_id', artifactData.artifact_id)
+          .eq('artifact_id', artifact.artifact_id)
           .order('submitted_at', { ascending: false })
-          .limit(1)
-          .single();
+          .limit(1);
 
-        if (submissionData?.submission_data) {
+        if (submissionError) {
+          console.error('❌ Error querying artifact_submissions:', submissionError);
+          return null;
+        }
+
+        const latestSubmission = submissionData?.[0];
+        if (latestSubmission?.submission_data) {
           console.log('✅ Found buyer questionnaire response as artifact submission');
-          return submissionData.submission_data as BuyerQuestionnaireResponse;
+          return latestSubmission.submission_data as BuyerQuestionnaireResponse;
         }
       }
 
-      // Fallback to old schema if new schema doesn't have data
-      console.log('🔄 Falling back to legacy questionnaire response retrieval');
-      const { data: rfpData } = await supabase
-        .from('rfps')
-        .select('buyer_questionnaire_response')
-        .eq('id', rfpId)
-        .single();
-      
-      if (rfpData?.buyer_questionnaire_response) {
-        console.log('✅ Found buyer questionnaire response in legacy format');
-        return rfpData.buyer_questionnaire_response as BuyerQuestionnaireResponse;
-      }
-
+      // No buyer questionnaire artifact found or no submissions
       console.log('📋 No buyer questionnaire response found for RFP:', rfpId);
+      console.log('� A buyer questionnaire artifact and submission must exist for this RFP');
       return null;
     } catch (err) {
       console.error('❌ Exception getting buyer questionnaire response:', err);

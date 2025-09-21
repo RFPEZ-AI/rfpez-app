@@ -22,22 +22,8 @@ import {
   downloadOutline,
   clipboardOutline
 } from 'ionicons/icons';
-import { RFPService } from '../../services/rfpService';
+import { RFPService, type BuyerQuestionnaireResponse } from '../../services/rfpService';
 import type { RFP } from '../../types/rfp';
-
-// Type for proposal questionnaire response
-interface BuyerQuestionnaireResponse {
-  form_data: Record<string, unknown>;
-  supplier_info: {
-    name: string;
-    email: string;
-    [key: string]: unknown;
-  };
-  submitted_at?: string;
-  form_version?: string;
-  generated_at?: string;
-  bid_id?: number;
-}
 
 interface ProposalManagerProps {
   rfp: RFP;
@@ -85,7 +71,7 @@ export const ProposalManager: React.FC<ProposalManagerProps> = ({
     try {
       const proposal = await RFPService.generateRequest(
         rfp,
-        questionnaireResponse?.form_data || {},
+        questionnaireResponse?.default_values || {},
         questionnaireResponse?.supplier_info || { name: 'Unknown', email: 'unknown@example.com' }
       );
 

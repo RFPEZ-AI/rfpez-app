@@ -1,124 +1,155 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import { supabase } from '../supabaseClient';
-import type { UserProfile } from '../types/database';
-import type { RFP } from '../types/rfp';
+import type { UserProfile, SessionActiveAgent } from '../types/database';
 
 export class UserContextService {
   /**
-   * Set the current RFP context for a user
+   * Set the current session context for a user
    */
-  static async setCurrentRfp(userId: string, rfpId: number | null): Promise<UserProfile | null> {
-    console.log('🔄 Setting current RFP context for user:', userId, 'RFP ID:', rfpId);
+  static async setCurrentSession(userId: string, sessionId: string | null): Promise<UserProfile | null> {
+    console.log('📝 Setting current session context for user:', userId, 'Session ID:', sessionId);
     
     try {
       const { data, error } = await supabase
         .from('user_profiles')
-        .update({ current_rfp_id: rfpId })
+        .update({ current_session_id: sessionId })
         .eq('supabase_user_id', userId)
         .select()
         .single();
       
       if (error) {
-        console.error('❌ Error setting current RFP context:', error);
+        console.error('❌ Error setting current session context:', error);
         return null;
       }
       
-      console.log('✅ Current RFP context updated successfully');
+      console.log('✅ Current session context updated successfully');
       return data;
     } catch (error) {
-      console.error('❌ Exception in setCurrentRfp:', error);
+      console.error('❌ Exception in setCurrentSession:', error);
       return null;
     }
   }
 
   /**
-   * Get the current RFP context for a user
+   * Get the current agent context for a user via their current session
    */
-  static async getCurrentRfp(userId: string): Promise<RFP | null> {
-    console.log('🔄 Getting current RFP context for user:', userId);
+  static async getCurrentAgent(userId: string): Promise<SessionActiveAgent | null> {
+    console.log('🔄 Getting current agent context via session for user:', userId);
     
     try {
-      // First get the user profile with current_rfp_id
-      const { data: profile, error: profileError } = await supabase
+      // Get the user's current session and its agent
+      const { data, error } = await supabase
         .from('user_profiles')
-        .select('current_rfp_id')
+        .select(`
+          current_session_id,
+          sessions:current_session_id (
+            current_agent_id,
+            agents:current_agent_id (*)
+          )
+        `)
         .eq('supabase_user_id', userId)
         .single();
       
-      if (profileError || !profile?.current_rfp_id) {
-        console.log('ℹ️ No current RFP context found for user');
+      if (error) {
+        console.error('❌ Error fetching current agent via session:', error);
         return null;
       }
       
-      // Then get the RFP details
-      const { data: rfp, error: rfpError } = await supabase
-        .from('rfps')
-        .select('*')
-        .eq('id', profile.current_rfp_id)
-        .single();
+      // Extract the agent from the nested structure
+      const sessionData = data?.sessions as { agents?: SessionActiveAgent } | null;
+      const agent = sessionData?.agents;
       
-      if (rfpError) {
-        console.error('❌ Error fetching current RFP:', rfpError);
+      if (!agent) {
+        console.log('ℹ️ No current agent found via session for user');
         return null;
       }
       
-      console.log('✅ Current RFP context retrieved successfully:', rfp?.name);
-      return rfp;
+      console.log('✅ Current agent context retrieved via session:', agent.agent_name);
+      return agent;
     } catch (error) {
-      console.error('❌ Exception in getCurrentRfp:', error);
+      console.error('❌ Exception in getCurrentAgent:', error);
       return null;
     }
   }
 
   /**
-   * Clear the current RFP context for a user
+   * Get the current session context for a user  
    */
-  static async clearCurrentRfp(userId: string): Promise<UserProfile | null> {
-    return this.setCurrentRfp(userId, null);
+  static async getCurrentSession(userId: string): Promise<string | null> {
+    console.log('🔄 Getting current session context for user:', userId);
+    
+    try {
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('current_session_id')
+        .eq('supabase_user_id', userId)
+        .single();
+      
+      if (profileError || !profile?.current_session_id) {
+        console.log('ℹ️ No current session context found for user');
+        return null;
+      }
+      
+      console.log('✅ Current session context retrieved successfully:', profile.current_session_id);
+      return profile.current_session_id;
+    } catch (error) {
+      console.error('❌ Exception in getCurrentSession:', error);
+      return null;
+    }
   }
 
   /**
-   * Get user profile with current RFP context
+   * Clear the current session context for a user (this also clears agent context)
    */
-  static async getUserProfileWithRfpContext(userId: string): Promise<{
+  static async clearCurrentSession(userId: string): Promise<UserProfile | null> {
+    return this.setCurrentSession(userId, null);
+  }
+
+  /**
+   * Get user profile with full context (session and derived agent)
+   */
+  static async getUserProfileWithContext(userId: string): Promise<{
     profile: UserProfile | null;
-    currentRfp: RFP | null;
+    currentAgent: SessionActiveAgent | null;
+    currentSessionId: string | null;
   }> {
-    console.log('🔄 Getting user profile with RFP context for user:', userId);
+    console.log('🔄 Getting user profile with full context for user:', userId);
     
     try {
-      // Get user profile
+      // Get user profile with session and agent data
       const { data: profile, error: profileError } = await supabase
         .from('user_profiles')
-        .select('*')
+        .select(`
+          *,
+          sessions:current_session_id (
+            id,
+            current_agent_id,
+            agents:current_agent_id (*)
+          )
+        `)
         .eq('supabase_user_id', userId)
         .single();
       
       if (profileError) {
         console.error('❌ Error fetching user profile:', profileError);
-        return { profile: null, currentRfp: null };
+        return { profile: null, currentAgent: null, currentSessionId: null };
       }
       
-      // Get current RFP if exists
-      let currentRfp: RFP | null = null;
-      if (profile.current_rfp_id) {
-        const { data: rfp, error: rfpError } = await supabase
-          .from('rfps')
-          .select('*')
-          .eq('id', profile.current_rfp_id)
-          .single();
-        
-        if (!rfpError && rfp) {
-          currentRfp = rfp;
-        }
-      }
+      // Extract agent from session
+      const sessionData = profile?.sessions as { agents?: SessionActiveAgent } | null;
+      const currentAgent = sessionData?.agents || null;
+      const currentSessionId = profile.current_session_id || null;
       
-      console.log('✅ User profile with RFP context retrieved successfully');
-      return { profile, currentRfp };
+      console.log('✅ User profile with context retrieved successfully');
+      return { 
+        profile, 
+        currentAgent, 
+        currentSessionId 
+      };
     } catch (error) {
-      console.error('❌ Exception in getUserProfileWithRfpContext:', error);
-      return { profile: null, currentRfp: null };
+      console.error('❌ Exception in getUserProfileWithContext:', error);
+      return { profile: null, currentAgent: null, currentSessionId: null };
     }
   }
 }

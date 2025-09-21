@@ -7,6 +7,7 @@
 import { supabase } from '../supabaseClient';
 import { AgentService } from './agentService';
 import { mcpClient } from './mcpClient';
+import { RFPService } from './rfpService';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages.mjs';
 
@@ -20,7 +21,7 @@ interface SupplierInfo {
 
 interface QuestionnaireResponse {
   supplier_info?: SupplierInfo;
-  form_data?: Record<string, unknown>;
+  default_values?: Record<string, unknown>;
   [key: string]: unknown;
 }
 
@@ -362,7 +363,7 @@ export const claudeApiFunctions: Tool[] = [
           "type": "object",
           "description": "UI Schema for customizing form appearance and behavior"
         },
-        "form_data": {
+        "default_values": {
           "type": "object",
           "description": "Initial/default data to populate the form with"
         },
@@ -388,7 +389,7 @@ export const claudeApiFunctions: Tool[] = [
   },
   {
     "name": "update_form_artifact",
-    "description": "Update an existing form artifact with new data or schema. CRITICAL: When updating form_data, you MUST use the exact field names from the existing form schema. Call get_form_submission first to see the current schema structure.",
+    "description": "Update an existing form artifact with new data or schema. CRITICAL: When updating default_values, you MUST use the exact field names from the existing form schema. Call get_form_submission first to see the current schema structure.",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -398,7 +399,7 @@ export const claudeApiFunctions: Tool[] = [
         },
         "updates": {
           "type": "object",
-          "description": "Updates to apply to the artifact. For form_data, field names must EXACTLY match the schema properties.",
+          "description": "Updates to apply to the artifact. For default_values, field names must EXACTLY match the schema properties.",
           "properties": {
             "title": { 
               "type": "string",
@@ -416,7 +417,7 @@ export const claudeApiFunctions: Tool[] = [
               "type": "object",
               "description": "UI Schema for form rendering customization" 
             },
-            "form_data": { 
+            "default_values": { 
               "type": "object",
               "description": "Form data with field names EXACTLY matching the schema properties. For enum fields, values must match enum options exactly. For object fields (like project_timeline), provide nested objects with proper structure. IMPORTANT: Check existing schema first with get_form_submission to see required field names and formats."
             },
@@ -454,7 +455,7 @@ export const claudeApiFunctions: Tool[] = [
     }
   },
   {
-    "name": "validate_form_data",
+    "name": "validate_default_values",
     "description": "Validate form data against a JSON schema",
     "input_schema": {
       "type": "object",
@@ -463,12 +464,12 @@ export const claudeApiFunctions: Tool[] = [
           "type": "object",
           "description": "JSON Schema to validate against"
         },
-        "form_data": {
+        "default_values": {
           "type": "object",
           "description": "Form data to validate"
         }
       },
-      "required": ["form_schema", "form_data"]
+      "required": ["form_schema", "default_values"]
     }
   },
   {
@@ -633,10 +634,14 @@ export const claudeApiFunctions: Tool[] = [
   },
   {
     "name": "create_and_set_rfp",
-    "description": "Streamlined RFP creation: Creates a new RFP with minimal data, sets it as current RFP, and validates the creation. This replaces the multi-step process of supabase_insert + set_current_rfp + validation.",
+    "description": "Streamlined RFP creation: Creates a new RFP with minimal data, sets it as current RFP for the session, and validates the creation. This replaces the multi-step process of supabase_insert + set_current_rfp + validation.",
     "input_schema": {
       "type": "object",
       "properties": {
+        "session_id": {
+          "type": "string",
+          "description": "The UUID of the session to set the RFP as current for"
+        },
         "name": {
           "type": "string",
           "description": "The name/title of the RFP (required)"
@@ -654,7 +659,7 @@ export const claudeApiFunctions: Tool[] = [
           "description": "Optional due date in ISO format (YYYY-MM-DD)"
         }
       },
-      "required": ["name"]
+      "required": ["session_id", "name"]
     }
   },
   {
@@ -1400,6 +1405,7 @@ export class ClaudeAPIFunctionHandler {
         id: agent.id,
         name: agent.name,
         description: agent.description,
+        role: agent.role,
         initial_prompt: agent.initial_prompt,
         is_default: agent.is_default,
         is_restricted: agent.is_restricted,
@@ -1440,6 +1446,7 @@ export class ClaudeAPIFunctionHandler {
           id: defaultAgent.id,
           name: defaultAgent.name,
           description: defaultAgent.description,
+          role: defaultAgent.role,
           initial_prompt: defaultAgent.initial_prompt,
           is_default: true
         } : null,
@@ -1452,6 +1459,7 @@ export class ClaudeAPIFunctionHandler {
       current_agent: {
         id: activeAgent.agent_id,
         name: activeAgent.agent_name,
+        role: activeAgent.agent_role,
         instructions: activeAgent.agent_instructions,
         initial_prompt: activeAgent.agent_initial_prompt,
         avatar_url: activeAgent.agent_avatar_url
@@ -1992,7 +2000,7 @@ export class ClaudeAPIFunctionHandler {
   private async createFormArtifact(params: any, userId: string) {
     console.log('🎨 Starting createFormArtifact with params:', JSON.stringify(params, null, 2));
     
-    const { session_id, title, description, ui_schema, form_data, submit_action, artifact_role } = params;
+    const { session_id, title, description, ui_schema, default_values, submit_action, artifact_role } = params;
     const { form_schema } = params;
     
     // Default artifact_role to 'buyer_questionnaire' if not provided
@@ -2005,7 +2013,7 @@ export class ClaudeAPIFunctionHandler {
     console.log('  - description:', description, '(type:', typeof description, ')');
     console.log('  - form_schema:', form_schema, '(type:', typeof form_schema, ')');
     console.log('  - ui_schema:', ui_schema, '(type:', typeof ui_schema, ')');
-    console.log('  - form_data:', form_data, '(type:', typeof form_data, ')');
+    console.log('  - default_values:', default_values, '(type:', typeof default_values, ')');
     console.log('  - submit_action:', submit_action, '(type:', typeof submit_action, ')');
     console.log('  - artifact_role:', effectiveArtifactRole, '(type:', typeof effectiveArtifactRole, ')');
     
@@ -2081,25 +2089,32 @@ Please retry the create_form_artifact call with the complete form_schema paramet
         message_id: null, // Will be linked when message is stored
         name: title,
         file_type: 'form', // Required field in artifacts table
+        type: 'form', // Ensure type is set correctly
         artifact_role: effectiveArtifactRole, // Required field specifying the role of this artifact
         file_size: null,
         storage_path: null,
         mime_type: 'application/json',
+        // Store form data in separate fields for proper querying
+        schema: form_schema,
+        ui_schema: ui_schema || {},
+        default_values: default_values || {},
+        submit_action: submit_action || { type: 'save_session' },
         metadata: {
           type: 'form',
           description: description || null,
           schema: form_schema,
           ui_schema: ui_schema || {},
-          form_data: form_data || {},
+          default_values: default_values || {},
           submit_action: submit_action || { type: 'save_session' },
           user_id: dbUserId,
           status: 'active',
           artifact_role: effectiveArtifactRole
         },
+        // Also store in processed_content for backward compatibility
         processed_content: JSON.stringify({
           schema: form_schema,
           ui_schema: ui_schema || {},
-          form_data: form_data || {},
+          default_values: default_values || {},
           submit_action: submit_action || { type: 'save_session' }
         }),
         processing_status: 'completed'
@@ -2164,7 +2179,7 @@ Please retry the create_form_artifact call with the complete form_schema paramet
         type: 'form',
         form_schema,
         ui_schema: ui_schema || {},
-        form_data: form_data || {},
+        default_values: default_values || {},
         submit_action: submit_action || { type: 'save_session' },
         session_id: session_id,
         created_at: new Date().toISOString(),
@@ -2215,7 +2230,7 @@ Please retry the create_form_artifact call with the complete form_schema paramet
         message_id: null, // Will be linked when message is stored
         name: title,
         description: description || null,
-        type: 'text', // Use 'text' type for text artifacts
+        type: 'document', // Use 'document' type for text artifacts
         file_type: null, // Not a file-based artifact
         file_size: content.length,
         storage_path: null,
@@ -2226,7 +2241,7 @@ Please retry the create_form_artifact call with the complete form_schema paramet
           tags: tags || []
         },
         ui_schema: null,
-        form_data: {
+        default_values: {
           content,
           content_type,
           tags: tags || []
@@ -2235,7 +2250,7 @@ Please retry the create_form_artifact call with the complete form_schema paramet
         is_template: false,
         template_category: null,
         template_tags: null,
-        artifact_role: 'document',
+        artifact_role: 'template',
         status: 'active',
         processing_status: 'completed',
         processed_content: content,
@@ -2338,9 +2353,23 @@ Please retry the create_form_artifact call with the complete form_schema paramet
       
       // Generate request content
       const title = request_title || `Request for Proposal: ${rfp.name}`;
-      const questionnaire_response = rfp.buyer_questionnaire_response as QuestionnaireResponse;
       
-      const requestContent = this.generateRequestContent(rfp, questionnaire_response, sections, content_type);
+      // Get buyer questionnaire response from artifact submissions
+      let questionnaire_response: QuestionnaireResponse | null = null;
+      try {
+        const buyerResponse = await RFPService.getRfpBuyerQuestionnaireResponse(rfp_id);
+        if (buyerResponse) {
+          // Convert BuyerQuestionnaireResponse to QuestionnaireResponse format
+          questionnaire_response = {
+            supplier_info: buyerResponse.supplier_info,
+            default_values: buyerResponse.default_values
+          };
+        }
+      } catch (error) {
+        console.log('⚠️ Could not retrieve buyer questionnaire response:', error);
+      }
+      
+      const requestContent = this.generateRequestContent(rfp, questionnaire_response || {}, sections, content_type);
       
       // Create text artifact with the request content
       const artifact_id = `request_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
@@ -2351,7 +2380,7 @@ Please retry the create_form_artifact call with the complete form_schema paramet
         .insert({
           id: artifact_id,
           user_id: userId !== 'anonymous' ? userId : null,
-          type: 'text',
+          type: 'document',
           name: title,
           description: `Proposal generated for RFP: ${rfp.name}`,
           schema: {
@@ -2362,9 +2391,10 @@ Please retry the create_form_artifact call with the complete form_schema paramet
             rfp_id: rfp_id
           },
           ui_schema: null,
-          form_data: { content: requestContent, content_type, rfp_id },
+          default_values: { content: requestContent, content_type, rfp_id },
           submit_action: null,
           status: 'active',
+          artifact_role: 'request_document', // Required field for artifact role
           created_at: new Date().toISOString()
         })
         .select()
@@ -2372,14 +2402,19 @@ Please retry the create_form_artifact call with the complete form_schema paramet
       
       if (error) {
         console.error('❌ Failed to store proposal artifact in database:', error);
-        // Continue without database storage for anonymous users or fallback
+        throw new Error(`Failed to create request artifact: ${error.message}`);
       }
       
       // Also update the RFP with the proposal content
-      await supabase
+      const { error: rfpUpdateError } = await supabase
         .from('rfps')
         .update({ request: requestContent })
         .eq('id', rfp_id);
+      
+      if (rfpUpdateError) {
+        console.error('⚠️ Failed to update RFP with request content:', rfpUpdateError);
+        // Don't throw here - the artifact was created successfully
+      }
       
       console.log('✅ Proposal artifact created successfully:', { artifact_id, title });
       
@@ -2404,7 +2439,7 @@ Please retry the create_form_artifact call with the complete form_schema paramet
 
   // Helper method to generate proposal content
   private generateRequestContent(rfp: RFPData, questionnaire_response: QuestionnaireResponse, sections: string[], content_type: string): string {
-    const form_data = questionnaire_response?.form_data || {};
+    const default_values = questionnaire_response?.default_values || {};
     
     // Generate the bid form URL
     const bidFormUrl = `/rfp/${rfp.id}/bid`;
@@ -2436,7 +2471,7 @@ Please submit your bid through our online bid form. Your response should address
 4. Submit before the deadline
 
 ### Required Information
-${this.formatQuestionnaireDataForRequest(form_data)}
+${this.formatQuestionnaireDataForRequest(default_values)}
 
 ## Timeline
 - **RFP Issue Date:** ${new Date().toLocaleDateString()}
@@ -2490,7 +2525,7 @@ How to Submit Your Bid:
 4. Submit before the deadline
 
 Required Information:
-${this.formatQuestionnaireDataForRequest(form_data)}
+${this.formatQuestionnaireDataForRequest(default_values)}
 
 Timeline:
 - RFP Issue Date: ${new Date().toLocaleDateString()}
@@ -2510,8 +2545,8 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
   }
 
   // Helper method to format questionnaire data for request
-  private formatQuestionnaireDataForRequest(form_data: Record<string, unknown>): string {
-    const entries = Object.entries(form_data);
+  private formatQuestionnaireDataForRequest(default_values: Record<string, unknown>): string {
+    const entries = Object.entries(default_values);
     if (entries.length === 0) {
       return 'No questionnaire response data available.';
     }
@@ -2556,24 +2591,24 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
         .eq('id', artifact_id)
         .single();
       
-      // Smart form data mapping (if providing form_data)
-      let finalFormData = updates.form_data;
+      // Smart form data mapping (if providing default_values)
+      let finalFormData = updates.default_values;
       
       console.log('🔧 Smart mapping condition check:', {
-        hasFormData: !!updates.form_data,
+        hasFormData: !!updates.default_values,
         hasExistingArtifact: !!existingArtifact,
         hasSchema: !!(existingArtifact?.schema),
-        formDataKeys: updates.form_data ? Object.keys(updates.form_data) : [],
+        formDataKeys: updates.default_values ? Object.keys(updates.default_values) : [],
         updatesKeys: Object.keys(updates)
       });
       
-      if (updates.form_data && existingArtifact && existingArtifact.schema) {
-        console.log('🔍 Processing form_data against existing schema...');
+      if (updates.default_values && existingArtifact && existingArtifact.schema) {
+        console.log('🔍 Processing default_values against existing schema...');
         console.log('🔍 ENTRY: Smart mapping logic started successfully');
         
         const existingSchema = existingArtifact.schema;
         const schemaProperties = existingSchema.properties || {};
-        const formDataFields = Object.keys(updates.form_data);
+        const formDataFields = Object.keys(updates.default_values);
         const schemaFields = Object.keys(schemaProperties);
         
         console.log('📋 Schema mapping details:', {
@@ -2594,12 +2629,12 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
         if (exactMatches.length === formDataFields.length) {
           // Perfect match - use as-is
           console.log('✅ All form data fields match schema exactly');
-          finalFormData = updates.form_data;
+          finalFormData = updates.default_values;
         } else if (unmatchedFields.length > 0) {
           // Try smart mapping for nested object schemas
           console.log('🔄 Attempting smart mapping for nested schema structures...');
           
-          const mappedData = this.mapFlatDataToNestedSchema(updates.form_data, schemaProperties);
+          const mappedData = this.mapFlatDataToNestedSchema(updates.default_values, schemaProperties);
           
           if (Object.keys(mappedData).length > 0) {
             console.log('✅ Successfully mapped flat data to nested schema structure');
@@ -2607,7 +2642,7 @@ Generated on ${new Date().toLocaleDateString()} at ${new Date().toLocaleTimeStri
             finalFormData = mappedData;
           } else {
             // Fall back to detailed error for guidance
-            const errorMessage = `❌ FORM DATA FIELD MISMATCH: The following fields in form_data do not exist in the form schema: ${unmatchedFields.join(', ')}
+            const errorMessage = `❌ FORM DATA FIELD MISMATCH: The following fields in default_values do not exist in the form schema: ${unmatchedFields.join(', ')}
 
 🎯 Expected Schema Fields: ${schemaFields.join(', ')}
 📝 Provided Data Fields: ${formDataFields.join(', ')}
@@ -2620,7 +2655,7 @@ ${schemaFields.map(field => {
   return `- ${field}: ${prop.title || field} (${prop.type}${prop.enum ? `, options: ${prop.enum.join(', ')}` : ''})`;
 }).join('\n')}
 
-Please retry with form_data using the correct field names.`;
+Please retry with default_values using the correct field names.`;
             
             console.error(errorMessage);
             throw new Error(errorMessage);
@@ -2649,7 +2684,7 @@ Please retry with form_data using the correct field names.`;
               required: ["name", "email"]
             },
             ui_schema: updates.ui_schema || {},
-            form_data: finalFormData || updates.form_data || {},
+            default_values: finalFormData || updates.default_values || {},
             submit_action: updates.submit_action || 'save',
             status: 'active',
             created_at: new Date().toISOString(),
@@ -2684,7 +2719,7 @@ Please retry with form_data using the correct field names.`;
         const artifactContent = {
           schema: createdArtifact.schema,
           uiSchema: createdArtifact.ui_schema || {},
-          formData: createdArtifact.form_data || {},
+          formData: createdArtifact.default_values || {},
           submitAction: createdArtifact.submit_action || { type: 'save_session' }
         };
         
@@ -2713,7 +2748,7 @@ Please retry with form_data using the correct field names.`;
           description: updates.description,
           schema: updates.form_schema,
           ui_schema: updates.ui_schema,
-          form_data: finalFormData,
+          default_values: finalFormData,
           submit_action: updates.submit_action,
           updated_at: new Date().toISOString()
         })
@@ -2732,15 +2767,15 @@ Please retry with form_data using the correct field names.`;
       const artifactContent = {
         schema: updatedArtifact.schema,
         uiSchema: updatedArtifact.ui_schema || {},
-        formData: updatedArtifact.form_data || {},
+        formData: updatedArtifact.default_values || {},
         submitAction: updatedArtifact.submit_action || { type: 'save_session' }
       };
       
       console.log('🎯 ARTIFACT CONTENT DEBUG:', {
         artifactId: artifact_id,
         schemaKeys: Object.keys(updatedArtifact.schema?.properties || {}),
-        formDataKeys: Object.keys(updatedArtifact.form_data || {}),
-        formDataContent: updatedArtifact.form_data,
+        formDataKeys: Object.keys(updatedArtifact.default_values || {}),
+        formDataContent: updatedArtifact.default_values,
         fullContent: artifactContent
       });
       
@@ -2875,7 +2910,7 @@ Please retry with form_data using the correct field names.`;
           description: artifact.description,
           form_schema: artifact.schema,
           ui_schema: artifact.ui_schema,
-          form_data: artifact.form_data
+          default_values: artifact.default_values
         },
         schema_guidance: {
           field_names: Object.keys(artifact.schema?.properties || {}),
@@ -2890,7 +2925,7 @@ Please retry with form_data using the correct field names.`;
               }];
             })
           ),
-          update_instructions: "When updating this form with update_form_artifact, use these exact field names in form_data. For enum fields, use values from the enum array. For object fields, provide nested objects matching the schema structure."
+          update_instructions: "When updating this form with update_form_artifact, use these exact field names in default_values. For enum fields, use values from the enum array. For object fields, provide nested objects matching the schema structure."
         },
         latest_submission: latestSubmission ? {
           submission_id: latestSubmission.id,
@@ -2907,7 +2942,7 @@ Please retry with form_data using the correct field names.`;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async validateFormData(params: any, userId: string) {
-    const { form_schema, form_data } = params;
+    const { form_schema, default_values } = params;
     
     console.log('✅ Validating form data:', { userId });
     
@@ -2915,8 +2950,8 @@ Please retry with form_data using the correct field names.`;
       throw new Error('Valid form_schema is required for validation');
     }
     
-    if (!form_data || typeof form_data !== 'object') {
-      throw new Error('Valid form_data is required for validation');
+    if (!default_values || typeof default_values !== 'object') {
+      throw new Error('Valid default_values is required for validation');
     }
     
     try {
@@ -2926,7 +2961,7 @@ Please retry with form_data using the correct field names.`;
       // Basic validation against schema
       if (form_schema.required && Array.isArray(form_schema.required)) {
         for (const requiredField of form_schema.required) {
-          if (!(requiredField in form_data) || form_data[requiredField] === '' || form_data[requiredField] == null) {
+          if (!(requiredField in default_values) || default_values[requiredField] === '' || default_values[requiredField] == null) {
             errors.push(`Required field "${requiredField}" is missing or empty`);
           }
         }
@@ -2935,7 +2970,7 @@ Please retry with form_data using the correct field names.`;
       // Type validation for each field
       if (form_schema.properties) {
         for (const [fieldName, fieldSchema] of Object.entries(form_schema.properties as Record<string, unknown>)) {
-          const fieldValue = form_data[fieldName];
+          const fieldValue = default_values[fieldName];
           const fieldType = (fieldSchema as { type?: string }).type;
           
           if (fieldValue != null && fieldType) {
@@ -2978,7 +3013,7 @@ Please retry with form_data using the correct field names.`;
         valid: isValid,
         errors,
         warnings,
-        validated_fields: Object.keys(form_data),
+        validated_fields: Object.keys(default_values),
         message: isValid ? 'Form data is valid' : `Form validation failed with ${errors.length} error(s)`
       };
     } catch (error) {
@@ -3254,12 +3289,16 @@ Please retry with form_data using the correct field names.`;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createAndSetRfp(params: any, userId: string) {
-    const { name, description = '', specification = '', due_date = null } = params;
+    const { session_id, name, description = '', specification = '', due_date = null } = params;
     
-    console.log('🚀 Creating and setting new RFP:', { name, userId });
+    console.log('🚀 Creating and setting new RFP:', { name, session_id, userId });
     
     if (userId === 'anonymous') {
       throw new Error('Cannot create RFP for anonymous users. Please log in first.');
+    }
+    
+    if (!session_id || session_id.trim() === '') {
+      throw new Error('Session ID is required');
     }
     
     if (!name || name.trim() === '') {
@@ -3267,20 +3306,19 @@ Please retry with form_data using the correct field names.`;
     }
     
     try {
-      // Step 1: Check if user already has a current RFP
-      const profileId = await this.getUserProfileId(userId);
-      if (!profileId) {
-        throw new Error('User profile not found. Please ensure you are properly authenticated.');
-      }
-      
-      const { data: currentProfile } = await supabase
-        .from('user_profiles')
-        .select('current_rfp_id')
-        .eq('id', profileId)
+      // Step 1: Verify session exists and check if it already has a current RFP
+      const { data: currentSession, error: sessionError } = await supabase
+        .from('sessions')
+        .select('id, current_rfp_id, user_id')
+        .eq('id', session_id)
         .single();
       
-      if (currentProfile?.current_rfp_id) {
-        console.log('⚠️ User already has current RFP:', currentProfile.current_rfp_id);
+      if (sessionError || !currentSession) {
+        throw new Error('Session not found. Please ensure you have a valid session.');
+      }
+      
+      if (currentSession.current_rfp_id) {
+        console.log('⚠️ Session already has current RFP:', currentSession.current_rfp_id);
       }
       
       // Step 2: Create new RFP with supabase_insert
@@ -3319,11 +3357,11 @@ Please retry with form_data using the correct field names.`;
       
       console.log('✅ RFP created successfully:', newRfp.id);
       
-      // Step 3: Set as current RFP
+      // Step 3: Set as current RFP for the session
       const { error: updateError } = await supabase
-        .from('user_profiles')
+        .from('sessions')
         .update({ current_rfp_id: newRfp.id })
-        .eq('id', profileId)
+        .eq('id', session_id)
         .select('id, current_rfp_id')
         .single();
       
@@ -3332,7 +3370,7 @@ Please retry with form_data using the correct field names.`;
         throw new Error(`RFP created but failed to set as current: ${updateError.message}`);
       }
       
-      console.log('✅ RFP set as current successfully');
+      console.log('✅ RFP set as current for session successfully');
       
       // Step 4: Validation - verify RFP exists in database
       const { data: verifyRfp, error: verifyError } = await supabase
@@ -3360,12 +3398,12 @@ Please retry with form_data using the correct field names.`;
         success: true,
         rfp: newRfp,
         current_rfp_id: newRfp.id,
-        user_profile_id: profileId,
-        message: `RFP "${newRfp.name}" created successfully and set as current RFP`,
+        session_id: session_id,
+        message: `RFP "${newRfp.name}" created successfully and set as current RFP for this session`,
         steps_completed: [
-          'checked_current_context',
+          'checked_session_context',
           'created_rfp_record', 
-          'set_as_current_rfp',
+          'set_as_current_rfp_for_session',
           'validated_creation',
           'triggered_ui_refresh'
         ],

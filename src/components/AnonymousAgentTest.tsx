@@ -20,7 +20,7 @@ import { claudeAPIHandler } from '../services/claudeAPIFunctions';
 
 interface TestResult {
   success: boolean;
-  data?: any;
+  data?: unknown;
   error?: string;
   timestamp: Date;
 }
@@ -35,7 +35,7 @@ const AnonymousAgentTest: React.FC = () => {
   const [switchReason, setSwitchReason] = useState<string>('Testing anonymous user access');
   const [recommendationTopic, setRecommendationTopic] = useState<string>('I need help logging in');
 
-  const runTest = async (testName: string, testFunction: () => Promise<any>) => {
+  const runTest = async (testName: string, testFunction: () => Promise<unknown>) => {
     setLoading(prev => ({ ...prev, [testName]: true }));
     try {
       const result = await testFunction();
@@ -173,7 +173,7 @@ const AnonymousAgentTest: React.FC = () => {
                   onIonChange={(e: CustomEvent) => setSelectedAgentId(e.detail.value)}
                   placeholder="Choose an agent"
                 >
-                  {availableAgentsResult?.data?.agents?.map((agent: any) => (
+                  {(availableAgentsResult?.data as { agents?: Array<{ id: string; name: string; is_free?: boolean; is_restricted?: boolean }> })?.agents?.map((agent) => (
                     <IonSelectOption key={agent.id} value={agent.id}>
                       {agent.name} {agent.is_free ? '(Free)' : ''} {agent.is_restricted ? '(Restricted)' : ''}
                     </IonSelectOption>
@@ -185,7 +185,7 @@ const AnonymousAgentTest: React.FC = () => {
                 <IonLabel position="stacked">Reason</IonLabel>
                 <IonTextarea
                   value={switchReason}
-                  onIonInput={(e) => setSwitchReason(e.detail.value!)}
+                  onIonInput={(e) => setSwitchReason(e.detail.value || '')}
                   placeholder="Why are you switching agents?"
                 />
               </IonItem>
@@ -212,7 +212,7 @@ const AnonymousAgentTest: React.FC = () => {
                 <IonLabel position="stacked">Topic</IonLabel>
                 <IonTextarea
                   value={recommendationTopic}
-                  onIonInput={(e) => setRecommendationTopic(e.detail.value!)}
+                  onIonInput={(e) => setRecommendationTopic(e.detail.value || '')}
                   placeholder="What do you need help with?"
                 />
               </IonItem>

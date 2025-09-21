@@ -92,7 +92,7 @@ BEGIN
     type, 
     schema, 
     ui_schema, 
-    form_data,
+    default_values,
     status
   ) VALUES (
     test_id,
@@ -151,7 +151,7 @@ BEGIN
   IF EXISTS (
     SELECT 1 FROM information_schema.columns 
     WHERE table_name = 'artifacts' 
-    AND column_name IN ('schema', 'ui_schema', 'form_data', 'submit_action')
+    AND column_name IN ('schema', 'ui_schema', 'default_values', 'submit_action')
     GROUP BY table_name
     HAVING COUNT(*) = 4
   ) THEN

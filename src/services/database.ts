@@ -23,8 +23,8 @@ export class DatabaseService {
   }
 
   // Session operations
-  static async createSession(supabaseUserId: string, title: string, description?: string): Promise<Session | null> {
-    console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description });
+  static async createSession(supabaseUserId: string, title: string, description?: string, currentRfpId?: number): Promise<Session | null> {
+    console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description, currentRfpId });
     
     // First get the user profile to get the internal ID
     const { data: userProfile, error: profileError } = await supabase
@@ -41,13 +41,21 @@ export class DatabaseService {
     }
 
     console.log('Attempting to insert session into database...');
+    const sessionData: Omit<Session, 'id' | 'created_at' | 'updated_at' | 'is_archived'> = {
+      user_id: userProfile.id,
+      title,
+      description
+    };
+    
+    // Add current RFP ID if provided
+    if (currentRfpId) {
+      sessionData.current_rfp_id = currentRfpId;
+      console.log('Setting session current_rfp_id to:', currentRfpId);
+    }
+    
     const { data, error } = await supabase
       .from('sessions')
-      .insert({
-        user_id: userProfile.id,
-        title,
-        description
-      })
+      .insert(sessionData)
       .select()
       .single();
 
@@ -64,14 +72,15 @@ export class DatabaseService {
     supabaseUserId: string, 
     title: string, 
     agentId?: string,
-    description?: string
+    description?: string,
+    currentRfpId?: number
   ): Promise<Session | null> {
     console.log('DatabaseService.createSessionWithAgent called with:', { 
-      supabaseUserId, title, agentId, description 
+      supabaseUserId, title, agentId, description, currentRfpId 
     });
 
     // Create the session first
-    const session = await this.createSession(supabaseUserId, title, description);
+    const session = await this.createSession(supabaseUserId, title, description, currentRfpId);
     if (!session) {
       return null;
     }
@@ -186,6 +195,96 @@ export class DatabaseService {
       return false;
     }
     return true;
+  }
+
+  // Session context management
+  static async updateSessionContext(
+    sessionId: string, 
+    context: { 
+      current_rfp_id?: number | null; 
+      current_artifact_id?: string | null;
+      current_agent_id?: string | null;
+    }
+  ): Promise<Session | null> {
+    console.log('DatabaseService.updateSessionContext called with:', { sessionId, context });
+    
+    const { data, error } = await supabase
+      .from('sessions')
+      .update(context)
+      .eq('id', sessionId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating session context:', error);
+      return null;
+    }
+    
+    console.log('Session context updated successfully:', data);
+    return data;
+  }
+
+  static async getSessionWithContext(sessionId: string): Promise<Session | null> {
+    const { data, error } = await supabase
+      .from('sessions')
+      .select(`
+        *,
+        rfps!current_rfp_id(id, name, description),
+        artifacts!current_artifact_id(id, name, type, processed_content),
+        agents!current_agent_id(id, name, description, role)
+      `)
+      .eq('id', sessionId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching session with context:', error);
+      return null;
+    }
+    return data;
+  }
+
+  // User profile context management
+  static async updateUserProfileContext(
+    supabaseUserId: string,
+    context: {
+      current_agent_id?: string | null;
+      current_session_id?: string | null;
+    }
+  ): Promise<UserProfile | null> {
+    console.log('DatabaseService.updateUserProfileContext called with:', { supabaseUserId, context });
+    
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .update(context)
+      .eq('supabase_user_id', supabaseUserId)
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error updating user profile context:', error);
+      return null;
+    }
+    
+    console.log('User profile context updated successfully:', data);
+    return data;
+  }
+
+  static async getUserProfileWithContext(supabaseUserId: string): Promise<UserProfile | null> {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select(`
+        *,
+        current_agent:current_agent_id(id, name, description, role),
+        current_session:current_session_id(id, title, created_at)
+      `)
+      .eq('supabase_user_id', supabaseUserId)
+      .single();
+
+    if (error) {
+      console.error('Error fetching user profile with context:', error);
+      return null;
+    }
+    return data;
   }
 
   // Message operations
@@ -499,8 +598,8 @@ export class DatabaseService {
           artifact_id: artifactId,
           session_id: sessionId || null, // Use null instead of 'current'
           user_id: userId || null,
-          submission_data: submissionData,
-          status: 'submitted'
+          submission_data: submissionData
+          // Note: Removed 'status' field as it doesn't exist in the current schema
         });
 
       if (error) {
@@ -778,7 +877,7 @@ export class DatabaseService {
               type,
               schema,
               ui_schema,
-              form_data,
+              default_values,
               created_at
             )
           `)
@@ -815,7 +914,7 @@ export class DatabaseService {
             type,
             schema,
             ui_schema,
-            form_data,
+            default_values,
             submit_action,
             created_at
           )

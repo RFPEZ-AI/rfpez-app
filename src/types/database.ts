@@ -11,7 +11,7 @@ export interface UserProfile {
   full_name?: string;
   avatar_url?: string;
   role: UserRole;
-  current_rfp_id?: number; // Foreign key to rfps table
+  current_session_id?: string; // Foreign key to sessions table
   last_login?: string;
   created_at: string;
   updated_at: string;
@@ -26,6 +26,9 @@ export interface Session {
   updated_at: string;
   is_archived: boolean;
   session_metadata?: Record<string, unknown>;
+  current_rfp_id?: number; // Reference to current RFP
+  current_artifact_id?: string; // Reference to current artifact
+  current_agent_id?: string; // Reference to current agent
 }
 
 export interface SessionWithStats extends Session {
@@ -70,7 +73,7 @@ export interface Artifact {
   mime_type?: string;
   schema?: Record<string, unknown>; // JSON schema for forms
   ui_schema?: Record<string, unknown>; // UI schema for forms
-  form_data?: Record<string, unknown>; // Form data for forms
+  default_values?: Record<string, unknown>; // Default/pre-filled form values
   submit_action?: Record<string, unknown>; // Submit action for forms
   is_template?: boolean;
   template_category?: string;
@@ -95,6 +98,7 @@ export interface Agent {
   id: string; // UUID
   name: string;
   description?: string;
+  role?: string; // Functional role of the agent (e.g., sales, design, support, assistant)
   instructions: string; // System instructions for the agent
   initial_prompt: string; // Initial greeting/prompt for users
   avatar_url?: string;
@@ -125,6 +129,7 @@ export interface AgentWithActivity extends Agent {
 export interface SessionActiveAgent {
   agent_id: string;
   agent_name: string;
+  agent_role?: string;
   agent_instructions: string;
   agent_initial_prompt: string;
   agent_avatar_url?: string;

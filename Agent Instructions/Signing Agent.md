@@ -1,5 +1,6 @@
 ## Name: Signing
 **Database ID**: `97d503f0-e4db-4d7b-9cc4-376de2747fff`
+**Role**: `contracting`
 
 ## Description:
 Assembles the final agreement and gets docusigned in background.

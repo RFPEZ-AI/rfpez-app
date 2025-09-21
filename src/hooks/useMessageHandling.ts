@@ -83,7 +83,7 @@ export const useMessageHandling = () => {
     currentSessionId: string | undefined,
     setCurrentSessionId: (id: string) => void,
     setSelectedSessionId: (id: string) => void,
-    createNewSession: (agent: SessionActiveAgent | null) => Promise<string | null>,
+    createNewSession: (agent: SessionActiveAgent | null, currentRfpId?: number) => Promise<string | null>,
     loadUserSessions: () => Promise<void>,
     isAuthenticated: boolean,
     userId: string | undefined,
@@ -127,13 +127,13 @@ export const useMessageHandling = () => {
         
         // Create session if none exists
         if (!activeSessionId) {
-          console.log('No current session, creating new one...');
-          const newSessionId = await createNewSession(currentAgent);
+          console.log('No current session, creating new one with RFP context:', currentRfp?.id);
+          const newSessionId = await createNewSession(currentAgent, currentRfp?.id);
           if (newSessionId) {
             activeSessionId = newSessionId;
             setCurrentSessionId(newSessionId);
             setSelectedSessionId(newSessionId);
-            console.log('New session created with ID:', newSessionId);
+            console.log('New session created with ID:', newSessionId, 'and RFP:', currentRfp?.id);
             
             // Update user profile with current session ID for database persistence
             try {
@@ -402,13 +402,14 @@ export const useMessageHandling = () => {
   // Helper function to send auto-prompt messages after form submissions
   const sendAutoPrompt = async (
     formName: string,
+    formData: Record<string, unknown>,
     messages: Message[],
     setMessages: (updater: (prev: Message[]) => Message[]) => void,
     setIsLoading: (loading: boolean) => void,
     currentSessionId: string | undefined,
     setCurrentSessionId: (id: string) => void,
     setSelectedSessionId: (id: string) => void,
-    createNewSession: (agent: SessionActiveAgent | null) => Promise<string | null>,
+    createNewSession: (agent: SessionActiveAgent | null, currentRfpId?: number) => Promise<string | null>,
     loadUserSessions: () => Promise<void>,
     isAuthenticated: boolean,
     userId: string | undefined,
@@ -423,7 +424,7 @@ export const useMessageHandling = () => {
     // Use smart auto-prompt manager to decide if we should send
     const decision = SmartAutoPromptManager.shouldSendAutoPrompt(
       formName,
-      {}, // form data not available here, but could be passed if needed
+      formData, // Pass the actual form data
       currentRfp ? { status: 'unknown', phase: 'unknown' } : undefined,
       messages
     );
