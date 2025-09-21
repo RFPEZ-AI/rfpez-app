@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
@@ -149,6 +149,92 @@ const Home: React.FC = () => {
     if (item === 'Debug') history.push('/debug');
   };
 
+  // Define handleSelectSession before useEffects that call it
+  const handleSelectSession = useCallback(async (sessionId: string) => {
+    console.log('Session selected:', sessionId);
+    setSelectedSessionId(sessionId);
+    setCurrentSessionId(sessionId);
+    
+    // Save as last session for persistence
+    artifactWindowState.saveLastSession(sessionId);
+    
+    // Update user profile with current session ID for database persistence
+    try {
+      await DatabaseService.setUserCurrentSession(sessionId);
+      console.log('✅ Current session saved to user profile:', sessionId);
+    } catch (error) {
+      console.warn('⚠️ Failed to save current session to user profile:', error);
+    }
+
+    // Load session with context (RFP and artifact context)
+    try {
+      const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
+      
+      // Restore RFP context if it exists
+      if (sessionWithContext?.current_rfp_id) {
+        console.log('🎯 Restoring RFP context from session:', sessionWithContext.current_rfp_id);
+        await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+      } else {
+        console.log('📝 No RFP context found in session');
+      }
+      
+      // Note: Artifact context will be restored below when loading session artifacts
+      if (sessionWithContext?.current_artifact_id) {
+        console.log('📄 Session has artifact context:', sessionWithContext.current_artifact_id);
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load session context:', error);
+    }
+    
+    await loadSessionMessages(sessionId);
+    await loadSessionAgent(sessionId);
+    const sessionArtifacts = await loadSessionArtifacts(sessionId);
+    
+    // Try to restore the session's current artifact first, then fall back to saved or most recent
+    const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
+    let artifactToSelect = sessionWithContext?.current_artifact_id;
+    
+    if (!artifactToSelect || !sessionArtifacts?.some(a => a.id === artifactToSelect)) {
+      // Fallback to saved artifact for this session
+      const restoredArtifactId = artifactWindowState.restoreSessionArtifact(sessionId);
+      if (restoredArtifactId && sessionArtifacts?.some(a => a.id === restoredArtifactId)) {
+        artifactToSelect = restoredArtifactId;
+        console.log('Restored saved artifact:', restoredArtifactId);
+      } else if (sessionArtifacts && sessionArtifacts.length > 0) {
+        // Otherwise, fall back to the most recent artifact
+        const mostRecentArtifact = sessionArtifacts.reduce((latest, current) => {
+          return parseInt(current.id) > parseInt(latest.id) ? current : latest;
+        });
+        artifactToSelect = mostRecentArtifact.id;
+        console.log('Selected most recent artifact:', mostRecentArtifact.id);
+      }
+    }
+    
+    if (artifactToSelect) {
+      setSelectedArtifactFromState(artifactToSelect);
+      console.log('Selected artifact:', artifactToSelect);
+    }
+    
+    // If we have artifacts, ensure the window is properly shown
+    if (sessionArtifacts && sessionArtifacts.length > 0) {
+      if (!artifactWindowState.isOpen) {
+        artifactWindowState.openWindow();
+      }
+      if (artifactWindowState.isCollapsed) {
+        artifactWindowState.expandWindow();
+      }
+    }
+  }, [
+    setSelectedSessionId,
+    setCurrentSessionId,
+    artifactWindowState,
+    handleSetCurrentRfp,
+    loadSessionMessages,
+    loadSessionAgent,
+    loadSessionArtifacts,
+    setSelectedArtifactFromState
+  ]);
+
   // Load user sessions on mount if authenticated
   useEffect(() => {
     console.log('Auth state:', { isAuthenticated, supabaseLoading, user: !!user, userProfile: !!userProfile });
@@ -185,18 +271,30 @@ const Home: React.FC = () => {
 
   // Separate useEffect to handle session restoration after sessions are loaded
   useEffect(() => {
+    console.log('Session restoration check:', { 
+      isAuthenticated, 
+      sessionsCount: sessions.length, 
+      currentSessionId: !!currentSessionId 
+    });
+    
     if (isAuthenticated && sessions.length > 0 && !currentSessionId) {
       // Try to restore last session if available
       const lastSessionId = artifactWindowState.getLastSession();
+      console.log('Attempting to restore last session:', lastSessionId);
+      
       if (lastSessionId) {
         const session = sessions.find(s => s.id === lastSessionId);
         if (session) {
           console.log('Restoring last session:', lastSessionId);
           handleSelectSession(lastSessionId);
+        } else {
+          console.log('Last session not found in current sessions list');
         }
+      } else {
+        console.log('No last session found in localStorage');
       }
     }
-  }, [sessions, isAuthenticated, currentSessionId]);
+  }, [sessions, isAuthenticated, currentSessionId, handleSelectSession]);
 
   // Monitor session changes specifically for logout detection
   useEffect(() => {
@@ -226,11 +324,11 @@ const Home: React.FC = () => {
     return () => window.removeEventListener('message', handleRfpRefreshMessage);
   }, [userId, handleSetCurrentRfp, handleClearCurrentRfp]);
 
-  // Load active agent when session changes
+  // Load active agent when session changes - but only if not already handled by handleSelectSession
   useEffect(() => {
     if (currentSessionId && userId) {
+      // Only load agent - artifacts and messages are handled by handleSelectSession
       loadSessionAgent(currentSessionId);
-      loadSessionArtifacts(currentSessionId);
     } else if (!currentSessionId && isAuthenticated && userId && messages.length === 0) {
       loadDefaultAgentWithPrompt().then(initialMessage => {
         if (initialMessage) {
@@ -278,81 +376,6 @@ const Home: React.FC = () => {
     }
     
     console.log('New session started with initial prompt displayed');
-  };
-
-  const handleSelectSession = async (sessionId: string) => {
-    console.log('Session selected:', sessionId);
-    setSelectedSessionId(sessionId);
-    setCurrentSessionId(sessionId);
-    
-    // Save as last session for persistence
-    artifactWindowState.saveLastSession(sessionId);
-    
-    // Update user profile with current session ID for database persistence
-    try {
-      await DatabaseService.setUserCurrentSession(sessionId);
-      console.log('✅ Current session saved to user profile:', sessionId);
-    } catch (error) {
-      console.warn('⚠️ Failed to save current session to user profile:', error);
-    }
-
-    // Load session with context (RFP and artifact context)
-    try {
-      const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
-      
-      // Restore RFP context if it exists
-      if (sessionWithContext?.current_rfp_id) {
-        console.log('🎯 Restoring RFP context from session:', sessionWithContext.current_rfp_id);
-        await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
-      } else {
-        console.log('📝 No RFP context found in session');
-      }
-      
-      // Note: Artifact context will be restored below when loading session artifacts
-      if (sessionWithContext?.current_artifact_id) {
-        console.log('📄 Session has artifact context:', sessionWithContext.current_artifact_id);
-      }
-    } catch (error) {
-      console.warn('⚠️ Failed to load session context:', error);
-    }
-    
-    await loadSessionMessages(sessionId);
-    const sessionArtifacts = await loadSessionArtifacts(sessionId);
-    
-    // Try to restore the session's current artifact first, then fall back to saved or most recent
-    const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
-    let artifactToSelect = sessionWithContext?.current_artifact_id;
-    
-    if (!artifactToSelect || !sessionArtifacts?.some(a => a.id === artifactToSelect)) {
-      // Fallback to saved artifact for this session
-      const restoredArtifactId = artifactWindowState.restoreSessionArtifact(sessionId);
-      if (restoredArtifactId && sessionArtifacts?.some(a => a.id === restoredArtifactId)) {
-        artifactToSelect = restoredArtifactId;
-        console.log('Restored saved artifact:', restoredArtifactId);
-      } else if (sessionArtifacts && sessionArtifacts.length > 0) {
-        // Otherwise, fall back to the most recent artifact
-        const mostRecentArtifact = sessionArtifacts.reduce((latest, current) => {
-          return parseInt(current.id) > parseInt(latest.id) ? current : latest;
-        });
-        artifactToSelect = mostRecentArtifact.id;
-        console.log('Selected most recent artifact:', mostRecentArtifact.id);
-      }
-    }
-    
-    if (artifactToSelect) {
-      setSelectedArtifactFromState(artifactToSelect);
-      console.log('Selected artifact:', artifactToSelect);
-    }
-    
-    // If we have artifacts, ensure the window is properly shown
-    if (sessionArtifacts && sessionArtifacts.length > 0) {
-      if (!artifactWindowState.isOpen) {
-        artifactWindowState.openWindow();
-      }
-      if (artifactWindowState.isCollapsed) {
-        artifactWindowState.expandWindow();
-      }
-    }
   };
 
   const handleDeleteSession = async (sessionId: string) => {
