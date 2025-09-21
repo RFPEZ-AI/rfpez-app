@@ -1,5 +1,6 @@
 ## Name: Followup
 **Database ID**: `883e7834-1ad0-4810-a05d-ee32c9065217`
+**Role**: `communication`
 
 ## Description:
 Background agent that prompts non-responsive suppliers to remind and looks for alternate contacts. Periodically sends status reports to the user via email.

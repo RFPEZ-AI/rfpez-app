@@ -21,8 +21,8 @@ type RFP = {
   bid_form_questionaire?: FormSpec | null; // JSON Schema + RJSF form specification for bid submission
   is_template: boolean;
   is_public: boolean;
-  suppliers: number[]; // array of supplier IDs
-  agent_ids: number[]; // array of agent IDs
+  suppliers?: number[]; // array of supplier IDs (legacy field, removed from database)
+  agent_ids?: number[]; // array of agent IDs (legacy field, removed from database)
   created_at: string;
   updated_at: string;
 };

@@ -4,6 +4,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useSupabase } from '../context/SupabaseContext';
 import DatabaseService from '../services/database';
+import { UserContextService } from '../services/userContextService';
 import { ClaudeService } from '../services/claudeService';
 import { useErrorHandler } from '../utils/errorHandler';
 import { logger } from '../utils/logger';
@@ -85,6 +86,11 @@ export function useSessionManagement() {
       setCurrentSessionId(sessionId);
       setSelectedSessionId(sessionId);
 
+      // Persist session ID to user profile
+      if (user) {
+        await UserContextService.setCurrentSession(user.id, sessionId);
+      }
+
       // Reload sessions to include the new one
       await loadSessions();
 
@@ -102,7 +108,38 @@ export function useSessionManagement() {
       });
       throw error;
     }
-  }, [loadSessions, handleError]);
+  }, [loadSessions, handleError, user]);
+
+  // Session context management helper - defined before selectSession
+  const loadSessionWithContext = useCallback(async (sessionId: string) => {
+    try {
+      logger.info('Loading session with context', {
+        component: 'useSessionManagement',
+        sessionId
+      });
+
+      const session = await DatabaseService.getSessionWithContext(sessionId);
+      
+      if (session) {
+        logger.info('Session with context loaded successfully', {
+          component: 'useSessionManagement',
+          sessionId,
+          hasRfp: !!session.current_rfp_id,
+          hasArtifact: !!session.current_artifact_id,
+          hasAgent: !!session.current_agent_id
+        });
+      }
+
+      return session;
+    } catch (error) {
+      handleError(error as Error, {
+        component: 'useSessionManagement',
+        action: 'loadSessionWithContext',
+        sessionId
+      });
+      return null;
+    }
+  }, [handleError]);
 
   const selectSession = useCallback(async (sessionId: string) => {
     try {
@@ -114,6 +151,14 @@ export function useSessionManagement() {
       setSelectedSessionId(sessionId);
       setCurrentSessionId(sessionId);
 
+      // Persist session ID to user profile
+      if (user) {
+        await UserContextService.setCurrentSession(user.id, sessionId);
+      }
+
+      // Load session with context (RFP, artifact, and agent)
+      const sessionWithContext = await loadSessionWithContext(sessionId);
+
       // Load session messages
       const history = await ClaudeService.getConversationHistory(sessionId);
       const messages = 'messages' in history ? history.messages : [];
@@ -121,10 +166,16 @@ export function useSessionManagement() {
       logger.info('Session selected successfully', {
         component: 'useSessionManagement',
         sessionId,
-        messageCount: messages?.length || 0
+        messageCount: messages?.length || 0,
+        hasRfpContext: !!sessionWithContext?.current_rfp_id,
+        hasArtifactContext: !!sessionWithContext?.current_artifact_id,
+        hasAgentContext: !!sessionWithContext?.current_agent_id
       });
 
-      return messages || [];
+      return { 
+        messages: messages || [], 
+        session: sessionWithContext 
+      };
 
     } catch (error) {
       handleError(error as Error, {
@@ -132,9 +183,9 @@ export function useSessionManagement() {
         action: 'selectSession',
         sessionId
       });
-      return [];
+      return { messages: [], session: null };
     }
-  }, [handleError]);
+  }, [handleError, loadSessionWithContext, user]);
 
   const deleteSession = useCallback(async (sessionId: string) => {
     try {
@@ -177,6 +228,40 @@ export function useSessionManagement() {
     setSelectedSessionId(undefined);
   }, []);
 
+  // Session context management
+  const updateSessionContext = useCallback(async (
+    sessionId: string,
+    context: { 
+      current_rfp_id?: number | null; 
+      current_artifact_id?: string | null;
+      current_agent_id?: string | null;
+    }
+  ) => {
+    try {
+      logger.info('Updating session context', {
+        component: 'useSessionManagement',
+        sessionId,
+        context
+      });
+
+      await DatabaseService.updateSessionContext(sessionId, context);
+      
+      logger.info('Session context updated successfully', {
+        component: 'useSessionManagement',
+        sessionId,
+        context
+      });
+
+    } catch (error) {
+      handleError(error as Error, {
+        component: 'useSessionManagement',
+        action: 'updateSessionContext',
+        sessionId,
+        context
+      });
+    }
+  }, [handleError]);
+
   return {
     sessions,
     currentSessionId,
@@ -186,6 +271,8 @@ export function useSessionManagement() {
     selectSession,
     deleteSession,
     clearSessions,
-    loadSessions
+    loadSessions,
+    updateSessionContext,
+    loadSessionWithContext
   };
 }

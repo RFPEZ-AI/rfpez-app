@@ -1,5 +1,6 @@
 ## Name: Billing
 **Database ID**: `0fb62d0c-79fe-4995-a4ee-f6a462e2f05f`
+**Role**: `billing`
 
 ## Description:
 Provides options on different plans and collects credit card information for billing purposes. If needed, a meeting can be scheduled with a human representative.

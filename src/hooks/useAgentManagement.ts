@@ -3,9 +3,10 @@
 import { useState, useEffect } from 'react';
 import { Agent, SessionActiveAgent } from '../types/database';
 import { AgentService } from '../services/agentService';
+import { DatabaseService } from '../services/database';
 import { Message } from '../types/home';
 
-export const useAgentManagement = () => {
+export const useAgentManagement = (sessionId: string | null = null) => {
   const [currentAgent, setCurrentAgent] = useState<SessionActiveAgent | null>(null);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -31,6 +32,14 @@ export const useAgentManagement = () => {
           agent_avatar_url: defaultAgent.avatar_url
         };
         setCurrentAgent(sessionActiveAgent);
+        
+        // Persist agent to session context only (agents are session-based now)
+        if (sessionId) {
+          await DatabaseService.updateSessionContext(sessionId, {
+            current_agent_id: defaultAgent.id
+          });
+        }
+        
         console.log('Loaded default agent with prompt:', sessionActiveAgent);
 
         // Return the initial message to be displayed
@@ -60,9 +69,20 @@ export const useAgentManagement = () => {
     }
   };
 
-  const handleAgentChanged = (newAgent: SessionActiveAgent): Message | null => {
+  const handleAgentChanged = async (newAgent: SessionActiveAgent): Promise<Message | null> => {
     setCurrentAgent(newAgent);
     console.log('Agent changed to:', newAgent);
+    
+    try {
+      // Persist agent to session context only (agents are session-based now)
+      if (sessionId) {
+        await DatabaseService.updateSessionContext(sessionId, {
+          current_agent_id: newAgent.agent_id
+        });
+      }
+    } catch (error) {
+      console.error('Failed to persist agent change:', error);
+    }
     
     // Return the agent's initial prompt message if available
     if (newAgent.agent_initial_prompt) {

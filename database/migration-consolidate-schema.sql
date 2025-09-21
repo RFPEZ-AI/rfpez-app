@@ -44,7 +44,7 @@ CREATE TABLE IF NOT EXISTS artifacts_new (
   -- Form artifacts
   schema JSONB,
   ui_schema JSONB DEFAULT '{}'::jsonb,
-  form_data JSONB DEFAULT '{}'::jsonb,
+  default_values JSONB DEFAULT '{}'::jsonb,
   submit_action JSONB DEFAULT '{"type": "save_session"}'::jsonb,
   
   -- Template support

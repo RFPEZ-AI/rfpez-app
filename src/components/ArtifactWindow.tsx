@@ -56,21 +56,64 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
 
   // Check if artifact is a buyer questionnaire form (not a document/proposal)
   const isBuyerQuestionnaire = (artifact: Artifact): boolean => {
+    console.log('🔍 isBuyerQuestionnaire - Checking artifact:', {
+      id: artifact.id,
+      name: artifact.name,
+      type: artifact.type,
+      hasContent: !!artifact.content,
+      contentPreview: artifact.content?.substring(0, 100) + '...'
+    });
+    
     try {
-      // Only check if it's explicitly marked as a form type or is named 'Buyer Questionnaire'
-      if (artifact.content && (artifact.name === 'Buyer Questionnaire' || artifact.type === 'form')) {
+      // First check: if explicitly marked as form type, it should be a form
+      if (artifact.type === 'form') {
+        console.log('🔍 Artifact type is "form", proceeding with content validation');
+        
+        // If no content, assume it's a valid but empty form
+        if (!artifact.content) {
+          console.log('🔍 Form artifact has no content, treating as valid empty form');
+          return true;
+        }
+        
+        // Try to parse the content
         const parsed = JSON.parse(artifact.content);
+        console.log('🔍 Parsed content keys:', Object.keys(parsed));
         
         // If the parsed content has 'content' and 'content_type' properties, it's a document artifact
         if (parsed.content !== undefined && parsed.content_type !== undefined) {
+          console.log('🔍 Document artifact detected (has content/content_type), not a form');
           return false; // This is a document artifact, not a questionnaire
         }
         
-        // Must have a schema property (form schema) for it to be a questionnaire
-        return parsed.schema && typeof parsed.schema === 'object';
+        // Check for form structure: must have schema OR be empty (which we'll treat as valid)
+        const hasSchema = parsed.schema && typeof parsed.schema === 'object';
+        const isEmpty = Object.keys(parsed).length === 0;
+        const isValidForm = hasSchema || isEmpty;
+        
+        console.log('🔍 Form validation result:', {
+          hasSchema,
+          isEmpty,
+          isValidForm,
+          schemaType: typeof parsed.schema
+        });
+        
+        return isValidForm;
       }
+      
+      // Legacy check: if named 'Buyer Questionnaire', it should be a form
+      if (artifact.name === 'Buyer Questionnaire') {
+        console.log('🔍 Named "Buyer Questionnaire", treating as form');
+        return true;
+      }
+      
+      console.log('🔍 Type/name check failed - type:', artifact.type, 'name:', artifact.name);
     } catch (e) {
-      // Not JSON, not a form
+      console.log('🔍 JSON parse failed or other error:', e);
+      // If we can't parse it but it's marked as form type, assume it's a form
+      if (artifact.type === 'form') {
+        console.log('🔍 Parse failed but type is form, treating as valid form');
+        return true;
+      }
     }
     return false;
   };
@@ -784,7 +827,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
       
       // Prepare the questionnaire response data
       const questionnaireResponse = {
-        form_data: formData,
+        default_values: formData,
         supplier_info: {
           name: 'Anonymous User', // Default for anonymous submissions
           email: 'anonymous@example.com'

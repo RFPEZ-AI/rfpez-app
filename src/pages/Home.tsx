@@ -4,7 +4,6 @@ import React, { useEffect, useState } from 'react';
 import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
-import { UserContextService } from '../services/userContextService';
 import DatabaseService from '../services/database';
 import { Message, ArtifactReference, Artifact } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
@@ -78,7 +77,7 @@ const Home: React.FC = () => {
     handleSaveAgent,
     handleCancelAgent,
     handleShowAgentSelector
-  } = useAgentManagement();
+  } = useAgentManagement(currentSessionId);
 
   const {
     rfps,
@@ -100,7 +99,7 @@ const Home: React.FC = () => {
     handleClosePreview,
     handleSetCurrentRfp,
     handleClearCurrentRfp
-  } = useRFPManagement(userId);
+  } = useRFPManagement(currentSessionId);
 
   const {
     artifacts,
@@ -131,7 +130,10 @@ const Home: React.FC = () => {
       artifactWindowState.saveSessionArtifact(sessionId, artifactId);
       // Also update the artifact window state
       artifactWindowState.selectArtifact(artifactId);
-    }
+    },
+    // Pass RFP management functions for auto-creating placeholder RFPs
+    currentRfpId,
+    handleSetCurrentRfp
   );
 
   // Artifact window state management
@@ -215,25 +217,8 @@ const Home: React.FC = () => {
     const handleRfpRefreshMessage = (event: MessageEvent) => {
       if (event.data?.type === 'REFRESH_CURRENT_RFP') {
         console.log('🔄 Received RFP refresh request from Claude function');
-        // Trigger a refresh of the current RFP context
-        if (userId) {
-          // Force reload the current RFP context by calling the hook's load function
-          const refreshRfpContext = async () => {
-            try {
-              const currentRfp = await UserContextService.getCurrentRfp(userId);
-              if (currentRfp) {
-                handleSetCurrentRfp(currentRfp.id);
-                console.log('✅ RFP context refreshed from database:', currentRfp.name);
-              } else {
-                handleClearCurrentRfp();
-                console.log('✅ RFP context cleared (no current RFP in database)');
-              }
-            } catch (error) {
-              console.error('❌ Failed to refresh RFP context:', error);
-            }
-          };
-          refreshRfpContext();
-        }
+        // RFP context is now session-based only, no need to refresh from user profile
+        console.log('ℹ️ RFP context is now managed per session, refresh not needed');
       }
     };
 
@@ -310,24 +295,53 @@ const Home: React.FC = () => {
     } catch (error) {
       console.warn('⚠️ Failed to save current session to user profile:', error);
     }
+
+    // Load session with context (RFP and artifact context)
+    try {
+      const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
+      
+      // Restore RFP context if it exists
+      if (sessionWithContext?.current_rfp_id) {
+        console.log('🎯 Restoring RFP context from session:', sessionWithContext.current_rfp_id);
+        await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+      } else {
+        console.log('📝 No RFP context found in session');
+      }
+      
+      // Note: Artifact context will be restored below when loading session artifacts
+      if (sessionWithContext?.current_artifact_id) {
+        console.log('📄 Session has artifact context:', sessionWithContext.current_artifact_id);
+      }
+    } catch (error) {
+      console.warn('⚠️ Failed to load session context:', error);
+    }
     
     await loadSessionMessages(sessionId);
     const sessionArtifacts = await loadSessionArtifacts(sessionId);
     
-    // Try to restore the last selected artifact for this session
-    const restoredArtifactId = artifactWindowState.restoreSessionArtifact(sessionId);
+    // Try to restore the session's current artifact first, then fall back to saved or most recent
+    const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
+    let artifactToSelect = sessionWithContext?.current_artifact_id;
     
-    if (restoredArtifactId && sessionArtifacts?.some(a => a.id === restoredArtifactId)) {
-      // If we found a valid saved artifact, use it
-      setSelectedArtifactFromState(restoredArtifactId);
-      console.log('Restored saved artifact:', restoredArtifactId);
-    } else if (sessionArtifacts && sessionArtifacts.length > 0) {
-      // Otherwise, fall back to the most recent artifact
-      const mostRecentArtifact = sessionArtifacts.reduce((latest, current) => {
-        return parseInt(current.id) > parseInt(latest.id) ? current : latest;
-      });
-      selectArtifact(mostRecentArtifact.id);
-      console.log('Selected most recent artifact:', mostRecentArtifact.id);
+    if (!artifactToSelect || !sessionArtifacts?.some(a => a.id === artifactToSelect)) {
+      // Fallback to saved artifact for this session
+      const restoredArtifactId = artifactWindowState.restoreSessionArtifact(sessionId);
+      if (restoredArtifactId && sessionArtifacts?.some(a => a.id === restoredArtifactId)) {
+        artifactToSelect = restoredArtifactId;
+        console.log('Restored saved artifact:', restoredArtifactId);
+      } else if (sessionArtifacts && sessionArtifacts.length > 0) {
+        // Otherwise, fall back to the most recent artifact
+        const mostRecentArtifact = sessionArtifacts.reduce((latest, current) => {
+          return parseInt(current.id) > parseInt(latest.id) ? current : latest;
+        });
+        artifactToSelect = mostRecentArtifact.id;
+        console.log('Selected most recent artifact:', mostRecentArtifact.id);
+      }
+    }
+    
+    if (artifactToSelect) {
+      setSelectedArtifactFromState(artifactToSelect);
+      console.log('Selected artifact:', artifactToSelect);
     }
     
     // If we have artifacts, ensure the window is properly shown
@@ -370,8 +384,16 @@ const Home: React.FC = () => {
       addClaudeArtifacts,
       loadSessionAgent,
       (agent) => {
-        const agentMessage = handleAgentChanged(agent);
-        return agentMessage;
+        // Create a synchronous wrapper that returns null immediately
+        // and handles the async operation in the background
+        handleAgentChanged(agent).then(agentMessage => {
+          if (agentMessage) {
+            setMessages((prev: Message[]) => [...prev, agentMessage]);
+          }
+        }).catch(error => {
+          console.error('Failed to handle agent change:', error);
+        });
+        return null; // Return null immediately to satisfy the sync interface
       },
       selectedArtifact // Add current artifact context
     );
@@ -398,8 +420,8 @@ const Home: React.FC = () => {
     }
   };
 
-  const onAgentChanged = (newAgent: SessionActiveAgent) => {
-    const agentMessage = handleAgentChanged(newAgent);
+  const onAgentChanged = async (newAgent: SessionActiveAgent) => {
+    const agentMessage = await handleAgentChanged(newAgent);
     if (agentMessage) {
       setMessages((prev: Message[]) => [...prev, agentMessage]);
     }
@@ -412,83 +434,87 @@ const Home: React.FC = () => {
     console.log('Form data:', formData);
     
     try {
-      // Use currentRfpId from props
-      if (!currentRfpId) {
-        console.error('❌ No RFP context available');
-        alert('No RFP context available. Please select an RFP first.');
-        return;
-      }
-
-      console.log('📤 Updating RFP questionnaire response using RFPService...');
-      
-      // Prepare the questionnaire response data
-      const questionnaireResponse = {
-        form_data: formData,
-        supplier_info: {
-          name: 'Anonymous User', // Default for anonymous submissions
-          email: 'anonymous@example.com'
-        },
-        submitted_at: new Date().toISOString(),
-        form_version: '1.0'
-      };
-
-      // Save the questionnaire response using the new RFPService method
-      const { RFPService } = await import('../services/rfpService');
-      const updatedRfp = await RFPService.updateRfpBuyerQuestionnaireResponse(
-        currentRfpId, 
-        questionnaireResponse
-      );
-
-      if (updatedRfp) {
-        console.log('✅ Form response saved successfully');
-        
-        // Also save to artifact_submissions table for persistence across sessions
-        console.log('💾 Saving form submission to artifact_submissions table...');
-        try {
-          await DatabaseService.saveArtifactSubmission(
-            artifact.id,
-            formData,
-            currentSessionId,
-            user?.id
-          );
-          console.log('✅ Form submission saved to artifact_submissions table');
-        } catch (submissionError) {
-          console.warn('⚠️ Could not save to artifact_submissions table:', submissionError);
-          // Continue - this is not critical for the main functionality
-        }
-        
-        alert('Questionnaire submitted successfully!');
-        
-        // Send auto-prompt after successful submission
-        const formName = artifact.name || 'Form';
-        console.log('📤 Sending auto-prompt for form:', formName);
-        
-        await sendAutoPrompt(
-          formName,
-          messages,
-          setMessages,
-          setIsLoading,
+      // Save to artifact_submissions table (always available)
+      console.log('💾 Saving form submission to artifact_submissions table...');
+      try {
+        await DatabaseService.saveArtifactSubmission(
+          artifact.id,
+          formData,
           currentSessionId,
-          setCurrentSessionId,
-          setSelectedSessionId,
-          createNewSession,
-          loadUserSessions,
-          isAuthenticated,
-          userId,
-          currentAgent,
-          userProfile,
-          currentRfp,
-          addClaudeArtifacts,
-          loadSessionAgent,
-          (agent) => {
-            const agentMessage = handleAgentChanged(agent);
-            return agentMessage;
-          }
+          user?.id
         );
-      } else {
-        console.error('❌ Failed to save form response - RFPService.update returned null');
-        alert('Failed to save questionnaire response. Please try again.');
+        console.log('✅ Form submission saved to artifact_submissions table');
+      } catch (submissionError) {
+        console.warn('⚠️ Could not save to artifact_submissions table:', submissionError);
+        // Continue - try other methods
       }
+
+      // If we have RFP context, also save there
+      if (currentRfpId) {
+        console.log('📤 Updating RFP questionnaire response using RFPService...');
+        
+        // Prepare the questionnaire response data
+        const questionnaireResponse = {
+          default_values: formData,
+          supplier_info: {
+            name: 'Anonymous User', // Default for anonymous submissions
+            email: 'anonymous@example.com'
+          },
+          submitted_at: new Date().toISOString(),
+          form_version: '1.0'
+        };
+
+        // Save the questionnaire response using the new RFPService method
+        const { RFPService } = await import('../services/rfpService');
+        const updatedRfp = await RFPService.updateRfpBuyerQuestionnaireResponse(
+          currentRfpId, 
+          questionnaireResponse
+        );
+
+        if (updatedRfp) {
+          console.log('✅ Form response saved to RFP successfully');
+        }
+      } else {
+        console.log('ℹ️ No RFP context - form saved to artifact submissions only');
+      }
+        
+      alert('Form submitted successfully!');
+        
+      // Send auto-prompt after successful submission
+      const formName = artifact.name || 'Form';
+      console.log('📤 Sending auto-prompt for form:', formName);
+      
+      await sendAutoPrompt(
+        formName,
+        formData, // Pass the actual form data
+        messages,
+        setMessages,
+        setIsLoading,
+        currentSessionId,
+        setCurrentSessionId,
+        setSelectedSessionId,
+        createNewSession,
+        loadUserSessions,
+        isAuthenticated,
+        userId,
+        currentAgent,
+        userProfile,
+        currentRfp,
+        addClaudeArtifacts,
+        loadSessionAgent,
+        (agent) => {
+          // Create a synchronous wrapper that returns null immediately
+          // and handles the async operation in the background
+          handleAgentChanged(agent).then(agentMessage => {
+            if (agentMessage) {
+              setMessages((prev: Message[]) => [...prev, agentMessage]);
+            }
+          }).catch(error => {
+            console.error('Failed to handle agent change:', error);
+          });
+          return null; // Return null immediately to satisfy the sync interface
+        }
+      );
       
     } catch (error) {
       console.error('❌ Error submitting form:', error);
@@ -540,7 +566,7 @@ const Home: React.FC = () => {
                 try {
                   const { RFPService } = await import('../services/rfpService');
                   const questionnaireResponse = await RFPService.getRfpBuyerQuestionnaireResponse(currentRfp.id);
-                  responseData = questionnaireResponse?.form_data || {};
+                  responseData = questionnaireResponse?.default_values || {};
                   console.log('Using buyer questionnaire response data from new method:', responseData);
                 } catch (error) {
                   console.warn('Failed to load questionnaire response, falling back to legacy:', error);
@@ -558,7 +584,7 @@ const Home: React.FC = () => {
                 try {
                   const { RFPService } = await import('../services/rfpService');
                   const questionnaireResponse = await RFPService.getRfpBuyerQuestionnaireResponse(currentRfp.id);
-                  responseData = questionnaireResponse?.form_data || (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
+                  responseData = questionnaireResponse?.default_values || (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
                 } catch (error) {
                   responseData = (currentRfp.buyer_questionnaire_response as Record<string, unknown>) || formData.formData || {};
                 }

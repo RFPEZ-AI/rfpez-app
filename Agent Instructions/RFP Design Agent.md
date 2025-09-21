@@ -1,5 +1,6 @@
 ## Name: RFP Designer
 **Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
+**Role**: `design`
 
 ## Description:
 Creates comprehensive RFP packages by gathering buyer requirements, generating interactive questionnaires, and producing request documents. Generates "request" content (rfps.request field) sent to suppliers to solicit bids.

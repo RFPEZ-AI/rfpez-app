@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react';
 import { RFP } from '../types/rfp';
 import { RFPFormValues } from '../components/RFPEditModal';
 import { RFPService } from '../services/rfpService';
-import { UserContextService } from '../services/userContextService';
+import DatabaseService from '../services/database';
 
-export const useRFPManagement = (userId?: string) => {
+export const useRFPManagement = (currentSessionId?: string) => {
   const [rfps, setRFPs] = useState<RFP[]>([]);
   const [showRFPMenu, setShowRFPMenu] = useState(false);
   const [showRFPModal, setShowRFPModal] = useState(false);
@@ -20,34 +20,6 @@ export const useRFPManagement = (userId?: string) => {
   useEffect(() => { 
     RFPService.getAll().then(setRFPs); 
   }, []);
-
-  // Load user's current RFP context when authenticated
-  useEffect(() => {
-    const loadUserRfpContext = async () => {
-      if (userId) {
-        console.log('Loading user RFP context...');
-        try {
-          const currentRfp = await UserContextService.getCurrentRfp(userId);
-          if (currentRfp) {
-            setCurrentRfpId(currentRfp.id);
-            setCurrentRfp(currentRfp);
-            console.log('Restored RFP context:', currentRfp.name);
-          } else {
-            console.log('No current RFP context found for user');
-          }
-        } catch (error) {
-          console.error('Failed to load user RFP context:', error);
-        }
-      } else {
-        // Clear RFP context when user logs out
-        setCurrentRfpId(null);
-        setCurrentRfp(null);
-        console.log('Cleared RFP context for logged out user');
-      }
-    };
-
-    loadUserRfpContext();
-  }, [userId]);
 
   const handleNewRFP = () => { 
     setEditingRFP(null); 
@@ -129,10 +101,17 @@ export const useRFPManagement = (userId?: string) => {
         setCurrentRfpId(rfpId);
         setCurrentRfp(rfp);
         console.log('Current RFP context set:', rfp.name, rfpId);
-        
-        if (userId) {
-          await UserContextService.setCurrentRfp(userId, rfpId);
-          console.log('Current RFP context saved to user profile');
+
+        // Update session context if we have an active session
+        if (currentSessionId) {
+          try {
+            await DatabaseService.updateSessionContext(currentSessionId, { 
+              current_rfp_id: rfpId 
+            });
+            console.log('✅ RFP context saved to session:', currentSessionId, rfpId);
+          } catch (error) {
+            console.warn('⚠️ Failed to save RFP context to session:', error);
+          }
         }
       }
     } catch (error) {
@@ -144,10 +123,17 @@ export const useRFPManagement = (userId?: string) => {
     setCurrentRfpId(null);
     setCurrentRfp(null);
     console.log('Current RFP context cleared');
-    
-    if (userId) {
-      await UserContextService.clearCurrentRfp(userId);
-      console.log('Current RFP context cleared from user profile');
+
+    // Clear RFP context from session if we have an active session
+    if (currentSessionId) {
+      try {
+        await DatabaseService.updateSessionContext(currentSessionId, { 
+          current_rfp_id: null 
+        });
+        console.log('✅ RFP context cleared from session:', currentSessionId);
+      } catch (error) {
+        console.warn('⚠️ Failed to clear RFP context from session:', error);
+      }
     }
   };
 

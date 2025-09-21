@@ -61,19 +61,21 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     }
   };
 
-  const createNewSession = async (currentAgent: SessionActiveAgent | null): Promise<string | null> => {
-    console.log('Creating new session, auth state:', { isAuthenticated, user: !!userId });
+  const createNewSession = async (currentAgent: SessionActiveAgent | null, currentRfpId?: number): Promise<string | null> => {
+    console.log('Creating new session, auth state:', { isAuthenticated, user: !!userId, currentRfpId });
     if (!isAuthenticated || !userId) {
       console.log('Not authenticated or userId not available, skipping session creation');
       return null;
     }
     
     try {
-      console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id);
+      console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id, 'and RFP:', currentRfpId);
       const session = await DatabaseService.createSessionWithAgent(
         userId, 
         'New Chat Session',
-        currentAgent?.agent_id
+        currentAgent?.agent_id,
+        undefined, // description
+        currentRfpId
       );
       console.log('Session created:', session);
       if (session) {

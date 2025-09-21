@@ -266,7 +266,7 @@ describe('BidSubmissionPage', () => {
             email: 'john@test.com',
             company: 'Test Co'
           },
-          form_data: {
+          default_values: {
             testField: 'Test Company'
           },
           form_version: 'rfpez-form@1',

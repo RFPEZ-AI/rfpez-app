@@ -8,6 +8,8 @@ interface DatabaseOperation {
   data?: Record<string, unknown>;
   filter?: Record<string, unknown>;
   id?: string;
+  resolve?: (value: unknown) => void;
+  reject?: (reason?: unknown) => void;
 }
 
 export class DatabaseOperationAggregator {
@@ -27,7 +29,7 @@ export class DatabaseOperationAggregator {
         id: `op_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
       };
 
-      this.pendingOperations.push(opWithPromise as any);
+      this.pendingOperations.push(opWithPromise);
       this.scheduleAggregation();
     });
   }
@@ -66,7 +68,7 @@ export class DatabaseOperationAggregator {
       } catch (error) {
         console.error(`Failed to execute batch ${groupKey}:`, error);
         // Reject all operations in this batch
-        groupOps.forEach((op: any) => {
+        groupOps.forEach((op: DatabaseOperation) => {
           op.reject?.(error);
         });
       }
@@ -76,8 +78,8 @@ export class DatabaseOperationAggregator {
   /**
    * Group operations for batch execution
    */
-  private static groupOperations(operations: any[]): Map<string, any[]> {
-    const groups = new Map<string, any[]>();
+  private static groupOperations(operations: DatabaseOperation[]): Map<string, DatabaseOperation[]> {
+    const groups = new Map<string, DatabaseOperation[]>();
 
     operations.forEach(op => {
       const key = `${op.table}_${op.type}`;
@@ -86,7 +88,7 @@ export class DatabaseOperationAggregator {
         groups.set(key, []);
       }
       
-      groups.get(key)!.push(op);
+      groups.get(key)?.push(op);
     });
 
     return groups;
@@ -95,7 +97,7 @@ export class DatabaseOperationAggregator {
   /**
    * Execute a batch of similar operations
    */
-  private static async executeBatch(groupKey: string, operations: any[]) {
+  private static async executeBatch(groupKey: string, operations: DatabaseOperation[]) {
     const [table, type] = groupKey.split('_');
 
     try {
@@ -124,7 +126,7 @@ export class DatabaseOperationAggregator {
   /**
    * Execute batch SELECT operations
    */
-  private static async executeBatchSelect(table: string, operations: any[]) {
+  private static async executeBatchSelect(table: string, operations: DatabaseOperation[]) {
     const { supabase } = await import('../supabaseClient');
 
     // For selects, we can often optimize by combining filters
@@ -151,18 +153,18 @@ export class DatabaseOperationAggregator {
   /**
    * Execute batch UPDATE operations
    */
-  private static async executeBatchUpdate(table: string, operations: any[]) {
+  private static async executeBatchUpdate(table: string, operations: DatabaseOperation[]) {
     const { supabase } = await import('../supabaseClient');
 
     // Group updates by similar filter criteria
-    const updateGroups = new Map<string, any[]>();
+    const updateGroups = new Map<string, DatabaseOperation[]>();
 
     operations.forEach(op => {
       const filterKey = JSON.stringify(op.filter);
       if (!updateGroups.has(filterKey)) {
         updateGroups.set(filterKey, []);
       }
-      updateGroups.get(filterKey)!.push(op);
+      updateGroups.get(filterKey)?.push(op);
     });
 
     // Execute each update group
@@ -198,7 +200,7 @@ export class DatabaseOperationAggregator {
   /**
    * Execute batch INSERT operations
    */
-  private static async executeBatchInsert(table: string, operations: any[]) {
+  private static async executeBatchInsert(table: string, operations: DatabaseOperation[]) {
     const { supabase } = await import('../supabaseClient');
 
     try {
@@ -224,7 +226,7 @@ export class DatabaseOperationAggregator {
   /**
    * Execute batch DELETE operations
    */
-  private static async executeBatchDelete(table: string, operations: any[]) {
+  private static async executeBatchDelete(table: string, operations: DatabaseOperation[]) {
     const { supabase } = await import('../supabaseClient');
 
     // Group deletes by filter criteria

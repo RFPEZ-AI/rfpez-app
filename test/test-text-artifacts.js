@@ -67,7 +67,7 @@ We are confident this approach will deliver excellent results.`,
             email: 'test@example.com',
             company: 'Test Solutions Inc.'
           },
-          form_data: {
+          default_values: {
             experience_years: '5+ years',
             team_size: '10-20 developers',
             technology_stack: 'React, Node.js, PostgreSQL',
