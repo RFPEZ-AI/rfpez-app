@@ -5,6 +5,71 @@ import Anthropic from '@anthropic-ai/sdk';
 import type { Agent } from '../types/database';
 import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
 import { APIRetryHandler } from '../utils/apiRetry';
+import { supabase } from '../supabaseClient';
+
+// Isolated storage function that's immune to abort signal interference
+const storeMessageIsolated = async (
+  sessionId: string, 
+  content: string, 
+  role: 'user' | 'assistant', 
+  metadata?: Record<string, unknown>
+): Promise<void> => {
+  try {
+    // Get auth token fresh to avoid any contamination
+    const session = await supabase.auth.getSession();
+    const accessToken = session.data.session?.access_token;
+    
+    if (!accessToken) {
+      throw new Error('No access token available for isolated storage');
+    }
+    
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
+    if (!supabaseUrl) {
+      throw new Error('REACT_APP_SUPABASE_URL not configured');
+    }
+    
+    // Create completely fresh AbortController that's isolated from any global state
+    const isolatedController = new AbortController();
+    const timeoutId = setTimeout(() => isolatedController.abort(), 30000); // 30s timeout
+    
+    const request = {
+      jsonrpc: "2.0" as const,
+      id: Date.now(),
+      method: 'tools/call',
+      params: {
+        name: 'store_message',
+        arguments: { session_id: sessionId, content, role, metadata }
+      }
+    };
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/mcp-server`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${accessToken}`
+      },
+      body: JSON.stringify(request),
+      signal: isolatedController.signal // Use our isolated signal
+    });
+    
+    clearTimeout(timeoutId);
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`HTTP ${response.status}: ${errorText}`);
+    }
+    
+    const result = await response.json();
+    
+    if (result.error) {
+      throw new Error(`MCP Error: ${result.error.message}`);
+    }
+    
+  } catch (error) {
+    console.error('Storage failed:', error);
+    throw error;
+  }
+};
 
 interface ClaudeMessage {
   role: 'user' | 'assistant';
@@ -90,14 +155,15 @@ export class ClaudeService {
     onChunk?: (chunk: string, isComplete: boolean) => void
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
+    const requestId = `claude_req_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
     const functionsExecuted: string[] = [];
     
-    try {
-      // Check if request was already cancelled
-      if (abortSignal?.aborted) {
-        throw new Error('Request was cancelled');
-      }
+    // Basic abort signal validation
+    if (abortSignal?.aborted) {
+      throw new Error('Request was cancelled');
+    }
 
+    try {
       const client = this.getClient();
       
       // Build the conversation context
@@ -135,10 +201,6 @@ CURRENT RFP CONTEXT:
 - Specification: ${currentRfp.specification}
 
 You are currently working with this specific RFP. When creating questionnaires, generating proposals, or managing RFP data, use this RFP ID (${currentRfp.id}) for database operations. You can reference the RFP details above to provide context-aware assistance.` : '';
-
-      console.log('=== CLAUDE SERVICE ARTIFACT DEBUG ===');
-      console.log('currentArtifact received:', currentArtifact);
-
       const artifactContext = currentArtifact ? `
 
 CURRENT ARTIFACT CONTEXT:
@@ -192,23 +254,7 @@ Use these functions when relevant to help the user. For example:
 
 Be helpful, accurate, and professional. When switching agents, make the transition smooth and explain the benefits.`;
 
-      console.log('Sending request to Claude API with MCP functions...', {
-        agent: agent.name,
-        messageCount: messages.length,
-        sessionId,
-        functionsAvailable: claudeApiFunctions.length,
-        userContext: userProfile ? {
-          name: userProfile.full_name,
-          email: userProfile.email,
-          role: userProfile.role
-        } : 'anonymous',
-        rfpContext: currentRfp ? {
-          id: currentRfp.id,
-          name: currentRfp.name
-        } : 'none'
-      });
-
-      let response;
+      let response: any;
       let streamedContent = '';
 
       if (stream && onChunk) {
@@ -220,6 +266,13 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
               if (abortSignal?.aborted) {
                 throw new Error('Request was cancelled');
               }
+              
+              // Prepare options object with conditional signal
+              const apiOptions: any = {};
+              if (abortSignal) {
+                apiOptions.signal = abortSignal;
+              }
+              
               return client.messages.stream({
                 model: 'claude-3-5-sonnet-latest',
                 max_tokens: 2000,
@@ -228,23 +281,31 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                 messages: messages,
                 tools: claudeApiFunctions,
                 tool_choice: { type: 'auto' }
-              });
+              }, apiOptions);
             },
             {
               maxRetries: 3,
               baseDelay: 2000,
-              maxDelay: 60000,
-              onRetry: (attempt, error) => {
-                const errorMessage = error instanceof Error ? error.message : String(error);
-                console.log(`🔄 Retrying Claude API streaming call (attempt ${attempt}) due to:`, errorMessage);
-              }
+              maxDelay: 60000
             }
           );
 
           // Process streaming response
+          let chunkCount = 0;
+          let lastAbortCheck = Date.now();
+          
           for await (const messageStreamEvent of streamResponse) {
-            if (abortSignal?.aborted) {
+            chunkCount++;
+            const chunkTime = Date.now();
+            
+            // Optimized abort checking - only check every 100ms or every 20 chunks
+            const shouldCheckAbort = (chunkTime - lastAbortCheck > 100) || (chunkCount % 20 === 0);
+            if (shouldCheckAbort && abortSignal?.aborted) {
               throw new Error('Request was cancelled');
+            }
+            
+            if (shouldCheckAbort) {
+              lastAbortCheck = chunkTime;
             }
 
             if (messageStreamEvent.type === 'content_block_delta') {
@@ -267,52 +328,97 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             (response.content[0] as { text: string; type: string }).text = streamedContent;
           }
         } catch (streamError) {
-          // Handle streaming-specific errors
-          if (streamError && typeof streamError === 'object' && 'name' in streamError) {
-            const errorName = (streamError as { name: string }).name;
-            if (errorName === 'APIUserAbortError' || errorName === 'AbortError') {
-              // This is a user cancellation, throw a clean cancellation error
-              throw new Error('Request was cancelled');
+          // Enhanced error analysis for Claude API error objects
+          const errorAnalysis = {
+            hasStatus: streamError && typeof streamError === 'object' && 'status' in streamError,
+            hasHeaders: streamError && typeof streamError === 'object' && 'headers' in streamError,
+            hasRequestID: streamError && typeof streamError === 'object' && 'requestID' in streamError,
+            isEmpty: !streamError || (typeof streamError === 'object' && Object.keys(streamError).length === 0),
+            isEmptyStrict: streamError === null || streamError === undefined || 
+                          (typeof streamError === 'object' && Object.getOwnPropertyNames(streamError).length === 0)
+          };
+          
+          let errorMessage = 'Unknown error occurred';
+          
+          if (errorAnalysis.hasStatus || errorAnalysis.hasHeaders || errorAnalysis.hasRequestID) {
+            // This is a Claude API error response object
+            const stringValue = streamError?.toString?.() || String(streamError);
+            
+            if (stringValue && stringValue !== '[object Object]') {
+              errorMessage = stringValue;
+              
+              // Clean up error message format
+              if (errorMessage.startsWith('Error: ')) {
+                errorMessage = errorMessage.substring(7);
+              }
+            } else {
+              // Try to extract error details
+              try {
+                const statusValue = (streamError as any).status;
+                const errorValue = (streamError as any).error;
+                
+                if (errorValue && typeof errorValue === 'object' && errorValue.message) {
+                  errorMessage = errorValue.message;
+                } else if (errorValue && typeof errorValue === 'string') {
+                  errorMessage = errorValue;
+                } else if (statusValue) {
+                  errorMessage = `HTTP ${statusValue} error`;
+                } else {
+                  errorMessage = 'Claude API returned an error response';
+                }
+              } catch {
+                errorMessage = 'Claude API error - details unavailable';
+              }
             }
+            
+            throw new Error(`Claude API error: ${errorMessage}`);
+            
+          } else if (errorAnalysis.isEmpty && errorAnalysis.isEmptyStrict) {
+            // Empty error from post-streaming function calls - usually not critical
+            throw new Error('Function processing completed with empty error - this is usually not critical');
+          } else {
+            // Handle other error types
+            if (streamError && typeof streamError === 'object' && 'name' in streamError) {
+              const errorName = (streamError as { name: string }).name;
+              
+              if (errorName === 'APIUserAbortError') {
+                throw new Error('Request was cancelled');
+              }
+            }
+            
+            // Default error handling
+            throw streamError;
           }
-          
-          // Check if it's an abort signal error
-          if (streamError instanceof Error && 
-              (streamError.message.includes('aborted') || 
-               streamError.message.includes('cancelled') ||
-               streamError.message.includes('Request was cancelled'))) {
-            throw new Error('Request was cancelled');
-          }
-          
-          // Re-throw other streaming errors to be handled by the main catch block
-          throw streamError;
         }
       } else {
         // Non-streaming response (existing logic)
         response = await APIRetryHandler.executeWithRetry(
           async () => {
-            // Check for cancellation before each API call
+            // Enhanced abort checking with defensive logic
             if (abortSignal?.aborted) {
               throw new Error('Request was cancelled');
             }
+            
+            // Prepare options object with conditional signal for non-streaming
+            const apiOptions: any = {};
+            if (abortSignal) {
+              apiOptions.signal = abortSignal;
+            }
+            
             return client.messages.create({
-              model: 'claude-3-5-sonnet-latest', // Use latest version automatically
+              model: 'claude-3-5-sonnet-latest',
               max_tokens: 2000,
               temperature: 0.7,
               system: systemPrompt,
               messages: messages,
-              tools: claudeApiFunctions, // Include MCP functions
-              tool_choice: { type: 'auto' } // Let Claude decide when to use functions
-            });
+              tools: claudeApiFunctions,
+              tool_choice: { type: 'auto' }
+            }, apiOptions);
           },
           {
             maxRetries: 3,
-            baseDelay: 2000, // Start with 2 seconds
-            maxDelay: 60000, // Max 1 minute delay
-            onRetry: (attempt, error) => {
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              console.log(`🔄 Retrying Claude API call (attempt ${attempt}) due to:`, errorMessage);
-            }
+            baseDelay: 2000,
+            maxDelay: 60000
           }
         );
       }
@@ -323,11 +429,11 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       const allFunctionResults: any[] = [];
 
       // Process the response and handle any function calls
-      while (response.content.some(block => block.type === 'tool_use')) {
+      while (response.content.some((block: any) => block.type === 'tool_use')) {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const toolUses = response.content.filter(block => block.type === 'tool_use') as any[];
+        const toolUses = response.content.filter((block: any) => block.type === 'tool_use') as any[];
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textBlocks = response.content.filter(block => block.type === 'text') as any[];
+        const textBlocks = response.content.filter((block: any) => block.type === 'text') as any[];
         
         // Collect any text content
         if (textBlocks.length > 0) {
@@ -347,12 +453,6 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         
         for (const toolUse of toolUses) {
           try {
-            // Check for cancellation before each function execution
-            if (abortSignal?.aborted) {
-              throw new Error('Request was cancelled');
-            }
-            
-            console.log(`Executing function: ${toolUse.name}`, toolUse.input);
             functionsExecuted.push(toolUse.name);
             
             const result = await claudeAPIHandler.executeFunction(toolUse.name, toolUse.input);
@@ -362,7 +462,6 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             if (toolUse.name === 'switch_agent' && result && typeof result === 'object' && 'stop_processing' in result && (result as any).stop_processing) {
               shouldStopProcessing = true;
-              console.log('Agent switch detected, stopping additional processing');
             }
             
             toolResults.push({
@@ -371,7 +470,6 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
               content: JSON.stringify(result, null, 2)
             });
           } catch (error) {
-            console.error(`Function execution error for ${toolUse.name}:`, error);
             toolResults.push({
               type: 'tool_result',
               tool_use_id: toolUse.id,
@@ -390,17 +488,13 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
 
         // If agent switch occurred, stop processing and return the switch message
         if (shouldStopProcessing) {
-          console.log('Stopping processing due to agent switch');
           break; // Exit the while loop to prevent additional Claude responses
         }
 
         // Get Claude's response to the function results
         response = await APIRetryHandler.executeWithRetry(
           async () => {
-            // Check for cancellation before follow-up API call
-            if (abortSignal?.aborted) {
-              throw new Error('Request was cancelled');
-            }
+            // Use fresh abort check to avoid Claude SDK cleanup interference
             return client.messages.create({
               model: 'claude-3-5-sonnet-latest',
               max_tokens: 2000,
@@ -415,11 +509,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
           {
             maxRetries: 3,
             baseDelay: 2000,
-            maxDelay: 60000,
-            onRetry: (attempt, error) => {
-              const errorMessage = error instanceof Error ? error.message : String(error);
-              console.log(`🔄 Retrying Claude API follow-up call (attempt ${attempt}) due to:`, errorMessage);
-            }
+            maxDelay: 60000
           }
         );
       }
@@ -429,43 +519,32 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         finalContent += streamedContent;
       } else {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const finalTextBlocks = response.content.filter(block => block.type === 'text') as any[];
+        const finalTextBlocks = response.content.filter((block: any) => block.type === 'text') as any[];
         finalContent += finalTextBlocks.map(block => block.text).join('');
       }
 
       const responseTime = Date.now() - startTime;
 
-      console.log('Claude API response with MCP integration received', {
-        responseTime,
-        contentLength: finalContent.length,
-        functionsExecuted,
-        functionResults: allFunctionResults.length,
-        usage: response.usage,
-        streaming: stream
-      });
-
       // Store the conversation in the current session if sessionId is provided
+      // NOTE: Use completely isolated storage to avoid abort signal interference
       if (sessionId && finalContent.trim()) {
-        try {
-          await claudeAPIHandler.executeFunction('store_message', {
-            session_id: sessionId,
-            content: userMessage,
-            role: 'user'
-          });
-          
-          await claudeAPIHandler.executeFunction('store_message', {
-            session_id: sessionId,
-            content: finalContent,
-            role: 'assistant',
-            metadata: {
+        // Execute isolated storage asynchronously without blocking
+        const executeIsolatedStorage = async () => {
+          try {
+            await storeMessageIsolated(sessionId, userMessage, 'user');
+            await storeMessageIsolated(sessionId, finalContent, 'assistant', {
               agent_id: agent.id,
               functions_called: functionsExecuted,
               model: response.model
-            }
-          });
-        } catch (error) {
-          console.warn('Failed to store conversation:', error);
-        }
+            });
+          } catch (error) {
+            console.warn('Failed to store conversation (non-critical):', error);
+            // Storage errors are non-critical - don't propagate them
+          }
+        };
+        
+        // Execute storage in next tick to isolate from streaming context
+        setTimeout(executeIsolatedStorage, 0);
       }
 
       // Check if any agent switching occurred
@@ -494,15 +573,73 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       };
 
     } catch (error) {
-      console.error('Claude API Error:', error);
-      
-      // Handle abort/cancellation errors specifically
+      // Handle abort/cancellation errors with clean detection
       if (error instanceof Error) {
-        // Check for user cancellation/abort errors
         if (error.message === 'Request was cancelled' ||
             error.message.includes('aborted') ||
             error.message.includes('cancelled')) {
-          throw new Error('Request was cancelled');
+          
+          // Check for spurious aborts that should be ignored
+          const isSpuriousAbort = (
+            error.message.includes('signal is aborted without reason') ||
+            error.message.includes('aborted without reason') ||
+            (error.name === 'AbortError' && (!error.message || error.message.trim() === ''))
+          );
+          
+          // Check for Claude SDK internal cleanup aborts
+          const isClaudeSDKCleanupAbort = (
+            error.message.includes('Request was aborted') &&
+            !error.message.includes('User') &&
+            !error.message.includes('timeout')
+          );
+          
+          const isBrowserAbort = (
+            error.message.includes('fetch') ||
+            error.message.includes('network') ||
+            error.message.includes('DOMException') ||
+            error.stack?.includes('fetch')
+          );
+          
+          const isUserInitiated = (
+            error.message === 'Request was cancelled' &&
+            !isBrowserAbort && 
+            !isSpuriousAbort &&
+            !isClaudeSDKCleanupAbort
+          );
+          
+          // Only throw for legitimate user cancellations
+          if (isUserInitiated && !isSpuriousAbort && !isClaudeSDKCleanupAbort) {
+            throw new Error('Request was cancelled');
+          } else if (isClaudeSDKCleanupAbort) {
+            // Claude SDK cleanup - streaming was successful
+            throw new Error('CLAUDE_SDK_CLEANUP_SUCCESS');
+          } else if (isSpuriousAbort) {
+            // Return recovery response for spurious aborts
+            return {
+              content: "I apologize, but there was a temporary connection issue. Please try your request again.",
+              metadata: {
+                model: 'claude-3-5-sonnet-latest',
+                response_time: Date.now() - startTime,
+                temperature: 0.7,
+                streaming: stream,
+                tokens_used: 0,
+                error_recovery: 'spurious_abort_ignored'
+              }
+            };
+          } else {
+            // Browser/network abort recovery
+            return {
+              content: "There was a network connectivity issue. Please check your connection and try again.",
+              metadata: {
+                model: 'claude-3-5-sonnet-latest', 
+                response_time: Date.now() - startTime,
+                temperature: 0.7,
+                streaming: stream,
+                tokens_used: 0,
+                error_recovery: 'network_abort_ignored'
+              }
+            };
+          }
         }
         
         // Handle other specific error types

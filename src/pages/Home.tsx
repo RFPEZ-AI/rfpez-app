@@ -18,6 +18,7 @@ import { useRFPManagement } from '../hooks/useRFPManagement';
 import { useArtifactManagement } from '../hooks/useArtifactManagement';
 import { useArtifactWindowState } from '../hooks/useArtifactWindowState';
 import { useMessageHandling } from '../hooks/useMessageHandling';
+import { AbortControllerMonitor } from '../utils/abortControllerMonitor';
 
 // Import layout components
 import HomeHeader from '../components/HomeHeader';
@@ -33,6 +34,52 @@ import AgentSelector from '../components/AgentSelector';
 const Home: React.FC = () => {
   const { user, session, loading: supabaseLoading, userProfile } = useSupabase();
   const history = useHistory();
+  
+  // Initialize AbortController monitoring for debugging
+  useEffect(() => {
+    console.log('🔧 Initializing AbortController monitoring for debugging');
+    AbortControllerMonitor.instance.startMonitoring();
+    
+    // Add global debug functions
+    (window as any).debugAborts = () => {
+      console.log('🔍 Manual abort debug check triggered');
+      AbortControllerMonitor.instance.printReport();
+    };
+    
+    (window as any).viewAbortLogs = () => {
+      try {
+        const logs = JSON.parse(localStorage.getItem('abortLogs') || '[]');
+        console.group('📊 PERSISTENT ABORT LOGS');
+        console.log('Total stored abort events:', logs.length);
+        logs.forEach((log: any, index: number) => {
+          console.group(`🚨 Abort #${index + 1} (${new Date(log.timestamp).toLocaleString()})`);
+          console.log('Request ID:', log.requestId);
+          console.log('Duration before abort:', log.duration + 'ms');
+          console.log('Reason:', log.reason);
+          console.log('Message:', log.messageContent);
+          console.log('Agent:', log.agentName);
+          console.log('Controller matches:', log.controllerMatches);
+          console.log('URL:', log.url);
+          console.log('Stack trace:', log.stackTrace);
+          console.groupEnd();
+        });
+        console.groupEnd();
+        return logs;
+      } catch (error) {
+        console.error('❌ Failed to read abort logs:', error);
+        return [];
+      }
+    };
+    
+    (window as any).clearAbortLogs = () => {
+      localStorage.removeItem('abortLogs');
+      console.log('🧹 Cleared persistent abort logs');
+    };
+    
+    return () => {
+      AbortControllerMonitor.instance.stopMonitoring();
+    };
+  }, []);
   
   // Derived authentication state
   const isAuthenticated = !!session;
@@ -106,6 +153,7 @@ const Home: React.FC = () => {
     selectedArtifact,
     selectArtifact,
     setSelectedArtifactFromState,
+    setArtifacts,
     loadSessionArtifacts,
     handleAttachFile,
     addClaudeArtifacts,
@@ -459,6 +507,56 @@ const Home: React.FC = () => {
     if (agentMessage) {
       setMessages((prev: Message[]) => [...prev, agentMessage]);
     }
+  };
+
+  // Handler for viewing bids - creates and displays a bid view artifact
+  const handleViewBids = () => {
+    if (!currentRfp) {
+      console.warn('No current RFP selected');
+      return;
+    }
+
+    // Create a bid view artifact
+    const bidViewArtifact: Artifact = {
+      id: `bid-view-${currentRfp.id}-${Date.now()}`,
+      name: `Bids for ${currentRfp.name}`,
+      type: 'bid_view',
+      size: '0 KB',
+      content: currentRfp.name, // Pass RFP name as content
+      rfpId: currentRfp.id,
+      role: 'buyer'
+    };
+
+    console.log('Creating bid view artifact:', bidViewArtifact.id);
+
+    // Add artifact to state
+    setArtifacts((prev: Artifact[]) => {
+      const existing = prev.find(a => a.id === bidViewArtifact.id);
+      if (existing) {
+        return prev;
+      }
+      return [...prev, bidViewArtifact];
+    });
+
+    // Select the artifact after a brief delay to ensure state is updated
+    setTimeout(() => {
+      const artifactRef: ArtifactReference = {
+        artifactId: bidViewArtifact.id,
+        artifactName: bidViewArtifact.name,
+        artifactType: 'bid_view',
+        isCreated: true,
+        displayText: `View bids for ${currentRfp.name}`
+      };
+      
+      console.log('Attempting to select artifact:', artifactRef.artifactId);
+      
+      // Select artifact directly using the artifact management functions
+      selectArtifact(bidViewArtifact.id);
+      artifactWindowState.selectArtifact(bidViewArtifact.id);
+      artifactWindowState.openWindow();
+      artifactWindowState.expandWindow();
+      console.log('Selected bid view artifact for display:', bidViewArtifact.name);
+    }, 100);
   };
 
   // Form submission handler with auto-prompt
@@ -884,7 +982,10 @@ const Home: React.FC = () => {
       </IonContent>
 
       {/* Footer outside of IonContent for better MCP browser compatibility */}
-      <HomeFooter currentRfp={currentRfp} />
+      <HomeFooter 
+        currentRfp={currentRfp} 
+        onViewBids={handleViewBids}
+      />
 
       {/* Modals */}
       <AgentEditModal

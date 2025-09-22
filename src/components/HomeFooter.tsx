@@ -1,13 +1,16 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React from 'react';
+import { IonButton, IonIcon } from '@ionic/react';
+import { reorderTwoOutline } from 'ionicons/icons';
 import { RFP } from '../types/rfp';
 
 interface HomeFooterProps {
   currentRfp: RFP | null;
+  onViewBids?: () => void;
 }
 
-const HomeFooter: React.FC<HomeFooterProps> = ({ currentRfp }) => {
+const HomeFooter: React.FC<HomeFooterProps> = ({ currentRfp, onViewBids }) => {
   return (
     <div style={{
       position: 'fixed',
@@ -23,7 +26,7 @@ const HomeFooter: React.FC<HomeFooterProps> = ({ currentRfp }) => {
       height: '40px',
       display: 'flex',
       alignItems: 'center',
-      justifyContent: 'flex-start',
+      justifyContent: 'space-between', // Changed to space-between to accommodate the button
       zIndex: 9999, // Higher z-index to ensure it's visible
       boxSizing: 'border-box',
       fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -32,6 +35,27 @@ const HomeFooter: React.FC<HomeFooterProps> = ({ currentRfp }) => {
       <span>
         Current RFP: {currentRfp ? currentRfp.name : 'none'}
       </span>
+      
+      {/* Right side buttons */}
+      {currentRfp && onViewBids && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <IonButton 
+            size="small" 
+            fill="outline" 
+            color="primary"
+            onClick={onViewBids}
+            style={{ 
+              '--height': '28px',
+              '--padding-start': '8px',
+              '--padding-end': '8px',
+              fontSize: '12px'
+            }}
+          >
+            <IonIcon icon={reorderTwoOutline} slot="start" />
+            Bids
+          </IonButton>
+        </div>
+      )}
     </div>
   );
 };
