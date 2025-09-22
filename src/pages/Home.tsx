@@ -41,18 +41,26 @@ const Home: React.FC = () => {
     AbortControllerMonitor.instance.startMonitoring();
     
     // Add global debug functions
-    (window as any).debugAborts = () => {
+    (window as typeof window & {
+      debugAborts?: () => void;
+      viewAbortLogs?: () => unknown[];
+      clearAbortLogs?: () => void;
+    }).debugAborts = () => {
       console.log('🔍 Manual abort debug check triggered');
       AbortControllerMonitor.instance.printReport();
     };
     
-    (window as any).viewAbortLogs = () => {
+    (window as typeof window & {
+      debugAborts?: () => void;
+      viewAbortLogs?: () => unknown[];
+      clearAbortLogs?: () => void;
+    }).viewAbortLogs = () => {
       try {
         const logs = JSON.parse(localStorage.getItem('abortLogs') || '[]');
         console.group('📊 PERSISTENT ABORT LOGS');
         console.log('Total stored abort events:', logs.length);
-        logs.forEach((log: any, index: number) => {
-          console.group(`🚨 Abort #${index + 1} (${new Date(log.timestamp).toLocaleString()})`);
+        logs.forEach((log: Record<string, unknown>, index: number) => {
+          console.group(`🚨 Abort #${index + 1} (${new Date(String(log.timestamp)).toLocaleString()})`);
           console.log('Request ID:', log.requestId);
           console.log('Duration before abort:', log.duration + 'ms');
           console.log('Reason:', log.reason);
@@ -71,7 +79,11 @@ const Home: React.FC = () => {
       }
     };
     
-    (window as any).clearAbortLogs = () => {
+    (window as typeof window & {
+      debugAborts?: () => void;
+      viewAbortLogs?: () => unknown[];
+      clearAbortLogs?: () => void;
+    }).clearAbortLogs = () => {
       localStorage.removeItem('abortLogs');
       console.log('🧹 Cleared persistent abort logs');
     };

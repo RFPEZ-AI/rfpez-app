@@ -162,8 +162,16 @@ class AbortControllerMonitor {
 }
 
 // Global functions for easy access
-(window as any).startAbortMonitoring = () => AbortControllerMonitor.instance.startMonitoring();
-(window as any).stopAbortMonitoring = () => AbortControllerMonitor.instance.stopMonitoring();
-(window as any).abortReport = () => AbortControllerMonitor.instance.printReport();
+declare global {
+  interface Window {
+    startAbortMonitoring?: () => void;
+    stopAbortMonitoring?: () => void;
+    abortReport?: () => void;
+  }
+}
+
+(window as Window).startAbortMonitoring = () => AbortControllerMonitor.instance.startMonitoring();
+(window as Window).stopAbortMonitoring = () => AbortControllerMonitor.instance.stopMonitoring();
+(window as Window).abortReport = () => AbortControllerMonitor.instance.printReport();
 
 export { AbortControllerMonitor };

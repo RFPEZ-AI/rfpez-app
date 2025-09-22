@@ -2,6 +2,7 @@
 
 // Claude API service for RFPEZ.AI Multi-Agent System with MCP Integration
 import Anthropic from '@anthropic-ai/sdk';
+import type { Message, ContentBlock, TextBlock, ToolUseBlock } from '@anthropic-ai/sdk/resources';
 import type { Agent } from '../types/database';
 import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
 import { APIRetryHandler } from '../utils/apiRetry';
@@ -155,7 +156,6 @@ export class ClaudeService {
     onChunk?: (chunk: string, isComplete: boolean) => void
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
-    const requestId = `claude_req_${startTime}_${Math.random().toString(36).substr(2, 9)}`;
     const functionsExecuted: string[] = [];
     
     // Basic abort signal validation
@@ -254,7 +254,7 @@ Use these functions when relevant to help the user. For example:
 
 Be helpful, accurate, and professional. When switching agents, make the transition smooth and explain the benefits.`;
 
-      let response: any;
+      let response: Message;
       let streamedContent = '';
 
       if (stream && onChunk) {
@@ -268,7 +268,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
               }
               
               // Prepare options object with conditional signal
-              const apiOptions: any = {};
+              const apiOptions: { signal?: AbortSignal } = {};
               if (abortSignal) {
                 apiOptions.signal = abortSignal;
               }
@@ -354,11 +354,13 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             } else {
               // Try to extract error details
               try {
-                const statusValue = (streamError as any).status;
-                const errorValue = (streamError as any).error;
+                const errorObj = streamError as Record<string, unknown>;
+                const statusValue = errorObj.status;
+                const errorValue = errorObj.error;
                 
-                if (errorValue && typeof errorValue === 'object' && errorValue.message) {
-                  errorMessage = errorValue.message;
+                if (errorValue && typeof errorValue === 'object' && 
+                    (errorValue as Record<string, unknown>).message) {
+                  errorMessage = String((errorValue as Record<string, unknown>).message);
                 } else if (errorValue && typeof errorValue === 'string') {
                   errorMessage = errorValue;
                 } else if (statusValue) {
@@ -400,7 +402,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             }
             
             // Prepare options object with conditional signal for non-streaming
-            const apiOptions: any = {};
+            const apiOptions: { signal?: AbortSignal } = {};
             if (abortSignal) {
               apiOptions.signal = abortSignal;
             }
@@ -429,11 +431,11 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       const allFunctionResults: any[] = [];
 
       // Process the response and handle any function calls
-      while (response.content.some((block: any) => block.type === 'tool_use')) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const toolUses = response.content.filter((block: any) => block.type === 'tool_use') as any[];
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const textBlocks = response.content.filter((block: any) => block.type === 'text') as any[];
+      while (response.content.some((block: ContentBlock) => block.type === 'tool_use')) {
+        const toolUses = response.content.filter((block: ContentBlock): block is ToolUseBlock => 
+          block.type === 'tool_use');
+        const textBlocks = response.content.filter((block: ContentBlock): block is TextBlock => 
+          block.type === 'text');
         
         // Collect any text content
         if (textBlocks.length > 0) {
