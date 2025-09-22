@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Message, Session, Artifact, ArtifactReference } from '../types/home';
+import { useIsMobile } from '../utils/useMediaQuery';
 import SessionHistory from './SessionHistory';
 import SessionDialog from './SessionDialog';
 import ArtifactWindow from './ArtifactWindow';
@@ -68,6 +69,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
   forceSessionHistoryCollapsed = false,
   onSessionHistoryToggle
 }) => {
+  const isMobile = useIsMobile();
   // Use selected artifact based on window state if available, otherwise fall back to most recent
   const displayedArtifact = selectedArtifact || (artifacts.length > 0 ? artifacts[artifacts.length - 1] : null);
 
@@ -75,47 +77,88 @@ const HomeContent: React.FC<HomeContentProps> = ({
     <div style={{ 
       flex: 1,
       display: 'flex',
+      flexDirection: isMobile ? 'column' : 'row',
       overflow: 'hidden',
-      minHeight: 0,
-      paddingTop: '56px', // Account for header height
-      paddingBottom: '40px' // Account for footer height
+      minHeight: 0
+      // No padding needed - parent container handles positioning
     }}>
-      {/* Left Panel - Session History */}
-      <SessionHistory
-        sessions={sessions}
-        onNewSession={onNewSession}
-        onSelectSession={onSelectSession}
-        onDeleteSession={onDeleteSession}
-        selectedSessionId={selectedSessionId}
-        forceCollapsed={forceSessionHistoryCollapsed}
-        onToggleExpanded={onSessionHistoryToggle}
-      />
-
-      {/* Center Panel - Dialog with integrated prompt */}
-      <div style={{ flex: 1, overflow: 'hidden' }}>
-        <SessionDialog
-          messages={messages}
-          isLoading={isLoading}
-          onSendMessage={onSendMessage}
-          onAttachFile={onAttachFile}
-          promptPlaceholder="chat here..."
-          onArtifactSelect={onArtifactSelect}
-          currentAgent={currentAgent}
-          onCancelRequest={onCancelRequest}
-        />
-      </div>
-
-      {/* Right Panel - Artifacts */}
-      {artifactWindowOpen && (
-        <ArtifactWindow
-          artifact={displayedArtifact}
-          onDownload={onDownloadArtifact}
-          onFormSubmit={onFormSubmit}
-          currentRfpId={currentRfpId}
-          isCollapsed={artifactWindowCollapsed}
-          onToggleCollapse={onToggleArtifactCollapse}
+      {!isMobile && (
+        /* Left Panel - Session History (Desktop only) */
+        <SessionHistory
+          sessions={sessions}
+          onNewSession={onNewSession}
+          onSelectSession={onSelectSession}
+          onDeleteSession={onDeleteSession}
+          selectedSessionId={selectedSessionId}
+          forceCollapsed={forceSessionHistoryCollapsed}
+          onToggleExpanded={onSessionHistoryToggle}
         />
       )}
+
+      {/* Center Panel - Dialog with integrated prompt */}
+      <div style={{ 
+        flex: 1, 
+        overflow: 'hidden',
+        display: 'flex',
+        flexDirection: isMobile ? 'column' : 'row'
+      }}>
+        {isMobile && (
+          /* Left Panel - Session History (Mobile - top) */
+          <div style={{
+            maxHeight: forceSessionHistoryCollapsed ? '40px' : '200px', // Limit height to prevent excessive space usage
+            flexShrink: 0, // Don't shrink below minimum
+            transition: 'max-height 0.3s ease'
+          }}>
+            <SessionHistory
+              sessions={sessions}
+              onNewSession={onNewSession}
+              onSelectSession={onSelectSession}
+              onDeleteSession={onDeleteSession}
+              selectedSessionId={selectedSessionId}
+              forceCollapsed={forceSessionHistoryCollapsed}
+              onToggleExpanded={onSessionHistoryToggle}
+            />
+          </div>
+        )}
+        
+        {/* Message area - flex to accommodate artifact panel on mobile */}
+        <div style={{ 
+          flex: 1, 
+          overflow: 'hidden',
+          display: 'flex',
+          flexDirection: 'column',
+          minHeight: isMobile ? '200px' : 0 // Ensure minimum space for messages on mobile
+        }}>
+          <SessionDialog
+            messages={messages}
+            isLoading={isLoading}
+            onSendMessage={onSendMessage}
+            onAttachFile={onAttachFile}
+            promptPlaceholder="chat here..."
+            onArtifactSelect={onArtifactSelect}
+            currentAgent={currentAgent}
+            onCancelRequest={onCancelRequest}
+          />
+        </div>
+
+        {/* Right Panel - Artifacts (Desktop) or Bottom Panel (Mobile) */}
+        <div style={{ 
+          display: artifactWindowOpen ? 'block' : 'none',
+          ...(isMobile && { 
+            flexShrink: 0, // Prevent artifact from shrinking messages area to 0
+            maxHeight: '50vh' // Limit artifact window to max 50% of viewport on mobile
+          })
+        }}>
+          <ArtifactWindow
+            artifact={displayedArtifact}
+            onDownload={onDownloadArtifact}
+            onFormSubmit={onFormSubmit}
+            currentRfpId={currentRfpId}
+            isCollapsed={artifactWindowCollapsed}
+            onToggleCollapse={onToggleArtifactCollapse}
+          />
+        </div>
+      </div>
     </div>
   );
 };

@@ -1,7 +1,8 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React from 'react';
-import { IonHeader, IonToolbar, IonButtons } from '@ionic/react';
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon } from '@ionic/react';
+import { documentTextOutline } from 'ionicons/icons';
 import type { User } from '@supabase/supabase-js';
 import { RFP } from '../types/rfp';
 import { Agent, SessionActiveAgent, UserProfile } from '../types/database';
@@ -44,6 +45,10 @@ interface HomeHeaderProps {
   
   // Main menu props
   onMainMenuSelect: (item: string) => void;
+  
+  // Artifact window props
+  artifactWindowOpen?: boolean;
+  onToggleArtifactWindow?: () => void;
 }
 
 const HomeHeader: React.FC<HomeHeaderProps> = ({
@@ -69,7 +74,9 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   onEditAgent,
   onDeleteAgent,
   onSwitchAgent,
-  onMainMenuSelect
+  onMainMenuSelect,
+  artifactWindowOpen,
+  onToggleArtifactWindow
 }) => {
   const isMobile = useIsMobile();
 
@@ -164,6 +171,22 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             gap: '8px',
             marginRight: '8px'
           }}>
+            {/* Artifact Window Toggle Button */}
+            {onToggleArtifactWindow && (
+              <IonButton
+                fill="clear"
+                size="small"
+                onClick={onToggleArtifactWindow}
+                title={artifactWindowOpen ? "Hide artifacts" : "Show artifacts"}
+                style={{
+                  '--padding-start': '6px',
+                  '--padding-end': '6px',
+                  '--color': artifactWindowOpen ? 'var(--ion-color-primary)' : 'var(--ion-color-medium)'
+                }}
+              >
+                <IonIcon icon={documentTextOutline} />
+              </IonButton>
+            )}
             <AuthButtons />
           </div>
         </IonButtons>

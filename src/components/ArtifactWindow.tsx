@@ -1,8 +1,9 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState, useRef } from 'react';
-import { IonButton, IonIcon } from '@ionic/react';
-import { downloadOutline, documentTextOutline, chevronBackOutline, chevronForwardOutline } from 'ionicons/icons';
+import React, { useState, useRef, useEffect } from 'react';
+import { IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
+import { downloadOutline, documentTextOutline, chevronBackOutline, chevronForwardOutline, expandOutline, closeOutline, clipboardOutline, imageOutline, chevronUpOutline, reorderTwoOutline } from 'ionicons/icons';
+import { useIsMobile } from '../utils/useMediaQuery';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import { RJSFSchema, UiSchema } from '@rjsf/utils';
@@ -36,19 +37,69 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
   onToggleCollapse: externalToggleCollapse,
   currentRfpId
 }) => {
+  const isMobile = useIsMobile();
   const [internalCollapsed, setInternalCollapsed] = useState(true);
+  const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
+  const [mobileHeight, setMobileHeight] = useState<number>(40); // Percentage of screen height - more conservative for mobile
+  const [isDragging, setIsDragging] = useState<boolean>(false);
 
   // Use external collapsed state if provided, otherwise use internal state
   const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
   const toggleCollapse = externalToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
+  // Handle drag to resize on mobile
+  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragMove = (e: MouseEvent | TouchEvent) => {
+    if (!isDragging || !isMobile) return;
+    
+    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+    const windowHeight = window.innerHeight;
+    const newHeight = Math.max(10, Math.min(50, ((windowHeight - clientY) / windowHeight) * 100)); // Limit to 50vh max
+    setMobileHeight(newHeight);
+  };
+
+  const handleDragEnd = () => {
+    setIsDragging(false);
+  };
+
+  // Add event listeners for drag
+  React.useEffect(() => {
+    if (isDragging) {
+      document.addEventListener('mousemove', handleDragMove);
+      document.addEventListener('mouseup', handleDragEnd);
+      document.addEventListener('touchmove', handleDragMove);
+      document.addEventListener('touchend', handleDragEnd);
+      
+      return () => {
+        document.removeEventListener('mousemove', handleDragMove);
+        document.removeEventListener('mouseup', handleDragEnd);
+        document.removeEventListener('touchmove', handleDragMove);
+        document.removeEventListener('touchend', handleDragEnd);
+      };
+    }
+  }, [isDragging]);
+
+  // Reset mobile height when collapsed changes
+  React.useEffect(() => {
+    if (collapsed) {
+      setMobileHeight(60); // Reset to better default
+    }
+  }, [collapsed]);
+
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'document':
+      case 'text':
       case 'pdf':
         return documentTextOutline;
       case 'form':
-        return documentTextOutline;
+        return clipboardOutline;
+      case 'image':
+        return imageOutline;
       default:
         return documentTextOutline;
     }
@@ -127,6 +178,22 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
   const FormRenderer: React.FC<FormRendererProps> = ({ artifact, onSubmit }) => {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const formRef = useRef<any>(null);
+    const containerRef = useRef<HTMLDivElement>(null);
+    const [isInModal, setIsInModal] = useState(false);
+
+    // Detect if we're inside a modal
+    useEffect(() => {
+      const checkModalContext = () => {
+        if (containerRef.current) {
+          // Check if we're inside an IonContent (which indicates modal context)
+          const ionContent = containerRef.current.closest('ion-content');
+          const ionModal = containerRef.current.closest('ion-modal');
+          setIsInModal(!!(ionContent && ionModal));
+        }
+      };
+      
+      checkModalContext();
+    }, []);
 
     try {
       console.log('🎯 FormRenderer: parsing artifact content:', artifact.content);
@@ -141,18 +208,29 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         }
       };
 
-      // Use title and description from the form spec if available, fallback to artifact name
+      // Use title from the form spec if available, fallback to artifact name
       const formTitle = formSpec.title || artifact.name;
-      const formDescription = formSpec.description;
 
       return (
-        <div style={{ 
-          padding: '16px', 
-          height: '100%', 
-          display: 'flex', 
-          flexDirection: 'column' 
-        }}>
-          {/* Custom styles for form inputs */}
+        <div 
+          ref={containerRef}
+          className="form-renderer-container"
+          data-testid="form-renderer"
+          data-artifact-id={artifact.id}
+          data-form-title={formTitle}
+          data-is-modal={isInModal}
+          data-mobile={isMobile}
+          style={{ 
+            padding: isMobile ? '8px 8px 8px 8px' : '12px 12px 12px 12px',
+            // Add extra top padding when in modal to account for modal header
+            paddingTop: isInModal 
+              ? (isMobile ? '56px' : '64px') 
+              : (isMobile ? '8px' : '12px'),
+            height: '100%', 
+            display: 'flex', 
+            flexDirection: 'column' 
+          }}>
+          {/* Custom styles for form inputs with mobile-responsive improvements */}
           <style>{`
             /* Fix ARIA accessibility issue - prevent aria-hidden on router outlet when forms are focused */
             ion-router-outlet[aria-hidden="true"]:has(.form-group input:focus),
@@ -188,10 +266,12 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               background-color: #f0f8ff !important;
               border: 1px solid #d0d0d0 !important;
               color: #333333 !important;
-              padding: 8px 12px !important;
+              padding: ${isMobile ? '10px 14px' : '8px 12px'} !important;
               border-radius: 4px !important;
-              font-size: 14px !important;
+              font-size: ${isMobile ? '16px' : '14px'} !important;
               line-height: 1.4 !important;
+              width: 100% !important;
+              box-sizing: border-box !important;
             }
             
             .form-group input[type="text"]:focus,
@@ -215,32 +295,40 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               font-weight: 500 !important;
               margin-bottom: 4px !important;
               display: block !important;
+              font-size: ${isMobile ? '14px' : '13px'} !important;
             }
             
             .form-group .help-block {
               color: #666666 !important;
-              font-size: 12px !important;
+              font-size: ${isMobile ? '12px' : '11px'} !important;
               margin-top: 4px !important;
+            }
+            
+            /* Mobile-specific form improvements */
+            @media (max-width: 768px) {
+              .form-group {
+                margin-bottom: 16px !important;
+              }
+              
+              .form-group textarea {
+                min-height: 100px !important;
+              }
+              
+              .form-control {
+                min-height: 44px !important; /* iOS recommended touch target */
+              }
             }
           `}</style>
           
-          <div style={{ marginBottom: '16px' }}>
-            <h3 style={{ margin: '0 0 8px 0', color: 'var(--ion-color-primary)' }}>
-              {formTitle}
-            </h3>
-            {formDescription && (
-              <p style={{ 
-                margin: '0', 
-                color: 'var(--ion-color-medium)', 
-                fontSize: '14px',
-                lineHeight: '1.4'
-              }}>
-                {formDescription}
-              </p>
-            )}
-          </div>
-          
-          <div style={{ flex: 1, overflow: 'auto', marginBottom: '16px' }}>
+          <div 
+            className="form-content-container"
+            data-testid="form-content"
+            style={{ 
+            flex: 1, 
+            overflow: 'auto', 
+            marginBottom: isMobile ? '8px' : '12px',
+            paddingTop: isMobile ? '8px' : '12px'
+          }}>
             <Form
               schema={formSpec.schema}
               uiSchema={(formSpec.uiSchema || {}) as UiSchema<Record<string, unknown>>}
@@ -256,13 +344,24 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
             </Form>
           </div>
           
-          <div style={{ 
-            padding: '12px 0',
+          <div 
+            className="form-submit-container"
+            data-testid="form-submit-area"
+            style={{ 
+            padding: isMobile ? '8px 0' : '12px 0',
             borderTop: '1px solid var(--ion-color-light)',
             flexShrink: 0
           }}>
             <IonButton
+              className="form-submit-button"
+              data-testid="form-submit"
+              data-form-action="submit"
               expand="block"
+              size={isMobile ? 'default' : 'default'}
+              style={{
+                '--min-height': isMobile ? '48px' : '44px',
+                fontSize: isMobile ? '16px' : '14px'
+              }}
               onClick={() => {
                 console.log('Submit button clicked');
                 // Trigger form submission using the ref
@@ -658,7 +757,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
           <h3 style={{ margin: '0 0 8px 0', color: 'var(--ion-color-primary)' }}>
             {title || artifact.name}
           </h3>
-          {description && (
+          {description && description.trim() && (
             <p style={{ 
               margin: '0', 
               color: 'var(--ion-color-medium)', 
@@ -696,7 +795,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
           flex: 1, 
           overflow: 'auto',
           backgroundColor: content_type === 'markdown' ? '#ffffff' : 'var(--ion-color-light)',
-          padding: content_type === 'markdown' ? '24px' : '16px',
+          padding: content_type === 'markdown' ? (isMobile ? '12px' : '16px') : '12px',
           borderRadius: '8px',
           border: '1px solid var(--ion-color-light-shade)',
           fontSize: '14px',
@@ -860,121 +959,343 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
   };
 
   return (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      borderLeft: '1px solid var(--ion-color-light-shade)',
-      width: collapsed ? '40px' : '400px',
-      minWidth: collapsed ? '40px' : '400px',
-      transition: 'width 0.3s ease-in-out',
-      overflow: 'hidden'
-    }}>
-      {/* Header with collapse button */}
-      <div style={{ 
-        padding: '16px',
-        borderBottom: collapsed ? 'none' : '1px solid var(--ion-color-light-shade)',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: collapsed ? 'center' : 'space-between',
-        flexShrink: 0
+    <>
+      {/* Main Artifact Panel - Responsive */}
+      <div 
+        className="artifact-window-container"
+        data-testid="artifact-window"
+        data-collapsed={collapsed}
+        data-mobile={isMobile}
+        data-artifact-type={artifact?.type || 'none'}
+        style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        borderLeft: isMobile ? 'none' : '1px solid var(--ion-color-light-shade)',
+        borderTop: isMobile ? '1px solid var(--ion-color-light-shade)' : 'none',
+        width: collapsed ? (isMobile ? '100%' : '40px') : (isMobile ? '100%' : '400px'),
+        minWidth: collapsed ? (isMobile ? '100%' : '40px') : (isMobile ? '100%' : '400px'),
+        height: isMobile ? (collapsed ? '60px' : `${mobileHeight}vh`) : '100%',
+        maxHeight: isMobile ? '50vh' : '100%', // Limit to 50vh max on mobile
+        minHeight: isMobile ? '60px' : '100%',
+        backgroundColor: '#ffffff', // Always opaque white background
+        transition: isMobile ? 'height 0.3s ease-in-out' : 'width 0.3s ease-in-out',
+        overflow: 'hidden',
+        boxShadow: isMobile ? '0 -4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+        borderRadius: isMobile ? '12px 12px 0 0' : '0',
+        zIndex: isMobile ? 10 : 'auto'
       }}>
-        {!collapsed && (
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
-            <h3 style={{ margin: '0', fontSize: '1.1em' }}>
-              {artifact ? artifact.type.toUpperCase() : 'Artifact'}
-            </h3>
-          </div>
-        )}
-        <IonButton
-          fill="clear"
-          size="small"
-          onClick={toggleCollapse}
-          title="Expand/collapse artifact panel"
+        {/* Header with collapse, expand buttons, and integrated resize control */}
+        <div 
+          className="artifact-window-header"
+          data-testid="artifact-header"
+          data-collapsed={collapsed}
           style={{ 
-            '--padding-start': '8px',
-            '--padding-end': '8px'
-          }}
-        >
-          <IonIcon 
-            icon={collapsed ? chevronBackOutline : chevronForwardOutline} 
-            style={{ 
-              transform: collapsed ? 'rotate(180deg)' : 'rotate(0deg)',
-              transition: 'transform 0.3s ease-in-out'
-            }}
-          />
-        </IonButton>
-      </div>
-
-      {/* Content area */}
-      {!collapsed && (
-        <div style={{ 
-          flex: 1, 
-          display: 'flex', 
-          flexDirection: 'column',
-          overflow: 'hidden',
-          backgroundColor: 'var(--ion-background-color)'
-        }}>
-          {/* Artifact display area */}
-          <div style={{ flex: 1, overflow: 'hidden' }}>
-            {!artifact ? (
-              // No artifact state
-              <div style={{ 
-                display: 'flex', 
-                justifyContent: 'center', 
-                alignItems: 'center', 
-                height: '100%',
-                flexDirection: 'column',
-                textAlign: 'center',
-                color: 'var(--ion-color-medium)',
-                padding: '16px'
-              }}>
-                <IonIcon icon={documentTextOutline} size="large" />
-                <p>No artifact to display</p>
-                <p style={{ fontSize: '0.9em' }}>
-                  Artifacts will appear here during your conversation
-                </p>
-              </div>
-            ) : (
-              // Display the artifact
-              <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {/* Artifact header */}
-                <div style={{ 
-                  padding: '16px',
-                  borderBottom: '1px solid var(--ion-color-light-shade)',
-                  flexShrink: 0,
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '12px'
-                }}>
+          padding: '8px 16px',
+          borderBottom: collapsed ? 'none' : '1px solid var(--ion-color-light-shade)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          flexShrink: 0,
+          backgroundColor: isMobile ? '#ffffff' : 'var(--ion-background-color)',
+          minHeight: '40px',
+          // Add resize functionality to the entire header on mobile
+          cursor: isMobile && !collapsed && artifact ? 'row-resize' : 'default',
+          userSelect: 'none'
+        }}
+        // Add drag events to header on mobile for resize
+        onMouseDown={isMobile && !collapsed && artifact ? handleDragStart : undefined}
+        onTouchStart={isMobile && !collapsed && artifact ? handleDragStart : undefined}>
+          {!collapsed && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+              <h3 style={{ margin: '0', fontSize: '1.1em' }}>
+                {artifact ? artifact.type.toUpperCase() : 'Artifact'}
+              </h3>
+              {/* Mobile drag control indicator */}
+              {isMobile && artifact && (
+                <div 
+                  className="mobile-drag-control"
+                  data-testid="mobile-drag-control"
+                  data-height-percentage={mobileHeight}
+                  style={{
+                    position: 'absolute',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    padding: '4px 8px',
+                    borderRadius: '6px',
+                    backgroundColor: 'rgba(var(--ion-color-primary-rgb), 0.1)',
+                    border: '1px solid rgba(var(--ion-color-primary-rgb), 0.3)',
+                    cursor: 'row-resize',
+                    userSelect: 'none',
+                    minWidth: '32px',
+                    height: '24px'
+                  }}
+                >
                   <IonIcon 
-                    icon={getTypeIcon(artifact.type)} 
-                    style={{ fontSize: '20px', color: 'var(--ion-color-primary)' }} 
+                    icon={reorderTwoOutline}
+                    style={{
+                      color: 'var(--ion-color-primary)',
+                      fontSize: '16px'
+                    }}
                   />
-                  <div style={{ flex: 1 }}>
-                    <h4 style={{ margin: '0', fontSize: '1em' }}>{artifact.name}</h4>
-                  </div>
-                  {onDownload && (
-                    <IonButton
-                      fill="clear"
-                      size="small"
-                      onClick={() => onDownload(artifact)}
-                    >
-                      <IonIcon icon={downloadOutline} />
-                    </IonButton>
-                  )}
                 </div>
-                
-                {/* Artifact content */}
-                <div style={{ flex: 1, overflow: 'hidden' }}>
-                  {renderArtifactContent(artifact)}
-                </div>
-              </div>
+              )}
+            </div>
+          )}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+            {/* Full-screen button for mobile */}
+            {isMobile && !collapsed && artifact && (
+              <IonButton
+                className="artifact-fullscreen-button"
+                data-testid="artifact-fullscreen"
+                data-action="expand-fullscreen"
+                fill="clear"
+                size="small"
+                onClick={() => setIsFullScreen(true)}
+                title="Expand to full screen"
+                style={{ 
+                  '--padding-start': '4px',
+                  '--padding-end': '4px',
+                  minWidth: '32px',
+                  height: '32px'
+                }}
+              >
+                <IonIcon icon={expandOutline} />
+              </IonButton>
             )}
+            {/* Collapse/Expand button */}
+            <IonButton
+              className="artifact-toggle-button"
+              data-testid="artifact-toggle"
+              data-action={collapsed ? 'expand' : 'collapse'}
+              fill="clear"
+              size="small"
+              onClick={toggleCollapse}
+              title={isMobile ? (collapsed ? "Show artifact" : "Hide artifact") : "Expand/collapse artifact panel"}
+              style={{ 
+                '--padding-start': '4px',
+                '--padding-end': '4px',
+                minWidth: '32px',
+                height: '32px'
+              }}
+            >
+              <IonIcon 
+                icon={isMobile ? (collapsed ? chevronBackOutline : chevronForwardOutline) : (collapsed ? chevronBackOutline : chevronForwardOutline)} 
+                style={{ 
+                  transform: isMobile 
+                    ? (collapsed ? 'rotate(90deg)' : 'rotate(-90deg)') 
+                    : (collapsed ? 'rotate(180deg)' : 'rotate(0deg)'),
+                  transition: 'transform 0.3s ease-in-out'
+                }}
+              />
+            </IonButton>
           </div>
         </div>
-      )}
-    </div>
+
+
+
+        {/* Collapsed state content for mobile */}
+        {collapsed && isMobile && (
+          <div 
+            style={{
+              flex: 1,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              padding: '0 16px',
+              backgroundColor: 'var(--ion-background-color)',
+              borderTop: '1px solid var(--ion-color-light-shade)',
+              cursor: 'pointer'
+            }}
+            onClick={toggleCollapse}
+          >
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '8px',
+              flex: 1 
+            }}>
+              {artifact ? (
+                <>
+                  <IonIcon 
+                    icon={getTypeIcon(artifact.type)} 
+                    style={{ color: 'var(--ion-color-primary)' }} 
+                  />
+                  <span style={{ 
+                    fontSize: '0.9em', 
+                    color: 'var(--ion-color-dark)',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis'
+                  }}>
+                    {artifact.name}
+                  </span>
+                </>
+              ) : (
+                <>
+                  <IonIcon 
+                    icon={documentTextOutline} 
+                    style={{ color: 'var(--ion-color-medium)' }} 
+                  />
+                  <span style={{ 
+                    fontSize: '0.9em', 
+                    color: 'var(--ion-color-medium)' 
+                  }}>
+                    No artifact available
+                  </span>
+                </>
+              )}
+            </div>
+            <div style={{
+              fontSize: '0.8em',
+              color: 'var(--ion-color-medium)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '4px'
+            }}>
+              Tap to expand
+              <IonIcon icon={chevronUpOutline} style={{ fontSize: '16px' }} />
+            </div>
+          </div>
+        )}
+
+        {/* Content area */}
+        {!collapsed && (
+          <div 
+            className="artifact-content-area"
+            data-testid="artifact-content"
+            style={{ 
+            flex: 1, 
+            display: 'flex', 
+            flexDirection: 'column',
+            overflow: 'hidden',
+            backgroundColor: 'var(--ion-background-color)',
+            minHeight: 0
+          }}>
+            {/* Artifact display area */}
+            <div 
+              className="artifact-display-area"
+              data-testid="artifact-display"
+              data-has-artifact={!!artifact}
+              style={{ flex: 1, overflow: 'hidden' }}>
+              {!artifact ? (
+                // No artifact state
+                <div 
+                  className="artifact-empty-state"
+                  data-testid="artifact-empty"
+                  style={{ 
+                  display: 'flex', 
+                  justifyContent: 'center', 
+                  alignItems: 'center', 
+                  height: '100%',
+                  flexDirection: 'column',
+                  textAlign: 'center',
+                  color: 'var(--ion-color-medium)',
+                  padding: '16px'
+                }}>
+                  <IonIcon icon={documentTextOutline} size="large" />
+                  <p>No artifact to display</p>
+                  <p style={{ fontSize: '0.9em' }}>
+                    Artifacts will appear here during your conversation
+                  </p>
+                </div>
+              ) : (
+                // Display the artifact
+                <div 
+                  className="artifact-container"
+                  data-testid="artifact-container"
+                  data-artifact-id={artifact.id}
+                  data-artifact-name={artifact.name}
+                  style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                  {/* Artifact header - only show if there's meaningful content */}
+                  {(artifact.name || onDownload) && (
+                    <div 
+                      className="artifact-header-section"
+                      data-testid="artifact-header-section"
+                      data-has-name={!!artifact.name}
+                      data-has-download={!!onDownload}
+                      style={{ 
+                      padding: '8px 16px',
+                      borderBottom: '1px solid var(--ion-color-light-shade)',
+                      flexShrink: 0,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      minHeight: '40px'
+                    }}>
+                      <IonIcon 
+                        icon={getTypeIcon(artifact.type)} 
+                        style={{ fontSize: '20px', color: 'var(--ion-color-primary)' }} 
+                      />
+                      {artifact.name && (
+                        <div style={{ flex: 1 }}>
+                          <h4 style={{ margin: '0', fontSize: '1em' }}>{artifact.name}</h4>
+                        </div>
+                      )}
+                      {onDownload && (
+                        <IonButton
+                          className="artifact-download-button"
+                          data-testid="artifact-download"
+                          data-action="download"
+                          data-artifact-id={artifact.id}
+                          fill="clear"
+                          size="small"
+                          onClick={() => onDownload(artifact)}
+                        >
+                          <IonIcon icon={downloadOutline} />
+                        </IonButton>
+                      )}
+                    </div>
+                  )}
+                  
+                  {/* Artifact content */}
+                  <div 
+                    className="artifact-content-section"
+                    data-testid="artifact-content-section"
+                    data-artifact-type={artifact.type}
+                    style={{ flex: 1, overflow: 'auto' }}>
+                    {renderArtifactContent(artifact)}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Full-Screen Modal for Mobile */}
+      <IonModal 
+        className="artifact-fullscreen-modal"
+        data-testid="artifact-modal"
+        data-artifact-type={artifact?.type || 'none'}
+        isOpen={isFullScreen} 
+        onDidDismiss={() => setIsFullScreen(false)}>
+        <IonHeader>
+          <IonToolbar>
+            <IonTitle>{artifact ? artifact.name : 'Artifact'}</IonTitle>
+            <IonButton
+              slot="end"
+              fill="clear"
+              onClick={() => setIsFullScreen(false)}
+            >
+              <IonIcon icon={closeOutline} />
+            </IonButton>
+          </IonToolbar>
+        </IonHeader>
+        <IonContent>
+          {artifact && (
+            <div style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+              {/* Full-screen artifact content */}
+              <div style={{ flex: 1, overflow: 'auto' }}>
+                {renderArtifactContent(artifact)}
+              </div>
+            </div>
+          )}
+        </IonContent>
+      </IonModal>
+    </>
   );
 };
 
