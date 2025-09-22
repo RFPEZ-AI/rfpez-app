@@ -226,7 +226,61 @@ export class RFPService {
   }  // Bid Methods
   static async createBid(bid: Partial<Bid>): Promise<Bid | null> {
     console.log('🔄 Creating bid with data:', JSON.stringify(bid, null, 2));
-    const { data, error } = await supabase.from('bids').insert(bid).select().single();
+    
+    // Extract supplier info from bid response to auto-create supplier profile if needed
+    let supplierId = bid.supplier_id;
+    
+    if (!supplierId && bid.response && typeof bid.response === 'object') {
+      const response = bid.response as any;
+      const supplierInfo = response.supplier_info;
+      
+      if (supplierInfo && supplierInfo.email) {
+        console.log('🔍 Checking for existing supplier profile with email:', supplierInfo.email);
+        
+        // Check if supplier profile already exists for this email
+        const { data: existingSupplier } = await supabase
+          .from('supplier_profiles')
+          .select('id')
+          .eq('email', supplierInfo.email)
+          .single();
+        
+        if (existingSupplier) {
+          console.log('✅ Found existing supplier profile:', existingSupplier.id);
+          supplierId = existingSupplier.id;
+        } else {
+          // Create new supplier profile
+          console.log('🆕 Creating new supplier profile for:', supplierInfo.email);
+          const supplierData = {
+            name: supplierInfo.name || 'Unknown Supplier',
+            email: supplierInfo.email,
+            description: supplierInfo.company ? `Company: ${supplierInfo.company}` : null,
+            phone: supplierInfo.phone || null
+          };
+          
+          const { data: newSupplier, error: supplierError } = await supabase
+            .from('supplier_profiles')
+            .insert(supplierData)
+            .select('id')
+            .single();
+          
+          if (supplierError) {
+            console.error('❌ Error creating supplier profile:', supplierError);
+            // Continue with bid creation even if supplier profile creation fails
+          } else {
+            console.log('✅ Created supplier profile with ID:', newSupplier.id);
+            supplierId = newSupplier.id;
+          }
+        }
+      }
+    }
+    
+    // Create the bid with supplier_id if we have one
+    const bidDataWithSupplier = { ...bid };
+    if (supplierId) {
+      bidDataWithSupplier.supplier_id = supplierId;
+    }
+    
+    const { data, error } = await supabase.from('bids').insert(bidDataWithSupplier).select().single();
     if (error) {
       console.error('❌ Supabase error creating bid:', JSON.stringify(error, null, 2));
       console.error('Error message:', error.message);

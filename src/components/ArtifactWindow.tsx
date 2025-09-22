@@ -10,6 +10,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { SingletonArtifactWindowProps, Artifact } from '../types/home';
 import { RFPService } from '../services/rfpService';
+import BidView from './BidView';
 
 interface BuyerQuestionnaireData {
   schema: RJSFSchema;
@@ -110,6 +111,8 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         return clipboardOutline;
       case 'image':
         return imageOutline;
+      case 'bid_view':
+        return reorderTwoOutline;
       default:
         return documentTextOutline;
     }
@@ -463,6 +466,11 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
     }
     
     return false;
+  };
+
+  // Check if artifact is a bid view
+  const isBidView = (artifact: Artifact): boolean => {
+    return artifact.type === 'bid_view';
   };
 
   // Text renderer component  
@@ -861,6 +869,15 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         <FormRenderer 
           artifact={artifact}
           onSubmit={(formData) => handleFormSubmit(artifact, formData)}
+        />
+      );
+    }
+    
+    if (isBidView(artifact)) {
+      return (
+        <BidView 
+          currentRfpId={currentRfpId ?? null}
+          rfpName={artifact.content || artifact.name}
         />
       );
     }

@@ -23,6 +23,7 @@ import {
 import { colorPaletteOutline, flask, server, checkmarkCircle, closeCircle, refresh } from 'ionicons/icons';
 import ClaudeTestComponent from '../components/ClaudeTestComponent';
 import ClaudeStreamingTestComponent from '../components/ClaudeStreamingTestComponent';
+import ClaudeAPITestComponent from '../components/ClaudeAPITestComponent';
 import AuthDebugger from '../components/AuthDebugger';
 import RoleManagement from '../components/RoleManagement';
 import MCPTestComponent from '../components/MCPTestComponent';
@@ -438,6 +439,9 @@ const DebugPage: React.FC = () => {
             </IonButton>
           </IonCardContent>
         </IonCard>
+
+        {/* Claude API Availability Test */}
+        <ClaudeAPITestComponent />
 
         {/* Role Management Section (Admin Only) */}
         {userProfile?.role && RoleService.isAdministrator(userProfile.role) && (
