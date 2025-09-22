@@ -3,7 +3,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { IonButton, IonIcon, IonModal, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
 import { downloadOutline, documentTextOutline, chevronBackOutline, chevronForwardOutline, expandOutline, closeOutline, clipboardOutline, imageOutline, chevronUpOutline, reorderTwoOutline } from 'ionicons/icons';
-import { useIsMobile } from '../utils/useMediaQuery';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import { RJSFSchema, UiSchema } from '@rjsf/utils';
@@ -37,29 +36,40 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
   onToggleCollapse: externalToggleCollapse,
   currentRfpId
 }) => {
-  const isMobile = useIsMobile();
+  // Aspect ratio detection: portrait when height > width
+  const [isPortrait, setIsPortrait] = useState<boolean>(window.innerHeight > window.innerWidth);
   const [internalCollapsed, setInternalCollapsed] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
-  const [mobileHeight, setMobileHeight] = useState<number>(40); // Percentage of screen height - more conservative for mobile
+  const [portraitHeight, setPortraitHeight] = useState<number>(40); // Percentage of screen height for portrait mode
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   // Use external collapsed state if provided, otherwise use internal state
   const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
   const toggleCollapse = externalToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
-  // Handle drag to resize on mobile
+  // Listen for window resize to update aspect ratio detection
+  useEffect(() => {
+    const handleResize = () => {
+      setIsPortrait(window.innerHeight > window.innerWidth);
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Handle drag to resize in portrait mode
   const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => {
     e.preventDefault();
     setIsDragging(true);
   };
 
   const handleDragMove = (e: MouseEvent | TouchEvent) => {
-    if (!isDragging || !isMobile) return;
+    if (!isDragging || !isPortrait) return;
     
     const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
     const windowHeight = window.innerHeight;
     const newHeight = Math.max(10, Math.min(50, ((windowHeight - clientY) / windowHeight) * 100)); // Limit to 50vh max
-    setMobileHeight(newHeight);
+    setPortraitHeight(newHeight);
   };
 
   const handleDragEnd = () => {
@@ -83,10 +93,10 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
     }
   }, [isDragging]);
 
-  // Reset mobile height when collapsed changes
+  // Reset portrait height when collapsed changes
   React.useEffect(() => {
     if (collapsed) {
-      setMobileHeight(60); // Reset to better default
+      setPortraitHeight(60); // Reset to better default
     }
   }, [collapsed]);
 
@@ -219,13 +229,13 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
           data-artifact-id={artifact.id}
           data-form-title={formTitle}
           data-is-modal={isInModal}
-          data-mobile={isMobile}
+          data-portrait={isPortrait}
           style={{ 
-            padding: isMobile ? '8px 8px 8px 8px' : '12px 12px 12px 12px',
+            padding: isPortrait ? '8px 8px 8px 8px' : '12px 12px 12px 12px',
             // Add extra top padding when in modal to account for modal header
             paddingTop: isInModal 
-              ? (isMobile ? '56px' : '64px') 
-              : (isMobile ? '8px' : '12px'),
+              ? (isPortrait ? '56px' : '64px') 
+              : (isPortrait ? '8px' : '12px'),
             height: '100%', 
             display: 'flex', 
             flexDirection: 'column' 
@@ -266,9 +276,9 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               background-color: #f0f8ff !important;
               border: 1px solid #d0d0d0 !important;
               color: #333333 !important;
-              padding: ${isMobile ? '10px 14px' : '8px 12px'} !important;
+              padding: ${isPortrait ? '10px 14px' : '8px 12px'} !important;
               border-radius: 4px !important;
-              font-size: ${isMobile ? '16px' : '14px'} !important;
+              font-size: ${isPortrait ? '16px' : '14px'} !important;
               line-height: 1.4 !important;
               width: 100% !important;
               box-sizing: border-box !important;
@@ -295,12 +305,12 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               font-weight: 500 !important;
               margin-bottom: 4px !important;
               display: block !important;
-              font-size: ${isMobile ? '14px' : '13px'} !important;
+              font-size: ${isPortrait ? '14px' : '13px'} !important;
             }
             
             .form-group .help-block {
               color: #666666 !important;
-              font-size: ${isMobile ? '12px' : '11px'} !important;
+              font-size: ${isPortrait ? '12px' : '11px'} !important;
               margin-top: 4px !important;
             }
             
@@ -326,8 +336,8 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
             style={{ 
             flex: 1, 
             overflow: 'auto', 
-            marginBottom: isMobile ? '8px' : '12px',
-            paddingTop: isMobile ? '8px' : '12px'
+            marginBottom: isPortrait ? '8px' : '12px',
+            paddingTop: isPortrait ? '8px' : '12px'
           }}>
             <Form
               schema={formSpec.schema}
@@ -348,7 +358,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
             className="form-submit-container"
             data-testid="form-submit-area"
             style={{ 
-            padding: isMobile ? '8px 0' : '12px 0',
+            padding: isPortrait ? '8px 0' : '12px 0',
             borderTop: '1px solid var(--ion-color-light)',
             flexShrink: 0
           }}>
@@ -357,10 +367,10 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               data-testid="form-submit"
               data-form-action="submit"
               expand="block"
-              size={isMobile ? 'default' : 'default'}
+              size={isPortrait ? 'default' : 'default'}
               style={{
-                '--min-height': isMobile ? '48px' : '44px',
-                fontSize: isMobile ? '16px' : '14px'
+                '--min-height': isPortrait ? '48px' : '44px',
+                fontSize: isPortrait ? '16px' : '14px'
               }}
               onClick={() => {
                 console.log('Submit button clicked');
@@ -795,7 +805,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
           flex: 1, 
           overflow: 'auto',
           backgroundColor: content_type === 'markdown' ? '#ffffff' : 'var(--ion-color-light)',
-          padding: content_type === 'markdown' ? (isMobile ? '12px' : '16px') : '12px',
+          padding: content_type === 'markdown' ? (isPortrait ? '12px' : '16px') : '12px',
           borderRadius: '8px',
           border: '1px solid var(--ion-color-light-shade)',
           fontSize: '14px',
@@ -965,24 +975,24 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         className="artifact-window-container"
         data-testid="artifact-window"
         data-collapsed={collapsed}
-        data-mobile={isMobile}
+        data-portrait={isPortrait}
         data-artifact-type={artifact?.type || 'none'}
         style={{ 
         display: 'flex', 
         flexDirection: 'column',
-        borderLeft: isMobile ? 'none' : '1px solid var(--ion-color-light-shade)',
-        borderTop: isMobile ? '1px solid var(--ion-color-light-shade)' : 'none',
-        width: collapsed ? (isMobile ? '100%' : '40px') : (isMobile ? '100%' : '400px'),
-        minWidth: collapsed ? (isMobile ? '100%' : '40px') : (isMobile ? '100%' : '400px'),
-        height: isMobile ? (collapsed ? '60px' : `${mobileHeight}vh`) : '100%',
-        maxHeight: isMobile ? '50vh' : '100%', // Limit to 50vh max on mobile
-        minHeight: isMobile ? '60px' : '100%',
+        borderLeft: isPortrait ? 'none' : '1px solid var(--ion-color-light-shade)',
+        borderTop: isPortrait ? '1px solid var(--ion-color-light-shade)' : 'none',
+        width: collapsed ? (isPortrait ? '100%' : '40px') : (isPortrait ? '100%' : '400px'),
+        minWidth: collapsed ? (isPortrait ? '100%' : '40px') : (isPortrait ? '100%' : '400px'),
+        height: isPortrait ? (collapsed ? '60px' : `${portraitHeight}vh`) : '100%',
+        maxHeight: isPortrait ? '50vh' : '100%', // Limit to 50vh max in portrait mode
+        minHeight: isPortrait ? '60px' : '100%',
         backgroundColor: '#ffffff', // Always opaque white background
-        transition: isMobile ? 'height 0.3s ease-in-out' : 'width 0.3s ease-in-out',
+        transition: isPortrait ? 'height 0.3s ease-in-out' : 'width 0.3s ease-in-out',
         overflow: 'hidden',
-        boxShadow: isMobile ? '0 -4px 12px rgba(0, 0, 0, 0.15)' : 'none',
-        borderRadius: isMobile ? '12px 12px 0 0' : '0',
-        zIndex: isMobile ? 10 : 'auto'
+        boxShadow: isPortrait ? '0 -4px 12px rgba(0, 0, 0, 0.15)' : 'none',
+        borderRadius: isPortrait ? '12px 12px 0 0' : '0',
+        zIndex: isPortrait ? 10 : 'auto'
       }}>
         {/* Header with collapse, expand buttons, and integrated resize control */}
         <div 
@@ -996,26 +1006,26 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
           alignItems: 'center',
           justifyContent: 'space-between',
           flexShrink: 0,
-          backgroundColor: isMobile ? '#ffffff' : 'var(--ion-background-color)',
+          backgroundColor: isPortrait ? '#ffffff' : 'var(--ion-background-color)',
           minHeight: '40px',
-          // Add resize functionality to the entire header on mobile
-          cursor: isMobile && !collapsed && artifact ? 'row-resize' : 'default',
+          // Add resize functionality to the entire header in portrait mode
+          cursor: isPortrait && !collapsed && artifact ? 'row-resize' : 'default',
           userSelect: 'none'
         }}
-        // Add drag events to header on mobile for resize
-        onMouseDown={isMobile && !collapsed && artifact ? handleDragStart : undefined}
-        onTouchStart={isMobile && !collapsed && artifact ? handleDragStart : undefined}>
+        // Add drag events to header in portrait mode for resize
+        onMouseDown={isPortrait && !collapsed && artifact ? handleDragStart : undefined}
+        onTouchStart={isPortrait && !collapsed && artifact ? handleDragStart : undefined}>
           {!collapsed && (
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
               <h3 style={{ margin: '0', fontSize: '1.1em' }}>
                 {artifact ? artifact.type.toUpperCase() : 'Artifact'}
               </h3>
-              {/* Mobile drag control indicator */}
-              {isMobile && artifact && (
+              {/* Portrait mode drag control indicator */}
+              {isPortrait && artifact && (
                 <div 
-                  className="mobile-drag-control"
-                  data-testid="mobile-drag-control"
-                  data-height-percentage={mobileHeight}
+                  className="portrait-drag-control"
+                  data-testid="portrait-drag-control"
+                  data-height-percentage={portraitHeight}
                   style={{
                     position: 'absolute',
                     left: '50%',
@@ -1045,8 +1055,8 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
             </div>
           )}
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-            {/* Full-screen button for mobile */}
-            {isMobile && !collapsed && artifact && (
+            {/* Full-screen button for portrait mode */}
+            {isPortrait && !collapsed && artifact && (
               <IonButton
                 className="artifact-fullscreen-button"
                 data-testid="artifact-fullscreen"
@@ -1073,7 +1083,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               fill="clear"
               size="small"
               onClick={toggleCollapse}
-              title={isMobile ? (collapsed ? "Show artifact" : "Hide artifact") : "Expand/collapse artifact panel"}
+              title={isPortrait ? (collapsed ? "Show artifact" : "Hide artifact") : "Expand/collapse artifact panel"}
               style={{ 
                 '--padding-start': '4px',
                 '--padding-end': '4px',
@@ -1082,9 +1092,9 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               }}
             >
               <IonIcon 
-                icon={isMobile ? (collapsed ? chevronBackOutline : chevronForwardOutline) : (collapsed ? chevronBackOutline : chevronForwardOutline)} 
+                icon={isPortrait ? (collapsed ? chevronBackOutline : chevronForwardOutline) : (collapsed ? chevronBackOutline : chevronForwardOutline)} 
                 style={{ 
-                  transform: isMobile 
+                  transform: isPortrait 
                     ? (collapsed ? 'rotate(90deg)' : 'rotate(-90deg)') 
                     : (collapsed ? 'rotate(180deg)' : 'rotate(0deg)'),
                   transition: 'transform 0.3s ease-in-out'
@@ -1096,8 +1106,8 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
 
 
 
-        {/* Collapsed state content for mobile */}
-        {collapsed && isMobile && (
+        {/* Collapsed state content for portrait mode */}
+        {collapsed && isPortrait && (
           <div 
             style={{
               flex: 1,
