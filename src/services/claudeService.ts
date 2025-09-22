@@ -28,6 +28,8 @@ interface ClaudeResponse {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     agent_switch_result?: any;
     buyer_questionnaire?: Record<string, unknown>;
+    is_streaming?: boolean;
+    stream_complete?: boolean;
     [key: string]: unknown; // Allow additional metadata properties
   };
 }
@@ -83,7 +85,9 @@ export class ClaudeService {
       type: string;
       content?: string;
     } | null,
-    abortSignal?: AbortSignal
+    abortSignal?: AbortSignal,
+    stream = false,
+    onChunk?: (chunk: string, isComplete: boolean) => void
   ): Promise<ClaudeResponse> {
     const startTime = Date.now();
     const functionsExecuted: string[] = [];
@@ -204,32 +208,114 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         } : 'none'
       });
 
-      let response = await APIRetryHandler.executeWithRetry(
-        async () => {
-          // Check for cancellation before each API call
-          if (abortSignal?.aborted) {
+      let response;
+      let streamedContent = '';
+
+      if (stream && onChunk) {
+        // Streaming response
+        try {
+          const streamResponse = await APIRetryHandler.executeWithRetry(
+            async () => {
+              // Check for cancellation before each API call
+              if (abortSignal?.aborted) {
+                throw new Error('Request was cancelled');
+              }
+              return client.messages.stream({
+                model: 'claude-3-5-sonnet-latest',
+                max_tokens: 2000,
+                temperature: 0.7,
+                system: systemPrompt,
+                messages: messages,
+                tools: claudeApiFunctions,
+                tool_choice: { type: 'auto' }
+              });
+            },
+            {
+              maxRetries: 3,
+              baseDelay: 2000,
+              maxDelay: 60000,
+              onRetry: (attempt, error) => {
+                const errorMessage = error instanceof Error ? error.message : String(error);
+                console.log(`🔄 Retrying Claude API streaming call (attempt ${attempt}) due to:`, errorMessage);
+              }
+            }
+          );
+
+          // Process streaming response
+          for await (const messageStreamEvent of streamResponse) {
+            if (abortSignal?.aborted) {
+              throw new Error('Request was cancelled');
+            }
+
+            if (messageStreamEvent.type === 'content_block_delta') {
+              if (messageStreamEvent.delta.type === 'text_delta') {
+                const chunk = messageStreamEvent.delta.text;
+                streamedContent += chunk;
+                onChunk(chunk, false);
+              }
+            } else if (messageStreamEvent.type === 'message_stop') {
+              onChunk('', true); // Signal completion
+              break;
+            }
+          }
+
+          // Convert stream response to regular response format for function handling
+          response = await streamResponse.finalMessage();
+          
+          // Update response content with streamed content
+          if (response.content.length > 0 && response.content[0].type === 'text') {
+            (response.content[0] as { text: string; type: string }).text = streamedContent;
+          }
+        } catch (streamError) {
+          // Handle streaming-specific errors
+          if (streamError && typeof streamError === 'object' && 'name' in streamError) {
+            const errorName = (streamError as { name: string }).name;
+            if (errorName === 'APIUserAbortError' || errorName === 'AbortError') {
+              // This is a user cancellation, throw a clean cancellation error
+              throw new Error('Request was cancelled');
+            }
+          }
+          
+          // Check if it's an abort signal error
+          if (streamError instanceof Error && 
+              (streamError.message.includes('aborted') || 
+               streamError.message.includes('cancelled') ||
+               streamError.message.includes('Request was cancelled'))) {
             throw new Error('Request was cancelled');
           }
-          return client.messages.create({
-            model: 'claude-3-5-sonnet-latest', // Use latest version automatically
-            max_tokens: 2000,
-            temperature: 0.7,
-            system: systemPrompt,
-            messages: messages,
-            tools: claudeApiFunctions, // Include MCP functions
-            tool_choice: { type: 'auto' } // Let Claude decide when to use functions
-          });
-        },
-        {
-          maxRetries: 3,
-          baseDelay: 2000, // Start with 2 seconds
-          maxDelay: 60000, // Max 1 minute delay
-          onRetry: (attempt, error) => {
-            const errorMessage = error instanceof Error ? error.message : String(error);
-            console.log(`🔄 Retrying Claude API call (attempt ${attempt}) due to:`, errorMessage);
-          }
+          
+          // Re-throw other streaming errors to be handled by the main catch block
+          throw streamError;
         }
-      );
+      } else {
+        // Non-streaming response (existing logic)
+        response = await APIRetryHandler.executeWithRetry(
+          async () => {
+            // Check for cancellation before each API call
+            if (abortSignal?.aborted) {
+              throw new Error('Request was cancelled');
+            }
+            return client.messages.create({
+              model: 'claude-3-5-sonnet-latest', // Use latest version automatically
+              max_tokens: 2000,
+              temperature: 0.7,
+              system: systemPrompt,
+              messages: messages,
+              tools: claudeApiFunctions, // Include MCP functions
+              tool_choice: { type: 'auto' } // Let Claude decide when to use functions
+            });
+          },
+          {
+            maxRetries: 3,
+            baseDelay: 2000, // Start with 2 seconds
+            maxDelay: 60000, // Max 1 minute delay
+            onRetry: (attempt, error) => {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              console.log(`🔄 Retrying Claude API call (attempt ${attempt}) due to:`, errorMessage);
+            }
+          }
+        );
+      }
 
       // Handle function calls if any
       let finalContent = '';
@@ -339,9 +425,13 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       }
 
       // Collect final text content
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const finalTextBlocks = response.content.filter(block => block.type === 'text') as any[];
-      finalContent += finalTextBlocks.map(block => block.text).join('');
+      if (stream && streamedContent) {
+        finalContent += streamedContent;
+      } else {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const finalTextBlocks = response.content.filter(block => block.type === 'text') as any[];
+        finalContent += finalTextBlocks.map(block => block.text).join('');
+      }
 
       const responseTime = Date.now() - startTime;
 
@@ -350,7 +440,8 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         contentLength: finalContent.length,
         functionsExecuted,
         functionResults: allFunctionResults.length,
-        usage: response.usage
+        usage: response.usage,
+        streaming: stream
       });
 
       // Store the conversation in the current session if sessionId is provided
@@ -396,15 +487,25 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
           functions_called: functionsExecuted,
           function_results: allFunctionResults,
           agent_switch_occurred: agentSwitchOccurred,
-          agent_switch_result: agentSwitchResult
+          agent_switch_result: agentSwitchResult,
+          is_streaming: stream,
+          stream_complete: true
         }
       };
 
     } catch (error) {
       console.error('Claude API Error:', error);
       
-      // Handle specific error types with better user messaging
+      // Handle abort/cancellation errors specifically
       if (error instanceof Error) {
+        // Check for user cancellation/abort errors
+        if (error.message === 'Request was cancelled' ||
+            error.message.includes('aborted') ||
+            error.message.includes('cancelled')) {
+          throw new Error('Request was cancelled');
+        }
+        
+        // Handle other specific error types
         if (error.message.includes('API key')) {
           throw new Error('Invalid Claude API key. Please check your configuration.');
         }
@@ -423,6 +524,28 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         }
         if (error.message.includes('quota') || error.message.includes('usage')) {
           throw new Error('Claude API usage quota exceeded. Please check your account billing or try again later.');
+        }
+        // Check for overloaded_error specifically
+        if (error.message.includes('overloaded_error')) {
+          throw new Error('Claude API is currently overloaded. Please wait a moment and try again.');
+        }
+      }
+      
+      // Check for APIUserAbortError specifically (for streaming)
+      if (error && typeof error === 'object' && 'name' in error) {
+        const errorName = (error as { name: string }).name;
+        if (errorName === 'APIUserAbortError' || errorName === 'AbortError') {
+          throw new Error('Request was cancelled');
+        }
+      }
+
+      // Check for structured error responses from Claude API
+      if (error && typeof error === 'object' && 'error' in error) {
+        const apiError = (error as { error: { type?: string; message?: string } }).error;
+        if (apiError && typeof apiError === 'object' && 'type' in apiError) {
+          if (apiError.type === 'overloaded_error') {
+            throw new Error('Claude API is currently experiencing high demand. Please wait a moment and try again.');
+          }
         }
       }
 
@@ -453,18 +576,46 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
   }
 
   /**
-   * Generate a streaming response (for future implementation)
+   * Generate a streaming response using Claude API
    */
   static async generateStreamingResponse(
     userMessage: string,
     agent: Agent,
     conversationHistory: ClaudeMessage[] = [],
-    sessionId?: string
-    // onChunk parameter removed as it's not currently used
+    sessionId?: string,
+    userProfile?: {
+      id?: string;
+      email?: string;
+      full_name?: string;
+      role?: string;
+    },
+    currentRfp?: {
+      id: number;
+      name: string;
+      description: string;
+      specification: string;
+    } | null,
+    currentArtifact?: {
+      id: string;
+      name: string;
+      type: string;
+      content?: string;
+    } | null,
+    abortSignal?: AbortSignal,
+    onChunk?: (chunk: string, isComplete: boolean) => void
   ): Promise<ClaudeResponse> {
-    // For now, fall back to regular response with session support
-    // Streaming can be implemented later when needed
-    return this.generateResponse(userMessage, agent, conversationHistory, sessionId);
+    return this.generateResponse(
+      userMessage,
+      agent,
+      conversationHistory,
+      sessionId,
+      userProfile,
+      currentRfp,
+      currentArtifact,
+      abortSignal,
+      true, // Enable streaming
+      onChunk
+    );
   }
 
   /**

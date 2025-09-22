@@ -22,6 +22,7 @@ import {
 } from '@ionic/react';
 import { colorPaletteOutline, flask, server, checkmarkCircle, closeCircle, refresh } from 'ionicons/icons';
 import ClaudeTestComponent from '../components/ClaudeTestComponent';
+import ClaudeStreamingTestComponent from '../components/ClaudeStreamingTestComponent';
 import AuthDebugger from '../components/AuthDebugger';
 import RoleManagement from '../components/RoleManagement';
 import MCPTestComponent from '../components/MCPTestComponent';
@@ -406,6 +407,9 @@ const DebugPage: React.FC = () => {
             <ClaudeTestComponent />
           </IonCardContent>
         </IonCard>
+
+        {/* Claude Streaming Test Section */}
+        <ClaudeStreamingTestComponent />
 
         {/* Auth Debug Section */}
         <IonCard>
