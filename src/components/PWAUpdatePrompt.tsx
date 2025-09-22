@@ -10,7 +10,6 @@ interface UpdatePromptProps {
 const PWAUpdatePrompt: React.FC<UpdatePromptProps> = ({ onUpdate }) => {
   const [showUpdate, setShowUpdate] = useState(false);
   const [waitingWorker, setWaitingWorker] = useState<ServiceWorker | null>(null);
-  const [lastCheckTime, setLastCheckTime] = useState<Date | null>(null);
 
   useEffect(() => {
     // Listen for service worker updates
@@ -55,7 +54,6 @@ const PWAUpdatePrompt: React.FC<UpdatePromptProps> = ({ onUpdate }) => {
           if (!document.hidden) {
             navigator.serviceWorker.ready.then(registration => {
               const checkTime = new Date();
-              setLastCheckTime(checkTime);
               console.log('PWA: Manual update check at:', checkTime.toISOString());
               registration.update().then(() => {
                 console.log('PWA: Manual update check completed');
