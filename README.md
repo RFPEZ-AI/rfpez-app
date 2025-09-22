@@ -368,7 +368,8 @@ This README contains comprehensive information about:
 ### Additional Documentation Files
 - **MCP Integration**: See `DOCUMENTATION/MCP-README.md` for detailed MCP setup
 - **Claude API**: See `DOCUMENTATION/CLAUDE-INTEGRATION.md` for API integration guide
-- **Deployment**: See `DOCUMENTATION/DEPLOYMENT.md` for production deployment
+- **Deployment & Versioning**: See `DOCUMENTATION/DEPLOYMENT-AND-VERSIONING.md` for comprehensive deployment guide
+- **Quick Deployment Reference**: See `DOCUMENTATION/DEPLOYMENT-QUICK-REFERENCE.md` for common commands
 - **Database Schema**: See `database/README.md` for schema information
 - **Step-by-step Guides**: See `DOCUMENTATION/` folder for detailed implementation guides
 
