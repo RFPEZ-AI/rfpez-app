@@ -21,6 +21,13 @@ export const useRFPManagement = (currentSessionId?: string) => {
     RFPService.getAll().then(setRFPs); 
   }, []);
 
+  // Clear current RFP context when session changes to ensure session isolation
+  useEffect(() => {
+    console.log('🔄 Session changed in RFP management, clearing current RFP context');
+    setCurrentRfpId(null);
+    setCurrentRfp(null);
+  }, [currentSessionId]);
+
   const handleNewRFP = () => { 
     setEditingRFP(null); 
     setShowRFPModal(true); 
