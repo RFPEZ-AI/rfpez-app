@@ -27,6 +27,14 @@ jobs:
           cache: 'npm'
           cache-dependency-path: package-lock.json
       
+      - name: Auto-increment version
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          npm version patch --no-git-tag-version
+          git add package.json package-lock.json
+          git commit -m "Auto-increment version to $(node -p "require('./package.json').version")" || exit 0
+      
       - name: Install dependencies
         run: npm ci
       
@@ -35,6 +43,8 @@ jobs:
         env:
           REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL }}
           REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY }}
+          REACT_APP_BUILD_NUMBER: ${{ github.run_number }}
+          REACT_APP_COMMIT_SHA: ${{ github.sha }}
       
       - name: Deploy to Azure Static Web Apps
         id: builddeploy
