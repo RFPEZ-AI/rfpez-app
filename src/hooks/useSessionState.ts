@@ -26,12 +26,14 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
       console.log('Attempting to load sessions from Supabase for user:', userId);
       const sessionsData = await DatabaseService.getUserSessions(userId);
       console.log('Sessions loaded:', sessionsData);
-      const formattedSessions: Session[] = sessionsData.map(session => ({
-        id: session.id,
-        title: session.title,
-        timestamp: new Date(session.updated_at),
-        agent_name: session.agent_name
-      }));
+      const formattedSessions: Session[] = sessionsData
+        .map(session => ({
+          id: session.id,
+          title: session.title,
+          timestamp: new Date(session.updated_at),
+          agent_name: session.agent_name
+        }))
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Sort descending (newest first)
       setSessions(formattedSessions);
     } catch (error) {
       console.error('Failed to load sessions:', error);
