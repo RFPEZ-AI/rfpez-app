@@ -5,7 +5,7 @@ import { IonAlert, IonToast } from '@ionic/react';
 
 export interface APIError {
   message: string;
-  type: 'rate_limit' | 'network' | 'auth' | 'quota' | 'server' | 'unknown';
+  type: 'rate_limit' | 'network' | 'auth' | 'quota' | 'server' | 'overloaded' | 'unknown';
   retryable: boolean;
   suggestion?: string;
 }
@@ -61,6 +61,13 @@ const APIErrorHandler: React.FC<APIErrorHandlerProps> = ({
           icon: '⚠️',
           color: 'medium' as const,
           suggestion: error.suggestion || 'The API service is temporarily unavailable. Please try again in a few moments.'
+        };
+      case 'overloaded':
+        return {
+          header: 'Service Overloaded',
+          icon: '🚫',
+          color: 'warning' as const,
+          suggestion: error.suggestion || 'The API is currently experiencing high demand. Please wait a moment and try again.'
         };
       default:
         return {
@@ -137,6 +144,15 @@ export const categorizeError = (error: Error | unknown): APIError => {
       type: 'rate_limit',
       retryable: true,
       suggestion: 'The API is receiving too many requests. Please wait a moment before trying again.'
+    };
+  }
+
+  if (messageLower.includes('overloaded') || messageLower.includes('overloaded_error') || messageLower.includes('high demand')) {
+    return {
+      message,
+      type: 'overloaded',
+      retryable: true,
+      suggestion: 'The Claude API is currently experiencing high demand. Please wait a moment and try again.'
     };
   }
 

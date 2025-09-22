@@ -180,6 +180,19 @@ export class APIRetryHandler {
       return true;
     }
 
+    // Check for overloaded errors (should be retryable with longer delays)
+    if (message.includes('overloaded') || message.includes('overloaded_error') || message.includes('high demand')) {
+      return true;
+    }
+
+    // Check for structured overloaded errors
+    if (error && typeof error === 'object' && 'error' in error) {
+      const apiError = (error as { error: { type?: string; message?: string } }).error;
+      if (apiError && typeof apiError === 'object' && 'type' in apiError && apiError.type === 'overloaded_error') {
+        return true;
+      }
+    }
+
     // Check for network errors
     if (message.includes('network') || message.includes('timeout') || message.includes('connection')) {
       return true;
@@ -198,7 +211,7 @@ export class APIRetryHandler {
     // For rate limit errors, use a longer delay
     const hasStatus = typeof error === 'object' && error !== null && 'status' in error;
     const status = hasStatus ? (error as { status: number }).status : 0;
-    const message = error instanceof Error ? error.message : '';
+    const message = error instanceof Error ? error.message.toLowerCase() : '';
     
     if (status === 429 || message.includes('rate limit')) {
       const rateLimitDelay = this.rateLimitInfo?.resetTime 
@@ -206,6 +219,24 @@ export class APIRetryHandler {
         : 60000; // Default to 1 minute
 
       return Math.min(rateLimitDelay, maxDelay);
+    }
+
+    // For overloaded errors, use longer delays to avoid making the problem worse
+    if (message.includes('overloaded') || message.includes('overloaded_error') || message.includes('high demand')) {
+      // Progressive delays for overload: 5s, 15s, 30s
+      const overloadDelays = [5000, 15000, 30000];
+      const delayIndex = Math.min(attempt, overloadDelays.length - 1);
+      return overloadDelays[delayIndex];
+    }
+
+    // Check for structured overloaded errors
+    if (error && typeof error === 'object' && 'error' in error) {
+      const apiError = (error as { error: { type?: string; message?: string } }).error;
+      if (apiError && typeof apiError === 'object' && 'type' in apiError && apiError.type === 'overloaded_error') {
+        const overloadDelays = [5000, 15000, 30000];
+        const delayIndex = Math.min(attempt, overloadDelays.length - 1);
+        return overloadDelays[delayIndex];
+      }
     }
 
     // Standard exponential backoff
@@ -222,6 +253,7 @@ export class APIRetryHandler {
       // Check if it's a rate limit error and enhance the message
       const hasStatus = typeof error === 'object' && error !== null && 'status' in error;
       const status = hasStatus ? (error as { status: number }).status : 0;
+      const message = error.message.toLowerCase();
       
       if (status === 429) {
         const waitTime = this.rateLimitInfo?.resetTime 
@@ -234,10 +266,18 @@ export class APIRetryHandler {
         );
       }
 
-      if (error.message.includes('rate limit')) {
+      if (message.includes('rate limit')) {
         return new Error(
           'Rate limit exceeded. The API is receiving too many requests. ' +
           'Please wait a moment before trying again.'
+        );
+      }
+
+      // Check for overloaded errors
+      if (message.includes('overloaded') || message.includes('overloaded_error') || message.includes('high demand')) {
+        return new Error(
+          'Claude API is currently experiencing high demand and is overloaded. ' +
+          'The system is automatically retrying with longer delays. Please be patient.'
         );
       }
 

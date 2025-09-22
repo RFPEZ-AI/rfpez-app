@@ -222,6 +222,34 @@ export const useMessageHandling = () => {
           metadata: {}
         };
 
+        // Create a temporary AI message for streaming updates
+        const aiMessageId = (Date.now() + 1).toString();
+        const aiMessage: Message = {
+          id: aiMessageId,
+          content: '',
+          isUser: false,
+          timestamp: new Date(),
+          agentName: agentForResponse.agent_name
+        };
+        
+        // Add the empty AI message to the UI immediately
+        setMessages(prev => [...prev, aiMessage]);
+
+        // Create streaming callback to update the message content
+        const onStreamingChunk = (chunk: string, isComplete: boolean) => {
+          setMessages(prev => 
+            prev.map(msg => 
+              msg.id === aiMessageId 
+                ? { ...msg, content: msg.content + chunk }
+                : msg
+            )
+          );
+          
+          if (isComplete) {
+            console.log('Streaming complete for message:', aiMessageId);
+          }
+        };
+
         const claudeResponse = await ClaudeService.generateResponse(
           content,
           agentForClaude,
@@ -240,15 +268,19 @@ export const useMessageHandling = () => {
             specification: currentRfp.specification
           } : null,
           currentArtifact || null,
-          abortControllerRef.current?.signal
+          abortControllerRef.current?.signal,
+          true, // Enable streaming
+          onStreamingChunk // Stream callback
         );
         
         console.log('=== CLAUDE RESPONSE DEBUG ===');
         console.log('1. Raw response content:', claudeResponse.content.substring(0, 200) + '...');
         console.log('2. Response has metadata:', !!claudeResponse.metadata);
+        console.log('3. Was streaming:', claudeResponse.metadata.is_streaming);
         
-        const aiMessage: Message = {
-          id: (Date.now() + 1).toString(),
+        // Update the final message with complete content and metadata
+        const finalAiMessage: Message = {
+          id: aiMessageId,
           content: claudeResponse.content,
           isUser: false,
           timestamp: new Date(),
@@ -261,15 +293,27 @@ export const useMessageHandling = () => {
         // Generate artifact references for the AI message
         const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
         if (artifactRefs.length > 0) {
-          aiMessage.artifactRefs = artifactRefs;
+          finalAiMessage.artifactRefs = artifactRefs;
         }
         
-        setMessages(prev => [...prev, aiMessage]);
+        // Update the message in state with final content and artifact references
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === aiMessageId 
+              ? finalAiMessage
+              : msg
+          )
+        );
 
         // Process Claude response metadata for artifacts with message ID
-        addClaudeArtifacts(claudeResponse.metadata, aiMessage.id);
+        addClaudeArtifacts(claudeResponse.metadata, finalAiMessage.id);
 
         setIsLoading(false);
+        
+        // Clean up abort controller after successful completion
+        if (abortControllerRef.current) {
+          abortControllerRef.current = null;
+        }
 
         // Check if an agent switch occurred during the Claude response
         if (claudeResponse.metadata.agent_switch_occurred) {
@@ -329,9 +373,28 @@ export const useMessageHandling = () => {
         console.error('Claude API Error:', claudeError);
         setIsLoading(false);
         
-        // Check if this was a cancellation
-        if (claudeError instanceof Error && claudeError.message === 'Request was cancelled') {
-          console.log('Request was cancelled by user');
+        // Clean up abort controller
+        if (abortControllerRef.current) {
+          abortControllerRef.current = null;
+        }
+        
+        // Check if this was a cancellation (more comprehensive check)
+        if (claudeError instanceof Error && 
+            (claudeError.message === 'Request was cancelled' ||
+             claudeError.message.includes('aborted') ||
+             claudeError.message.includes('cancelled'))) {
+          console.log('Request was cancelled by user - cleaning up UI state');
+          
+          // Remove the incomplete AI message if streaming was cancelled
+          setMessages(prev => {
+            // Remove the last message if it's an AI message with no content (streaming was interrupted)
+            const lastMessage = prev[prev.length - 1];
+            if (lastMessage && !lastMessage.isUser && lastMessage.content.trim() === '') {
+              return prev.slice(0, -1);
+            }
+            return prev;
+          });
+          
           return; // Don't show error message for cancelled requests
         }
         

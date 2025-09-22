@@ -96,7 +96,24 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                   whiteSpace: 'pre-wrap'
                 }}>
                   {message.content}
+                  {/* Show typing indicator for streaming messages that are still being written */}
+                  {!message.isUser && message.content.length > 0 && isLoading && (
+                    <span style={{
+                      opacity: 0.7,
+                      animation: 'blink 1s infinite',
+                      marginLeft: '2px'
+                    }}>▊</span>
+                  )}
                 </div>
+                
+                <style>
+                  {`
+                    @keyframes blink {
+                      0%, 50% { opacity: 1; }
+                      51%, 100% { opacity: 0; }
+                    }
+                  `}
+                </style>
                 
                 {/* Artifact references */}
                 {message.artifactRefs && message.artifactRefs.length > 0 && (
@@ -144,7 +161,13 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
             <IonCard style={{ marginRight: '20%' }}>
               <IonCardContent>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div>{currentAgent?.agent_name || 'AI'} Agent is working...</div>
+                  <div>
+                    {/* Check if we have a partial message being streamed */}
+                    {messages.length > 0 && !messages[messages.length - 1].isUser && messages[messages.length - 1].content.length > 0
+                      ? `${currentAgent?.agent_name || 'AI'} Agent is responding...`
+                      : `${currentAgent?.agent_name || 'AI'} Agent is thinking...`
+                    }
+                  </div>
                   {onCancelRequest && (
                     <button 
                       onClick={onCancelRequest}
