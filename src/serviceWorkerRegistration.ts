@@ -56,6 +56,28 @@ export function register(config?: Config) {
         registerValidSW(swUrl, config);
       }
     });
+
+    // Force update check when page becomes visible (user returns to app)
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.update().catch(error => {
+            console.log('Service worker update check failed:', error);
+          });
+        });
+      }
+    });
+
+    // Force update check every 30 minutes when app is active
+    setInterval(() => {
+      if (!document.hidden) {
+        navigator.serviceWorker.ready.then(registration => {
+          registration.update().catch(error => {
+            console.log('Periodic service worker update check failed:', error);
+          });
+        });
+      }
+    }, 30 * 60 * 1000); // 30 minutes
   }
 }
 
