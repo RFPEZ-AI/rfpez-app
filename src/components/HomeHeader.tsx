@@ -98,23 +98,12 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
           <img 
             src="/assets/logo.svg?v=2" 
             alt="RFPEZ.AI" 
-            style={{ height: '32px', marginRight: isMobile ? '6px' : '12px' }}
+            title={`${versionDisplay} PWA`}
+            style={{ height: '32px', marginRight: isMobile ? '6px' : '12px', cursor: 'pointer' }}
           />
           {!isMobile && (
             <div style={{ display: 'flex', alignItems: 'center' }}>
               <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
-              <span style={{ 
-                fontSize: '10px', 
-                fontWeight: 'normal', 
-                backgroundColor: '#007bff', 
-                color: 'white', 
-                padding: '2px 6px', 
-                borderRadius: '8px', 
-                marginLeft: '8px',
-                lineHeight: '1'
-              }}>
-                {versionDisplay} PWA
-              </span>
             </div>
           )}
           
