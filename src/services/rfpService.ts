@@ -231,8 +231,8 @@ export class RFPService {
     let supplierId = bid.supplier_id;
     
     if (!supplierId && bid.response && typeof bid.response === 'object') {
-      const response = bid.response as any;
-      const supplierInfo = response.supplier_info;
+      const response = bid.response as Record<string, unknown>;
+      const supplierInfo = response.supplier_info as Record<string, unknown> | undefined;
       
       if (supplierInfo && supplierInfo.email) {
         console.log('🔍 Checking for existing supplier profile with email:', supplierInfo.email);

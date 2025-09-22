@@ -84,10 +84,17 @@ export const testClaudeAPIAvailability = async (): Promise<{
 };
 
 // Global function for browser console testing
-(window as any).testClaudeAPI = testClaudeAPIAvailability;
+declare global {
+  interface Window {
+    testClaudeAPI?: typeof testClaudeAPIAvailability;
+    checkClaudeAPI?: () => Promise<unknown>;
+  }
+}
+
+(window as Window).testClaudeAPI = testClaudeAPIAvailability;
 
 // Also add a simpler version that logs results
-(window as any).checkClaudeAPI = async () => {
+(window as Window).checkClaudeAPI = async () => {
   console.log('🔍 Checking Claude API availability...');
   const result = await testClaudeAPIAvailability();
   
