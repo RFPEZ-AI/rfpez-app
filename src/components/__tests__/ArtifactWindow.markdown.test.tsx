@@ -11,6 +11,11 @@ jest.mock('react-markdown', () => {
   };
 });
 
+// Mock useIsMobile hook
+jest.mock('../../utils/useMediaQuery', () => ({
+  useIsMobile: jest.fn(() => false) // Default to desktop for tests
+}));
+
 describe('ArtifactWindow Enhanced Markdown Rendering', () => {
   const createDocumentArtifact = (content: string, name = 'Test Document'): Artifact => ({
     id: 'test-doc-1',

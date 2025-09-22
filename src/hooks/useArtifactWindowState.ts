@@ -16,10 +16,10 @@ interface ArtifactWindowState {
 export const useArtifactWindowState = () => {
   const isMobile = useIsMobile();
   
-  // Default state: closed on mobile, open on desktop
+  // Default state: open on both desktop and mobile for better UX
   const getDefaultState = (): ArtifactWindowState => ({
-    isOpen: !isMobile,
-    isCollapsed: true, // Start collapsed by default
+    isOpen: true, // Open by default on both desktop and mobile
+    isCollapsed: isMobile, // Start collapsed on mobile, expanded on desktop
     selectedArtifactId: null
   });
 

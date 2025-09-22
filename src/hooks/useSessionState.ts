@@ -40,9 +40,9 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
 
   const loadSessionMessages = async (sessionId: string) => {
     try {
-      console.log('Loading messages for session:', sessionId);
+      console.log('🔍 Loading messages for session:', sessionId);
       const messagesData = await DatabaseService.getSessionMessages(sessionId);
-      console.log('Raw messages data:', messagesData);
+      console.log('📨 Raw messages data from database:', messagesData);
       const formattedMessages: Message[] = messagesData
         .map(msg => ({
           id: msg.id,
@@ -54,8 +54,9 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
           artifactRefs: (msg.metadata?.artifactRefs as ArtifactReference[]) || []
         }))
         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-      console.log('Formatted messages:', formattedMessages);
+      console.log('✨ Formatted messages:', formattedMessages);
       setMessages(formattedMessages);
+      console.log('✅ Messages set to state, total:', formattedMessages.length);
     } catch (error) {
       console.error('Failed to load session messages:', error);
     }

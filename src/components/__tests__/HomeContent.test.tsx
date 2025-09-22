@@ -49,6 +49,11 @@ jest.mock('../ArtifactWindow', () => {
   };
 });
 
+// Mock the useIsMobile hook
+jest.mock('../../utils/useMediaQuery', () => ({
+  useIsMobile: () => false // Default to desktop for tests
+}));
+
 describe('HomeContent', () => {
   const mockMessages: Message[] = [
     {

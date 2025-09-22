@@ -152,6 +152,17 @@ const Home: React.FC = () => {
   // Define handleSelectSession before useEffects that call it
   const handleSelectSession = useCallback(async (sessionId: string) => {
     console.log('Session selected:', sessionId);
+    
+    // On mobile, collapse the session history to give more space for messages
+    const windowWidth = window.innerWidth;
+    const isMobileViewport = windowWidth <= 768;
+    console.log('📱 Mobile detection check:', { isMobileViewport, windowWidth });
+    
+    if (isMobileViewport) {
+      console.log('📱 Mobile viewport detected: collapsing session history');
+      setForceSessionHistoryCollapsed(true);
+    }
+    
     setSelectedSessionId(sessionId);
     setCurrentSessionId(sessionId);
     
@@ -810,8 +821,13 @@ const Home: React.FC = () => {
         '--padding-top': '0',
         '--padding-bottom': '0'
       }}>
+        {/* Proper content container that accounts for header */}
         <div style={{ 
-          height: '100vh',
+          position: 'absolute',
+          top: '56px', // Start below the header
+          left: 0,
+          right: 0,
+          bottom: '40px', // Account for footer
           display: 'flex', 
           flexDirection: 'column',
           overflow: 'hidden'
@@ -841,6 +857,11 @@ const Home: React.FC = () => {
             onToggleArtifactCollapse={artifactWindowState.toggleCollapse}
             forceSessionHistoryCollapsed={forceSessionHistoryCollapsed}
             onSessionHistoryToggle={(expanded) => {
+              // Reset force collapsed state when user manually expands
+              if (expanded) {
+                setForceSessionHistoryCollapsed(false);
+              }
+              
               // If session history is being expanded and we're on mobile, collapse artifact window
               if (expanded && window.innerWidth <= 768 && artifactWindowState.isOpen) {
                 artifactWindowState.closeWindow();

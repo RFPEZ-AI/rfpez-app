@@ -37,14 +37,26 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedSessionForAction, setSelectedSessionForAction] = useState<string | null>(null);
 
-  // Determine actual expanded state based on forceCollapsed prop
-  const isExpanded = !forceCollapsed && internalExpanded;
+  // Determine actual expanded state based on internal state
+  // forceCollapsed now only triggers auto-collapse via useEffect, but manual expansion is always allowed
+  const isExpanded = internalExpanded;
 
-  // Set initial collapsed state based on screen size
-  // On mobile/narrow screens (≤768px), start collapsed for better space utilization
+  // Auto-collapse when forceCollapsed becomes true
   useEffect(() => {
-    setInternalExpanded(!isMobile);
-  }, [isMobile]);
+    if (forceCollapsed) {
+      console.log('🔄 SessionHistory: Force collapsing due to forceCollapsed=true');
+      setInternalExpanded(false);
+    }
+  }, [forceCollapsed]);
+
+  // Initialize expanded state based on mobile detection
+  useEffect(() => {
+    console.log('🔄 SessionHistory: Initializing expanded state', { isMobile, forceCollapsed });
+    // Only auto-expand if not force collapsed
+    if (!forceCollapsed) {
+      setInternalExpanded(true);
+    }
+  }, [isMobile]); // Only depend on isMobile, not forceCollapsed
 
   // Notify parent when expansion state changes
   useEffect(() => {
@@ -52,9 +64,8 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   }, [isExpanded, onToggleExpanded]);
 
   const toggleExpanded = () => {
-    if (!forceCollapsed) {
-      setInternalExpanded(!internalExpanded);
-    }
+    // Allow toggle always, but force collapse may override it
+    setInternalExpanded(!internalExpanded);
   };
 
   const handleSessionRightClick = (e: React.MouseEvent, sessionId: string) => {
@@ -80,17 +91,26 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
       width: isExpanded ? '300px' : '60px',
       minWidth: isExpanded ? '300px' : '60px',
       transition: 'width 0.3s ease, min-width 0.3s ease',
-      backgroundColor: 'var(--ion-background-color)'
+      backgroundColor: 'var(--ion-background-color)',
+      position: 'relative',
+      zIndex: 1
+      // No margin needed - parent container handles positioning
     }}>
       {/* Header with collapse/expand and new session controls */}
       <div style={{ 
-        padding: isExpanded ? '16px' : '8px', 
+        padding: isExpanded ? '8px 12px' : '4px', 
         borderBottom: '1px solid var(--ion-color-light-shade)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: isExpanded ? 'flex-start' : 'center',
-        gap: isExpanded ? '8px' : '4px',
-        flexDirection: isExpanded ? 'row' : 'column'
+        justifyContent: isExpanded ? 'space-between' : 'center',
+        gap: '4px',
+        flexDirection: 'row',
+        minHeight: isExpanded ? '40px' : '32px',
+        flexShrink: 0,
+        position: 'sticky',
+        top: 0,
+        backgroundColor: 'var(--ion-background-color)',
+        zIndex: 2
       }}>
         {/* Collapse/Expand Button */}
         <IonButton 
@@ -99,9 +119,11 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
           onClick={toggleExpanded}
           title="Expand/collapse history"
           style={{ 
-            '--padding-start': '8px', 
-            '--padding-end': '8px',
-            order: isExpanded ? 1 : 2
+            '--padding-start': '4px', 
+            '--padding-end': '4px',
+            order: 1,
+            minWidth: isExpanded ? '32px' : '24px',
+            height: isExpanded ? '32px' : '24px'
           }}
         >
           <IonIcon icon={isExpanded ? chevronDown : chevronForward} />
@@ -110,24 +132,32 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
         {/* New Session Button - always visible but different styles */}
         {isExpanded ? (
           <IonButton 
-            expand="block" 
             fill="clear" 
+            size="small"
             onClick={onNewSession}
             title="Create new session"
-            style={{ flex: 1, order: 2 }}
+            style={{ 
+              '--padding-start': '4px', 
+              '--padding-end': '4px',
+              order: 2,
+              minWidth: '32px',
+              height: '32px'
+            }}
           >
-            <IonIcon icon={create} slot="start" />
-            New Session
+            <IonIcon icon={create} />
           </IonButton>
         ) : (
           <IonButton 
             fill="clear" 
+            size="small"
             onClick={onNewSession}
             title="Create new session"
             style={{ 
-              '--padding-start': '8px', 
-              '--padding-end': '8px',
-              order: 1
+              '--padding-start': '4px', 
+              '--padding-end': '4px',
+              order: 2,
+              minWidth: '24px',
+              height: '24px'
             }}
           >
             <IonIcon icon={create} />
@@ -137,8 +167,16 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
 
       {/* Session List - only visible when expanded */}
       {isExpanded && (
-        <div style={{ flex: 1, overflow: 'auto' }}>
-          <IonList>
+        <div style={{ 
+          flex: 1, 
+          overflow: 'auto',
+          // On mobile, limit the session list height to prevent taking too much space
+          maxHeight: isMobile ? '160px' : 'none'
+        }}>
+          <IonList style={{
+            // More compact styling on mobile
+            '--ion-item-min-height': isMobile ? '40px' : '48px'
+          }}>
             {sessions.map((session) => (
               <IonItem
                 key={session.id}
