@@ -47,12 +47,14 @@ export function useSessionManagement() {
 
       const userSessions = await DatabaseService.getUserSessions(user.id);
       
-      const formattedSessions: Session[] = userSessions.map(session => ({
-        id: session.id,
-        title: session.title,
-        timestamp: new Date(session.created_at),
-        agent_name: session.agent_name
-      }));
+      const formattedSessions: Session[] = userSessions
+        .map(session => ({
+          id: session.id,
+          title: session.title,
+          timestamp: new Date(session.updated_at), // Use updated_at for most recent activity
+          agent_name: session.agent_name
+        }))
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Sort descending (newest first)
 
       setSessions(formattedSessions);
 
