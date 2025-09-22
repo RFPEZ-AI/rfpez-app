@@ -13,6 +13,7 @@ import AgentIndicator from './AgentIndicator';
 import AuthButtons from './AuthButtons';
 import { RoleService } from '../services/roleService';
 import { useIsMobile } from '../utils/useMediaQuery';
+import packageJson from '../../package.json';
 
 interface HomeHeaderProps {
   // User and authentication props
@@ -79,6 +80,15 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   onToggleArtifactWindow
 }) => {
   const isMobile = useIsMobile();
+  
+  // Get version info - use build number if available, otherwise package version
+  const buildNumber = process.env.REACT_APP_BUILD_NUMBER;
+  const commitSha = process.env.REACT_APP_COMMIT_SHA?.substring(0, 7);
+  const baseVersion = packageJson.version;
+  
+  const versionDisplay = buildNumber 
+    ? `v${baseVersion}.${buildNumber}${commitSha ? ` (${commitSha})` : ''}`
+    : `v${baseVersion}`;
 
   return (
     <IonHeader>
@@ -103,7 +113,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                 marginLeft: '8px',
                 lineHeight: '1'
               }}>
-                v1.2 PWA
+                {versionDisplay} PWA
               </span>
             </div>
           )}
