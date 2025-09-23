@@ -811,6 +811,30 @@ For questions about this RFP, please contact us through the RFPEZ.AI platform.
   // Find bid form artifact for an RFP
   static async getBidFormForRfp(rfpId: number): Promise<FormSpec | null> {
     try {
+      console.log('🔍 Looking for bid form for RFP ID:', rfpId);
+
+      // First, try the new schema with rfp_artifacts junction table
+      const { data: rfpArtifacts, error: rfpArtifactError } = await supabase
+        .from('rfp_artifacts')
+        .select('artifact_id, artifacts!inner(*)')
+        .eq('rfp_id', rfpId)
+        .eq('artifact_role', 'bid_form')
+        .order('created_at', { ascending: false });
+
+      if (rfpArtifactError) {
+        console.warn('Error querying rfp_artifacts table:', rfpArtifactError);
+      } else if (rfpArtifacts && rfpArtifacts.length > 0) {
+        console.log('✅ Found bid form via rfp_artifacts table');
+        const bidFormArtifact = (rfpArtifacts[0] as any).artifacts;
+        console.log('Found bid form artifact:', bidFormArtifact.name, 'for RFP:', rfpId);
+
+        // Extract the form specification from the artifact
+        return this.extractFormSpecFromArtifact(bidFormArtifact);
+      }
+
+      // Fallback to legacy approach for backwards compatibility
+      console.log('⚠️ No bid form found via rfp_artifacts, trying legacy name-based search');
+      
       // First, get the RFP to get its name for pattern matching
       const rfp = await this.getById(rfpId);
       if (!rfp) {
@@ -842,32 +866,33 @@ For questions about this RFP, please contact us through the RFPEZ.AI platform.
 
       // Use the most recent matching bid form
       const bidFormArtifact = artifacts[0];
-      console.log('Found bid form artifact:', bidFormArtifact.name, 'for RFP:', rfp.name);
-
-      // Extract the form specification from the artifact
-      // The schema might be in the schema field or in processed_content
-      let formSpec: FormSpec;
+      console.log('Found bid form artifact via legacy search:', bidFormArtifact.name, 'for RFP:', rfp.name);
       
-      if (bidFormArtifact.processed_content) {
-        try {
-          const processedData = JSON.parse(bidFormArtifact.processed_content);
-          formSpec = {
-            schema: processedData.schema || bidFormArtifact.schema || {},
-            uiSchema: processedData.ui_schema || bidFormArtifact.ui_schema || {},
-            defaults: processedData.form_data || bidFormArtifact.form_data || {},
-            version: '1.0'
-          };
-          console.log('✅ Extracted form spec from processed_content');
-        } catch (error) {
-          console.warn('Failed to parse processed_content, falling back to direct fields');
-          formSpec = {
-            schema: bidFormArtifact.schema || {},
-            uiSchema: bidFormArtifact.ui_schema || {},
-            defaults: bidFormArtifact.form_data || {},
-            version: '1.0'
-          };
-        }
-      } else {
+      return this.extractFormSpecFromArtifact(bidFormArtifact);
+    } catch (error) {
+      console.error('Error finding bid form for RFP:', error);
+      return null;
+    }
+  }
+
+  // Helper method to extract FormSpec from artifact data
+  private static extractFormSpecFromArtifact(bidFormArtifact: any): FormSpec {
+    // Extract the form specification from the artifact
+    // The schema might be in the schema field or in processed_content
+    let formSpec: FormSpec;
+    
+    if (bidFormArtifact.processed_content) {
+      try {
+        const processedData = JSON.parse(bidFormArtifact.processed_content);
+        formSpec = {
+          schema: processedData.schema || bidFormArtifact.schema || {},
+          uiSchema: processedData.ui_schema || bidFormArtifact.ui_schema || {},
+          defaults: processedData.form_data || bidFormArtifact.form_data || {},
+          version: '1.0'
+        };
+        console.log('✅ Extracted form spec from processed_content');
+      } catch (error) {
+        console.warn('Failed to parse processed_content, falling back to direct fields');
         formSpec = {
           schema: bidFormArtifact.schema || {},
           uiSchema: bidFormArtifact.ui_schema || {},
@@ -875,11 +900,15 @@ For questions about this RFP, please contact us through the RFPEZ.AI platform.
           version: '1.0'
         };
       }
-
-      return formSpec;
-    } catch (error) {
-      console.error('Error finding bid form for RFP:', error);
-      return null;
+    } else {
+      formSpec = {
+        schema: bidFormArtifact.schema || {},
+        uiSchema: bidFormArtifact.ui_schema || {},
+        defaults: bidFormArtifact.form_data || {},
+        version: '1.0'
+      };
     }
+
+    return formSpec;
   }
 }

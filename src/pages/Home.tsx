@@ -482,6 +482,13 @@ const Home: React.FC = () => {
   };
 
   const onSendMessage = async (content: string) => {
+    // IMMEDIATE DEBUG - Add visual overlay to confirm this function is called
+    console.error('🌟🌟🌟 ON_SEND_MESSAGE CALLED IN HOME.TSX:', content);
+    const homeDebug = document.createElement('div');
+    homeDebug.style.cssText = 'position:fixed;top:75px;left:0;background:yellow;color:black;padding:5px;z-index:99999;font-weight:bold;';
+    homeDebug.innerHTML = `🌟 HOME ON_SEND_MESSAGE: ${content.substring(0, 30)}`;
+    document.body.appendChild(homeDebug);
+    
     await handleSendMessage(
       content,
       messages,
