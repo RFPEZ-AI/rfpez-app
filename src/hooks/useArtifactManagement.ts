@@ -627,6 +627,20 @@ export const useArtifactManagement = (
                       console.warn('⚠️ Could not save bid form artifact to database:', error);
                     } else {
                       console.log('✅ Bid form artifact saved to database with role:', data.artifact_role);
+                      
+                      // Now link the artifact to the RFP in the junction table
+                      const { DatabaseService } = await import('../services/database');
+                      const linkSuccess = await DatabaseService.linkArtifactToRFP(
+                        placeholderRfp.id, 
+                        formArtifact.id, 
+                        'bid_form'
+                      );
+                      
+                      if (linkSuccess) {
+                        console.log('✅ Bid form artifact linked to RFP in junction table');
+                      } else {
+                        console.warn('⚠️ Failed to link bid form artifact to RFP in junction table');
+                      }
                     }
                   }
                 } else {
@@ -669,6 +683,20 @@ export const useArtifactManagement = (
                     console.warn('⚠️ Could not save bid form artifact to database:', error);
                   } else {
                     console.log('✅ Bid form artifact saved to database with role for existing RFP:', data.artifact_role);
+                    
+                    // Now link the artifact to the existing RFP in the junction table
+                    const { DatabaseService } = await import('../services/database');
+                    const linkSuccess = await DatabaseService.linkArtifactToRFP(
+                      currentRfpId, 
+                      formArtifact.id, 
+                      'bid_form'
+                    );
+                    
+                    if (linkSuccess) {
+                      console.log('✅ Bid form artifact linked to existing RFP in junction table');
+                    } else {
+                      console.warn('⚠️ Failed to link bid form artifact to existing RFP in junction table');
+                    }
                   }
                 }
               } catch (error) {

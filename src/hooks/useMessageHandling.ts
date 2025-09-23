@@ -115,18 +115,8 @@ export const useMessageHandling = () => {
       content?: string;
     } | null
   ) => {
-    // CRITICAL DEBUG: Log every handleSendMessage call to detect duplicates
-    console.error('🚨 HANDLE_SEND_MESSAGE CALLED:', {
-      timestamp: new Date().toISOString(),
-      content: content.substring(0, 50) + '...',
-      hasActiveController: !!abortControllerRef.current,
-      isAborted: abortControllerRef.current?.signal.aborted,
-      isProcessing: isProcessingRef.current
-    });
-    
     // GUARD: Prevent overlapping calls
     if (isProcessingRef.current) {
-      console.error('🚨 BLOCKING DUPLICATE CALL - Request already in progress');
       return;
     }
     
@@ -371,6 +361,22 @@ export const useMessageHandling = () => {
 
         console.error('🔥 ABOUT TO CALL CLAUDE API - This should appear!');
 
+        // DYNAMIC STREAMING DETECTION: Check for function-calling keywords
+        const rfpKeywords = [
+          'create rfp', 'rfp for', 'procurement', 'procure', 'sourcing', 'source', 
+          'bid for', 'proposal for', 'vendor for', 'need to source',
+          'looking for', 'find supplier', 'find vendor', 'buy',
+          'purchase', 'need to buy', 'need to purchase', 'need to find',
+          'need to get', 'require', 'looking to', 'want to source',
+          'want to buy', 'want to purchase', 'need to procure'
+        ];
+        const shouldForceFunctionCall = rfpKeywords.some(keyword => 
+          content.toLowerCase().includes(keyword.toLowerCase())
+        );
+
+        // SMART STREAMING: Use non-streaming for function calls, streaming for text-only
+        const useStreaming = !shouldForceFunctionCall; // Disable streaming when function calls expected
+
         const claudeResponse = await ClaudeService.generateResponse(
           content,
           agentForClaude,
@@ -389,8 +395,8 @@ export const useMessageHandling = () => {
             specification: currentRfp.specification
           } : null,
           currentArtifact || null,
-          thisRequestController.signal, // Use the specific controller for this request
-          true, // Enable streaming
+          undefined, // DISABLE ABORT SIGNAL - bypass AbortController issues
+          useStreaming, // SMART STREAMING: false for function calls, true for text-only
           onStreamingChunk // Stream callback
         );
         
@@ -401,13 +407,6 @@ export const useMessageHandling = () => {
         console.log('4. Stream complete:', claudeResponse.metadata.stream_complete);
         console.log('5. Functions executed:', claudeResponse.metadata.functions_called);
         console.log('✅ COMPLETE CLAUDE RESPONSE FINISHED (including all function calls and streaming)');
-        
-        // Log function execution status
-        if (claudeResponse.metadata.functions_called && claudeResponse.metadata.functions_called.length > 0) {
-          console.error('🚨 FUNCTION EXECUTION DETECTED: ' + (claudeResponse.metadata.functions_called || []).join(', '));
-        } else {
-          console.error('🚨 NO FUNCTIONS EXECUTED IN RESPONSE');
-        }
         
         // Update the final message with complete content and metadata
         const finalAiMessage: Message = {

@@ -2,7 +2,7 @@
 
 // Claude API service for RFPEZ.AI Multi-Agent System with MCP Integration
 import Anthropic from '@anthropic-ai/sdk';
-import type { Message, ContentBlock, TextBlock, ToolUseBlock } from '@anthropic-ai/sdk/resources';
+import type { Message, ContentBlock, TextBlock, ToolUseBlock, MessageParam } from '@anthropic-ai/sdk/resources';
 import type { Agent } from '../types/database';
 import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
 import { APIRetryHandler } from '../utils/apiRetry';
@@ -72,11 +72,6 @@ const storeMessageIsolated = async (
   }
 };
 
-interface ClaudeMessage {
-  role: 'user' | 'assistant';
-  content: string;
-}
-
 interface ClaudeResponse {
   content: string;
   metadata: {
@@ -98,6 +93,36 @@ interface ClaudeResponse {
     stream_complete?: boolean;
     [key: string]: unknown; // Allow additional metadata properties
   };
+}
+
+/**
+ * Validates that a message has valid non-empty content
+ */
+function validateMessageContent(message: MessageParam): boolean {
+  if (typeof message.content === 'string') {
+    return message.content.trim().length > 0;
+  }
+  
+  if (Array.isArray(message.content)) {
+    return message.content.length > 0;
+  }
+  
+  return false;
+}
+
+/**
+ * Validates all messages in an array and filters out invalid ones
+ */
+function validateAndFilterMessages(messages: MessageParam[]): MessageParam[] {
+  const validMessages = messages.filter(validateMessageContent);
+  
+  console.log('🔍 MESSAGE VALIDATION:', {
+    totalMessages: messages.length,
+    validMessages: validMessages.length,
+    filteredOut: messages.length - validMessages.length
+  });
+  
+  return validMessages;
 }
 
 export class ClaudeService {
@@ -131,7 +156,7 @@ export class ClaudeService {
   static async generateResponse(
     userMessage: string,
     agent: Agent,
-    conversationHistory: ClaudeMessage[] = [],
+    conversationHistory: MessageParam[] = [],
     sessionId?: string,
     userProfile?: {
       id?: string;
@@ -155,6 +180,24 @@ export class ClaudeService {
     stream = false,
     onChunk?: (chunk: string, isComplete: boolean) => void
   ): Promise<ClaudeResponse> {
+    
+    // CRITICAL: Check for RFP keywords IMMEDIATELY before any async operations
+    const lastUserMessage = conversationHistory[conversationHistory.length - 1] || { content: userMessage };
+    const userMessageContent = typeof lastUserMessage.content === 'string' ? lastUserMessage.content : userMessage;
+    const rfpKeywords = [
+      'create rfp', 'rfp for', 'procurement', 'procure', 'sourcing', 'source', 
+      'bid for', 'proposal for', 'vendor for', 'need to source',
+      'looking for', 'find supplier', 'find vendor', 'buy',
+      'purchase', 'need to buy', 'need to purchase', 'need to find',
+      'need to get', 'require', 'looking to', 'want to source',
+      'want to buy', 'want to purchase', 'need to procure'
+    ];
+    const shouldForceFunctionCall = rfpKeywords.some(keyword => 
+      userMessageContent.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    // Check if function calling is needed for this message type
+    
     const startTime = Date.now();
     const functionsExecuted: string[] = [];
     
@@ -167,7 +210,7 @@ export class ClaudeService {
       const client = this.getClient();
       
       // Build the conversation context
-      const messages: ClaudeMessage[] = [
+      const messages: MessageParam[] = [
         ...conversationHistory,
         {
           role: 'user',
@@ -267,7 +310,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       let response: Message | undefined = undefined;
       let streamedContent = '';
 
-      if ((stream && onChunk) || (!stream || !onChunk)) {
+      if (stream && onChunk) {
         // Streaming response
         try {
           const streamResponse = await APIRetryHandler.executeWithRetry(
@@ -279,8 +322,16 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
               
               // Prepare options object with conditional signal
               const apiOptions: { signal?: AbortSignal } = {};
-              if (abortSignal) {
-                apiOptions.signal = abortSignal;
+              // DEBUGGING: Temporarily disable abort signal to prevent CLAUDE_SDK_CLEANUP_SUCCESS error
+              // if (abortSignal) {
+              //   apiOptions.signal = abortSignal;
+              // }
+              
+              // Validate messages before sending to Claude API
+              const validatedMessages = validateAndFilterMessages(messages);
+              
+              if (validatedMessages.length === 0) {
+                throw new Error('No valid messages to send to Claude API');
               }
               
               return client.messages.stream({
@@ -288,9 +339,9 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                 max_tokens: 2000,
                 temperature: 0.7,
                 system: systemPrompt,
-                messages: messages,
+                messages: validatedMessages,
                 tools: claudeApiFunctions,
-                tool_choice: { type: 'auto' }
+                tool_choice: shouldForceFunctionCall ? { type: 'any' } : { type: 'auto' }
               }, apiOptions);
             },
             {
@@ -310,9 +361,6 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             
             // Optimized abort checking - only check every 100ms or every 20 chunks
             const shouldCheckAbort = (chunkTime - lastAbortCheck > 100) || (chunkCount % 20 === 0);
-            if (shouldCheckAbort && abortSignal?.aborted) {
-              throw new Error('Request was cancelled');
-            }
             
             if (shouldCheckAbort) {
               lastAbortCheck = chunkTime;
@@ -332,8 +380,6 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
 
           // Convert stream response to regular response format for function handling
           response = await streamResponse.finalMessage();
-          
-
           
           // Update response content with streamed content
           if (response?.content?.length > 0 && response.content[0].type === 'text') {
@@ -415,18 +461,26 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             
             // Prepare options object with conditional signal for non-streaming
             const apiOptions: { signal?: AbortSignal } = {};
-            if (abortSignal) {
-              apiOptions.signal = abortSignal;
-            }
+            // DEBUGGING: Temporarily disable abort signal to prevent CLAUDE_SDK_CLEANUP_SUCCESS error
+            // if (abortSignal) {
+            //   apiOptions.signal = abortSignal;
+            // }
             
+            // Validate messages before sending to Claude API
+            const validatedMessages = validateAndFilterMessages(messages);
+            
+            if (validatedMessages.length === 0) {
+              throw new Error('No valid messages to send to Claude API');
+            }
+
             return client.messages.create({
               model: 'claude-3-5-sonnet-latest',
               max_tokens: 2000,
               temperature: 0.7,
               system: systemPrompt,
-              messages: messages,
+              messages: validatedMessages,
               tools: claudeApiFunctions,
-              tool_choice: { type: 'auto' }
+              tool_choice: shouldForceFunctionCall ? { type: 'any' } : { type: 'auto' }
             }, apiOptions);
           },
           {
@@ -494,12 +548,31 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
           }
         }
 
-        // Add tool results as user message
-        messages.push({
-          role: 'user',
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          content: toolResults as any
-        });
+        // Add tool results as user message - ensure we have valid content
+        if (toolResults.length > 0) {
+          const validToolResults = toolResults.filter(result => 
+            result.tool_use_id && result.content !== undefined
+          );
+          
+          if (validToolResults.length > 0) {
+            const toolMessage: MessageParam = {
+              role: 'user',
+              content: validToolResults.map(result => ({
+                type: 'tool_result' as const,
+                tool_use_id: result.tool_use_id,
+                content: result.content || 'No content',
+                is_error: result.is_error || false
+              }))
+            };
+            
+            messages.push(toolMessage);
+            console.log('✅ TOOL RESULTS MESSAGE ADDED:', validToolResults.length, 'results');
+          } else {
+            console.warn('⚠️ ALL TOOL RESULTS INVALID - no valid tool_use_id or content found');
+          }
+        } else {
+          console.warn('⚠️ NO TOOL RESULTS TO ADD - this may indicate a function execution issue');
+        }
 
         // If agent switch occurred, stop processing and return the switch message
         if (shouldStopProcessing) {
@@ -510,15 +583,21 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         response = await APIRetryHandler.executeWithRetry(
           async () => {
             // Use fresh abort check to avoid Claude SDK cleanup interference
+            // Validate messages before sending to Claude API
+            const validatedMessages = validateAndFilterMessages(messages);
+            
+            if (validatedMessages.length === 0) {
+              throw new Error('No valid messages to send to Claude API in function processing loop');
+            }
+            
             return client.messages.create({
               model: 'claude-3-5-sonnet-latest',
               max_tokens: 2000,
               temperature: 0.7,
               system: systemPrompt,
-              // eslint-disable-next-line @typescript-eslint/no-explicit-any
-              messages: messages as any,
+              messages: validatedMessages,
               tools: claudeApiFunctions,
-              tool_choice: { type: 'auto' }
+              tool_choice: shouldForceFunctionCall ? { type: 'any' } : { type: 'auto' }
             });
           },
           {
@@ -733,7 +812,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
   static async generateStreamingResponse(
     userMessage: string,
     agent: Agent,
-    conversationHistory: ClaudeMessage[] = [],
+    conversationHistory: MessageParam[] = [],
     sessionId?: string,
     userProfile?: {
       id?: string;
@@ -805,7 +884,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
   /**
    * Format conversation history for Claude API
    */
-  static formatConversationHistory(messages: { role: string; content: string }[]): ClaudeMessage[] {
+  static formatConversationHistory(messages: { role: string; content: string }[]): MessageParam[] {
     return messages
       .filter(msg => msg.role === 'user' || msg.role === 'assistant')
       .map(msg => ({

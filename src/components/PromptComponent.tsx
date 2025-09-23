@@ -73,6 +73,13 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
 
   const handleSend = () => {
     if (message.trim() && !isLoading) {
+      // IMMEDIATE DEBUG - Add visual overlay to confirm this function is called
+      console.error('🎯🎯🎯 HANDLE_SEND CALLED IN PROMPT_COMPONENT:', message.trim());
+      const promptDebug = document.createElement('div');
+      promptDebug.style.cssText = 'position:fixed;top:100px;left:0;background:magenta;color:white;padding:5px;z-index:99999;font-weight:bold;';
+      promptDebug.innerHTML = `🎯 PROMPT HANDLE_SEND: ${message.trim().substring(0, 30)}`;
+      document.body.appendChild(promptDebug);
+      
       onSendMessage(message.trim());
       setMessage('');
       

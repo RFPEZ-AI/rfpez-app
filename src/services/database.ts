@@ -907,7 +907,7 @@ export class DatabaseService {
       const { data, error } = await supabase
         .from('rfp_artifacts')
         .select(`
-          role,
+          artifact_role,
           artifacts:artifact_id (
             id,
             name,
@@ -920,7 +920,7 @@ export class DatabaseService {
           )
         `)
         .eq('rfp_id', rfpId)
-        .eq('role', role);
+        .eq('artifact_role', role);
 
       if (error) {
         console.error('❌ Error loading RFP artifacts by role:', error);
@@ -945,7 +945,7 @@ export class DatabaseService {
         .insert({
           rfp_id: rfpId,
           artifact_id: artifactId,
-          role: role
+          artifact_role: role
         });
 
       if (error) {
