@@ -12,7 +12,6 @@ import MCPTestComponent from './components/MCPTestComponent';
 import AgentManagementTest from './components/AgentManagementTest';
 import AgentAvatarDemo from './pages/AgentAvatarDemo';
 import { SupabaseProvider } from './context/SupabaseContext';
-import PWAInstallPrompt from './components/PWAInstallPrompt';
 import OfflineNotification from './components/OfflineNotification';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 import AuthDebugPanel from './components/AuthDebugPanel';
@@ -101,7 +100,6 @@ const App: React.FC = () => {
           <Route exact path="/" render={() => <Redirect to="/home" />} />
         </IonRouterOutlet>
       </IonReactRouter>
-      <PWAInstallPrompt />
       <OfflineNotification />
       <PWAUpdatePrompt />
       <AuthDebugPanel 
