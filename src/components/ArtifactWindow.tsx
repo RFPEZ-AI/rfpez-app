@@ -221,6 +221,19 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         }
       };
 
+      const handleError = (errors: any[]) => {
+        console.error('Form validation failed:', errors);
+        errors.forEach((error, index) => {
+          console.error(`Validation error ${index + 1}:`, {
+            property: error.property,
+            message: error.message,
+            schemaPath: error.schemaPath,
+            data: error.data
+          });
+        });
+        alert(`Form validation failed with ${errors.length} error(s). Please check the console for details.`);
+      };
+
       // Use title from the form spec if available, fallback to artifact name
       const formTitle = formSpec.title || artifact.name;
 
@@ -349,6 +362,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               validator={validator as any}
               onSubmit={handleSubmit}
+              onError={handleError}
               showErrorList={false}
               ref={formRef}
             >
@@ -377,25 +391,29 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
               }}
               onClick={() => {
                 console.log('Submit button clicked');
-                // Trigger form submission using the ref
+                // Trigger form submission using the ref - this will trigger validation first
                 if (formRef.current) {
                   console.log('Form ref available, attempting to submit...');
                   try {
-                    // Try to call the submit method if it exists
-                    if (formRef.current.submit) {
+                    // First try to use the Form's built-in submit method
+                    if (formRef.current.submit && typeof formRef.current.submit === 'function') {
+                      console.log('Using Form ref submit method...');
                       formRef.current.submit();
                     } else {
-                      // Fallback: find the form element and submit it
+                      // Fallback: find and click the hidden submit button to trigger validation
                       const formElement = formRef.current.formElement || 
                                          document.querySelector('form[class*="rjsf"]') ||
                                          document.querySelector('form');
                       if (formElement) {
-                        console.log('Found form element, triggering submit...');
+                        console.log('Found form element, looking for submit button...');
                         const submitButton = formElement.querySelector('button[type="submit"]');
                         if (submitButton) {
+                          console.log('Clicking hidden submit button to trigger validation...');
                           submitButton.click();
                         } else {
-                          formElement.requestSubmit();
+                          console.log('No submit button found, trying form.submit()...');
+                          // This will bypass validation but better than nothing
+                          formElement.submit();
                         }
                       } else {
                         console.warn('Could not find form element to submit');

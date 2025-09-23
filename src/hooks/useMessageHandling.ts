@@ -12,14 +12,19 @@ import { categorizeError } from '../components/APIErrorHandler';
 
 export const useMessageHandling = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
+  const isProcessingRef = useRef<boolean>(false); // Add processing guard
   
   // Cleanup effect to abort any ongoing requests when component unmountss
   useEffect(() => {
     return () => {
       if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+        console.error('🚨 ABORT REASON: Component unmounted', {
+          stackTrace: new Error().stack
+        });
         abortControllerRef.current.abort('Component unmounted');
         abortControllerRef.current = null;
       }
+      isProcessingRef.current = false; // Reset processing state on cleanup
     };
   }, []);
   
@@ -110,8 +115,29 @@ export const useMessageHandling = () => {
       content?: string;
     } | null
   ) => {
+    // CRITICAL DEBUG: Log every handleSendMessage call to detect duplicates
+    console.error('🚨 HANDLE_SEND_MESSAGE CALLED:', {
+      timestamp: new Date().toISOString(),
+      content: content.substring(0, 50) + '...',
+      hasActiveController: !!abortControllerRef.current,
+      isAborted: abortControllerRef.current?.signal.aborted,
+      isProcessing: isProcessingRef.current
+    });
+    
+    // GUARD: Prevent overlapping calls
+    if (isProcessingRef.current) {
+      console.error('🚨 BLOCKING DUPLICATE CALL - Request already in progress');
+      return;
+    }
+    
+    // Set processing flag
+    isProcessingRef.current = true;
+    
     // Check if there's already an active request and abort it safely
     if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
+      console.error('🚨 ABORTING PREVIOUS REQUEST due to new request starting', {
+        stackTrace: new Error().stack
+      });
       abortControllerRef.current.abort('New request started');
     }
     
@@ -123,14 +149,21 @@ export const useMessageHandling = () => {
     const thisRequestController = abortControllerRef.current;
     const requestId = `req_${timestamp}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // Add abort signal monitoring
+    // Add abort signal monitoring with detailed logging
     const currentSignal = thisRequestController.signal;
     
-    // Simplified abort handler
+    // Enhanced abort handler with stack trace
     let abortDetected = false;
     const abortHandler = () => {
       if (abortDetected) return;
       abortDetected = true;
+      
+      console.error('🚨🚨🚨 ABORT SIGNAL TRIGGERED:', {
+        requestId: requestId,
+        reason: currentSignal.reason,
+        timestamp: new Date().toISOString(),
+        stackTrace: new Error().stack
+      });
     };
     
     currentSignal.addEventListener('abort', abortHandler);
@@ -269,16 +302,22 @@ export const useMessageHandling = () => {
         // Add the empty AI message to the UI immediately
         setMessages(prev => [...prev, aiMessage]);
 
-        // Create streaming callback to update the message content with batching
+        // Create streaming callback with proper UTF-8 handling and buffering
         let streamingBuffer = '';
         let lastUpdateTime = 0;
         const updateInterval = 50; // Update UI every 50ms to reduce re-render frequency
+        let streamingCompleted = false;
         
         const onStreamingChunk = (chunk: string, isComplete: boolean) => {
+          // Prevent processing after completion
+          if (streamingCompleted) return;
+          
           if (isComplete) {
+            streamingCompleted = true;
             console.log('✅ Streaming phase complete for message:', aiMessageId, '(Note: function calls may still be processing)');
-            // Final update with any remaining buffer
-            if (streamingBuffer) {
+            
+            // Final update with any remaining buffer - ensure no text is lost
+            if (streamingBuffer.length > 0) {
               setMessages(prev => 
                 prev.map(msg => 
                   msg.id === aiMessageId 
@@ -286,16 +325,20 @@ export const useMessageHandling = () => {
                     : msg
                 )
               );
+              streamingBuffer = ''; // Clear buffer after final update
             }
-            // DO NOT clean up AbortController here - function calls may still be running
+            
+            // CRITICAL: DO NOT clean up AbortController here - function calls may still be running
+            // The cleanup will happen after ClaudeService.generateResponse() fully completes
             return;
           }
           
-          // Buffer chunks and update UI less frequently to reduce re-renders
+          // Handle partial UTF-8 chunks properly - accumulate in buffer
           streamingBuffer += chunk;
           const now = Date.now();
           
-          if (now - lastUpdateTime >= updateInterval || streamingBuffer.length > 200) {
+          // Update UI periodically or when buffer gets large
+          if (now - lastUpdateTime >= updateInterval || streamingBuffer.length > 150) {
             setMessages(prev => 
               prev.map(msg => 
                 msg.id === aiMessageId 
@@ -326,6 +369,8 @@ export const useMessageHandling = () => {
           throw new Error('Request was aborted before Claude API call');
         }
 
+        console.error('🔥 ABOUT TO CALL CLAUDE API - This should appear!');
+
         const claudeResponse = await ClaudeService.generateResponse(
           content,
           agentForClaude,
@@ -353,7 +398,16 @@ export const useMessageHandling = () => {
         console.log('1. Raw response content:', claudeResponse.content.substring(0, 200) + '...');
         console.log('2. Response has metadata:', !!claudeResponse.metadata);
         console.log('3. Was streaming:', claudeResponse.metadata.is_streaming);
-        console.log('✅ COMPLETE CLAUDE RESPONSE FINISHED (including all function calls)');
+        console.log('4. Stream complete:', claudeResponse.metadata.stream_complete);
+        console.log('5. Functions executed:', claudeResponse.metadata.functions_called);
+        console.log('✅ COMPLETE CLAUDE RESPONSE FINISHED (including all function calls and streaming)');
+        
+        // Log function execution status
+        if (claudeResponse.metadata.functions_called && claudeResponse.metadata.functions_called.length > 0) {
+          console.error('🚨 FUNCTION EXECUTION DETECTED: ' + (claudeResponse.metadata.functions_called || []).join(', '));
+        } else {
+          console.error('🚨 NO FUNCTIONS EXECUTED IN RESPONSE');
+        }
         
         // Update the final message with complete content and metadata
         const finalAiMessage: Message = {
@@ -387,11 +441,15 @@ export const useMessageHandling = () => {
 
         setIsLoading(false);
         
-        // Clean up abort controller after successful completion
-        
+        // Clean up abort controller ONLY after complete response (streaming + function calls)
+        console.log('🧹 Cleaning up AbortController after complete Claude response processing');
         if (abortControllerRef.current === thisRequestController) {
+          console.log('✅ AbortController cleanup after successful completion');
           abortControllerRef.current = null;
         }
+        
+        // Reset processing flag after successful completion
+        isProcessingRef.current = false;
 
         // Check if an agent switch occurred during the Claude response
         if (claudeResponse.metadata.agent_switch_occurred) {
@@ -451,12 +509,47 @@ export const useMessageHandling = () => {
         if (claudeError instanceof Error && claudeError.message === 'CLAUDE_SDK_CLEANUP_SUCCESS') {
           console.log('✅ Claude SDK cleanup completed - streaming was successful');
           setIsLoading(false);
-
           
+          // Reset processing flag after streaming success
+          isProcessingRef.current = false;
+
           // Clean up abort controller normally
           if (abortControllerRef.current === thisRequestController) {
             console.log('✅ Cleaning up AbortController after successful streaming (SDK cleanup)');
             abortControllerRef.current = null;
+          }
+          
+          // IMPORTANT: Still save the AI message for streaming success case
+          if (isAuthenticated && userId && activeSessionId) {
+            try {
+              console.log('Saving AI response to session after streaming cleanup success:', activeSessionId);
+              
+              // Get the most recent AI message from the UI state
+              const currentMessages = messages;
+              const lastAiMessage = currentMessages
+                .filter(msg => !msg.isUser)
+                .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime())[0];
+              
+              if (lastAiMessage && lastAiMessage.content.trim()) {
+                const savedAiMessage = await DatabaseService.addMessage(
+                  activeSessionId, 
+                  userId, 
+                  lastAiMessage.content, 
+                  'assistant',
+                  undefined, // agent_id not available in this scope
+                  lastAiMessage.agentName,
+                  {},
+                  { is_streaming: true, stream_complete: true }, // Metadata indicating this was a streaming response
+                  lastAiMessage.artifactRefs // Pass any artifact references
+                );
+                console.log('AI message saved after streaming cleanup:', savedAiMessage);
+                await loadUserSessions();
+              } else {
+                console.warn('No AI message content found to save after streaming cleanup');
+              }
+            } catch (error) {
+              console.error('Failed to save AI message after streaming cleanup:', error);
+            }
           }
           
           // Don't show error to user - streaming was actually successful
@@ -564,15 +657,24 @@ export const useMessageHandling = () => {
     } catch (error) {
       console.error('Failed to send message:', error);
       setIsLoading(false);
+      
+      // Reset processing flag on error
+      isProcessingRef.current = false;
     }
   };
 
   const cancelRequest = () => {
     if (abortControllerRef.current) {
+      console.error('🚨 ABORT REASON: User cancelled request', {
+        stackTrace: new Error().stack
+      });
       console.log('🚫 MANUAL CANCELLATION: Cancelling Claude request...');
       console.trace('📍 Manual cancellation stack trace');
       abortControllerRef.current.abort('User cancelled request');
       abortControllerRef.current = null;
+      
+      // Reset processing flag on cancellation
+      isProcessingRef.current = false;
     } else {
       console.log('🚫 MANUAL CANCELLATION: No active request to cancel');
     }
