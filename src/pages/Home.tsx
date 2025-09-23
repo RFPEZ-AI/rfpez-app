@@ -18,6 +18,9 @@ import { useRFPManagement } from '../hooks/useRFPManagement';
 import { useArtifactManagement } from '../hooks/useArtifactManagement';
 import { useArtifactWindowState } from '../hooks/useArtifactWindowState';
 import { useMessageHandling } from '../hooks/useMessageHandling';
+
+// Import test functions for debugging
+import '../test-claude-functions';
 import { AbortControllerMonitor } from '../utils/abortControllerMonitor';
 
 // Import layout components
@@ -383,17 +386,36 @@ const Home: React.FC = () => {
 
   // Listen for RFP refresh messages from Claude functions
   useEffect(() => {
-    const handleRfpRefreshMessage = (event: MessageEvent) => {
+    const handleRfpRefreshMessage = async (event: MessageEvent) => {
       if (event.data?.type === 'REFRESH_CURRENT_RFP') {
         console.log('🔄 Received RFP refresh request from Claude function');
-        // RFP context is now session-based only, no need to refresh from user profile
-        console.log('ℹ️ RFP context is now managed per session, refresh not needed');
+        
+        // Reload the current session's RFP context from the database
+        if (currentSessionId) {
+          try {
+            console.log('📊 Reloading session RFP context for session:', currentSessionId);
+            const sessionWithContext = await DatabaseService.getSessionWithContext(currentSessionId);
+            
+            if (sessionWithContext?.current_rfp_id) {
+              console.log('🎯 Refreshing RFP context from session:', sessionWithContext.current_rfp_id);
+              await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+              console.log('✅ RFP context refreshed successfully');
+            } else {
+              console.log('📝 No RFP context found in session after refresh');
+              handleClearCurrentRfp();
+            }
+          } catch (error) {
+            console.warn('⚠️ Failed to refresh session RFP context:', error);
+          }
+        } else {
+          console.log('⚠️ No current session to refresh RFP context for');
+        }
       }
     };
 
     window.addEventListener('message', handleRfpRefreshMessage);
     return () => window.removeEventListener('message', handleRfpRefreshMessage);
-  }, [userId, handleSetCurrentRfp, handleClearCurrentRfp]);
+  }, [currentSessionId, handleSetCurrentRfp, handleClearCurrentRfp]);
 
   // Load active agent when session changes - but only if not already handled by handleSelectSession
   useEffect(() => {

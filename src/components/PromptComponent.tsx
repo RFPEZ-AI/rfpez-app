@@ -99,7 +99,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
+    if (e.key === 'Enter' && !e.shiftKey && !isLoading) {
       e.preventDefault(); // Prevent default line break
       handleSend();
     }
