@@ -30,7 +30,8 @@ RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend
 ### Development Commands
 ```bash
 # Start development with API server
-npm run start:dev  # Runs both frontend and API server concurrently
+
+npx kill-port 3000 && npm start  # kill any existing instance and start a new one
 
 # Testing patterns
 npm test           # Jest tests with watch mode
@@ -152,7 +153,8 @@ The project includes comprehensive browser automation through MCP (Model Context
 ### Prerequisites for Browser MCP Testing
 ```bash
 # Ensure the main application is running
-npm run start:dev  # Starts app on http://localhost:3000
+npx kill-port 3000 && npm start  # Starts app on http://localhost:3000
+note: do not use sleep in the same terminal as it will block the app start
 
 # For authentication tests, use test account:
 # Email: mskiba@esphere.com
@@ -193,3 +195,4 @@ await mcp_browser_click({ index: elements[0].index });
 - Use `test-utils.tsx` render wrapper for component tests
 - MCP tests in separate automation project for integration testing
 - VS Code tasks available for automated test execution and MCP validation
+- When sending message prompts using the mcp browser tools, add the enter key to submit the message

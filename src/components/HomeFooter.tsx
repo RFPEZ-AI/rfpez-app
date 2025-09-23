@@ -51,7 +51,6 @@ const HomeFooter: React.FC<HomeFooterProps> = ({ currentRfp, onViewBids }) => {
               fontSize: '12px'
             }}
           >
-            <IonIcon icon={reorderTwoOutline} slot="start" />
             Bids
           </IonButton>
         </div>
