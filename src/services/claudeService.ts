@@ -266,71 +266,8 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
 
       let response: Message | undefined = undefined;
       let streamedContent = '';
-      let useNonStreamingResponse = false;
 
-      // EXPERIMENTAL: Test if streaming is causing tool_use issues
-      if (stream && onChunk && claudeApiFunctions.length > 0) {
-        console.error('🔧 EXPERIMENTAL: Testing non-streaming for tool_use detection');
-        
-        try {
-          // Try non-streaming first to see if we get tool_use blocks
-          const nonStreamResponse = await APIRetryHandler.executeWithRetry(
-            async () => {
-              const apiOptions: { signal?: AbortSignal } = {};
-              if (abortSignal) {
-                apiOptions.signal = abortSignal;
-              }
-              
-              return client.messages.create({
-                model: 'claude-3-5-sonnet-latest',
-                max_tokens: 2000,
-                temperature: 0.7,
-                system: systemPrompt,
-                messages: messages,
-                tools: claudeApiFunctions,
-                tool_choice: { type: 'auto' }
-              }, apiOptions);
-            },
-            {
-              maxRetries: 3,
-              baseDelay: 2000,
-              maxDelay: 60000
-            }
-          );
-          
-          console.error('🔧 NON-STREAMING TEST RESULT:', {
-            hasContent: !!nonStreamResponse.content,
-            contentLength: nonStreamResponse.content?.length || 0,
-            contentTypes: nonStreamResponse.content?.map(block => block.type) || [],
-            hasToolUse: nonStreamResponse.content?.some(block => block.type === 'tool_use') || false,
-            toolUseCount: nonStreamResponse.content?.filter(block => block.type === 'tool_use').length || 0
-          });
-          
-          // If non-streaming has tool_use, use it instead of streaming
-          if (nonStreamResponse.content?.some(block => block.type === 'tool_use')) {
-            console.error('🔧 TOOL_USE FOUND IN NON-STREAMING - USING NON-STREAMING RESPONSE');
-            response = nonStreamResponse;
-            useNonStreamingResponse = true;
-            
-            // Send text content via onChunk for UI
-            const textBlocks = nonStreamResponse.content?.filter(block => block.type === 'text') || [];
-            if (textBlocks.length > 0) {
-              const textContent = textBlocks.map(block => (block as any).text).join('');
-              onChunk?.(textContent, false);
-            }
-            onChunk?.('', true); // Signal completion
-          } else {
-            console.error('🔧 NO TOOL_USE IN NON-STREAMING - FALLING BACK TO STREAMING');
-            throw new Error('No tool_use found, continue with streaming');
-          }
-        } catch (testError) {
-          const errorMessage = testError instanceof Error ? testError.message : 'Unknown error';
-          console.error('🔧 NON-STREAMING TEST FAILED, CONTINUING WITH STREAMING:', errorMessage);
-          // Continue with streaming logic below
-        }
-      }
-
-      if ((stream && onChunk && !useNonStreamingResponse) || (!stream || !onChunk)) {
+      if ((stream && onChunk) || (!stream || !onChunk)) {
         // Streaming response
         try {
           const streamResponse = await APIRetryHandler.executeWithRetry(
@@ -346,18 +283,6 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                 apiOptions.signal = abortSignal;
               }
               
-              console.error('🔧 DEBUG: Claude API Request params:', {
-                model: 'claude-3-5-sonnet-latest',
-                max_tokens: 2000,
-                temperature: 0.7,
-                systemPromptLength: systemPrompt.length,
-                messagesCount: messages.length,
-                toolsCount: claudeApiFunctions.length,
-                toolChoice: { type: 'auto' },
-                toolNames: claudeApiFunctions.map(t => t.name),
-                hasCreateAndSetRfp: claudeApiFunctions.some(t => t.name === 'create_and_set_rfp')
-              });
-
               return client.messages.stream({
                 model: 'claude-3-5-sonnet-latest',
                 max_tokens: 2000,
@@ -394,40 +319,21 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             }
 
             if (messageStreamEvent.type === 'content_block_delta') {
-              console.error('🔧 STREAM DELTA:', messageStreamEvent.delta.type);
               if (messageStreamEvent.delta.type === 'text_delta') {
                 const chunk = messageStreamEvent.delta.text;
                 streamedContent += chunk;
                 onChunk?.(chunk, false);
               }
             } else if (messageStreamEvent.type === 'message_stop') {
-              console.error('🔧 STREAM STOP - processing final message');
               onChunk?.('', true); // Signal completion
               break;
-            } else {
-              console.error('🔧 STREAM EVENT:', messageStreamEvent.type, messageStreamEvent);
             }
           }
 
           // Convert stream response to regular response format for function handling
           response = await streamResponse.finalMessage();
           
-          console.error('🔧 STREAMING FINAL MESSAGE:', {
-            responseType: typeof response,
-            hasContent: !!response.content,
-            contentLength: response.content?.length || 0,
-            contentTypes: response.content?.map(block => block.type) || [],
-            toolUseBlocks: response.content?.filter(block => block.type === 'tool_use').map(block => ({
-              type: block.type,
-              name: (block as any).name,
-              id: (block as any).id
-            })) || [],
-            textBlocks: response.content?.filter(block => block.type === 'text').map(block => ({
-              type: block.type,
-              textLength: (block as any).text?.length || 0
-            })) || [],
-            fullResponse: JSON.stringify(response, null, 2)
-          });
+
           
           // Update response content with streamed content
           if (response?.content?.length > 0 && response.content[0].type === 'text') {
@@ -536,36 +442,13 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const allFunctionResults: any[] = [];
 
-      // Debug: Check what's in the response content before function processing
-      console.error('🔧 FUNCTION EXECUTION DEBUG: Checking response content for tool uses');
-      console.error('🔧 Response content structure:', {
-        contentLength: response?.content?.length || 0,
-        contentTypes: response.content.map(block => block.type),
-        hasToolUse: response.content.some(block => block.type === 'tool_use'),
-        toolUseCount: response.content.filter(block => block.type === 'tool_use').length
-      });
-
-      // Visual debugging for UI - log to both console and create alert for testing
-      const hasToolUse = response.content.some((block: ContentBlock) => block.type === 'tool_use');
-      const toolUseBlocks = response.content.filter((block: ContentBlock) => block.type === 'tool_use');
-      
-      console.error('🔧 FUNCTION CALL DETECTION:', {
-        hasToolUse,
-        toolCount: toolUseBlocks.length,
-        functions: toolUseBlocks.map((block: any) => block.name),
-        aboutToEnterLoop: toolUseBlocks.length > 0
-      });
-
       // Process the response and handle any function calls
-      console.error('🔧 ABOUT TO ENTER FUNCTION PROCESSING LOOP');
       while (response.content.some((block: ContentBlock) => block.type === 'tool_use')) {
-        console.error('🔧 INSIDE FUNCTION PROCESSING LOOP');
         const toolUses = response.content.filter((block: ContentBlock): block is ToolUseBlock => 
           block.type === 'tool_use');
         const textBlocks = response.content.filter((block: ContentBlock): block is TextBlock => 
           block.type === 'text');
-        
-        console.error('🔧 EXECUTING FUNCTIONS:', toolUses.map(t => t.name));
+
         
         // Collect any text content
         if (textBlocks.length > 0) {
