@@ -1,0 +1,282 @@
+// Copyright Mark Skiba, 2025 All rights reserved
+// Memory Management Tests for StreamManager
+
+import { streamManager } from '../claudeAPIProxy';
+
+// MemoryBuffer interface for type safety
+interface MemoryBuffer {
+  id: string;
+  size: number;
+  data: ArrayBuffer;
+  isInUse: boolean;
+  createdAt: number;
+  lastUsed: number;
+  useCount: number;
+}
+
+describe('Memory Management', () => {
+  // Clean up before each test
+  beforeEach(() => {
+    streamManager.destroy();
+    jest.clearAllMocks();
+    
+    // Reset memory pool state
+    (streamManager as any).memoryPool = new Map();
+    (streamManager as any).memoryMetrics = {
+      totalAllocated: 0,
+      totalUsed: 0,
+      bufferCount: 0,
+      poolUtilization: 0,
+      gcCount: 0,
+      memoryLeakRisk: 0,
+      averageBufferSize: 0,
+      lastMemoryPressure: 0,
+      bufferDetails: [],
+      recommendations: []
+    };
+    
+    // Clear token batches
+    (streamManager as any).tokenBatches.clear();
+    (streamManager as any).batchTimers.clear();
+  });
+
+  afterEach(() => {
+    streamManager.destroy();
+  });
+
+  describe('Memory Buffer Allocation', () => {
+    it('should allocate new memory buffer for requests', () => {
+      const buffer = streamManager.allocateBuffer(1024);
+      
+      expect(buffer).toBeDefined();
+      expect(buffer.size).toBeGreaterThanOrEqual(1024);
+      expect(buffer.isInUse).toBe(true);
+      expect(buffer.data).toBeInstanceOf(ArrayBuffer);
+      expect(buffer.id).toMatch(/^buffer_/);
+      expect(buffer.useCount).toBe(1);
+    });
+
+    it('should reuse existing buffers when available', () => {
+      // Allocate and release a buffer
+      const buffer1 = streamManager.allocateBuffer(1024);
+      const bufferId = buffer1.id;
+      streamManager.releaseBuffer(bufferId);
+      
+      // Allocate similar sized buffer - should reuse
+      const buffer2 = streamManager.allocateBuffer(1000);
+      
+      expect(buffer2.id).toBe(bufferId);
+      expect(buffer2.isInUse).toBe(true);
+      expect(buffer2.useCount).toBe(2);
+    });
+
+    it('should create new buffer when no suitable buffer exists', () => {
+      const buffer1 = streamManager.allocateBuffer(1024);
+      const buffer2 = streamManager.allocateBuffer(8192);
+      
+      expect(buffer1.id).not.toBe(buffer2.id);
+      expect(buffer1.size).not.toBe(buffer2.size);
+      expect(buffer1.size).toBe(4096); // Rounded up to min size
+      expect(buffer2.size).toBe(8192);
+    });
+
+    it('should respect minimum buffer size', () => {
+      const buffer = streamManager.allocateBuffer(100); // Smaller than 4KB min
+      
+      expect(buffer.size).toBeGreaterThanOrEqual(4 * 1024); // 4KB minimum
+    });
+
+    it('should respect maximum buffer size', () => {
+      const buffer = streamManager.allocateBuffer(10 * 1024 * 1024); // 10MB request
+      
+      expect(buffer.size).toBeLessThanOrEqual(1024 * 1024); // 1MB maximum
+    });
+  });
+
+  describe('Memory Buffer Release', () => {
+    it('should release buffer back to pool', () => {
+      const buffer = streamManager.allocateBuffer(1024);
+      const bufferId = buffer.id;
+      
+      expect(buffer.isInUse).toBe(true);
+      
+      const released = streamManager.releaseBuffer(bufferId);
+      
+      expect(released).toBe(true);
+      expect(buffer.isInUse).toBe(false);
+    });
+
+    it('should return false for non-existent buffer', () => {
+      const released = streamManager.releaseBuffer('non-existent');
+      
+      expect(released).toBe(false);
+    });
+
+    it('should return false for already released buffer', () => {
+      const buffer = streamManager.allocateBuffer(1024);
+      streamManager.releaseBuffer(buffer.id);
+      
+      const secondRelease = streamManager.releaseBuffer(buffer.id);
+      
+      expect(secondRelease).toBe(false);
+    });
+  });
+
+  // Note: Memory pressure tests have been moved to the Debug page (MemoryStressTest component)
+  // These tests were too disruptive for normal unit testing and are now available as on-demand stress tests
+  // in the Debug interface for occasional testing and memory issue debugging.
+
+  describe('Memory Metrics Tracking', () => {
+    it('should track memory allocation metrics', () => {
+      const buffer1 = streamManager.allocateBuffer(1024);
+      const buffer2 = streamManager.allocateBuffer(2048);
+      
+      const metrics = streamManager.getMemoryMetrics();
+      
+      expect(metrics.bufferCount).toBe(2);
+      expect(metrics.totalAllocated).toBeGreaterThan(3072); // At least 3KB
+      expect(metrics.totalUsed).toBeGreaterThan(3072);
+      expect(metrics.poolUtilization).toBeGreaterThan(0);
+      expect(metrics.averageBufferSize).toBeGreaterThan(0);
+    });
+
+    it('should provide buffer details in metrics', () => {
+      const buffer = streamManager.allocateBuffer(1024);
+      
+      const metrics = streamManager.getMemoryMetrics();
+      
+      expect(metrics.bufferDetails).toHaveLength(1);
+      expect(metrics.bufferDetails[0]).toMatchObject({
+        id: buffer.id,
+        size: buffer.size,
+        isInUse: true,
+        age: expect.any(Number)
+      });
+    });
+
+    it('should provide memory optimization recommendations', () => {
+      // Create high pool utilization
+      const buffers = [];
+      for (let i = 0; i < 45; i++) { // 90% of maxPoolSize
+        buffers.push(streamManager.allocateBuffer(1024));
+      }
+      
+      const metrics = streamManager.getMemoryMetrics();
+      
+      expect(metrics.recommendations).toContainEqual(
+        expect.stringContaining('increasing maxPoolSize')
+      );
+    });
+  });
+
+  describe('Token Batching with Memory Management', () => {
+    it('should allocate memory buffer for new token batch', () => {
+      const streamId = 'test-stream-1';
+      
+      streamManager.addTokenToBatch(streamId, 'test token', {});
+      
+      const batchStats = streamManager.getBatchStatistics();
+      expect(batchStats[streamId]).toBeDefined();
+      expect(batchStats[streamId].tokenCount).toBe(1);
+    });
+
+    it('should release memory buffer when batch is flushed', () => {
+      const streamId = 'test-stream-1';
+      
+      // Add enough tokens to trigger flush
+      for (let i = 0; i < 10; i++) {
+        streamManager.addTokenToBatch(streamId, `token ${i}`, {});
+      }
+      
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      
+      // Force flush
+      const flushedBatch = streamManager.flushBatchForTesting(streamId, true);
+      
+      expect(flushedBatch).toBeDefined();
+      expect(flushedBatch).not.toBeNull();
+      expect(flushedBatch!.tokens.length).toBe(10);
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Released memory buffer')
+      );
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should clean up memory buffers during batch cleanup', () => {
+      const streamId = 'test-stream-1';
+      
+      streamManager.addTokenToBatch(streamId, 'test token', {});
+      
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      
+      streamManager.cleanupBatches(streamId);
+      
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Released memory buffer')
+      );
+      
+      consoleSpy.mockRestore();
+    });
+
+    it('should handle memory buffer overflow in token batching', () => {
+      const streamId = 'test-stream-1';
+      
+      // Create a very large token that would exceed buffer size
+      const largeToken = 'x'.repeat(100000); // 100KB token
+      
+      const consoleSpy = jest.spyOn(console, 'log').mockImplementation();
+      
+      streamManager.addTokenToBatch(streamId, largeToken, {});
+      
+      // Should handle gracefully without errors
+      const batchStats = streamManager.getBatchStatistics();
+      expect(batchStats[streamId]).toBeDefined();
+      
+      consoleSpy.mockRestore();
+    });
+  });
+
+  // Note: Aggressive cleanup tests have been moved to the Debug page (MemoryStressTest component)
+  // These tests were too disruptive for normal unit testing.
+
+  describe('Memory Management Integration with Streaming Health', () => {
+    it('should include memory metrics in streaming health', () => {
+      const buffer = streamManager.allocateBuffer(1024);
+      
+      const healthMetrics = streamManager.getStreamingHealthMetrics();
+      
+      expect(healthMetrics.memoryHealth).toBeDefined();
+      expect(healthMetrics.memoryHealth.totalAllocated).toContain('MB');
+      expect(healthMetrics.memoryHealth.bufferCount).toBeGreaterThan(0);
+      expect(healthMetrics.memoryHealth.poolUtilization).toContain('%');
+      expect(healthMetrics.memoryHealth.memoryLeakRisk).toMatch(/LOW|MEDIUM|HIGH/);
+    });
+
+    // Note: Memory leak risk test has been moved to the Debug page (MemoryStressTest component)
+    // This test creates high memory pressure and was too disruptive for unit testing.
+  });
+
+  describe('Memory Pool Configuration', () => {
+    it('should respect memory pool configuration limits', () => {
+      const config = (streamManager as any).memoryPoolConfig;
+      
+      expect(config.maxBufferSize).toBe(1024 * 1024); // 1MB
+      expect(config.maxPoolSize).toBe(50);
+      expect(config.minBufferSize).toBe(4 * 1024); // 4KB
+      expect(config.gcThreshold).toBe(0.8); // 80%
+    });
+
+    it('should handle pool exhaustion gracefully', () => {
+      // Fill up the entire pool
+      const buffers = [];
+      for (let i = 0; i < 51; i++) { // One more than maxPoolSize
+        buffers.push(streamManager.allocateBuffer(1024));
+      }
+      
+      // Last buffer should be temporary
+      const lastBuffer = buffers[buffers.length - 1];
+      expect(lastBuffer.id).toContain('temp_');
+    });
+  });
+});

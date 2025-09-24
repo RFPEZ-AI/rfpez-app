@@ -30,8 +30,9 @@ RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend
 ### Development Commands
 ```bash
 # Start development with API server
-
+Avoid restarting the server frequently, but if needed:
 npx kill-port 3000 && npm start  # kill any existing instance and start a new one
+If you need to restart, open a new terminal tab so that subsequent commands don't stop the server
 
 # Testing patterns
 npm test           # Jest tests with watch mode

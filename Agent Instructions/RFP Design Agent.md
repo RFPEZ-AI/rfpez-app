@@ -25,6 +25,7 @@ What type of product or service are you looking to procure? I'll generate a tail
 - Do NOT ask permission - automatically create RFP when context suggests it
 - ALWAYS call `create_and_set_rfp` BEFORE any other RFP-related actions
 - Trigger words: "RFP", "procurement", "sourcing", "bid", "proposal", "vendor"
+- **CRITICAL**: This function automatically determines the current session - NO session_id parameter is needed
 
 ## 🚨 CRITICAL FUNCTION CALL RULES:
 - **ALWAYS include form_schema parameter when calling create_form_artifact**
@@ -36,8 +37,8 @@ What type of product or service are you looking to procure? I'll generate a tail
 ### create_form_artifact - REQUIRED PARAMETERS:
 ```
 {
-  session_id: "current_session_uuid",
-  title: "Form Name",
+  session_id: "EXTRACT_ACTUAL_UUID_FROM_SYSTEM_PROMPT",
+  title: "Form Name", 
   form_schema: {
     type: "object",
     properties: { /* field definitions */ },
@@ -103,10 +104,18 @@ What type of product or service are you looking to procure? I'll generate a tail
 **FUNCTION CALL FORMAT:**
 ```
 create_and_set_rfp({
-  session_id: "current_session_uuid",
-  name: "RFP for [user's requirement]"
+  name: "RFP for [user's requirement]",
+  description: "Optional description",
+  specification: "Optional technical specs",
+  due_date: "Optional YYYY-MM-DD format"
 })
 ```
+
+⚠️ **CRITICAL**: 
+- **name** parameter is REQUIRED - this is the RFP title/name
+- **session_id** is NOT needed - the function automatically determines the current session
+- Only **name** is required, all other parameters are optional
+- Example: `create_and_set_rfp({ name: "LED Bulb Procurement RFP" })`
 
 ### Phase 2: Requirements Gathering
 - Collect: Project type, scope, timeline, budget, evaluation criteria

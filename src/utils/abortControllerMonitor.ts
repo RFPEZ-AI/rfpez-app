@@ -65,13 +65,14 @@ class AbortControllerMonitor {
           
           const duration = info.abortedAt - info.createdAt;
           
-          console.group('🚨 AbortController aborted - Global Monitor');
-          console.log('📋 Controller ID:', id);
-          console.log('👤 Created by:', caller);
-          console.log('⏱️ Duration:', duration + 'ms');
-          console.log('💬 Reason:', this.signal.reason || 'No reason');
-          console.log('📊 Active controllers remaining:', AbortControllerMonitor.instance.getActiveCount() - 1);
-          console.groupEnd();
+          // DISABLED: Verbose logging causes memory pressure
+          // console.group('🚨 AbortController aborted - Global Monitor');
+          // console.log('📋 Controller ID:', id);
+          // console.log('👤 Created by:', caller);
+          // console.log('⏱️ Duration:', duration + 'ms');
+          // console.log('💬 Reason:', this.signal.reason || 'No reason');
+          // console.log('📊 Active controllers remaining:', AbortControllerMonitor.instance.getActiveCount() - 1);
+          // console.groupEnd();
         });
         
         return this;

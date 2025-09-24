@@ -634,17 +634,14 @@ export const claudeApiFunctions: Tool[] = [
   },
   {
     "name": "create_and_set_rfp",
-    "description": "Streamlined RFP creation: Creates a new RFP with minimal data, sets it as current RFP for the session, and validates the creation. This replaces the multi-step process of supabase_insert + set_current_rfp + validation.",
+    "description": "Creates a new RFP and sets it as the current active RFP. Automatically determines the current session context. REQUIRED: Must provide a name parameter. EXAMPLE: {\"name\": \"LED Bulb Procurement RFP\"}",
     "input_schema": {
       "type": "object",
       "properties": {
-        "session_id": {
-          "type": "string",
-          "description": "The UUID of the session to set the RFP as current for"
-        },
         "name": {
           "type": "string",
-          "description": "The name/title of the RFP (required)"
+          "description": "The name/title of the RFP (REQUIRED - must be a non-empty string)",
+          "minLength": 1
         },
         "description": {
           "type": "string",
@@ -659,7 +656,8 @@ export const claudeApiFunctions: Tool[] = [
           "description": "Optional due date in ISO format (YYYY-MM-DD)"
         }
       },
-      "required": ["session_id", "name"]
+      "required": ["name"],
+      "additionalProperties": false
     }
   },
   {
@@ -1134,6 +1132,7 @@ export class ClaudeAPIFunctionHandler {
       case 'get_artifact_status':
         return await this.getArtifactStatus(parameters, userId);
       case 'create_and_set_rfp':
+        console.log('🔍 DEBUG: executeFunction called create_and_set_rfp with parameters:', JSON.stringify(parameters, null, 2));
         return await this.createAndSetRfp(parameters, userId);
       case 'generate_rfp_bid_url':
         return await this.generateRfpBidUrl(parameters, userId);
@@ -3289,24 +3288,43 @@ Please retry with default_values using the correct field names.`;
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private async createAndSetRfp(params: any, userId: string) {
-    const { session_id, name, description = '', specification = '', due_date = null } = params;
+    console.log('🔍 DEBUG: createAndSetRfp called with params:', JSON.stringify(params, null, 2));
+    console.log('🔍 DEBUG: createAndSetRfp called with userId:', userId);
     
-    console.log('🚀 Creating and setting new RFP:', { name, session_id, userId });
+    // Robust parameter validation
+    if (!params || typeof params !== 'object') {
+      throw new Error('Invalid parameters provided to createAndSetRfp. Expected object with at least a name field.');
+    }
+    
+    const { name, description = '', specification = '', due_date = null } = params;
+    
+    console.log('🚀 Creating and setting new RFP:', { name, userId });
     
     if (userId === 'anonymous') {
       throw new Error('Cannot create RFP for anonymous users. Please log in first.');
     }
     
-    if (!session_id || session_id.trim() === '') {
-      throw new Error('Session ID is required');
-    }
-    
-    if (!name || name.trim() === '') {
-      throw new Error('RFP name is required');
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      console.error('❌ DEBUG: Invalid name parameter:', { name, params });
+      throw new Error(`RFP name is required and must be a non-empty string. Received: ${typeof name === 'string' ? `"${name}"` : typeof name}`);
     }
     
     try {
-      // Step 1: Verify session exists and check if it already has a current RFP
+      // Step 1: Get the current session ID for the user
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('current_session_id')
+        .eq('supabase_user_id', userId)
+        .single();
+      
+      if (profileError || !profile?.current_session_id) {
+        throw new Error('No active session found. Please start a conversation session first.');
+      }
+      
+      const session_id = profile.current_session_id;
+      console.log('✅ Found current session:', session_id);
+      
+      // Step 2: Verify session exists and check if it already has a current RFP
       const { data: currentSession, error: sessionError } = await supabase
         .from('sessions')
         .select('id, current_rfp_id, user_id')
@@ -3321,7 +3339,7 @@ Please retry with default_values using the correct field names.`;
         console.log('⚠️ Session already has current RFP:', currentSession.current_rfp_id);
       }
       
-      // Step 2: Create new RFP with supabase_insert
+      // Step 3: Create new RFP with supabase_insert
       const insertData: {
         name: string;
         status: string;
@@ -3357,7 +3375,7 @@ Please retry with default_values using the correct field names.`;
       
       console.log('✅ RFP created successfully:', newRfp.id);
       
-      // Step 3: Set as current RFP for the session
+      // Step 4: Set as current RFP for the session
       const { error: updateError } = await supabase
         .from('sessions')
         .update({ current_rfp_id: newRfp.id })
@@ -3372,7 +3390,7 @@ Please retry with default_values using the correct field names.`;
       
       console.log('✅ RFP set as current for session successfully');
       
-      // Step 4: Validation - verify RFP exists in database
+      // Step 5: Validation - verify RFP exists in database
       const { data: verifyRfp, error: verifyError } = await supabase
         .from('rfps')
         .select('id, name, status')
@@ -3385,7 +3403,7 @@ Please retry with default_values using the correct field names.`;
       
       console.log('✅ RFP creation validated successfully');
       
-      // Step 5: Trigger frontend UI refresh
+      // Step 6: Trigger frontend UI refresh
       if (typeof window !== 'undefined') {
         window.postMessage({ 
           type: 'REFRESH_CURRENT_RFP', 
@@ -3401,7 +3419,8 @@ Please retry with default_values using the correct field names.`;
         session_id: session_id,
         message: `RFP "${newRfp.name}" created successfully and set as current RFP for this session`,
         steps_completed: [
-          'checked_session_context',
+          'retrieved_current_session',
+          'verified_session_exists',
           'created_rfp_record', 
           'set_as_current_rfp_for_session',
           'validated_creation',

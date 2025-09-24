@@ -13,6 +13,7 @@ interface Message {
   timestamp: Date;
   agentName?: string; // Agent name for assistant messages
   artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
+  isToolProcessing?: boolean; // True if this is a tool processing indicator message
 }
 
 interface SessionDialogProps {
@@ -71,12 +72,18 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
               style={{
                 marginLeft: message.isUser ? '20%' : '0',
                 marginRight: message.isUser ? '0' : '20%',
-                backgroundColor: message.isUser 
-                  ? 'var(--ion-color-primary)' 
-                  : 'var(--ion-color-light)',
-                border: message.isUser 
-                  ? '1px solid var(--ion-color-primary-shade)' 
-                  : '1px solid var(--ion-color-light-shade)'
+                backgroundColor: message.isToolProcessing
+                  ? 'var(--ion-color-warning-tint)'
+                  : message.isUser 
+                    ? 'var(--ion-color-primary)' 
+                    : 'var(--ion-color-light)',
+                border: message.isToolProcessing
+                  ? '1px solid var(--ion-color-warning)'
+                  : message.isUser 
+                    ? '1px solid var(--ion-color-primary-shade)' 
+                    : '1px solid var(--ion-color-light-shade)',
+                opacity: message.isToolProcessing ? 0.9 : 1,
+                animation: message.isToolProcessing ? 'pulse 2s infinite' : 'none'
               }}
             >
               <IonCardContent style={{
@@ -111,6 +118,11 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                     @keyframes blink {
                       0%, 50% { opacity: 1; }
                       51%, 100% { opacity: 0; }
+                    }
+                    @keyframes pulse {
+                      0% { opacity: 0.9; }
+                      50% { opacity: 0.6; }
+                      100% { opacity: 0.9; }
                     }
                   `}
                 </style>

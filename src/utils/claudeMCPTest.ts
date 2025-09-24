@@ -103,43 +103,47 @@ export class MCPMonitor {
   }> = [];
 
   static logAttempt(functionName: string, details?: string) {
-    this.logs.push({
-      timestamp: new Date(),
-      type: 'attempt',
-      functionName,
-      details
-    });
-    console.log(`🔗 MCP Attempt: ${functionName}`, details);
+    // DISABLED: Excessive logging causes memory pressure
+    // this.logs.push({
+    //   timestamp: new Date(),
+    //   type: 'attempt',
+    //   functionName,
+    //   details
+    // });
+    // console.log(`🔗 MCP Attempt: ${functionName}`, details);
   }
 
   static logSuccess(functionName: string, details?: string) {
-    this.logs.push({
-      timestamp: new Date(),
-      type: 'success',
-      functionName,
-      details
-    });
-    console.log(`✅ MCP Success: ${functionName}`, details);
+    // DISABLED: Excessive logging causes memory pressure
+    // this.logs.push({
+    //   timestamp: new Date(),
+    //   type: 'success',
+    //   functionName,
+    //   details
+    // });
+    // console.log(`✅ MCP Success: ${functionName}`, details);
   }
 
   static logFailure(functionName: string, error: string) {
-    this.logs.push({
-      timestamp: new Date(),
-      type: 'failure',
-      functionName,
-      details: error
-    });
-    console.log(`❌ MCP Failure: ${functionName}`, error);
+    // DISABLED: Excessive logging causes memory pressure  
+    // this.logs.push({
+    //   timestamp: new Date(),
+    //   type: 'failure',
+    //   functionName,
+    //   details: error
+    // });
+    // console.log(`❌ MCP Failure: ${functionName}`, error);
   }
 
   static logFallback(functionName: string, details?: string) {
-    this.logs.push({
-      timestamp: new Date(),
-      type: 'fallback',
-      functionName,
-      details
-    });
-    console.log(`🔄 MCP Fallback: ${functionName}`, details);
+    // DISABLED: Excessive logging causes memory pressure
+    // this.logs.push({
+    //   timestamp: new Date(),
+    //   type: 'fallback',
+    //   functionName,
+    //   details
+    // });
+    // console.log(`🔄 MCP Fallback: ${functionName}`, details);
   }
 
   static getReport() {

@@ -1,11 +1,12 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import { useRef, useEffect } from 'react';
+import { v4 as uuidv4 } from 'uuid';
 import { Message, ArtifactReference } from '../types/home';
 import { RFP } from '../types/rfp';
 import { SessionActiveAgent, UserProfile } from '../types/database';
 import DatabaseService from '../services/database';
-import { ClaudeService } from '../services/claudeService';
+import { ClaudeService } from '../services/claudeServiceV2';
 import { AgentService } from '../services/agentService';
 import { SmartAutoPromptManager } from '../utils/smartAutoPromptManager';
 import { categorizeError } from '../components/APIErrorHandler';
@@ -237,9 +238,10 @@ export const useMessageHandling = () => {
         // Get conversation history for context
         const conversationHistory = messages
           .filter(msg => msg.id !== 'initial-prompt')
+          .filter(msg => msg.content && msg.content.trim() !== '') // Filter out empty messages
           .map(msg => ({
             role: (msg.isUser ? 'user' : 'assistant') as 'user' | 'assistant',
-            content: msg.content
+            content: msg.content.trim()
           }))
           .slice(-10);
         
@@ -280,7 +282,7 @@ export const useMessageHandling = () => {
         };
 
         // Create a temporary AI message for streaming updates
-        const aiMessageId = (Date.now() + 1).toString();
+        let aiMessageId = (Date.now() + 1).toString();
         const aiMessage: Message = {
           id: aiMessageId,
           content: '',
@@ -298,28 +300,126 @@ export const useMessageHandling = () => {
         const updateInterval = 50; // Update UI every 50ms to reduce re-render frequency
         let streamingCompleted = false;
         
-        const onStreamingChunk = (chunk: string, isComplete: boolean) => {
-          // Prevent processing after completion
-          if (streamingCompleted) return;
+        let toolProcessingMessageId: string | null = null;
+        let isWaitingForToolCompletion = false;
+        
+        const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean) => {
+          console.log('📡 onStreamingChunk called:', {
+            chunkLength: chunk.length,
+            chunkPreview: chunk.substring(0, 30) + '...',
+            isComplete,
+            toolProcessing,
+            streamingCompleted,
+            isWaitingForToolCompletion
+          });
+          
+          // Prevent processing after completion (unless we're handling tool processing)
+          if (streamingCompleted && !toolProcessing && !isWaitingForToolCompletion) {
+            console.log('⚠️ Ignoring chunk - streaming completed');
+            return;
+          }
           
           if (isComplete) {
-            streamingCompleted = true;
-            console.log('✅ Streaming phase complete for message:', aiMessageId, '(Note: function calls may still be processing)');
-            
-            // Final update with any remaining buffer - ensure no text is lost
-            if (streamingBuffer.length > 0) {
-              setMessages(prev => 
-                prev.map(msg => 
-                  msg.id === aiMessageId 
-                    ? { ...msg, content: msg.content + streamingBuffer }
-                    : msg
-                )
-              );
-              streamingBuffer = ''; // Clear buffer after final update
+            if (toolProcessing) {
+              console.log('🔧 Message segment complete - tools processing for message:', aiMessageId, {
+                streamingBuffer: streamingBuffer.length,
+                currentMessageId: aiMessageId
+              });
+              
+              // Final update with any remaining buffer before tool processing
+              if (streamingBuffer.length > 0) {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: msg.content + streamingBuffer }
+                      : msg
+                  )
+                );
+                streamingBuffer = '';
+              }
+              
+              // Create a tool processing indicator message
+              const toolProcessingMessage: Message = {
+                id: uuidv4(),
+                content: '🔧 Processing tools...',
+                isUser: false,
+                timestamp: new Date(),
+                agentName: agentForResponse?.agent_name || 'AI Assistant',
+                isToolProcessing: true
+              };
+              
+              toolProcessingMessageId = toolProcessingMessage.id;
+              console.log('🔧 Created tool processing message:', toolProcessingMessageId);
+              
+              // Add tool processing message
+              setMessages(prev => [...prev, toolProcessingMessage]);
+              
+              // Set up for continuation after tools
+              isWaitingForToolCompletion = true;
+              streamingCompleted = false;
+              console.log('🔧 Set isWaitingForToolCompletion = true');
+              
+            } else {
+              streamingCompleted = true;
+              console.log('✅ Streaming phase complete for message:', aiMessageId);
+              
+              // Remove tool processing message if it exists
+              if (toolProcessingMessageId) {
+                setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
+                toolProcessingMessageId = null;
+              }
+              
+              // Final update with any remaining buffer
+              if (streamingBuffer.length > 0) {
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { ...msg, content: msg.content + streamingBuffer }
+                      : msg
+                  )
+                );
+                streamingBuffer = '';
+              }
+              
+              isWaitingForToolCompletion = false;
             }
             
             // CRITICAL: DO NOT clean up AbortController here - function calls may still be running
             // The cleanup will happen after ClaudeService.generateResponse() fully completes
+            return;
+          }
+          
+          // If we get new content after tool processing started, create a new message
+          if (isWaitingForToolCompletion && chunk.trim()) {
+            console.log('📝 Creating new message for content after tool processing:', {
+              chunk: chunk.substring(0, 50) + '...',
+              isWaitingForToolCompletion,
+              toolProcessingMessageId
+            });
+            
+            // Remove tool processing message
+            if (toolProcessingMessageId) {
+              setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
+              toolProcessingMessageId = null;
+            }
+            
+            // Create new message for continuation
+            const continuationMessageId = uuidv4();
+            const continuationMessage: Message = {
+              id: continuationMessageId,
+              content: chunk,
+              isUser: false,
+              timestamp: new Date(),
+              agentName: agentForResponse?.agent_name || 'AI Assistant'
+            };
+            
+            setMessages(prev => [...prev, continuationMessage]);
+            
+            // Switch to new message for further streaming
+            aiMessageId = continuationMessageId;
+            isWaitingForToolCompletion = false;
+            streamingBuffer = '';
+            lastUpdateTime = Date.now();
             return;
           }
           
@@ -359,24 +459,10 @@ export const useMessageHandling = () => {
           throw new Error('Request was aborted before Claude API call');
         }
 
-        console.error('🔥 ABOUT TO CALL CLAUDE API - This should appear!');
+        // DISABLED: Debug logging causes memory pressure
+        // console.error('🔥 ABOUT TO CALL CLAUDE API - This should appear!');
 
-        // DYNAMIC STREAMING DETECTION: Check for function-calling keywords
-        const rfpKeywords = [
-          'create rfp', 'rfp for', 'procurement', 'procure', 'sourcing', 'source', 
-          'bid for', 'proposal for', 'vendor for', 'need to source',
-          'looking for', 'find supplier', 'find vendor', 'buy',
-          'purchase', 'need to buy', 'need to purchase', 'need to find',
-          'need to get', 'require', 'looking to', 'want to source',
-          'want to buy', 'want to purchase', 'need to procure'
-        ];
-        const shouldForceFunctionCall = rfpKeywords.some(keyword => 
-          content.toLowerCase().includes(keyword.toLowerCase())
-        );
-
-        // SMART STREAMING: Use non-streaming for function calls, streaming for text-only
-        const useStreaming = !shouldForceFunctionCall; // Disable streaming when function calls expected
-
+        // FIXED: Always use streaming with proper tool handling
         const claudeResponse = await ClaudeService.generateResponse(
           content,
           agentForClaude,
@@ -396,7 +482,7 @@ export const useMessageHandling = () => {
           } : null,
           currentArtifact || null,
           undefined, // DISABLE ABORT SIGNAL - bypass AbortController issues
-          useStreaming, // SMART STREAMING: false for function calls, true for text-only
+          true, // ALWAYS use streaming with correct tool handling
           onStreamingChunk // Stream callback
         );
         
@@ -408,35 +494,59 @@ export const useMessageHandling = () => {
         console.log('5. Functions executed:', claudeResponse.metadata.functions_called);
         console.log('✅ COMPLETE CLAUDE RESPONSE FINISHED (including all function calls and streaming)');
         
-        // Update the final message with complete content and metadata
-        const finalAiMessage: Message = {
-          id: aiMessageId,
-          content: claudeResponse.content,
-          isUser: false,
-          timestamp: new Date(),
-          agentName: agentForResponse.agent_name
-        };
+        // CRITICAL FIX: Get the current message content that was built up during streaming
+        // to avoid overriding streamed content with final response
+        let finalContent = claudeResponse.content || '';
         
-        // Process Claude response metadata for artifacts and create artifact references
-        console.log('Claude response metadata:', claudeResponse.metadata);
-        
-        // Generate artifact references for the AI message
+        // Generate artifact references for the AI message (outside callback for database save)
         const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
-        if (artifactRefs.length > 0) {
-          finalAiMessage.artifactRefs = artifactRefs;
-        }
         
-        // Update the message in state with final content and artifact references
-        setMessages(prev => 
-          prev.map(msg => 
+        // Update the message in state with final content and artifact references, preserving streamed content
+        setMessages(prev => {
+          const currentMessage = prev.find(msg => msg.id === aiMessageId);
+          const currentContent = currentMessage?.content || '';
+          
+          // If streaming was used, use the streamed content; otherwise use Claude's final response
+          const wasStreaming = claudeResponse.metadata?.is_streaming;
+          if (wasStreaming && currentContent) {
+            // Use the streamed content that was built up during streaming
+            finalContent = currentContent;
+          } else {
+            // Use Claude's final response (non-streaming case)
+            finalContent = claudeResponse.content || '';
+          }
+          
+          console.log('🔧 FINAL CONTENT ASSEMBLY:');
+          console.log('- Was streaming:', wasStreaming);
+          console.log('- Current streamed content length:', currentContent.length);
+          console.log('- Claude response content length:', (claudeResponse.content || '').length);
+          console.log('- Final content length:', finalContent.length);
+          console.log('- Final content preview:', finalContent.substring(0, 100) + '...');
+          
+          // Create the final message with preserved streaming content
+          const finalAiMessage: Message = {
+            id: aiMessageId,
+            content: finalContent,
+            isUser: false,
+            timestamp: new Date(),
+            agentName: agentForResponse?.agent_name || 'AI Assistant'
+          };
+          
+          // Add artifact references if any
+          if (artifactRefs.length > 0) {
+            finalAiMessage.artifactRefs = artifactRefs;
+          }
+          
+          return prev.map(msg => 
             msg.id === aiMessageId 
               ? finalAiMessage
               : msg
-          )
-        );
+          );
+        });
 
         // Process Claude response metadata for artifacts with message ID
-        addClaudeArtifacts(claudeResponse.metadata, finalAiMessage.id);
+        console.log('🔍 useMessageHandling: About to call addClaudeArtifacts with metadata:', claudeResponse.metadata);
+        addClaudeArtifacts(claudeResponse.metadata, aiMessageId);
 
         setIsLoading(false);
         
@@ -489,8 +599,8 @@ export const useMessageHandling = () => {
               userId, 
               claudeResponse.content, 
               'assistant',
-              agentForResponse.agent_id,
-              agentForResponse.agent_name,
+              agentForResponse?.agent_id || 'unknown',
+              agentForResponse?.agent_name || 'AI Assistant',
               {},
               claudeResponse.metadata,
               artifactRefs // Pass the artifact references
