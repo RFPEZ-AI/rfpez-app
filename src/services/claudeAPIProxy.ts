@@ -62,6 +62,7 @@ export interface ClaudeGenerateParams {
   temperature?: number;
   system?: string;
   tools?: any[];
+  sessionId?: string; // Add session context for edge function
 }
 
 class ClaudeAPIProxyService {
@@ -92,14 +93,28 @@ class ClaudeAPIProxyService {
       
       console.log(`🌐 Calling edge function: ${functionName}`, { parameters });
       
+      // Create abort controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => {
+        console.error(`⌛ Edge function timeout after 120 seconds: ${functionName}`);
+        controller.abort();
+      }, 120000); // 120 second timeout - increased for complex operations like RFP creation
+      
       const response = await fetch(this.baseUrl, {
         method: 'POST',
         headers,
+        signal: controller.signal, // Add abort signal
         body: JSON.stringify({
           functionName,
           parameters,
+          sessionContext: parameters.sessionId ? {
+            sessionId: parameters.sessionId,
+            timestamp: new Date().toISOString()
+          } : undefined,
         }),
       });
+      
+      clearTimeout(timeoutId); // Clear timeout on success
 
       if (!response.ok) {
         const errorText = await response.text();

@@ -11,6 +11,10 @@ interface EdgeFunctionCall {
   functionName: string;
   parameters: any;
   clientCallbacks?: ClientCallback[];
+  sessionContext?: {
+    sessionId: string;
+    timestamp: string;
+  };
 }
 
 interface ClientCallback {
@@ -548,6 +552,383 @@ class DatabaseHandler {
       throw error;
     }
   }
+
+  // MCP Protocol Functions
+  async getConversationHistory(parameters: any, userId: string): Promise<any> {
+    const { session_id, limit = 50, offset = 0 } = parameters;
+    
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        content,
+        role,
+        created_at,
+        message_order,
+        metadata,
+        ai_metadata
+      `)
+      .eq('session_id', session_id)
+      .order('message_order', { ascending: true })
+      .range(offset, offset + limit - 1);
+    
+    if (error) {
+      throw new Error(`Failed to retrieve messages: ${error.message}`);
+    }
+    
+    return {
+      session_id,
+      messages: messages || [],
+      total_retrieved: messages?.length || 0,
+      offset,
+      limit
+    };
+  }
+
+  async getRecentSessions(parameters: any, userId: string): Promise<any> {
+    const { limit = 10 } = parameters;
+    
+    const { data: sessions, error } = await supabase
+      .from('sessions')
+      .select(`
+        id,
+        title,
+        description,
+        created_at,
+        updated_at,
+        session_metadata
+      `)
+      .eq('user_id', userId)
+      .eq('is_archived', false)
+      .order('updated_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      throw new Error(`Failed to retrieve sessions: ${error.message}`);
+    }
+    
+    return {
+      sessions: sessions || [],
+      total_retrieved: sessions?.length || 0
+    };
+  }
+
+  async storeMessage(parameters: any, userId: string): Promise<any> {
+    const { session_id, content, role, metadata = {} } = parameters;
+    
+    // Get the current highest message order for this session
+    const { data: lastMessage } = await supabase
+      .from('messages')
+      .select('message_order')
+      .eq('session_id', session_id)
+      .order('message_order', { ascending: false })
+      .limit(1)
+      .single();
+    
+    const nextOrder = (lastMessage?.message_order || 0) + 1;
+    
+    const { data: message, error } = await supabase
+      .from('messages')
+      .insert({
+        session_id,
+        user_id: userId,
+        content,
+        role,
+        message_order: nextOrder,
+        metadata
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      throw new Error(`Failed to store message: ${error.message}`);
+    }
+    
+    // Update session timestamp
+    await supabase
+      .from('sessions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', session_id);
+    
+    return {
+      message_id: message.id,
+      session_id,
+      message_order: nextOrder,
+      created_at: message.created_at
+    };
+  }
+
+  async createSession(parameters: any, userId: string): Promise<any> {
+    const { title, description } = parameters;
+    
+    const { data: session, error } = await supabase
+      .from('sessions')
+      .insert({
+        user_id: userId,
+        title,
+        description
+      })
+      .select()
+      .single();
+    
+    if (error) {
+      throw new Error(`Failed to create session: ${error.message}`);
+    }
+    
+    return {
+      session_id: session.id,
+      title: session.title,
+      description: session.description,
+      created_at: session.created_at
+    };
+  }
+
+  async searchMessages(parameters: any, userId: string): Promise<any> {
+    const { query, limit = 20 } = parameters;
+    
+    // Use text search across messages for sessions owned by this user
+    const { data: messages, error } = await supabase
+      .from('messages')
+      .select(`
+        id,
+        session_id,
+        content,
+        role,
+        created_at,
+        sessions!inner(title, description)
+      `)
+      .textSearch('content', query)
+      .eq('sessions.user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      throw new Error(`Failed to search messages: ${error.message}`);
+    }
+    
+    return {
+      query,
+      results: messages || [],
+      total_found: messages?.length || 0
+    };
+  }
+
+  // Create and set RFP function - server-side implementation for performance
+  async createAndSetRfp(params: any, userId: string, sessionContext?: { sessionId: string; timestamp: string }) {
+    const startTime = Date.now();
+    console.log('🔍 DEBUG: createAndSetRfp called with params:', JSON.stringify(params, null, 2));
+    console.log('🔍 DEBUG: createAndSetRfp called with userId:', userId);
+    
+    // Robust parameter validation
+    if (!params || typeof params !== 'object') {
+      throw new Error('Invalid parameters provided to createAndSetRfp. Expected object with at least a name field.');
+    }
+    
+    const { name, description = '', specification = '', due_date = null } = params;
+    
+    console.log('🚀 Creating and setting new RFP:', { name, userId });
+    
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      console.error('❌ DEBUG: Invalid name parameter:', { name, params });
+      throw new Error(`RFP name is required and must be a non-empty string. Received: ${typeof name === 'string' ? `"${name}"` : typeof name}`);
+    }
+    
+    try {
+      // Step 1: Get the user profile and current session ID
+      console.log('⏱️ TIMING: Starting Step 1 - Get user profile and session at', Date.now() - startTime, 'ms');
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id, current_session_id')
+        .eq('supabase_user_id', userId)
+        .single();
+      
+      if (profileError || !profile) {
+        throw new Error('User profile not found. Please ensure you are authenticated.');
+      }
+      
+      let session_id = profile.current_session_id;
+      
+      // Step 1a: Use session context as fallback if available
+      if (!session_id && sessionContext?.sessionId) {
+        console.log('⚡ Using session context as fallback:', sessionContext.sessionId);
+        session_id = sessionContext.sessionId;
+        
+        // Verify this session exists and belongs to the user
+        const { data: sessionCheck } = await supabase
+          .from('sessions')
+          .select('id')
+          .eq('id', session_id)
+          .eq('user_id', profile.id)
+          .single();
+        
+        if (sessionCheck) {
+          console.log('✅ Session context verified, setting as current session');
+          // Set as current session in user profile
+          await supabase.rpc('set_user_current_session', {
+            user_uuid: userId,
+            session_uuid: session_id
+          });
+        } else {
+          console.log('⚠️ Session context invalid, will create new session');
+          session_id = null;
+        }
+      }
+      
+      // Step 1b: If still no current session, create one automatically
+      if (!session_id) {
+        console.log('⚠️ No current session found, creating new session automatically');
+        console.log('⏱️ TIMING: Starting Step 1a - Auto-create session at', Date.now() - startTime, 'ms');
+        
+        const { data: newSession, error: sessionError } = await supabase
+          .from('sessions')
+          .insert({
+            user_id: profile.id,
+            title: `RFP Session - ${name}`,
+            description: 'Auto-created session for RFP creation'
+          })
+          .select()
+          .single();
+        
+        if (sessionError) {
+          throw new Error(`Failed to create session: ${sessionError.message}`);
+        }
+        
+        session_id = newSession.id;
+        console.log('✅ New session created:', session_id);
+        
+        // Set as current session in user profile
+        const { error: setSessionError } = await supabase
+          .rpc('set_user_current_session', {
+            user_uuid: userId,
+            session_uuid: session_id
+          });
+        
+        if (setSessionError) {
+          console.warn('⚠️ Failed to set as current session, but continuing with RFP creation:', setSessionError);
+        } else {
+          console.log('✅ Session set as current for user');
+        }
+        
+        console.log('⏱️ TIMING: Step 1a completed at', Date.now() - startTime, 'ms');
+      } else {
+        console.log('✅ Found existing current session:', session_id);
+      }
+      
+      console.log('⏱️ TIMING: Step 1 completed at', Date.now() - startTime, 'ms');
+      
+      // Step 2: Verify session exists and check if it already has a current RFP
+      console.log('⏱️ TIMING: Starting Step 2 - Verify session at', Date.now() - startTime, 'ms');
+      const { data: currentSession, error: sessionError } = await supabase
+        .from('sessions')
+        .select('id, current_rfp_id, user_id')
+        .eq('id', session_id)
+        .single();
+      
+      if (sessionError || !currentSession) {
+        throw new Error('Session not found. Please ensure you have a valid session.');
+      }
+      
+      if (currentSession.current_rfp_id) {
+        console.log('⚠️ Session already has current RFP:', currentSession.current_rfp_id);
+      }
+      console.log('⏱️ TIMING: Step 2 completed at', Date.now() - startTime, 'ms');
+      
+      // Step 3: Create new RFP with supabase_insert
+      console.log('⏱️ TIMING: Starting Step 3 - Create RFP at', Date.now() - startTime, 'ms');
+      const insertData: {
+        name: string;
+        status: string;
+        description?: string;
+        specification?: string;
+        due_date?: string;
+      } = {
+        name: name.trim(),
+        status: 'draft'
+      };
+      
+      // Add optional fields if provided
+      if (description && description.trim()) {
+        insertData.description = description.trim();
+      }
+      if (specification && specification.trim()) {
+        insertData.specification = specification.trim();
+      }
+      if (due_date) {
+        insertData.due_date = due_date;
+      }
+      
+      const { data: newRfp, error: insertError } = await supabase
+        .from('rfps')
+        .insert(insertData)
+        .select('id, name, description, specification, status, created_at')
+        .single();
+      
+      if (insertError) {
+        console.error('❌ Failed to create RFP:', insertError);
+        throw new Error(`Failed to create RFP: ${insertError.message}`);
+      }
+      
+      console.log('✅ RFP created successfully:', newRfp.id);
+      console.log('⏱️ TIMING: Step 3 completed at', Date.now() - startTime, 'ms');
+      
+      // Step 4: Set as current RFP for the session
+      console.log('⏱️ TIMING: Starting Step 4 - Set as current RFP at', Date.now() - startTime, 'ms');
+      const { error: updateError } = await supabase
+        .from('sessions')
+        .update({ current_rfp_id: newRfp.id })
+        .eq('id', session_id)
+        .select('id, current_rfp_id')
+        .single();
+      
+      if (updateError) {
+        console.error('❌ Failed to set as current RFP:', updateError);
+        throw new Error(`RFP created but failed to set as current: ${updateError.message}`);
+      }
+      
+      console.log('✅ RFP set as current for session successfully');
+      console.log('⏱️ TIMING: Step 4 completed at', Date.now() - startTime, 'ms');
+      
+      // Step 5: Validation - verify RFP exists in database
+      console.log('⏱️ TIMING: Starting Step 5 - Validate creation at', Date.now() - startTime, 'ms');
+      const { data: verifyRfp, error: verifyError } = await supabase
+        .from('rfps')
+        .select('id, name, status')
+        .eq('id', newRfp.id)
+        .single();
+      
+      if (verifyError || !verifyRfp) {
+        throw new Error('RFP creation validation failed - RFP not found after creation');
+      }
+      
+      console.log('✅ RFP creation validated successfully');
+      console.log('⏱️ TIMING: Step 5 completed at', Date.now() - startTime, 'ms');
+      console.log('⏱️ TIMING: Total execution time:', Date.now() - startTime, 'ms');
+      
+      const wasSessionCreated = !profile.current_session_id;
+      const sessionMessage = wasSessionCreated ? ' (session auto-created)' : '';
+      
+      return {
+        success: true,
+        rfp: newRfp,
+        current_rfp_id: newRfp.id,
+        session_id: session_id,
+        session_auto_created: wasSessionCreated,
+        message: `RFP "${newRfp.name}" created successfully and set as current RFP${sessionMessage}`,
+        steps_completed: [
+          'retrieved_user_profile',
+          ...(wasSessionCreated ? ['auto_created_session', 'set_as_current_session'] : ['found_existing_session']),
+          'verified_session_exists',
+          'created_rfp_record', 
+          'set_as_current_rfp_for_session',
+          'validated_creation'
+        ]
+      };
+      
+    } catch (error) {
+      console.error('❌ Error in createAndSetRfp:', error);
+      throw error;
+    }
+  }
 }
 
 // Client callback generator
@@ -624,9 +1005,13 @@ function generateClientCallbacks(functionName: string, result: any, params?: any
 
 // Main function handler
 async function handleFunction(functionCall: EdgeFunctionCall, userId: string): Promise<EdgeFunctionResponse> {
-  const { functionName, parameters } = functionCall;
+  const { functionName, parameters, sessionContext } = functionCall;
   
-  console.log(`🚀 Handling function: ${functionName}`, { userId, parameters });
+  console.log(`🚀 Handling function: ${functionName}`, { 
+    userId, 
+    parameters,
+    sessionContext: sessionContext ? { sessionId: sessionContext.sessionId } : 'none'
+  });
   
   const claudeHandler = new ClaudeAPIHandler();
   const dbHandler = new DatabaseHandler();
@@ -660,6 +1045,31 @@ async function handleFunction(functionCall: EdgeFunctionCall, userId: string): P
         
       case 'supabase_delete':
         result = await dbHandler.supabaseDelete(parameters, userId);
+        break;
+        
+      case 'create_and_set_rfp':
+        result = await dbHandler.createAndSetRfp(parameters, userId, sessionContext);
+        break;
+        
+      // MCP Protocol functions
+      case 'get_conversation_history':
+        result = await dbHandler.getConversationHistory(parameters, userId);
+        break;
+        
+      case 'get_recent_sessions':
+        result = await dbHandler.getRecentSessions(parameters, userId);
+        break;
+        
+      case 'store_message':
+        result = await dbHandler.storeMessage(parameters, userId);
+        break;
+        
+      case 'create_session':
+        result = await dbHandler.createSession(parameters, userId);
+        break;
+        
+      case 'search_messages':
+        result = await dbHandler.searchMessages(parameters, userId);
         break;
         
       default:
@@ -714,7 +1124,7 @@ serve(async (req) => {
   try {
     // Parse request body
     const body = await req.json();
-    const { functionName, parameters, stream } = body;
+    const { functionName, parameters, stream, sessionContext } = body;
     
     if (!functionName) {
       return new Response(JSON.stringify({ 
@@ -752,7 +1162,7 @@ serve(async (req) => {
     }
 
     // Handle regular function calls
-    const response = await handleFunction({ functionName, parameters }, userId);
+    const response = await handleFunction({ functionName, parameters, sessionContext }, userId);
 
     return new Response(JSON.stringify(response), {
       status: response.success ? 200 : 400,

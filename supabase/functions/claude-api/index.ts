@@ -196,6 +196,139 @@ async function executeSearchMessages(params: any, userId: string) {
   }
 }
 
+async function executeCreateAndSetRfp(params: any, userId: string) {
+  console.log('🔍 DEBUG: executeCreateAndSetRfp called with params:', JSON.stringify(params, null, 2));
+  console.log('🔍 DEBUG: executeCreateAndSetRfp called with userId:', userId);
+  
+  // Robust parameter validation
+  if (!params || typeof params !== 'object') {
+    throw new Error('Invalid parameters provided to createAndSetRfp. Expected object with at least a name field.');
+  }
+  
+  const { name, description = '', specification = '', due_date = null } = params;
+  
+  console.log('🚀 Creating and setting new RFP:', { name, userId });
+  
+  if (!name || typeof name !== 'string' || name.trim() === '') {
+    console.error('❌ DEBUG: Invalid name parameter:', { name, params });
+    throw new Error(`RFP name is required and must be a non-empty string. Received: ${typeof name === 'string' ? `"${name}"` : typeof name}`);
+  }
+  
+  try {
+    // Step 1: Get the current session ID for the user
+    const { data: profile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('current_session_id')
+      .eq('supabase_user_id', userId)
+      .single();
+    
+    if (profileError || !profile?.current_session_id) {
+      throw new Error('No active session found. Please start a conversation session first.');
+    }
+    
+    const session_id = profile.current_session_id;
+    console.log('✅ Found current session:', session_id);
+    
+    // Step 2: Verify session exists and check if it already has a current RFP
+    const { data: currentSession, error: sessionError } = await supabase
+      .from('sessions')
+      .select('id, current_rfp_id, user_id')
+      .eq('id', session_id)
+      .single();
+    
+    if (sessionError || !currentSession) {
+      throw new Error('Session not found. Please ensure you have a valid session.');
+    }
+    
+    if (currentSession.current_rfp_id) {
+      console.log('⚠️ Session already has current RFP:', currentSession.current_rfp_id);
+    }
+    
+    // Step 3: Create new RFP with supabase_insert
+    const insertData: {
+      name: string;
+      status: string;
+      description?: string;
+      specification?: string;
+      due_date?: string;
+    } = {
+      name: name.trim(),
+      status: 'draft'
+    };
+    
+    // Add optional fields if provided
+    if (description && description.trim()) {
+      insertData.description = description.trim();
+    }
+    if (specification && specification.trim()) {
+      insertData.specification = specification.trim();
+    }
+    if (due_date) {
+      insertData.due_date = due_date;
+    }
+    
+    const { data: newRfp, error: insertError } = await supabase
+      .from('rfps')
+      .insert(insertData)
+      .select('id, name, description, specification, status, created_at')
+      .single();
+    
+    if (insertError) {
+      console.error('❌ Failed to create RFP:', insertError);
+      throw new Error(`Failed to create RFP: ${insertError.message}`);
+    }
+    
+    console.log('✅ RFP created successfully:', newRfp.id);
+    
+    // Step 4: Set as current RFP for the session
+    const { error: updateError } = await supabase
+      .from('sessions')
+      .update({ current_rfp_id: newRfp.id })
+      .eq('id', session_id)
+      .select('id, current_rfp_id')
+      .single();
+    
+    if (updateError) {
+      console.error('❌ Failed to set as current RFP:', updateError);
+      throw new Error(`RFP created but failed to set as current: ${updateError.message}`);
+    }
+    
+    console.log('✅ RFP set as current for session successfully');
+    
+    // Step 5: Validation - verify RFP exists in database
+    const { data: verifyRfp, error: verifyError } = await supabase
+      .from('rfps')
+      .select('id, name, status')
+      .eq('id', newRfp.id)
+      .single();
+    
+    if (verifyError || !verifyRfp) {
+      throw new Error('RFP creation validation failed - RFP not found after creation');
+    }
+    
+    console.log('✅ RFP creation validated successfully');
+    
+    return {
+      success: true,
+      rfp: newRfp,
+      current_rfp_id: newRfp.id,
+      session_id: session_id,
+      message: `RFP "${newRfp.name}" created successfully and set as current RFP for this session`,
+      steps_completed: [
+        'retrieved_current_session',
+        'verified_session_exists',
+        'created_rfp_record', 
+        'set_as_current_rfp_for_session',
+        'validated_creation'
+      ]
+    };
+    
+  } catch (error) {
+    console.error('❌ Error in executeCreateAndSetRfp:', error);
+    throw error;
+  }
+}
+
 // Main serve handler
 serve(async (req) => {
   // Handle CORS
@@ -271,6 +404,9 @@ serve(async (req) => {
         break
       case 'search_messages':
         result = await executeSearchMessages(parameters || {}, userId)
+        break
+      case 'create_and_set_rfp':
+        result = await executeCreateAndSetRfp(parameters || {}, userId)
         break
       default:
         return new Response(JSON.stringify({
