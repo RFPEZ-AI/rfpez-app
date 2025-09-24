@@ -412,27 +412,60 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                 else if (assistantContent[event.index].type === 'tool_use') {
                   // Tool is complete - IMMEDIATE EXECUTION APPROACH
                   const toolUse = assistantContent[event.index] as ToolUseBlock;
-                  console.log('🔨 Tool call detected during streaming - SEGMENTING RESPONSE:', toolUse.name);
+                  console.log('🔨 TOOL DETECTED DURING STREAMING:', {
+                    toolName: toolUse.name,
+                    toolId: toolUse.id,
+                    toolInput: toolUse.input,
+                    streamedContentLength: streamedContent.length,
+                    currentBlockIndex: event.index
+                  });
                   
                   // STEP 1: Close current message stream and signal tool processing
                   if (streamedContent.trim()) {
-                    console.log('📝 Closing current message segment before tool execution');
+                    console.log('📝 CLOSING MESSAGE SEGMENT - streamedContent length:', streamedContent.length);
                     onChunk?.('', true, true); // Signal completion with tool processing flag
+                  } else {
+                    console.log('📝 NO STREAMED CONTENT to close, but tool processing starting');
+                    onChunk?.('', true, true); // Still signal tool processing even with no content
                   }
                   
                   // STEP 2: Execute tool immediately
+                  console.log('⚙️ EXECUTING TOOL:', toolUse.name);
                   try {
-                    console.log('🔍 DEBUG: Tool use object:', JSON.stringify(toolUse, null, 2));
-                    functionsExecuted.push(toolUse.name);
-                    const result = await claudeAPIHandler.executeFunction(toolUse.name, toolUse.input);
-                    allFunctionResults.push({ function: toolUse.name, result });
-                    console.log('✅ Tool executed during streaming:', toolUse.name);
+                    console.log('🔍 TOOL EXECUTION DEBUG:', {
+                      toolName: toolUse.name,
+                      toolId: toolUse.id,
+                      inputKeys: Object.keys(toolUse.input || {}),
+                      functionsExecutedSoFar: functionsExecuted.length
+                    });
                     
-                    // STEP 3: If more content is expected, signal new message segment
-                    // (We'll handle this in the message completion phase)
+                    functionsExecuted.push(toolUse.name);
+                    const executionStart = Date.now();
+                    const result = await claudeAPIHandler.executeFunction(toolUse.name, toolUse.input);
+                    const executionTime = Date.now() - executionStart;
+                    
+                    allFunctionResults.push({ function: toolUse.name, result });
+                    
+                    console.log('✅ TOOL EXECUTION SUCCESS:', {
+                      toolName: toolUse.name,
+                      executionTimeMs: executionTime,
+                      resultType: typeof result,
+                      resultKeys: result && typeof result === 'object' ? Object.keys(result) : [],
+                      totalFunctionsExecuted: functionsExecuted.length,
+                      totalResults: allFunctionResults.length
+                    });
+                    
+                    // STEP 3: Tool execution complete - continuation will happen in message_stop
+                    console.log('🔄 Tool execution complete, awaiting continuation in message_stop phase');
                     
                   } catch (error) {
-                    console.error('❌ Tool execution failed during streaming:', error);
+                    console.error('❌ TOOL EXECUTION FAILED:', {
+                      toolName: toolUse.name,
+                      error: error instanceof Error ? error.message : 'Unknown error',
+                      errorType: error instanceof Error ? error.constructor.name : typeof error,
+                      stack: error instanceof Error ? error.stack : undefined
+                    });
+                    
                     allFunctionResults.push({ 
                       function: toolUse.name, 
                       result: { error: error instanceof Error ? error.message : 'Unknown error' }
@@ -447,29 +480,50 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
               }
             }
             else if (event.type === 'message_stop') {
-              console.log('⏹️ Streaming message stopped');
+              console.log('⏹️ STREAMING MESSAGE STOPPED:', {
+                streamedContentLength: streamedContent.length,
+                assistantContentBlocks: assistantContent.length,
+                functionsExecuted: functionsExecuted.length,
+                functionResults: allFunctionResults.length,
+                contentBlockTypes: assistantContent.map(block => block.type)
+              });
               
               // If we have function results from inline execution, we need to continue the conversation
               if (allFunctionResults.length > 0) {
-                console.log('🔄 Functions were executed during streaming, getting Claude response...');
+                console.log('🔄 PROCESSING TOOL RESULTS - Functions executed during streaming:', {
+                  functionsExecuted,
+                  resultCount: allFunctionResults.length,
+                  resultSummary: allFunctionResults.map(fr => ({ function: fr.function, hasResult: !!fr.result }))
+                });
                 
                 // Add assistant's message with mixed content to conversation
+                console.log('➕ Adding assistant message to conversation history');
                 messages.push({
                   role: 'assistant',
                   content: assistantContent as any
                 });
 
                 // Add tool results as user message
+                console.log('🔧 CREATING TOOL RESULTS MESSAGE');
                 const toolResults = allFunctionResults.map((funcResult, index) => {
                   const toolUseBlock = assistantContent.find(block => 
                     block.type === 'tool_use' && (block as ToolUseBlock).name === funcResult.function
                   ) as ToolUseBlock | undefined;
                   
-                  return {
+                  const toolResult = {
                     type: 'tool_result' as const,
                     tool_use_id: toolUseBlock?.id || `tool-${index}`,
                     content: JSON.stringify(funcResult.result, null, 2)
                   };
+                  
+                  console.log('🔧 Tool result created:', {
+                    functionName: funcResult.function,
+                    toolUseId: toolResult.tool_use_id,
+                    contentLength: toolResult.content.length,
+                    resultPreview: toolResult.content.substring(0, 200) + '...'
+                  });
+                  
+                  return toolResult;
                 });
 
                 const toolMessage: MessageParam = {
@@ -478,13 +532,34 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                 };
                 
                 messages.push(toolMessage);
-                console.log('✅ TOOL RESULTS MESSAGE ADDED:', toolResults.length, 'results');
+                console.log('✅ TOOL RESULTS MESSAGE ADDED:', {
+                  toolResultsCount: toolResults.length,
+                  totalMessagesInConversation: messages.length,
+                  toolResultsSize: JSON.stringify(toolResults).length
+                });
 
                 // Get Claude's response to the function results
+                console.log('🚀 CALLING CLAUDE API FOR TOOL RESPONSE');
                 try {
-                  const toolResponse = await APIRetryHandler.executeWithRetry(
+                  const toolResponseStart = Date.now();
+                  
+                  // Create timeout promise first
+                  const timeoutPromise = new Promise((_, reject) => {
+                    setTimeout(() => reject(new Error('FORCE_TIMEOUT: Tool processing exceeded 30 second limit')), 30000);
+                  });
+                  
+                  // Create API call with retry logic
+                  const toolResponsePromise = APIRetryHandler.executeWithRetry(
                     async () => {
                       const validatedMessages = validateAndFilterMessages(messages);
+                      console.log('📋 Making Claude API call with:', {
+                        messageCount: validatedMessages.length,
+                        lastMessageRole: validatedMessages[validatedMessages.length - 1]?.role,
+                        lastMessageType: Array.isArray(validatedMessages[validatedMessages.length - 1]?.content) 
+                          ? (validatedMessages[validatedMessages.length - 1]?.content?.[0] as any)?.type || 'text'
+                          : 'text',
+                        systemPromptLength: systemPrompt.length
+                      });
                       
                       return client.messages.create({
                         model: 'claude-3-5-sonnet-latest',
@@ -496,8 +571,24 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                         tool_choice: { type: 'auto' }
                       });
                     },
-                    { maxRetries: 3, baseDelay: 2000, maxDelay: 60000 }
+                    { 
+                      maxRetries: 1, // Reduced retries to prevent timeout conflicts
+                      baseDelay: 1000, 
+                      maxDelay: 5000 // Reduced max delay
+                    }
                   );
+                  
+                  // Race the API call against timeout - timeout will win after 30 seconds
+                  console.log('🏁 Starting Promise.race between API call and 30-second timeout');
+                  const toolResponse = await Promise.race([toolResponsePromise, timeoutPromise]) as any;
+                  
+                  const toolResponseTime = Date.now() - toolResponseStart;
+                  console.log('✅ CLAUDE TOOL RESPONSE RECEIVED:', {
+                    responseTimeMs: toolResponseTime,
+                    contentBlocks: toolResponse.content.length,
+                    contentTypes: toolResponse.content.map((block: any) => block.type),
+                    stopReason: toolResponse.stop_reason
+                  });
 
                   // Stream Claude's response to the tool results
                   const toolResponseText = toolResponse.content
@@ -505,17 +596,50 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                     .map((block: any) => block.text)
                     .join('');
                   
+                  console.log('📡 PROCESSING TOOL RESPONSE TEXT:', {
+                    totalContentBlocks: toolResponse.content.length,
+                    textBlocks: toolResponse.content.filter((block: any) => block.type === 'text').length,
+                    toolResponseTextLength: toolResponseText.length,
+                    toolResponsePreview: toolResponseText.substring(0, 200) + '...',
+                    hasTrimmedContent: !!toolResponseText.trim()
+                  });
+                  
                   if (toolResponseText.trim()) {
-                    console.log('📡 Streaming Claude response to tool results:', toolResponseText.length, 'characters');
+                    console.log('📡 STREAMING TOOL RESPONSE TO UI:', {
+                      contentLength: toolResponseText.length,
+                      willStream: !!onChunk
+                    });
                     // Stream the tool response content
                     onChunk?.(toolResponseText, false);
+                  } else {
+                    console.log('⚠️ NO TOOL RESPONSE TEXT TO STREAM - but still triggering continuation for UI cleanup');
+                    // CRITICAL FIX: Even with empty response, trigger continuation to remove processing message
+                    onChunk?.(' ', false); // Send minimal content to trigger continuation logic
                   }
                   
                   // Update the response object
                   response = toolResponse;
+                  console.log('✅ Tool response object updated successfully');
                   
                 } catch (error) {
-                  console.error('❌ Failed to get Claude response to tool results:', error);
+                  console.error('❌ FAILED TO GET CLAUDE TOOL RESPONSE:', {
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    errorType: error instanceof Error ? error.constructor.name : typeof error,
+                    stack: error instanceof Error ? error.stack : undefined,
+                    toolResultsCount: allFunctionResults.length,
+                    messagesInConversation: messages.length
+                  });
+                  
+                  // CRITICAL FIX: When tool response fails, still trigger continuation to remove processing message
+                  const isTimeout = error instanceof Error && error.message.includes('FORCE_TIMEOUT');
+                  const errorMessage = isTimeout 
+                    ? 'Tool processing exceeded time limit. Please try again.'
+                    : 'I encountered an issue processing the tools. Please try again.';
+                  
+                  console.log('🔧 Tool response failed - sending error message to trigger UI cleanup:', errorMessage);
+                  
+                  // Use special marker to ensure tool processing cleanup happens
+                  onChunk?.(errorMessage, false, true); // Third parameter forces tool completion cleanup
                 }
               }
               
@@ -655,31 +779,60 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       const finalTextBlocks = response.content.filter((block: any) => block.type === 'text') as any[];
       const responseTextContent = finalTextBlocks.map(block => block.text).join('');
       
+      console.log('🔧 FINAL CONTENT ASSEMBLY DEBUG:', {
+        streamingMode: stream && onChunk,
+        nonStreamingMode: !stream || !onChunk,
+        streamedContentLength: streamedContent.length,
+        responseTextContentLength: responseTextContent.length,
+        toolsExecuted: functionsExecuted.length,
+        responseContentBlocks: response.content.length,
+        responseContentTypes: response.content.map((block: any) => block.type)
+      });
+      
       if (stream && onChunk) {
         // For streaming with tool calls: combine streamed + response content
         if (streamedContent && responseTextContent) {
           // Both have content - combine them
           finalContent = streamedContent + responseTextContent;
-          console.log('🔧 STREAMING FIX: Combined streamed content (' + streamedContent.length + ' chars) + response content (' + responseTextContent.length + ' chars)');
+          console.log('🔧 STREAMING FIX: COMBINED CONTENT:', {
+            streamedLength: streamedContent.length,
+            responseLength: responseTextContent.length,
+            finalLength: finalContent.length,
+            streamedPreview: streamedContent.substring(0, 100) + '...',
+            responsePreview: responseTextContent.substring(0, 100) + '...'
+          });
         } else if (responseTextContent) {
           // Only response has content (tool calls scenario)
           finalContent = responseTextContent;
-          console.log('🔧 STREAMING FIX: Using response content (' + responseTextContent.length + ' chars) - tool calls case');
+          console.log('🔧 STREAMING FIX: TOOL RESPONSE ONLY:', {
+            responseLength: responseTextContent.length,
+            responsePreview: responseTextContent.substring(0, 200) + '...',
+            willManuallyStream: !!onChunk
+          });
           
           // CRITICAL: Stream the tool response content to UI since it wasn't streamed
           if (onChunk) {
-            console.log('📡 STREAMING FIX: Manually streaming tool response content to UI');
+            console.log('📡 STREAMING FIX: MANUALLY STREAMING TOOL RESPONSE TO UI');
             onChunk(responseTextContent, false);
             onChunk('', true); // Signal completion
           }
         } else if (streamedContent) {
           // Only streamed content (normal streaming case)
           finalContent = streamedContent;
-          console.log('🔧 STREAMING FIX: Using streamed content (' + streamedContent.length + ' chars) - normal streaming case');
+          console.log('🔧 STREAMING FIX: STREAMED CONTENT ONLY:', {
+            streamedLength: streamedContent.length,
+            streamedPreview: streamedContent.substring(0, 100) + '...'
+          });
+        } else {
+          console.log('⚠️ STREAMING FIX: NO CONTENT FOUND - both streamed and response are empty');
         }
       } else {
         // Non-streaming case
         finalContent = responseTextContent;
+        console.log('🔧 NON-STREAMING CASE:', {
+          responseLength: responseTextContent.length,
+          responsePreview: responseTextContent.substring(0, 100) + '...'
+        });
       }
 
       const responseTime = Date.now() - startTime;

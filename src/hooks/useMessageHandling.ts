@@ -302,16 +302,57 @@ export const useMessageHandling = () => {
         
         let toolProcessingMessageId: string | null = null;
         let isWaitingForToolCompletion = false;
+        let uiTimeoutId: NodeJS.Timeout | null = null;
         
-        const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean) => {
-          console.log('📡 onStreamingChunk called:', {
+        const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, forceToolCompletion?: boolean) => {
+          console.log('📡 STREAMING CHUNK DEBUG:', {
             chunkLength: chunk.length,
-            chunkPreview: chunk.substring(0, 30) + '...',
+            chunkPreview: chunk.length > 0 ? chunk.substring(0, 50) + '...' : '[empty]',
             isComplete,
             toolProcessing,
+            forceToolCompletion,
             streamingCompleted,
-            isWaitingForToolCompletion
+            isWaitingForToolCompletion,
+            currentMessageId: aiMessageId,
+            toolProcessingMessageId,
+            bufferLength: streamingBuffer.length
           });
+          
+          // Handle forced tool completion (e.g., from timeout)
+          if (forceToolCompletion && isWaitingForToolCompletion && toolProcessingMessageId) {
+            console.log('🔧 FORCED TOOL COMPLETION - cleaning up processing message:', toolProcessingMessageId);
+            
+            // Remove tool processing message
+            setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
+            
+            // Clear any active UI timeout since we're handling forced completion
+            if (uiTimeoutId) {
+              clearTimeout(uiTimeoutId);
+              uiTimeoutId = null;
+              console.log('⏰ UI timeout cleared - forced completion active');
+            }
+            
+            // Create new error/timeout message
+            const errorMessageId = uuidv4();
+            const errorMessage: Message = {
+              id: errorMessageId,
+              content: chunk,
+              isUser: false,
+              timestamp: new Date(),
+              agentName: agentForResponse?.agent_name || 'AI Assistant'
+            };
+            
+            setMessages(prev => [...prev, errorMessage]);
+            
+            // Reset state
+            toolProcessingMessageId = null;
+            isWaitingForToolCompletion = false;
+            streamingCompleted = true;
+            streamingBuffer = '';
+            
+            console.log('🔧 Tool processing state reset due to forced completion');
+            return;
+          }
           
           // Prevent processing after completion (unless we're handling tool processing)
           if (streamingCompleted && !toolProcessing && !isWaitingForToolCompletion) {
@@ -359,6 +400,37 @@ export const useMessageHandling = () => {
               streamingCompleted = false;
               console.log('🔧 Set isWaitingForToolCompletion = true');
               
+              // UI-LEVEL TIMEOUT: Force cleanup after 30 seconds regardless of API state
+              const uiTimeoutId = setTimeout(() => {
+                console.log('⏰ UI TIMEOUT TRIGGERED - forcing tool processing cleanup after 30 seconds');
+                console.log('🔧 Timeout cleanup for processing message:', toolProcessingMessageId);
+                
+                if (toolProcessingMessageId && isWaitingForToolCompletion) {
+                  // Remove tool processing message
+                  setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
+                  
+                  // Create timeout error message
+                  const timeoutMessageId = uuidv4();
+                  const timeoutMessage: Message = {
+                    id: timeoutMessageId,
+                    content: 'Tool processing exceeded time limit. Please try again.',
+                    isUser: false,
+                    timestamp: new Date(),
+                    agentName: agentForResponse?.agent_name || 'AI Assistant'
+                  };
+                  
+                  setMessages(prev => [...prev, timeoutMessage]);
+                  
+                  // Reset state
+                  toolProcessingMessageId = null;
+                  isWaitingForToolCompletion = false;
+                  streamingCompleted = true;
+                  streamingBuffer = '';
+                  
+                  console.log('⏰ UI timeout cleanup completed');
+                }
+              }, 30000); // 30 second timeout
+              
             } else {
               streamingCompleted = true;
               console.log('✅ Streaming phase complete for message:', aiMessageId);
@@ -367,6 +439,13 @@ export const useMessageHandling = () => {
               if (toolProcessingMessageId) {
                 setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
                 toolProcessingMessageId = null;
+              }
+              
+              // Clear the UI timeout since tool processing completed successfully
+              if (uiTimeoutId) {
+                clearTimeout(uiTimeoutId);
+                uiTimeoutId = null;
+                console.log('⏰ UI timeout cleared - tool processing completed successfully');
               }
               
               // Final update with any remaining buffer
@@ -401,6 +480,13 @@ export const useMessageHandling = () => {
             if (toolProcessingMessageId) {
               setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
               toolProcessingMessageId = null;
+            }
+            
+            // Clear the UI timeout since we're transitioning to a new message
+            if (uiTimeoutId) {
+              clearTimeout(uiTimeoutId);
+              uiTimeoutId = null;
+              console.log('⏰ UI timeout cleared - transitioning to continuation message');
             }
             
             // Create new message for continuation
