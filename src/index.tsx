@@ -9,6 +9,8 @@ import reportWebVitals from './reportWebVitals';
 import './utils/websocketDebugger';
 // Initialize function status verifier in development
 import './utils/functionStatusVerifier';
+// Initialize Claude streaming test function for development
+import './utils/claudeStreamingTester';
 
 const container = document.getElementById('root');
 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

@@ -9,6 +9,7 @@ export interface Message {
   agentName?: string; // Agent name for assistant messages
   artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
   metadata?: Record<string, unknown>; // Additional metadata for the message
+  isToolProcessing?: boolean; // True if this is a tool processing indicator message
 }
 
 export interface ArtifactReference {

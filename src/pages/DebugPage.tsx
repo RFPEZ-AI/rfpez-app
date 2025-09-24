@@ -32,6 +32,13 @@ import { useSupabase } from '../context/SupabaseContext';
 import { RoleService } from '../services/roleService';
 import { testClaudeMCPAvailability, MCPTestResult } from '../utils/mcpTestUtils';
 import { MCPMonitor, MCP_TEST_PROMPT, MCP_SIMPLE_TEST_PROMPT, MCP_CONVERSATION_TEST_PROMPT } from '../utils/claudeMCPTest';
+import Phase1TestButton from '../components/Phase1TestButton';
+import Phase2TestButton from '../components/Phase2TestButton';
+import StreamManagementTest from '../components/StreamManagementTest';
+import TokenBatchTest from '../components/TokenBatchTest';
+// DISABLED: Performance monitoring components cause memory pressure
+// import PerformanceMonitoringDashboard from '../components/PerformanceMonitoringDashboard';
+// import MemoryStressTest from '../components/MemoryStressTest';
 
 const DebugPage: React.FC = () => {
   const { userProfile } = useSupabase();
@@ -150,6 +157,18 @@ const DebugPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
+        {/* Phase 1 Test Button - Edge Function Integration */}
+        <Phase1TestButton />
+        
+        {/* Phase 2 Test Button - Streaming Integration */}
+        <Phase2TestButton />
+        
+        {/* Stream Management Test - Advanced Streaming Features */}
+        <StreamManagementTest />
+        
+        {/* Token Batching Test - Performance Optimization */}
+        <TokenBatchTest />
+        
         {/* MCP Integration Testing */}
         <IonCard>
           <IonCardHeader>
@@ -442,6 +461,21 @@ const DebugPage: React.FC = () => {
 
         {/* Claude API Availability Test */}
         <ClaudeAPITestComponent />
+
+        {/* Performance Monitoring Dashboard */}
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>Performance Monitoring Dashboard</IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            {/* DISABLED: Performance monitoring causes memory pressure */}
+            {/* <PerformanceMonitoringDashboard /> */}
+            <p>Performance monitoring disabled to reduce memory pressure.</p>
+          </IonCardContent>
+        </IonCard>
+
+        {/* DISABLED: Memory Stress Tests cause excessive memory pressure */}
+        {/* <MemoryStressTest /> */}
 
         {/* Role Management Section (Admin Only) */}
         {userProfile?.role && RoleService.isAdministrator(userProfile.role) && (

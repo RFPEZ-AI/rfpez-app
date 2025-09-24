@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
@@ -18,6 +18,15 @@ import { useRFPManagement } from '../hooks/useRFPManagement';
 import { useArtifactManagement } from '../hooks/useArtifactManagement';
 import { useArtifactWindowState } from '../hooks/useArtifactWindowState';
 import { useMessageHandling } from '../hooks/useMessageHandling';
+
+// Import clickable element decorator for development testing
+import '../utils/clickableElementDecorator';
+import '../utils/testIdManager';
+import ClickableDebugToggle from '../components/ClickableDebugToggle';
+
+// Import debug utilities in development
+import '../utils/rfpDesignerDebugger';
+import '../utils/claudeMessageDiagnosis';
 
 // Import test functions for debugging
 import '../test-claude-functions';
@@ -38,10 +47,10 @@ const Home: React.FC = () => {
   const { user, session, loading: supabaseLoading, userProfile } = useSupabase();
   const history = useHistory();
   
-  // Initialize AbortController monitoring for debugging
+  // DISABLED: AbortController monitoring causes excessive memory pressure
   useEffect(() => {
-    console.log('🔧 Initializing AbortController monitoring for debugging');
-    AbortControllerMonitor.instance.startMonitoring();
+    // console.log('🔧 Initializing AbortController monitoring for debugging');
+    // AbortControllerMonitor.instance.startMonitoring();
     
     // Add global debug functions
     (window as typeof window & {
@@ -109,6 +118,15 @@ const Home: React.FC = () => {
     currentSessionId,
     setCurrentSessionId
   } = useHomeState();
+
+  // CRITICAL FIX: Use ref to keep session ID synchronized and avoid stale closures
+  const currentSessionIdRef = useRef<string | undefined>(currentSessionId);
+  
+  // Keep ref synchronized with state
+  useEffect(() => {
+    currentSessionIdRef.current = currentSessionId;
+    console.log('📌 Session ID ref updated:', currentSessionId);
+  }, [currentSessionId]);
 
   const {
     sessions,
@@ -202,6 +220,7 @@ const Home: React.FC = () => {
   // Artifact window state management
   const artifactWindowState = useArtifactWindowState();
   const [forceSessionHistoryCollapsed, setForceSessionHistoryCollapsed] = useState(false);
+  const [isCreatingNewSession, setIsCreatingNewSession] = useState(false);
 
   const { handleSendMessage, sendAutoPrompt, cancelRequest } = useMessageHandling();
 
@@ -216,6 +235,9 @@ const Home: React.FC = () => {
   const handleSelectSession = useCallback(async (sessionId: string) => {
     console.log('Session selected:', sessionId);
     
+    // Clear the new session creation flag since we're now selecting a session
+    setIsCreatingNewSession(false);
+    
     // On mobile, collapse the session history to give more space for messages
     const windowWidth = window.innerWidth;
     const isMobileViewport = windowWidth <= 768;
@@ -228,6 +250,9 @@ const Home: React.FC = () => {
     
     setSelectedSessionId(sessionId);
     setCurrentSessionId(sessionId);
+    // CRITICAL: Update ref immediately for synchronous access
+    currentSessionIdRef.current = sessionId;
+    console.log('📌 Session ID ref updated via handleSelectSession:', sessionId);
     
     // Save as last session for persistence
     artifactWindowState.saveLastSession(sessionId);
@@ -242,14 +267,28 @@ const Home: React.FC = () => {
 
     // Load session with context (RFP and artifact context)
     try {
+      console.log('🔍 LOADING SESSION CONTEXT for sessionId:', sessionId);
       const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
+      console.log('🔍 SESSION CONTEXT LOADED:', {
+        hasSession: !!sessionWithContext,
+        sessionId: sessionWithContext?.id,
+        currentRfpId: sessionWithContext?.current_rfp_id,
+        currentArtifactId: sessionWithContext?.current_artifact_id,
+        fullContext: sessionWithContext
+      });
       
       // Restore RFP context if it exists
       if (sessionWithContext?.current_rfp_id) {
-        console.log('🎯 Restoring RFP context from session:', sessionWithContext.current_rfp_id);
-        await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+        console.log('🎯 RESTORING RFP CONTEXT from session:', sessionWithContext.current_rfp_id);
+        try {
+          await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+          console.log('✅ RFP context restoration completed');
+        } catch (rfpError) {
+          console.error('❌ RFP context restoration FAILED:', rfpError);
+        }
       } else {
-        console.log('📝 No RFP context found in session');
+        console.log('📝 NO RFP CONTEXT found in session - checking if any RFPs exist for fallback');
+        // TODO: Add fallback to find the most recent RFP for this session
       }
       
       // Note: Artifact context will be restored below when loading session artifacts
@@ -348,27 +387,95 @@ const Home: React.FC = () => {
     console.log('Session restoration check:', { 
       isAuthenticated, 
       sessionsCount: sessions.length, 
-      currentSessionId: !!currentSessionId 
+      currentSessionId: currentSessionId, // Show actual value, not boolean
+      isCreatingNewSession
     });
     
-    if (isAuthenticated && sessions.length > 0 && !currentSessionId) {
-      // Try to restore last session if available
-      const lastSessionId = artifactWindowState.getLastSession();
-      console.log('Attempting to restore last session:', lastSessionId);
-      
-      if (lastSessionId) {
-        const session = sessions.find(s => s.id === lastSessionId);
-        if (session) {
-          console.log('Restoring last session:', lastSessionId);
-          handleSelectSession(lastSessionId);
-        } else {
-          console.log('Last session not found in current sessions list');
-        }
-      } else {
-        console.log('No last session found in localStorage');
-      }
+    // Skip auto-restoration if we're in the process of creating a new session
+    if (isCreatingNewSession) {
+      console.log('Skipping session restoration - currently creating new session');
+      return;
     }
-  }, [sessions, isAuthenticated, currentSessionId, handleSelectSession]);
+    
+    if (isAuthenticated && sessions.length > 0 && !currentSessionId && !isCreatingNewSession) {
+      const restoreSession = async () => {
+        try {
+          // First try to restore from database (user's current session)
+          const dbCurrentSessionId = await DatabaseService.getUserCurrentSession();
+          console.log('Database current session ID:', dbCurrentSessionId);
+          
+          if (dbCurrentSessionId) {
+            const dbSession = sessions.find(s => s.id === dbCurrentSessionId);
+            if (dbSession) {
+              console.log('Restoring session from database:', dbCurrentSessionId);
+              handleSelectSession(dbCurrentSessionId);
+              return;
+            } else {
+              console.log('Database session not found in current sessions list');
+            }
+          }
+          
+          // Fallback to localStorage if database doesn't have a current session
+          const lastSessionId = artifactWindowState.getLastSession();
+          console.log('Attempting to restore last session from localStorage:', lastSessionId);
+          
+          if (lastSessionId) {
+            const session = sessions.find(s => s.id === lastSessionId);
+            if (session) {
+              console.log('Restoring last session from localStorage:', lastSessionId);
+              handleSelectSession(lastSessionId);
+            } else {
+              console.log('LocalStorage session not found in current sessions list');
+            }
+          } else {
+            console.log('No last session found in localStorage');
+          }
+        } catch (error) {
+          console.error('Error during session restoration:', error);
+          // Fallback to localStorage on error
+          const lastSessionId = artifactWindowState.getLastSession();
+          if (lastSessionId) {
+            const session = sessions.find(s => s.id === lastSessionId);
+            if (session) {
+              console.log('Fallback: Restoring last session from localStorage:', lastSessionId);
+              handleSelectSession(lastSessionId);
+            }
+          }
+        }
+      };
+      
+      restoreSession();
+    }
+  }, [sessions, isAuthenticated, currentSessionId, isCreatingNewSession, handleSelectSession]);
+
+  // Safety timeout to clear the new session creation flag
+  useEffect(() => {
+    if (isCreatingNewSession) {
+      console.log('⏰ Setting safety timeout for new session creation flag');
+      const timeoutId = setTimeout(() => {
+        console.log('⏰ Safety timeout triggered - clearing new session creation flag');
+        setIsCreatingNewSession(false);
+      }, 5000); // 5 seconds safety timeout
+
+      return () => {
+        clearTimeout(timeoutId);
+      };
+    }
+  }, [isCreatingNewSession]);
+
+  // Clear session creation flag when session ID is actually set
+  useEffect(() => {
+    console.log('🔄 useEffect for clearing isCreatingNewSession triggered:', {
+      isCreatingNewSession,
+      currentSessionId,
+      willClearFlag: isCreatingNewSession && currentSessionId
+    });
+    
+    if (isCreatingNewSession && currentSessionId) {
+      console.log('✅ New session ID available, clearing creation flag:', currentSessionId);
+      setIsCreatingNewSession(false);
+    }
+  }, [isCreatingNewSession, currentSessionId]);
 
   // Monitor session changes specifically for logout detection
   useEffect(() => {
@@ -432,43 +539,103 @@ const Home: React.FC = () => {
   }, [currentSessionId, userId, isAuthenticated]);
 
   const handleNewSession = async () => {
-    // Clear the UI state
-    setMessages([]);
-    clearArtifacts();
-    setSelectedSessionId(undefined);
-    setCurrentSessionId(undefined);
+    console.log('🆕 Starting new session creation...');
+    setIsCreatingNewSession(true);
     
-    // Reset artifact window for new session (blank state, closed)
-    artifactWindowState.resetForNewSession();
-    artifactWindowState.saveLastSession(null);
-    setForceSessionHistoryCollapsed(false);
-    
-    // Use the currently selected agent, or default if none selected
-    if (isAuthenticated && userId) {
-      if (currentAgent) {
-        const initialMessage: Message = {
-          id: 'initial-prompt',
-          content: currentAgent.agent_initial_prompt,
-          isUser: false,
-          timestamp: new Date(),
-          agentName: currentAgent.agent_name
-        };
-        setMessages([initialMessage]);
-        console.log('New session started with current agent:', currentAgent.agent_name);
+    try {
+      // Clear the current RFP for a fresh new session BEFORE clearing session ID
+      handleClearCurrentRfp();
+      
+      // Clear ALL UI state completely
+      setMessages([]);
+      clearArtifacts();
+      setSelectedSessionId(undefined);
+      setCurrentSessionId(undefined);
+      // CRITICAL: Clear ref as well
+      currentSessionIdRef.current = undefined;
+      console.log('📌 Session ID ref cleared in handleNewSession');
+      
+      // Reset artifact window state completely for new session
+      artifactWindowState.resetForNewSession();
+      artifactWindowState.saveLastSession(null);
+      setForceSessionHistoryCollapsed(true); // Keep session history collapsed for clean new session experience
+      
+      // 🔥 CRITICAL FIX: Actually create a new session in the database
+      if (isAuthenticated && userId && createNewSession) {
+        console.log('🔥 Creating actual new session in database...');
+        // For new sessions, we don't want to inherit the current RFP, so pass null for both agent (will use default) and RFP ID
+        const newSessionId = await createNewSession(currentAgent, undefined);
+        
+        if (newSessionId) {
+          console.log('✅ New session created successfully:', newSessionId);
+          console.log('🔄 Setting currentSessionId and selectedSessionId...');
+          setCurrentSessionId(newSessionId);
+          setSelectedSessionId(newSessionId);
+          // CRITICAL: Update ref immediately for synchronous access
+          currentSessionIdRef.current = newSessionId;
+          console.log('📌 Session ID ref updated immediately:', newSessionId);
+          
+          console.log('⏳ State set, isCreatingNewSession should be cleared by useEffect when currentSessionId updates');
+          
+          // Wait for React state to update before continuing
+          // Use a small delay to ensure state updates are processed
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          // Reload sessions to include the new session
+          if (loadUserSessions) {
+            console.log('♻️  Reloading sessions to include new session...');
+            await loadUserSessions();
+          }
+          
+          // Use the currently selected agent, or default if none selected
+          if (currentAgent) {
+            const initialMessage: Message = {
+              id: 'initial-prompt',
+              content: currentAgent.agent_initial_prompt,
+              isUser: false,
+              timestamp: new Date(),
+              agentName: currentAgent.agent_name
+            };
+            setMessages([initialMessage]);
+            console.log('New session started with current agent:', currentAgent.agent_name);
+          } else {
+            const initialMessage = await loadDefaultAgentWithPrompt();
+            if (initialMessage) {
+              setMessages([initialMessage]);
+            }
+          }
+          
+          console.log('🎉 New session created successfully with clean state');
+        } else {
+          console.error('❌ Failed to create new session');
+          // Fallback to loading default agent without session
+          const initialMessage = await loadDefaultAgentWithPrompt();
+          if (initialMessage) {
+            setMessages([initialMessage]);
+          }
+        }
       } else {
+        console.log('⚠️  Not authenticated or missing dependencies, creating local session only');
         const initialMessage = await loadDefaultAgentWithPrompt();
         if (initialMessage) {
           setMessages([initialMessage]);
         }
       }
-    } else {
+      
+    } catch (error) {
+      console.error('❌ Error creating new session:', error);
+      // Ensure we still have some UI state even if session creation fails
       const initialMessage = await loadDefaultAgentWithPrompt();
       if (initialMessage) {
         setMessages([initialMessage]);
       }
+    } finally {
+      // Clear the flag after successfully setting up the new session
+      setTimeout(() => {
+        console.log('🏁 New session creation complete, clearing flag');
+        setIsCreatingNewSession(false);
+      }, 100); // Small delay to ensure all state updates are processed
     }
-    
-    console.log('New session started with initial prompt displayed');
   };
 
   const handleDeleteSession = async (sessionId: string) => {
@@ -478,23 +645,83 @@ const Home: React.FC = () => {
       clearArtifacts();
       setSelectedSessionId(undefined);
       setCurrentSessionId(undefined);
+      // CRITICAL: Clear ref as well
+      currentSessionIdRef.current = undefined;
+      console.log('📌 Session ID ref cleared after deletion');
     }
   };
 
   const onSendMessage = async (content: string) => {
-    // IMMEDIATE DEBUG - Add visual overlay to confirm this function is called
-    console.error('🌟🌟🌟 ON_SEND_MESSAGE CALLED IN HOME.TSX:', content);
-    const homeDebug = document.createElement('div');
-    homeDebug.style.cssText = 'position:fixed;top:75px;left:0;background:yellow;color:black;padding:5px;z-index:99999;font-weight:bold;';
-    homeDebug.innerHTML = `🌟 HOME ON_SEND_MESSAGE: ${content.substring(0, 30)}`;
-    document.body.appendChild(homeDebug);
+    // CRITICAL FIX: Use ref for immediate access to current session ID, avoiding stale closures
+    const refSessionId = currentSessionIdRef.current;
+    
+    // Enhanced debugging for session ID issues
+    console.log('📤 onSendMessage called with:', {
+      content: content.substring(0, 50) + '...',
+      currentSessionId,
+      refSessionId,
+      isCreatingNewSession,
+      isAuthenticated,
+      userId
+    });
+    
+    // Prevent sending messages while creating a new session to avoid session ID race conditions
+    if (isCreatingNewSession) {
+      console.log('🚫 Message sending blocked - new session creation in progress');
+      return;
+    }
+    
+    // CRITICAL FIX: Use ref for most current session ID value
+    let activeSessionId = refSessionId;
+    
+    if (!activeSessionId && isAuthenticated && userId) {
+      console.warn('⚠️  No session ID available for authenticated user - creating emergency session');
+      console.log('🔍 State before emergency session:', {
+        currentSessionId,
+        isCreatingNewSession,
+        isAuthenticated,
+        userId,
+        messagesLength: messages.length
+      });
+      
+      // Create an emergency session synchronously
+      if (createNewSession) {
+        try {
+          console.log('🆘 Creating emergency session...');
+          const emergencySessionId = await createNewSession(currentAgent, undefined);
+          if (emergencySessionId) {
+            console.log('✅ Emergency session created:', emergencySessionId);
+            activeSessionId = emergencySessionId;
+            // Update state to reflect the new session
+            setCurrentSessionId(emergencySessionId);
+            setSelectedSessionId(emergencySessionId);
+            // CRITICAL: Update ref immediately for synchronous access
+            currentSessionIdRef.current = emergencySessionId;
+            console.log('📌 Emergency session ID ref updated:', emergencySessionId);
+            // Reload sessions to include the new session
+            if (loadUserSessions) {
+              await loadUserSessions();
+            }
+          } else {
+            console.error('❌ Failed to create emergency session');
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Error creating emergency session:', error);
+          return;
+        }
+      } else {
+        console.error('❌ No createNewSession function available');
+        return;
+      }
+    }
     
     await handleSendMessage(
       content,
       messages,
       setMessages,
       setIsLoading,
-      currentSessionId,
+      activeSessionId, // Use the validated session ID
       setCurrentSessionId,
       setSelectedSessionId,
       createNewSession,
@@ -1026,6 +1253,17 @@ const Home: React.FC = () => {
       <HomeFooter 
         currentRfp={currentRfp} 
         onViewBids={handleViewBids}
+      />
+
+      {/* Debug toggle for development testing */}
+      <ClickableDebugToggle 
+        className="debug-toggle"
+        style={{ 
+          position: 'fixed', 
+          bottom: '10px', 
+          right: '10px', 
+          zIndex: 9999 
+        }}
       />
 
       {/* Modals */}

@@ -480,6 +480,7 @@ export const useArtifactManagement = (
 
   // Claude artifacts handler
   const addClaudeArtifacts = (claudeMetadata: Record<string, unknown>, messageId?: string) => {
+    console.log('🔍 addClaudeArtifacts called with:', { claudeMetadata, messageId, currentRfpId });
     console.log('=== CLAUDE RESPONSE DEBUG ===');
     console.log('Response has metadata:', !!claudeMetadata);
     console.log('Metadata keys:', Object.keys(claudeMetadata || {}));
@@ -571,6 +572,7 @@ export const useArtifactManagement = (
             // Auto-create placeholder RFP for the form if no RFP context exists
             (async () => {
               try {
+                console.log('🔍 Placeholder RFP check - currentRfpId:', currentRfpId, 'type:', typeof currentRfpId, 'falsy:', !currentRfpId);
                 if (!currentRfpId) {
                   console.log('🏗️ Auto-creating placeholder RFP for form artifact:', formArtifact.name);
                   

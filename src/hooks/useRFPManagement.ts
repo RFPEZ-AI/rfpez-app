@@ -102,9 +102,13 @@ export const useRFPManagement = (currentSessionId?: string) => {
   const handleClosePreview = () => setShowRFPPreviewModal(false);
   
   const handleSetCurrentRfp = async (rfpId: number) => {
+    console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId);
     try {
+      console.log('🔍 DEBUG: Calling RFPService.getById with id:', rfpId);
       const rfp = await RFPService.getById(rfpId);
+      console.log('📦 DEBUG: RFPService.getById returned:', rfp);
       if (rfp) {
+        console.log('✅ DEBUG: RFP found, setting state - rfp.name:', rfp.name, 'rfp.id:', rfp.id);
         setCurrentRfpId(rfpId);
         setCurrentRfp(rfp);
         console.log('Current RFP context set:', rfp.name, rfpId);
@@ -120,8 +124,11 @@ export const useRFPManagement = (currentSessionId?: string) => {
             console.warn('⚠️ Failed to save RFP context to session:', error);
           }
         }
+      } else {
+        console.log('❌ DEBUG: RFP not found for id:', rfpId, '- RFPService.getById returned null/undefined');
       }
     } catch (error) {
+      console.error('❌ DEBUG: handleSetCurrentRfp failed for rfpId:', rfpId, 'error:', error);
       console.error('Failed to load RFP for context:', error);
     }
   };
