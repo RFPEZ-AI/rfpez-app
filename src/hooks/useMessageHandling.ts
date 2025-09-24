@@ -429,7 +429,7 @@ export const useMessageHandling = () => {
                   
                   console.log('⏰ UI timeout cleanup completed');
                 }
-              }, 30000); // 30 second timeout
+              }, 180000); // 3 minute timeout - debugging slow database operations
               
             } else {
               streamingCompleted = true;

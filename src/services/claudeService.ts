@@ -305,7 +305,19 @@ RFP MANAGEMENT FUNCTIONS - USE THESE ACTIVELY:
 - For RFP questionnaires: use create_questionnaire_artifact
 - For supplier forms: use create_supplier_form_artifact
 
-CRITICAL: When users request RFP creation, you MUST call the create_and_set_rfp function with proper parameters. Do not just say you will create an RFP - actually call the function.
+🚨 CRITICAL RULE: When users request RFP creation, you MUST IMMEDIATELY call the create_and_set_rfp function with proper parameters. Do not just say you will create an RFP - actually call the function FIRST, then respond.
+
+🚨 MANDATORY TRIGGER WORDS: If the user says ANY of these phrases, IMMEDIATELY call create_and_set_rfp:
+- "create rfp"
+- "create an rfp" 
+- "make an rfp"
+- "new rfp"
+- "rfp test"
+- "create rfp test"
+- "need an rfp"
+- "build an rfp"
+
+🚨 REQUIRED ACTION: Upon seeing these trigger words, IMMEDIATELY call create_and_set_rfp function with a name parameter. Do not ask questions first - create the RFP immediately, then ask for details.
 
 Be helpful, accurate, and professional. When switching agents, make the transition smooth and explain the benefits.`;
 
@@ -543,9 +555,9 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                 try {
                   const toolResponseStart = Date.now();
                   
-                  // Create timeout promise first
+                  // Create timeout promise first - increased from 30s to 90s for complex operations like RFP creation
                   const timeoutPromise = new Promise((_, reject) => {
-                    setTimeout(() => reject(new Error('FORCE_TIMEOUT: Tool processing exceeded 30 second limit')), 30000);
+                    setTimeout(() => reject(new Error('FORCE_TIMEOUT: Tool processing exceeded 90 second limit')), 90000);
                   });
                   
                   // Create API call with retry logic
@@ -633,7 +645,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                   // CRITICAL FIX: When tool response fails, still trigger continuation to remove processing message
                   const isTimeout = error instanceof Error && error.message.includes('FORCE_TIMEOUT');
                   const errorMessage = isTimeout 
-                    ? 'Tool processing exceeded time limit. Please try again.'
+                    ? 'Tool processing exceeded time limit (90s). Please try again. If this persists, there may be a database connectivity issue.'
                     : 'I encountered an issue processing the tools. Please try again.';
                   
                   console.log('🔧 Tool response failed - sending error message to trigger UI cleanup:', errorMessage);

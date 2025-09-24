@@ -634,7 +634,7 @@ export const claudeApiFunctions: Tool[] = [
   },
   {
     "name": "create_and_set_rfp",
-    "description": "Creates a new RFP and sets it as the current active RFP. Automatically determines the current session context. REQUIRED: Must provide a name parameter. EXAMPLE: {\"name\": \"LED Bulb Procurement RFP\"}",
+    "description": "🚨 PRIORITY FUNCTION: Creates a new RFP and sets it as the current active RFP. MUST BE CALLED whenever user says 'create rfp', 'create an rfp', 'make an rfp', 'new rfp', 'rfp test', or similar. Automatically determines the current session context. REQUIRED: Must provide a name parameter. EXAMPLE: {\"name\": \"LED Bulb Procurement RFP\"}. CALL THIS IMMEDIATELY - do not ask questions first!",
     "input_schema": {
       "type": "object",
       "properties": {
@@ -1017,6 +1017,13 @@ export class ClaudeAPIFunctionHandler {
     
     console.log(`🚀 executeFunction called with:`, { functionName, parameters: JSON.stringify(parameters, null, 2), userId });
     
+    // 🚨 CRITICAL DEBUG: Log ALL function calls to catch create_and_set_rfp issues
+    if (functionName === 'create_and_set_rfp') {
+      console.error('🚨🚨🚨 CRITICAL: create_and_set_rfp function called!');
+      console.error('🚨 Parameters:', JSON.stringify(parameters, null, 2));
+      console.error('🚨 Stack trace:', new Error().stack);
+    }
+    
     // MCP-enabled conversation functions - use MCP client for these
     try {
       console.log(`🔗 Attempting MCP client for function: ${functionName}`);
@@ -1131,9 +1138,12 @@ export class ClaudeAPIFunctionHandler {
         return await this.refreshCurrentRfp(parameters, userId);
       case 'get_artifact_status':
         return await this.getArtifactStatus(parameters, userId);
-      case 'create_and_set_rfp':
+      case 'create_and_set_rfp': {
         console.log('🔍 DEBUG: executeFunction called create_and_set_rfp with parameters:', JSON.stringify(parameters, null, 2));
-        return await this.createAndSetRfp(parameters, userId);
+        console.log('🚀 Routing create_and_set_rfp to server-side edge function for performance');
+        const { claudeAPIProxy } = await import('./claudeAPIProxy');
+        return await claudeAPIProxy.executeFunction('create_and_set_rfp', parameters);
+      }
       case 'generate_rfp_bid_url':
         return await this.generateRfpBidUrl(parameters, userId);
     

@@ -176,6 +176,7 @@ export class ClaudeService {
         temperature: 0.7,
         system: systemPrompt,
         tools: claudeApiFunctions,
+        sessionId: sessionId, // Pass session context to edge function
       });
 
       console.log('✅ Edge function Claude API response received');
@@ -459,6 +460,7 @@ You have access to various functions for database operations, artifact managemen
         temperature: 0.7,
         system: systemPrompt,
         tools: claudeApiFunctions,
+        sessionId: sessionId, // Pass session context to edge function
       };
 
       // Use the streaming proxy
