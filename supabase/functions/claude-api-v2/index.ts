@@ -115,6 +115,8 @@ class ClaudeAPIHandler {
     system?: string;
     messages: any[];
     tools?: any[];
+    sessionContext?: any;
+    userId?: string;
   }): Promise<ReadableStream> {
     console.log('🌊 Generating streaming Claude response');
     
@@ -203,7 +205,64 @@ class ClaudeAPIHandler {
                       controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
                       
                       // Execute tool function (if available)
-                      // TODO: Implement tool execution in streaming context
+                      console.log(`🔧 DEBUG - Executing tool in streaming context: ${currentToolUse.name}`);
+                      
+                      try {
+                        // Execute the tool using our handleFunction system
+                        const toolResult = await handleFunction({
+                          functionName: currentToolUse.name,
+                          parameters: currentToolUse.input,
+                          sessionContext: params.sessionContext
+                        }, params.userId || 'anonymous'); // Use the actual authenticated user ID
+                        
+                        console.log(`✅ DEBUG - Tool execution result:`, {
+                          functionName: currentToolUse.name,
+                          success: toolResult.success,
+                          hasCallbacks: toolResult.clientCallbacks && toolResult.clientCallbacks.length > 0
+                        });
+                        
+                        toolResults.push({
+                          tool_call_id: currentToolUse.id,
+                          result: toolResult
+                        });
+                        
+                        // Send tool result through streaming
+                        const toolResultData = JSON.stringify({
+                          type: 'tool_result',
+                          tool_call_id: currentToolUse.id,
+                          result: toolResult,
+                        });
+                        const encoder = new TextEncoder();
+                        controller.enqueue(encoder.encode(`data: ${toolResultData}\n\n`));
+                        
+                        // If there are client callbacks, send them through streaming
+                        if (toolResult.clientCallbacks && toolResult.clientCallbacks.length > 0) {
+                          console.log(`📤 DEBUG - Sending ${toolResult.clientCallbacks.length} callbacks through streaming`);
+                          
+                          const callbackData = JSON.stringify({
+                            type: 'client_callbacks',
+                            callbacks: toolResult.clientCallbacks,
+                          });
+                          controller.enqueue(encoder.encode(`data: ${callbackData}\n\n`));
+                        }
+                        
+                      } catch (toolError) {
+                        console.error(`❌ Tool execution error for ${currentToolUse.name}:`, toolError);
+                        
+                        toolResults.push({
+                          tool_call_id: currentToolUse.id,
+                          error: toolError.message
+                        });
+                        
+                        // Send tool error through streaming
+                        const toolErrorData = JSON.stringify({
+                          type: 'tool_error',
+                          tool_call_id: currentToolUse.id,
+                          error: toolError.message,
+                        });
+                        const encoder = new TextEncoder();
+                        controller.enqueue(encoder.encode(`data: ${toolErrorData}\n\n`));
+                      }
                       
                     } catch (e) {
                       console.error('Tool use parsing error:', e);
@@ -835,32 +894,28 @@ class DatabaseHandler {
       
       // Step 3: Create new RFP with supabase_insert
       console.log('⏱️ TIMING: Starting Step 3 - Create RFP at', Date.now() - startTime, 'ms');
+      
+      // ✅ FIX: Provide required fields that match database schema
+      // Database schema requires: name, due_date, description, specification as NOT NULL
+      const defaultDueDate = new Date();
+      defaultDueDate.setDate(defaultDueDate.getDate() + 30); // Default 30 days from now
+      
       const insertData: {
         name: string;
-        status: string;
-        description?: string;
-        specification?: string;
-        due_date?: string;
+        description: string;
+        specification: string;
+        due_date: string;
       } = {
         name: name.trim(),
-        status: 'draft'
+        description: description && description.trim() ? description.trim() : 'RFP created via AI assistant. Details to be filled in.',
+        specification: specification && specification.trim() ? specification.trim() : 'Specification details to be provided.',
+        due_date: due_date || defaultDueDate.toISOString().split('T')[0] // YYYY-MM-DD format
       };
-      
-      // Add optional fields if provided
-      if (description && description.trim()) {
-        insertData.description = description.trim();
-      }
-      if (specification && specification.trim()) {
-        insertData.specification = specification.trim();
-      }
-      if (due_date) {
-        insertData.due_date = due_date;
-      }
       
       const { data: newRfp, error: insertError } = await supabase
         .from('rfps')
         .insert(insertData)
-        .select('id, name, description, specification, status, created_at')
+        .select('id, name, description, specification, due_date, created_at')
         .single();
       
       if (insertError) {
@@ -892,7 +947,7 @@ class DatabaseHandler {
       console.log('⏱️ TIMING: Starting Step 5 - Validate creation at', Date.now() - startTime, 'ms');
       const { data: verifyRfp, error: verifyError } = await supabase
         .from('rfps')
-        .select('id, name, status')
+        .select('id, name, description')
         .eq('id', newRfp.id)
         .single();
       
@@ -935,6 +990,13 @@ class DatabaseHandler {
 function generateClientCallbacks(functionName: string, result: any, params?: any): ClientCallback[] {
   const callbacks: ClientCallback[] = [];
   
+  console.log(`🔄 DEBUG - Generating callbacks for ${functionName}:`, {
+    functionName,
+    resultSuccess: result?.success,
+    resultKeys: result ? Object.keys(result) : 'none',
+    paramsKeys: params ? Object.keys(params) : 'none'
+  });
+  
   switch (functionName) {
     case 'set_current_rfp':
       if (result.success && result.current_rfp_id) {
@@ -955,6 +1017,21 @@ function generateClientCallbacks(functionName: string, result: any, params?: any
         target: 'rfp_context',
         payload: { message: 'RFP context refresh requested' }
       });
+      break;
+      
+    case 'create_and_set_rfp':
+      if (result.success && result.current_rfp_id) {
+        callbacks.push({
+          type: 'ui_refresh',
+          target: 'rfp_context',
+          payload: { 
+            rfp_id: result.current_rfp_id,
+            rfp_name: result.rfp?.name,
+            rfp_data: result.rfp, // Include full RFP data to avoid database re-query
+            message: result.message 
+          }
+        });
+      }
       break;
       
     case 'create_form_artifact':
@@ -1000,6 +1077,16 @@ function generateClientCallbacks(functionName: string, result: any, params?: any
       break;
   }
   
+  console.log(`📤 DEBUG - Generated callbacks:`, {
+    functionName,
+    callbackCount: callbacks.length,
+    callbacks: callbacks.map(cb => ({
+      type: cb.type,
+      target: cb.target,
+      payloadKeys: cb.payload ? Object.keys(cb.payload) : 'none'
+    }))
+  });
+  
   return callbacks;
 }
 
@@ -1011,6 +1098,13 @@ async function handleFunction(functionCall: EdgeFunctionCall, userId: string): P
     userId, 
     parameters,
     sessionContext: sessionContext ? { sessionId: sessionContext.sessionId } : 'none'
+  });
+  
+  console.log(`📊 DEBUG - Function call details:`, {
+    functionName,
+    parameterKeys: parameters ? Object.keys(parameters) : 'none',
+    parametersSize: parameters ? JSON.stringify(parameters).length : 0,
+    hasSessionContext: !!sessionContext
   });
   
   const claudeHandler = new ClaudeAPIHandler();
@@ -1079,13 +1173,31 @@ async function handleFunction(functionCall: EdgeFunctionCall, userId: string): P
     // Generate client callbacks
     const clientCallbacks = generateClientCallbacks(functionName, result, parameters);
     
-    return {
+    console.log(`📤 DEBUG - Response generation:`, {
+      functionName,
+      resultSuccess: result?.success,
+      resultDataKeys: result?.data ? Object.keys(result.data) : 'none',
+      callbackCount: clientCallbacks.length,
+      callbacks: clientCallbacks,
+      requiresClientAction: clientCallbacks.length > 0
+    });
+    
+    const response = {
       success: true,
       data: result,
       clientCallbacks,
       requiresClientAction: clientCallbacks.length > 0,
       message: `Function ${functionName} executed successfully`
     };
+    
+    console.log(`📋 DEBUG - Final response:`, {
+      responseSuccess: response.success,
+      responseDataExists: !!response.data,
+      responseCallbackCount: response.clientCallbacks?.length || 0,
+      responseSize: JSON.stringify(response).length
+    });
+    
+    return response;
     
   } catch (error) {
     console.error(`❌ Error handling function ${functionName}:`, error);
@@ -1109,7 +1221,7 @@ serve(async (req) => {
       headers: {
         'Access-Control-Allow-Origin': '*',
         'Access-Control-Allow-Methods': 'POST, OPTIONS',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control',
       },
     });
   }
@@ -1147,7 +1259,13 @@ serve(async (req) => {
       console.log('🌊 Handling streaming Claude API request');
       
       const claudeHandler = new ClaudeAPIHandler();
-      const streamResponse = await claudeHandler.generateStreamingResponse(parameters);
+      // Add sessionContext and userId to parameters for streaming
+      const streamingParams = {
+        ...parameters,
+        sessionContext: sessionContext,
+        userId: userId
+      };
+      const streamResponse = await claudeHandler.generateStreamingResponse(streamingParams);
       
       return new Response(streamResponse, {
         status: 200,
@@ -1156,7 +1274,7 @@ serve(async (req) => {
           'Cache-Control': 'no-cache',
           'Connection': 'keep-alive',
           'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+          'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control',
         },
       });
     }
@@ -1164,11 +1282,21 @@ serve(async (req) => {
     // Handle regular function calls
     const response = await handleFunction({ functionName, parameters, sessionContext }, userId);
 
+    console.log(`🌐 DEBUG - Sending HTTP response:`, {
+      functionName,
+      responseSuccess: response.success,
+      responseStatus: response.success ? 200 : 400,
+      responseCallbacks: response.clientCallbacks?.length || 0,
+      responseSize: JSON.stringify(response).length,
+      hasData: !!response.data
+    });
+
     return new Response(JSON.stringify(response), {
       status: response.success ? 200 : 400,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control',
       },
     });
 
@@ -1177,13 +1305,14 @@ serve(async (req) => {
     
     return new Response(JSON.stringify({
       success: false,
-      error: error.message,
+      error: error instanceof Error ? error.message : 'Unknown error',
       data: null,
     }), {
       status: 500,
       headers: { 
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, cache-control',
       },
     });
   }

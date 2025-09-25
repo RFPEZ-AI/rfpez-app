@@ -494,7 +494,205 @@ const Home: React.FC = () => {
   // Listen for RFP refresh messages from Claude functions and enhanced client updates
   useEffect(() => {
     const handleRfpRefreshMessage = async (event: MessageEvent) => {
-      console.log('🐛 DEBUG: Window message received:', event.data);
+      console.log('🐛 HOME MESSAGE DEBUG: Window message received:', {
+        type: event.data?.type,
+        target: event.data?.target,
+        callbackType: event.data?.callbackType,
+        origin: event.origin,
+        timestamp: new Date().toISOString(),
+        hasData: !!event.data,
+        dataKeys: event.data ? Object.keys(event.data) : 'none',
+        dataSize: event.data ? JSON.stringify(event.data).length : 0,
+        fullData: event.data
+      });
+      
+      // ENHANCED: Handle Edge Function callbacks
+      if (event.data?.type === 'EDGE_FUNCTION_CALLBACK') {
+        console.log('🎯 HOME MESSAGE DEBUG: Edge Function callback detected:', {
+          callbackType: event.data.callbackType,
+          target: event.data.target,
+          hasPayload: !!event.data.payload,
+          payloadKeys: event.data.payload ? Object.keys(event.data.payload) : 'none',
+          debugInfo: event.data.debugInfo,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Handle different callback targets
+        switch (event.data.target) {
+          case 'rfp_context':
+            console.log('🎯 HOME MESSAGE DEBUG: RFP context callback processing:', {
+              callbackType: event.data.callbackType,
+              hasPayload: !!event.data.payload,
+              rfpId: event.data.payload?.rfp_id,
+              rfpName: event.data.payload?.rfp_name,
+              message: event.data.payload?.message,
+              payloadSize: event.data.payload ? JSON.stringify(event.data.payload).length : 0,
+              fullPayload: event.data.payload
+            });
+            
+            if (event.data.payload?.rfp_id) {
+              try {
+                const startTime = Date.now();
+                
+                // ENHANCED: Use rfp_data directly when available to avoid database re-query timing issues
+                if (event.data.payload.rfp_data) {
+                  console.log(`� HOME MESSAGE DEBUG: Using rfp_data directly from callback:`, {
+                    rfpId: event.data.payload.rfp_id,
+                    rfpName: event.data.payload.rfp_data.name,
+                    hasFullData: true
+                  });
+                  
+                  // Call handleSetCurrentRfp - it will work because the RFP exists now
+                  await handleSetCurrentRfp(event.data.payload.rfp_id);
+                  
+                  // Update session context if we have an active session
+                  if (currentSessionId) {
+                    try {
+                      await DatabaseService.updateSessionContext(currentSessionId, { 
+                        current_rfp_id: event.data.payload.rfp_id 
+                      });
+                      console.log('✅ RFP context saved to session via direct data:', currentSessionId, event.data.payload.rfp_id);
+                    } catch (error) {
+                      console.warn('⚠️ Failed to save RFP context to session via direct data:', error);
+                    }
+                  }
+                } else {
+                  console.log(`🔧 HOME MESSAGE DEBUG: No rfp_data in payload, calling handleSetCurrentRfp with ID: ${event.data.payload.rfp_id}`);
+                  await handleSetCurrentRfp(event.data.payload.rfp_id);
+                }
+                
+                const duration = Date.now() - startTime;
+                console.log(`✅ HOME MESSAGE DEBUG: RFP context updated successfully in ${duration}ms:`, {
+                  rfpId: event.data.payload.rfp_id,
+                  rfpName: event.data.payload.rfp_name || event.data.payload.rfp_data?.name || 'unnamed',
+                  method: event.data.payload.rfp_data ? 'direct_data' : 'database_query',
+                  duration
+                });
+              } catch (error) {
+                console.error('❌ HOME MESSAGE DEBUG: Edge Function RFP context update failed:', {
+                  rfpId: event.data.payload.rfp_id,
+                  error: error instanceof Error ? error.message : error,
+                  stack: error instanceof Error ? error.stack : undefined
+                });
+              }
+            } else {
+              console.warn('⚠️ HOME MESSAGE DEBUG: Edge Function callback received but no rfp_id in payload:', {
+                hasPayload: !!event.data.payload,
+                payloadKeys: event.data.payload ? Object.keys(event.data.payload) : 'none',
+                payload: event.data.payload
+              });
+            }
+            break;
+
+          case 'agent_context':
+            console.log('🤖 HOME MESSAGE DEBUG: Agent context callback processing:', {
+              callbackType: event.data.callbackType,
+              hasPayload: !!event.data.payload,
+              agentId: event.data.payload?.agent_id,
+              agentName: event.data.payload?.agent_name,
+              message: event.data.payload?.message,
+              fullPayload: event.data.payload
+            });
+            
+            if (event.data.payload?.agent_id) {
+              try {
+                console.log(`🔧 HOME MESSAGE DEBUG: Processing agent context update with ID: ${event.data.payload.agent_id}`);
+                const startTime = Date.now();
+                
+                // Find the agent and convert to SessionActiveAgent format
+                const targetAgent = agents.find(agent => agent.id === event.data.payload.agent_id);
+                if (targetAgent) {
+                  const sessionAgent: SessionActiveAgent = {
+                    agent_id: targetAgent.id,
+                    agent_name: targetAgent.name,
+                    agent_role: targetAgent.role,
+                    agent_instructions: targetAgent.instructions,
+                    agent_initial_prompt: targetAgent.initial_prompt || '',
+                    agent_avatar_url: targetAgent.avatar_url
+                  };
+                  await handleAgentChanged(sessionAgent);
+                  const duration = Date.now() - startTime;
+                  console.log(`✅ HOME MESSAGE DEBUG: Agent context updated successfully in ${duration}ms:`, {
+                    agentId: event.data.payload.agent_id,
+                    agentName: event.data.payload.agent_name || targetAgent.name,
+                    duration
+                  });
+                } else {
+                  console.warn('⚠️ HOME MESSAGE DEBUG: Agent not found in local agents list:', {
+                    requestedAgentId: event.data.payload.agent_id,
+                    availableAgents: agents.map(a => ({ id: a.id, name: a.name }))
+                  });
+                }
+              } catch (error) {
+                console.error('❌ HOME MESSAGE DEBUG: Edge Function agent context update failed:', {
+                  agentId: event.data.payload.agent_id,
+                  error: error instanceof Error ? error.message : error,
+                  stack: error instanceof Error ? error.stack : undefined
+                });
+              }
+            } else {
+              console.warn('⚠️ HOME MESSAGE DEBUG: Agent context callback received but no agent_id in payload:', {
+                hasPayload: !!event.data.payload,
+                payloadKeys: event.data.payload ? Object.keys(event.data.payload) : 'none',
+                payload: event.data.payload
+              });
+            }
+            break;
+
+          case 'artifact_viewer':
+            console.log('📎 HOME MESSAGE DEBUG: Artifact viewer callback processing:', {
+              callbackType: event.data.callbackType,
+              hasPayload: !!event.data.payload,
+              artifactId: event.data.payload?.artifactId,
+              type: event.data.payload?.type,
+              fullPayload: event.data.payload
+            });
+            
+            if (event.data.payload?.artifactId) {
+              try {
+                console.log(`� HOME MESSAGE DEBUG: Processing artifact viewer update with ID: ${event.data.payload.artifactId}`);
+                const startTime = Date.now();
+                
+                // Create artifact reference for the handler
+                const artifactRef: ArtifactReference = {
+                  artifactId: event.data.payload.artifactId,
+                  artifactName: event.data.payload.name || `Artifact ${event.data.payload.artifactId}`,
+                  artifactType: event.data.payload.type || 'form',
+                  isCreated: true
+                };
+                
+                handleArtifactSelect(artifactRef);
+                const duration = Date.now() - startTime;
+                console.log(`✅ HOME MESSAGE DEBUG: Artifact viewer updated successfully in ${duration}ms:`, {
+                  artifactId: event.data.payload.artifactId,
+                  type: event.data.payload.type,
+                  duration
+                });
+              } catch (error) {
+                console.error('❌ HOME MESSAGE DEBUG: Edge Function artifact viewer update failed:', {
+                  artifactId: event.data.payload.artifactId,
+                  error: error instanceof Error ? error.message : error,
+                  stack: error instanceof Error ? error.stack : undefined
+                });
+              }
+            } else {
+              console.warn('⚠️ HOME MESSAGE DEBUG: Artifact viewer callback received but no artifactId in payload:', {
+                hasPayload: !!event.data.payload,
+                payloadKeys: event.data.payload ? Object.keys(event.data.payload) : 'none',
+                payload: event.data.payload
+              });
+            }
+            break;
+
+          default:
+            console.log(`📝 HOME MESSAGE DEBUG: Edge Function callback for unhandled target: ${event.data.target}`, {
+              target: event.data.target,
+              callbackType: event.data.callbackType,
+              hasPayload: !!event.data.payload
+            });
+            break;
+        }
+      }
       
       // ENHANCED: Handle direct RFP updates from edge functions
       if (event.data?.type === 'UPDATE_CURRENT_RFP_DIRECT') {
@@ -607,8 +805,14 @@ const Home: React.FC = () => {
       }
     };
 
+    console.log('🎧 HOME MESSAGE DEBUG: Setting up window message event listener');
     window.addEventListener('message', handleRfpRefreshMessage);
-    return () => window.removeEventListener('message', handleRfpRefreshMessage);
+    console.log('✅ HOME MESSAGE DEBUG: Window message event listener registered');
+    
+    return () => {
+      console.log('🗑️ HOME MESSAGE DEBUG: Removing window message event listener');
+      window.removeEventListener('message', handleRfpRefreshMessage);
+    };
   }, [currentSessionId, handleSetCurrentRfp, handleClearCurrentRfp]);
 
   // Load active agent when session changes - but only if not already handled by handleSelectSession
