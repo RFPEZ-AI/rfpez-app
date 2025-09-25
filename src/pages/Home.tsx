@@ -8,7 +8,7 @@ import DatabaseService from '../services/database';
 import { Message, ArtifactReference, Artifact } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import { DocxExporter } from '../utils/docxExporter';
-import type { FormSpec } from '../types/rfp';
+import type { FormSpec, RFP } from '../types/rfp';
 
 // Import all our custom hooks
 import { useHomeState } from '../hooks/useHomeState';
@@ -491,31 +491,118 @@ const Home: React.FC = () => {
     }
   }, [session, supabaseLoading]);
 
-  // Listen for RFP refresh messages from Claude functions
+  // Listen for RFP refresh messages from Claude functions and enhanced client updates
   useEffect(() => {
     const handleRfpRefreshMessage = async (event: MessageEvent) => {
-      if (event.data?.type === 'REFRESH_CURRENT_RFP') {
-        console.log('🔄 Received RFP refresh request from Claude function');
-        
-        // Reload the current session's RFP context from the database
-        if (currentSessionId) {
+      console.log('🐛 DEBUG: Window message received:', event.data);
+      
+      // ENHANCED: Handle direct RFP updates from edge functions
+      if (event.data?.type === 'UPDATE_CURRENT_RFP_DIRECT') {
+        console.log('🎯 DEBUG: Direct RFP update from edge function:', event.data);
+        if (event.data.rfp_data) {
           try {
-            console.log('📊 Reloading session RFP context for session:', currentSessionId);
-            const sessionWithContext = await DatabaseService.getSessionWithContext(currentSessionId);
-            
-            if (sessionWithContext?.current_rfp_id) {
-              console.log('🎯 Refreshing RFP context from session:', sessionWithContext.current_rfp_id);
-              await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
-              console.log('✅ RFP context refreshed successfully');
-            } else {
-              console.log('📝 No RFP context found in session after refresh');
-              handleClearCurrentRfp();
-            }
+            await handleSetCurrentRfp(event.data.rfp_data.id);
+            console.log('✅ Direct RFP update successful:', event.data.rfp_data.name);
           } catch (error) {
-            console.warn('⚠️ Failed to refresh session RFP context:', error);
+            console.error('❌ Direct RFP update failed:', error);
           }
+        }
+        return;
+      }
+      
+      // ENHANCED: Handle success messages from edge functions
+      if (event.data?.type === 'SHOW_SUCCESS_MESSAGE') {
+        console.log('🎯 DEBUG: Success message from edge function:', event.data.message);
+        // You could integrate this with a toast system or notification component
+        // For now, just log it - can be enhanced later with proper UI notifications
+        return;
+      }
+      
+      // ENHANCED: Handle UI refresh requests from edge functions
+      if (event.data?.type === 'REFRESH_UI_STATE') {
+        console.log('🎯 DEBUG: UI refresh request from edge function:', event.data);
+        if (event.data.component === 'RFP_INDICATOR' && event.data.force_refresh) {
+          // Force a re-render of RFP indicator component
+          // This could trigger a state update that forces re-render
+          console.log('🔄 Forcing RFP indicator refresh');
+        }
+        return;
+      }
+      
+      // ORIGINAL: Handle legacy RFP refresh messages
+      if (event.data?.type === 'REFRESH_CURRENT_RFP') {
+        console.log('🎯 DEBUG: handleRfpRefreshMessage called - processing REFRESH_CURRENT_RFP');
+        console.log('🔄 Received RFP refresh request from Claude function', {
+          eventData: event.data,
+          currentSessionId
+        });
+        
+        // Priority 1: Use rfp_id from event data if provided
+        if (event.data.rfp_id) {
+          console.log('🎯 DEBUG: Setting current RFP from event data - using RFP ID:', event.data.rfp_id);
+          try {
+            await handleSetCurrentRfp(event.data.rfp_id);
+            console.log('🎯 DEBUG: RFP context set successfully from event data');
+            return; // Exit early since we successfully set RFP from event
+          } catch (error) {
+            console.warn('🎯 DEBUG: Failed to set RFP from event data, falling back to session:', error);
+          }
+        }
+        
+        // Priority 2: Fall back to session context reload
+        if (currentSessionId) {
+          const attemptSessionReload = async (retryCount = 0) => {
+            try {
+              console.log('🎯 DEBUG: Reloading session RFP context for session:', currentSessionId, 'attempt:', retryCount + 1);
+              const sessionWithContext = await DatabaseService.getSessionWithContext(currentSessionId);
+              
+              if (sessionWithContext?.current_rfp_id) {
+                console.log('🎯 DEBUG: Setting current RFP from session context:', sessionWithContext.current_rfp_id);
+                await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+                console.log('🎯 DEBUG: RFP context refreshed from session successfully');
+              } else if (retryCount < 3) {
+                // If we have an RFP name but no session context yet, retry after delay
+                if (event.data.rfp_name) {
+                  console.log('🎯 DEBUG: No session context yet for RFP:', event.data.rfp_name, '- retrying in 1s');
+                  setTimeout(() => attemptSessionReload(retryCount + 1), 1000);
+                } else {
+                  console.log('🎯 DEBUG: No RFP context found in session after refresh - clearing RFP');
+                  handleClearCurrentRfp();
+                }
+              } else {
+                console.log('🎯 DEBUG: Max retries reached - No RFP context found in session after refresh');
+                console.log('🎯 DEBUG: NOT clearing RFP - the RFP may have been created successfully but session context update failed');
+                
+                // Try to find RFP by name as a fallback
+                if (event.data.rfp_name) {
+                  console.log('🎯 DEBUG: Attempting to find RFP by name:', event.data.rfp_name);
+                  try {
+                    // Import RFPService dynamically to avoid circular dependencies
+                    const { RFPService } = await import('../services/rfpService');
+                    const rfps: RFP[] = await RFPService.getAll();
+                    const matchingRfp = rfps.find((rfp: RFP) => rfp.name === event.data.rfp_name);
+                    if (matchingRfp) {
+                      console.log('🎯 DEBUG: Found RFP by name - setting as current:', matchingRfp.id);
+                      await handleSetCurrentRfp(matchingRfp.id);
+                    } else {
+                      console.log('🎯 DEBUG: No RFP found with name:', event.data.rfp_name);
+                    }
+                  } catch (error) {
+                    console.error('🎯 DEBUG: Failed to search for RFP by name:', error);
+                  }
+                }
+              }
+            } catch (error) {
+              console.warn('🎯 DEBUG: Failed to refresh session RFP context (attempt', retryCount + 1, '):', error);
+              if (retryCount < 3) {
+                setTimeout(() => attemptSessionReload(retryCount + 1), 1000);
+              }
+            }
+          };
+          
+          attemptSessionReload();
         } else {
-          console.log('⚠️ No current session to refresh RFP context for');
+          console.log('🎯 DEBUG: No current session to refresh RFP context for');
         }
       }
     };

@@ -1,7 +1,0 @@
-nohup: ignoring input
-🚀 RFPEZ.AI Agent API Server running on http://localhost:3001
-📡 Available endpoints:
-   GET  /health
-   POST /api/agent/prompt
-   GET  /api/agent/capabilities
-   POST /api/agent/session
