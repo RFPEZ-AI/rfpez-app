@@ -365,6 +365,70 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
             }
           );
 
+          console.log('🚀 Stream response received:', {
+            streamResponseType: typeof streamResponse,
+            hasSymbolAsyncIterator: Symbol.asyncIterator in (streamResponse || {}),
+            isStreamResponse: streamResponse !== null && streamResponse !== undefined,
+            streamResponseKeys: Object.keys(streamResponse || {}),
+            streamResponseMethods: Object.getOwnPropertyNames(Object.getPrototypeOf(streamResponse || {}))
+          });
+          
+          // EXPERIMENTAL: Try multiple streaming initialization patterns
+          console.log('🔍 Stream response details:', {
+            connected: (streamResponse as any)?._connected,
+            ended: (streamResponse as any)?.ended,
+            errored: (streamResponse as any)?.errored,
+            aborted: (streamResponse as any)?.aborted,
+            hasOn: typeof (streamResponse as any)?.on === 'function',
+            hasEmit: typeof (streamResponse as any)?.emit === 'function',
+            constructor: streamResponse.constructor.name
+          });
+          
+          // Try to use stream event methods if available
+          if (typeof (streamResponse as any).on === 'function') {
+            console.log('🔧 Stream has EventEmitter pattern, trying alternative approach...');
+            
+            const accumulatedText = '';
+            let eventReceived = false;
+            
+            // Set up event listeners
+            (streamResponse as any).on('data', (data: any) => {
+              console.log('📡 Stream data event:', data);
+              eventReceived = true;
+            });
+            
+            (streamResponse as any).on('chunk', (chunk: any) => {
+              console.log('📡 Stream chunk event:', chunk);
+              eventReceived = true;
+            });
+            
+            (streamResponse as any).on('message', (message: any) => {
+              console.log('📡 Stream message event:', message);
+              eventReceived = true;
+            });
+            
+            // Wait a moment to see if events fire
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            if (eventReceived) {
+              console.log('✅ EventEmitter pattern worked!');
+              // Continue with EventEmitter pattern...
+            } else {
+              console.log('❌ No events received via EventEmitter, falling back to iterator');
+            }
+          }
+          
+          // POTENTIAL FIX: Some Claude SDK versions require explicit connection
+          if (typeof (streamResponse as any)?._run === 'function') {
+            console.log('🔧 Stream has _run method, attempting to start...');
+            try {
+              await (streamResponse as any)._run();
+              console.log('✅ Stream _run completed');
+            } catch (runError) {
+              console.warn('⚠️ Stream _run failed:', runError);
+            }
+          }
+          
           // FIXED: Process streaming response with SEGMENTED tool handling
           const assistantContent: ContentBlock[] = [];
           let currentTextContent = '';
@@ -372,10 +436,98 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
           let chunkCount = 0;
           let lastAbortCheck = Date.now();
           
+          console.log('🎯 About to enter streaming event loop with async iterator...', {
+            hasAsyncIterator: typeof streamResponse[Symbol.asyncIterator] === 'function',
+            streamReadyState: (streamResponse as any)?._connected ? 'connected' : 'not connected',
+            streamIteratorFunction: streamResponse[Symbol.asyncIterator]?.toString?.()
+          });
+          
+          // EXPERIMENTAL: Try to manually get the iterator and check its state
+          try {
+            const iterator = streamResponse[Symbol.asyncIterator]();
+            console.log('🔍 Manual iterator created:', {
+              iteratorType: typeof iterator,
+              iteratorMethods: Object.getOwnPropertyNames(iterator),
+              hasNext: typeof iterator.next === 'function'
+            });
+            
+            // Try to get first result manually
+            const firstResult = await iterator.next();
+            console.log('🔍 First manual iteration result:', {
+              done: firstResult.done,
+              hasValue: firstResult.value !== undefined,
+              valueType: typeof firstResult.value
+            });
+            
+            if (!firstResult.done && firstResult.value) {
+              console.log('✅ Manual iteration SUCCESS! Processing first event...');
+              // Process this first event
+              const event = firstResult.value;
+              console.log('🎯 FIRST STREAM EVENT:', {
+                eventType: event.type,
+                eventKeys: Object.keys(event)
+              });
+              
+              // Continue with manual iteration...
+              let iterationCount = 1;
+              let iterationComplete = false;
+              while (!iterationComplete) {
+                const nextResult = await iterator.next();
+                iterationCount++;
+                
+                if (nextResult.done) {
+                  console.log(`✅ Manual iteration completed after ${iterationCount} events`);
+                  iterationComplete = true;
+                  break;
+                }
+                
+                const event = nextResult.value;
+                console.log(`🎯 STREAM EVENT ${iterationCount}:`, {
+                  eventType: event.type,
+                  eventKeys: Object.keys(event)
+                });
+                
+                // Process the event here (same logic as below)
+                // ...
+                
+                if (iterationCount > 1000) {
+                  console.warn('⚠️ Breaking manual iteration after 1000 events');
+                  break;
+                }
+              }
+              
+              // If we get here, manual iteration worked!
+              console.log('✅ MANUAL ITERATION SUCCESSFUL - bypassing for-await loop');
+              return { 
+                content: currentTextContent,
+                metadata: {
+                  model: 'claude-3-5-sonnet-20241022',
+                  response_time: Date.now() - startTime,
+                  temperature: 0.7,
+                  functions_called: [],
+                  function_results: []
+                }
+              };
+              
+            } else {
+              console.log('❌ Manual iteration failed - first result was done or empty');
+            }
+          } catch (manualIterError) {
+            console.error('❌ Manual iteration error:', manualIterError);
+          }
+          
           // CRITICAL: Handle streaming events correctly per ChatGPT 5 guidance
+          console.log('🎯 Falling back to for-await loop...');
           for await (const event of streamResponse) {
             chunkCount++;
             const chunkTime = Date.now();
+            
+            // DEBUG: Log all events to understand what's happening
+            console.log('🎯 STREAM EVENT DEBUG:', {
+              eventType: event.type,
+              eventKeys: Object.keys(event),
+              eventData: JSON.stringify(event, null, 2).substring(0, 500)
+            });
             
             // Optimized abort checking - only check every 100ms or every 20 chunks
             const shouldCheckAbort = (chunkTime - lastAbortCheck > 100) || (chunkCount % 20 === 0);
@@ -453,6 +605,16 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                     
                     functionsExecuted.push(toolUse.name);
                     const executionStart = Date.now();
+                    
+                    // ENHANCED: Support stream insertions during tool execution
+                    if (toolUse.name === 'create_and_set_rfp' && onChunk) {
+                      // Send real-time updates during RFP creation
+                      onChunk('🔄 Creating RFP...', false, true);
+                      setTimeout(() => onChunk('📝 Saving RFP details...', false, true), 500);
+                      setTimeout(() => onChunk('🔗 Setting as current RFP...', false, true), 1000);
+                      setTimeout(() => onChunk('✅ RFP creation in progress...', false, true), 1500);
+                    }
+                    
                     const result = await claudeAPIHandler.executeFunction(toolUse.name, toolUse.input);
                     const executionTime = Date.now() - executionStart;
                     

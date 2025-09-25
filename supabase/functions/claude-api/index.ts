@@ -200,6 +200,12 @@ async function executeCreateAndSetRfp(params: any, userId: string) {
   console.log('🔍 DEBUG: executeCreateAndSetRfp called with params:', JSON.stringify(params, null, 2));
   console.log('🔍 DEBUG: executeCreateAndSetRfp called with userId:', userId);
   
+  // ENHANCED: Emit status updates for stream insertion (future enhancement)
+  const emitStatus = (status: string, step?: string) => {
+    console.log(`📡 STATUS UPDATE: ${status}${step ? ` - ${step}` : ''}`);
+    // TODO: Implement WebSocket or SSE for real-time status updates
+  };
+  
   // Robust parameter validation
   if (!params || typeof params !== 'object') {
     throw new Error('Invalid parameters provided to createAndSetRfp. Expected object with at least a name field.');
@@ -215,6 +221,8 @@ async function executeCreateAndSetRfp(params: any, userId: string) {
   }
   
   try {
+    emitStatus('🔍 Retrieving user session...', 'step_1_session_lookup');
+    
     // Step 1: Get the current session ID for the user
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
@@ -228,6 +236,7 @@ async function executeCreateAndSetRfp(params: any, userId: string) {
     
     const session_id = profile.current_session_id;
     console.log('✅ Found current session:', session_id);
+    emitStatus('✅ Session found', 'step_1_complete');
     
     // Step 2: Verify session exists and check if it already has a current RFP
     const { data: currentSession, error: sessionError } = await supabase
@@ -279,6 +288,9 @@ async function executeCreateAndSetRfp(params: any, userId: string) {
     }
     
     console.log('✅ RFP created successfully:', newRfp.id);
+    emitStatus('✅ RFP created', 'step_3_complete');
+    
+    emitStatus('🔗 Setting as current RFP...', 'step_4_set_current');
     
     // Step 4: Set as current RFP for the session
     const { error: updateError } = await supabase
@@ -294,6 +306,7 @@ async function executeCreateAndSetRfp(params: any, userId: string) {
     }
     
     console.log('✅ RFP set as current for session successfully');
+    emitStatus('✅ Set as current RFP', 'step_4_complete');
     
     // Step 5: Validation - verify RFP exists in database
     const { data: verifyRfp, error: verifyError } = await supabase
@@ -320,7 +333,37 @@ async function executeCreateAndSetRfp(params: any, userId: string) {
         'created_rfp_record', 
         'set_as_current_rfp_for_session',
         'validated_creation'
-      ]
+      ],
+      // CLIENT UPDATE INSTRUCTIONS - processed immediately by frontend
+      client_updates: {
+        type: 'RFP_CREATED_AND_SET',
+        immediate_actions: [
+          {
+            action: 'UPDATE_CURRENT_RFP',
+            data: {
+              id: newRfp.id,
+              name: newRfp.name,
+              description: newRfp.description,
+              specification: newRfp.specification,
+              status: newRfp.status
+            }
+          },
+          {
+            action: 'SHOW_SUCCESS_MESSAGE',
+            data: {
+              message: `✅ RFP "${newRfp.name}" created and set as current RFP`,
+              duration: 3000
+            }
+          },
+          {
+            action: 'REFRESH_UI_STATE',
+            data: {
+              component: 'RFP_INDICATOR',
+              force_refresh: true
+            }
+          }
+        ]
+      }
     };
     
   } catch (error) {

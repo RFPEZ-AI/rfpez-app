@@ -454,7 +454,11 @@ class ClaudeAPIProxyService {
 
                   case 'error':
                     console.error('❌ Stream error:', eventData.error);
-                    throw new Error(eventData.error);
+                    // Handle both string and object error formats
+                    const errorMessage = typeof eventData.error === 'string' 
+                      ? eventData.error 
+                      : eventData.error?.message || JSON.stringify(eventData.error);
+                    throw new Error(errorMessage);
 
                   default:
                     console.log('📝 Unknown event type:', eventData.type);

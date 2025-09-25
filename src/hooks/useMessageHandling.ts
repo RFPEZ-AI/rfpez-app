@@ -11,6 +11,25 @@ import { AgentService } from '../services/agentService';
 import { SmartAutoPromptManager } from '../utils/smartAutoPromptManager';
 import { categorizeError } from '../components/APIErrorHandler';
 
+// Client update interfaces for edge function communication
+interface ClientAction {
+  action: 'UPDATE_CURRENT_RFP' | 'SHOW_SUCCESS_MESSAGE' | 'REFRESH_UI_STATE';
+  data: any;
+}
+
+interface ClientUpdates {
+  type: string;
+  immediate_actions: ClientAction[];
+}
+
+interface EnhancedFunctionResult {
+  success?: boolean;
+  current_rfp_id?: string | number;
+  rfp?: any;
+  client_updates?: ClientUpdates;
+  [key: string]: any;
+}
+
 export const useMessageHandling = () => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const isProcessingRef = useRef<boolean>(false); // Add processing guard
@@ -33,12 +52,23 @@ export const useMessageHandling = () => {
   const generateArtifactReferences = (metadata: Record<string, unknown>): ArtifactReference[] => {
     const refs: ArtifactReference[] = [];
     
+    // DEBUG: Log all metadata to understand the structure
+    console.log('🐛 DEBUG: generateArtifactReferences called with metadata:', JSON.stringify(metadata, null, 2));
+    
     // Handle function results that contain forms/templates
     if (metadata.function_results && Array.isArray(metadata.function_results)) {
+      console.log('� DEBUG: function_results found, length:', metadata.function_results.length);
       metadata.function_results.forEach((func: unknown) => {
+        console.log('🔍 DEBUG: Processing function result:', func);
         if (typeof func === 'object' && func !== null) {
           const funcObj = func as Record<string, unknown>;
           const result = funcObj.result as Record<string, unknown>;
+          
+          console.log('🔍 DEBUG: Function object:', {
+            functionName: funcObj.function,
+            hasResult: !!result,
+            resultSuccess: result?.success
+          });
           
           // Handle different types of function results
           if (result && result.success) {
@@ -60,10 +90,118 @@ export const useMessageHandling = () => {
                 isCreated: true,
                 displayText: result.title as string
               });
+            } else if (funcObj.function === 'create_and_set_rfp' && result.current_rfp_id) {
+              // RFP creation - trigger UI refresh
+              const enhancedResult = result as EnhancedFunctionResult;
+              const rfpData = enhancedResult.rfp as any;
+              console.log('🐛 DEBUG: create_and_set_rfp detected in function_results - triggering context refresh', {
+                rfpId: enhancedResult.current_rfp_id,
+                rfpName: rfpData?.name,
+                fullResult: enhancedResult
+              });
+              
+              // ENHANCED: Process client_updates if present
+              if (enhancedResult.client_updates && enhancedResult.client_updates.immediate_actions) {
+                console.log('🎯 DEBUG: Processing client_updates from edge function', {
+                  updateType: enhancedResult.client_updates.type,
+                  actionCount: enhancedResult.client_updates.immediate_actions.length
+                });
+                
+                // Process each immediate action
+                enhancedResult.client_updates.immediate_actions.forEach((action: ClientAction, index: number) => {
+                  console.log(`🔄 DEBUG: Processing client action ${index + 1}:`, action);
+                  
+                  setTimeout(() => {
+                    switch (action.action) {
+                      case 'UPDATE_CURRENT_RFP':
+                        window.postMessage({ 
+                          type: 'UPDATE_CURRENT_RFP_DIRECT', 
+                          rfp_data: action.data,
+                          source: 'edge_function_direct_update'
+                        }, '*');
+                        break;
+                      case 'SHOW_SUCCESS_MESSAGE':
+                        window.postMessage({ 
+                          type: 'SHOW_SUCCESS_MESSAGE', 
+                          message: action.data.message,
+                          duration: action.data.duration
+                        }, '*');
+                        break;
+                      case 'REFRESH_UI_STATE':
+                        window.postMessage({ 
+                          type: 'REFRESH_UI_STATE', 
+                          component: action.data.component,
+                          force_refresh: action.data.force_refresh
+                        }, '*');
+                        break;
+                      default:
+                        console.log('🔄 Unknown client action:', action.action);
+                    }
+                  }, index * 50); // Stagger actions by 50ms each
+                });
+              } else {
+                // Fallback to original method if no client_updates
+                setTimeout(() => {
+                  window.postMessage({ 
+                    type: 'REFRESH_CURRENT_RFP', 
+                    rfp_id: enhancedResult.current_rfp_id,
+                    rfp_name: rfpData?.name,
+                    message: `New RFP created: ${rfpData?.name || 'Unknown'}`
+                  }, '*');
+                  console.log('🐛 DEBUG: Posting REFRESH_CURRENT_RFP message to window (fallback)');
+                }, 100);
+              }
             }
           }
         }
       });
+    } else {
+      console.log('🐛 DEBUG: function_results array is empty or missing');
+    }
+    
+    // NEW: Also check tool_use for create_and_set_rfp calls (handles case where function_results is empty)
+    if (metadata.tool_use && typeof metadata.tool_use === 'object') {
+      const toolUse = metadata.tool_use as Record<string, unknown>;
+      console.log('🐛 DEBUG: tool_use found:', {
+        name: toolUse.name,
+        hasInput: !!toolUse.input
+      });
+      
+      if (toolUse.name === 'create_and_set_rfp' && toolUse.input) {
+        const input = toolUse.input as Record<string, unknown>;
+        console.log('🐛 DEBUG: create_and_set_rfp detected in tool_use - triggering context refresh', {
+          toolInput: input,
+          rfpName: input.name
+        });
+        
+        // Trigger RFP context refresh even without waiting for function results
+        // This handles cases where the function was called but results aren't populated yet
+        setTimeout(async () => {
+          // Try to find the newly created RFP by name after giving it time to be created
+          const rfpName = input.name;
+          const foundRfpId = null;
+          
+          if (rfpName) {
+            try {
+              console.log('🐛 DEBUG: Attempting to find newly created RFP by name:', rfpName);
+              // Use DatabaseService to search for RFP by name (we'll need to add this method)
+              // For now, post the message without rfp_id and let the session context handle it
+              console.log('🐛 DEBUG: RFP name available for lookup:', rfpName);
+            } catch (error) {
+              console.log('🐛 DEBUG: Could not find RFP by name yet:', error);
+            }
+          }
+          
+          window.postMessage({ 
+            type: 'REFRESH_CURRENT_RFP', 
+            message: `RFP creation initiated: ${rfpName || 'Unknown'}`,
+            rfp_name: rfpName // Include RFP name for potential lookup
+          }, '*');
+          console.log('🐛 DEBUG: Posting REFRESH_CURRENT_RFP message from tool_use with RFP name:', rfpName);
+        }, 1000); // Longer delay to allow function to complete and commit to database
+      }
+    } else {
+      console.log('🐛 DEBUG: tool_use not found or invalid');
     }
     
     // Handle buyer questionnaire form (legacy support)

@@ -1,6 +1,0 @@
-nohup: ignoring input
-❌ Port 3001 is already in use!
-   Please stop the existing server or use a different port.
-   To find and stop the process using this port:
-   Windows: netstat -ano | findstr :3001
-   Linux/Mac: lsof -ti:3001 | xargs kill
