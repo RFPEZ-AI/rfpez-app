@@ -132,9 +132,28 @@ class ClaudeAPIProxyService {
         hasCallbacks: result.clientCallbacks && result.clientCallbacks.length > 0 
       });
 
+      console.log(`📊 DEBUG - Detailed response analysis:`, {
+        functionName,
+        responseSuccess: result.success,
+        responseData: !!result.data,
+        responseDataKeys: result.data ? Object.keys(result.data) : 'none',
+        responseMessage: result.message,
+        callbackCount: result.clientCallbacks?.length || 0,
+        callbacks: result.clientCallbacks?.map(cb => ({
+          type: cb.type,
+          target: cb.target,
+          payloadKeys: cb.payload ? Object.keys(cb.payload) : 'none'
+        })),
+        requiresClientAction: result.requiresClientAction,
+        responseSize: JSON.stringify(result).length
+      });
+
       // Process client callbacks if present
       if (result.clientCallbacks && result.clientCallbacks.length > 0) {
+        console.log(`🔄 DEBUG - Processing ${result.clientCallbacks.length} callbacks`);
         await this.processClientCallbacks(result.clientCallbacks);
+      } else {
+        console.log(`📭 DEBUG - No callbacks to process for ${functionName}`);
       }
 
       return result;
@@ -146,73 +165,225 @@ class ClaudeAPIProxyService {
 
   // Process client callbacks for UI updates
   private async processClientCallbacks(callbacks: ClientCallback[]): Promise<void> {
-    for (const callback of callbacks) {
+    console.log(`🎯 CALLBACK DEBUG - processClientCallbacks ENTRY:`, {
+      callbackCount: callbacks?.length || 0,
+      callbacksValid: Array.isArray(callbacks),
+      timestamp: new Date().toISOString(),
+      windowAvailable: typeof window !== 'undefined',
+      callbackDetails: callbacks?.map((cb, index) => ({
+        index,
+        type: cb?.type,
+        target: cb?.target,
+        hasPayload: !!cb?.payload,
+        payloadKeys: cb?.payload ? Object.keys(cb.payload) : []
+      })) || []
+    });
+    
+    if (!Array.isArray(callbacks)) {
+      console.error('❌ CALLBACK DEBUG - Invalid callbacks array:', callbacks);
+      return;
+    }
+    
+    if (callbacks.length === 0) {
+      console.warn('⚠️ CALLBACK DEBUG - No callbacks to process');
+      return;
+    }
+    
+    for (let i = 0; i < callbacks.length; i++) {
+      const callback = callbacks[i];
+      console.log(`🔄 CALLBACK DEBUG - Processing callback ${i + 1}/${callbacks.length}:`, {
+        callbackIndex: i,
+        type: callback?.type,
+        target: callback?.target,
+        hasPayload: !!callback?.payload,
+        payloadSize: callback?.payload ? JSON.stringify(callback.payload).length : 0,
+        payloadKeys: callback?.payload ? Object.keys(callback.payload) : [],
+        fullCallback: callback
+      });
+      
       try {
+        const startTime = Date.now();
         await this.executeClientCallback(callback);
+        const duration = Date.now() - startTime;
+        console.log(`✅ CALLBACK DEBUG - Callback ${i + 1} executed successfully in ${duration}ms`);
       } catch (error) {
-        console.warn('⚠️ Client callback execution failed:', callback, error);
+        console.error(`❌ CALLBACK DEBUG - Callback ${i + 1} execution failed:`, {
+          callback,
+          error: error instanceof Error ? error.message : error,
+          stack: error instanceof Error ? error.stack : undefined
+        });
         // Don't throw - callback failures shouldn't break the main operation
       }
     }
+    
+    console.log(`🎯 CALLBACK DEBUG - processClientCallbacks COMPLETED - processed ${callbacks.length} callbacks`);
   }
 
   // Execute individual client callback
   private async executeClientCallback(callback: ClientCallback): Promise<void> {
-    console.log('🔄 Executing client callback:', callback);
+    console.log('🔄 CALLBACK EXEC DEBUG - Starting callback execution:', {
+      type: callback?.type,
+      target: callback?.target,
+      hasPayload: !!callback?.payload,
+      windowAvailable: typeof window !== 'undefined',
+      timestamp: new Date().toISOString()
+    });
+
+    if (!callback) {
+      throw new Error('Callback is null or undefined');
+    }
+
+    if (!callback.type) {
+      throw new Error('Callback type is missing');
+    }
 
     switch (callback.type) {
       case 'ui_refresh':
+        console.log(`🖼️ CALLBACK EXEC DEBUG - Processing ui_refresh:`, {
+          target: callback.target,
+          payloadKeys: callback.payload ? Object.keys(callback.payload) : 'none',
+          payloadSize: callback.payload ? JSON.stringify(callback.payload).length : 0,
+          windowExists: typeof window !== 'undefined',
+          windowLocation: typeof window !== 'undefined' ? window.location.href : 'N/A'
+        });
+        
         // Trigger UI component refresh via window messaging
         if (typeof window !== 'undefined') {
-          window.postMessage({
+          const message = {
             type: 'EDGE_FUNCTION_CALLBACK',
             callbackType: callback.type,
             target: callback.target,
             payload: callback.payload,
-          }, '*');
+            debugInfo: {
+              timestamp: new Date().toISOString(),
+              source: 'claudeAPIProxy.executeClientCallback',
+              originalCallbackType: callback.type
+            }
+          };
+          
+          console.log(`📤 CALLBACK EXEC DEBUG - About to post window message:`, {
+            messageType: message.type,
+            callbackType: message.callbackType,
+            target: message.target,
+            hasPayload: !!message.payload,
+            messageSize: JSON.stringify(message).length
+          });
+          
+          try {
+            window.postMessage(message, '*');
+            console.log(`✅ CALLBACK EXEC DEBUG - Window message posted successfully`);
+            
+            // Add a small delay to allow message processing
+            await new Promise(resolve => setTimeout(resolve, 10));
+            
+            console.log(`🔍 CALLBACK EXEC DEBUG - Window message dispatch completed`);
+          } catch (postError) {
+            console.error(`❌ CALLBACK EXEC DEBUG - Failed to post window message:`, postError);
+            throw postError;
+          }
+        } else {
+          console.error(`❌ CALLBACK EXEC DEBUG - Window not available for ui_refresh callback`);
+          throw new Error('Window object not available for ui_refresh callback');
         }
         break;
 
       case 'state_update':
+        console.log(`🔄 CALLBACK EXEC DEBUG - Processing state_update:`, {
+          target: callback.target,
+          hasPayload: !!callback.payload
+        });
+        
         // Update local state via window messaging
         if (typeof window !== 'undefined') {
-          window.postMessage({
+          const message = {
             type: 'EDGE_FUNCTION_CALLBACK',
             callbackType: callback.type,
             target: callback.target,
             payload: callback.payload,
-          }, '*');
+            debugInfo: {
+              timestamp: new Date().toISOString(),
+              source: 'claudeAPIProxy.executeClientCallback.state_update'
+            }
+          };
+          
+          console.log(`📤 CALLBACK EXEC DEBUG - Posting state_update message:`, message);
+          window.postMessage(message, '*');
+          console.log(`✅ CALLBACK EXEC DEBUG - State_update message posted`);
+        } else {
+          console.error(`❌ CALLBACK EXEC DEBUG - Window not available for state_update`);
         }
         break;
 
       case 'notification':
+        console.log(`🔔 CALLBACK EXEC DEBUG - Processing notification:`, {
+          hasPayload: !!callback.payload
+        });
+        
         // Show user notification
         if (typeof window !== 'undefined') {
-          window.postMessage({
+          const message = {
             type: 'EDGE_FUNCTION_CALLBACK',
             callbackType: callback.type,
             target: 'notification',
             payload: callback.payload,
-          }, '*');
+            debugInfo: {
+              timestamp: new Date().toISOString(),
+              source: 'claudeAPIProxy.executeClientCallback.notification'
+            }
+          };
+          
+          console.log(`📤 CALLBACK EXEC DEBUG - Posting notification message:`, message);
+          window.postMessage(message, '*');
+          console.log(`✅ CALLBACK EXEC DEBUG - Notification message posted`);
+        } else {
+          console.error(`❌ CALLBACK EXEC DEBUG - Window not available for notification`);
         }
         break;
 
       default:
-        console.warn('Unknown callback type:', callback.type);
+        console.error(`❌ CALLBACK EXEC DEBUG - Unknown callback type: ${callback.type}`, callback);
+        throw new Error(`Unknown callback type: ${callback.type}`);
     }
   }
 
   // Claude API Methods
 
-  // Generate non-streaming Claude response
+  // Generate Claude response with streaming callbacks enabled
   async generateMessage(params: ClaudeGenerateParams): Promise<any> {
-    const response = await this.callEdgeFunction('generate_message', params);
+    console.log('🔄 CLAUDE PROXY DEBUG: generateMessage called, using streaming internally for callbacks');
     
-    if (!response.success) {
-      throw new Error(response.message || 'Claude API call failed');
+    // Use streaming internally but present as non-streaming interface
+    let finalResult: any = null;
+    let finalMetadata: any = null;
+    
+    try {
+      const streamingResponse = await this.generateStreamingResponse(
+        params,
+        (chunk: string, isComplete: boolean, metadata?: any) => {
+          console.log('🌊 STREAMING CHUNK DEBUG:', {
+            chunkLength: chunk.length,
+            isComplete,
+            hasMetadata: !!metadata,
+            metadataKeys: metadata ? Object.keys(metadata) : []
+          });
+          
+          if (isComplete) {
+            console.log('✅ STREAMING COMPLETE: Final metadata received');
+            finalMetadata = metadata;
+          }
+        }
+      );
+      
+      finalResult = streamingResponse;
+      console.log('✅ CLAUDE PROXY DEBUG: Streaming completed, returning result');
+      
+    } catch (error) {
+      console.error('❌ CLAUDE PROXY DEBUG: Streaming failed:', error);
+      throw error;
     }
-
-    return response.data;
+    
+    // Return in same format as original generateMessage
+    return finalResult;
   }
 
   // Test Claude API connection
@@ -335,10 +506,19 @@ class ClaudeAPIProxyService {
       };
 
       try {
+        // Add streaming headers for Server-Sent Events
+        const streamingHeaders = {
+          ...headers,
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        };
+        
+        console.log('🌊 STREAMING DEBUG: Making SSE request with headers:', streamingHeaders);
+
         // Use fetch for SSE connection
         const response = await fetch(this.baseUrl, {
           method: 'POST',
-          headers,
+          headers: streamingHeaders,
           body: JSON.stringify(requestBody),
           signal: effectiveSignal,
         });
@@ -451,6 +631,39 @@ class ClaudeAPIProxyService {
                       metadata: finalMetadata,
                     };
                   }
+
+                  case 'client_callbacks':
+                    console.log('🔄 STREAMING CALLBACK DEBUG - Processing client callbacks from streaming:', {
+                      hasCallbacks: !!eventData.callbacks,
+                      callbacksIsArray: Array.isArray(eventData.callbacks),
+                      callbackCount: eventData.callbacks?.length || 0,
+                      streamingEventData: eventData,
+                      timestamp: new Date().toISOString()
+                    });
+                    
+                    // Process callbacks immediately when received from streaming
+                    if (eventData.callbacks && Array.isArray(eventData.callbacks)) {
+                      console.log(`📞 STREAMING CALLBACK DEBUG - Processing ${eventData.callbacks.length} callbacks from streaming`);
+                      try {
+                        await this.processClientCallbacks(eventData.callbacks);
+                        console.log(`✅ STREAMING CALLBACK DEBUG - Successfully processed callbacks from streaming`);
+                      } catch (callbackError) {
+                        console.error(`❌ STREAMING CALLBACK DEBUG - Failed to process callbacks from streaming:`, callbackError);
+                      }
+                    } else {
+                      console.warn(`⚠️ STREAMING CALLBACK DEBUG - Invalid callbacks data from streaming:`, eventData.callbacks);
+                    }
+                    break;
+
+                  case 'tool_result':
+                    console.log('🔧 Tool result from streaming:', eventData);
+                    // Tool results are already processed server-side, just log for debugging
+                    break;
+
+                  case 'tool_error':
+                    console.error('❌ Tool execution error from streaming:', eventData.error);
+                    // Tool errors from server-side execution
+                    break;
 
                   case 'error':
                     console.error('❌ Stream error:', eventData.error);

@@ -21,12 +21,9 @@ export const useRFPManagement = (currentSessionId?: string) => {
     RFPService.getAll().then(setRFPs); 
   }, []);
 
-  // Clear current RFP context when session changes to ensure session isolation
-  useEffect(() => {
-    console.log('🔄 Session changed in RFP management, clearing current RFP context');
-    setCurrentRfpId(null);
-    setCurrentRfp(null);
-  }, [currentSessionId]);
+  // Note: RFP context clearing removed - session restoration in handleSelectSession 
+  // now properly handles setting the correct RFP context for each session.
+  // The previous automatic clearing was interfering with session RFP restoration.
 
   const handleNewRFP = () => { 
     setEditingRFP(null); 
