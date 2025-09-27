@@ -498,11 +498,23 @@ class ClaudeAPIProxyService {
       // Use provided abort signal or managed controller
       const effectiveSignal = abortSignal || managedController.signal;
       
+      // DEBUG: Log the params being sent to edge function
+      console.log('🔧 DEBUG PROXY: Params being sent to edge function:', {
+        hasTools: !!params.tools,
+        toolsLength: params.tools?.length || 0,
+        toolNames: params.tools?.map((t: any) => t.name) || 'no tools',
+        paramsKeys: Object.keys(params)
+      });
+
       // Create the request body with streaming flag
       const requestBody = {
         functionName: 'generate_response',
         parameters: params,
         stream: true,
+        sessionContext: params.sessionId ? {
+          sessionId: params.sessionId,
+          timestamp: new Date().toISOString()
+        } : undefined,
       };
 
       try {
@@ -523,15 +535,35 @@ class ClaudeAPIProxyService {
           signal: effectiveSignal,
         });
 
-      if (!response.ok) {
+        if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      // Check if we got a non-streaming fallback response (regular JSON)
+      const contentType = response.headers.get('content-type');
+      if (contentType && contentType.includes('application/json')) {
+        console.log('🚀 NON-STREAMING FALLBACK detected - handling as regular JSON response');
+        
+        const jsonResponse = await response.json();
+        console.log('🚀 NON-STREAMING FALLBACK data:', jsonResponse);
+        
+        if (jsonResponse.success && jsonResponse.data) {
+          // Handle as complete response
+          onChunk(jsonResponse.data, true, jsonResponse.metadata || {});
+          
+          return {
+            success: true,
+            content: jsonResponse.data,
+            metadata: jsonResponse.metadata || {},
+          };
+        } else {
+          throw new Error('Invalid non-streaming fallback response format');
+        }
       }
 
       if (!response.body) {
         throw new Error('No response body for streaming');
-      }
-
-      // Process Server-Sent Events stream
+      }      // Process Server-Sent Events stream
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       
@@ -559,7 +591,10 @@ class ClaudeAPIProxyService {
           for (const line of lines) {
             if (line.startsWith('data: ')) {
               try {
-                const eventData = JSON.parse(line.slice(6));
+                const rawData = line.slice(6);
+
+                
+                const eventData = JSON.parse(rawData);
                 
                 switch (eventData.type) {
                   case 'start':
@@ -603,6 +638,14 @@ class ClaudeAPIProxyService {
 
                   case 'complete': {
                     console.log('✅ Stream complete');
+                    console.log('🔍 CLIENT DEBUG - Complete event data:', {
+                      full_content_length: eventData.full_content?.length || 0,
+                      full_content_preview: eventData.full_content?.substring(0, 100) || '',
+                      full_content_end: eventData.full_content?.substring((eventData.full_content?.length || 0) - 100) || '',
+                      token_count: eventData.token_count,
+                      tool_results_count: eventData.tool_results?.length || 0
+                    });
+                    
                     finalMetadata.full_content = eventData.full_content;
                     finalMetadata.token_count = eventData.token_count;
                     finalMetadata.tool_results = eventData.tool_results;
@@ -663,6 +706,22 @@ class ClaudeAPIProxyService {
                   case 'tool_error':
                     console.error('❌ Tool execution error from streaming:', eventData.error);
                     // Tool errors from server-side execution
+                    break;
+
+                  case 'fresh_response':
+                    console.log('🔄 Fresh response received from tool execution:', {
+                      content_length: eventData.content?.length || 0,
+                      content_preview: eventData.content?.substring(0, 100) || '',
+                      token_count: eventData.token_count,
+                      tool_results_count: eventData.tool_results?.length || 0
+                    });
+                    
+                    // CRITICAL: Completely replace content with fresh response
+                    fullContent = eventData.content || '';
+                    finalMetadata.token_count = eventData.token_count;
+                    finalMetadata.tool_results = eventData.tool_results;
+                    
+                    console.log('🔄 CLIENT DEBUG - Fresh response will be handled by completion event');
                     break;
 
                   case 'error':

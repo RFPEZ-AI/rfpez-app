@@ -318,9 +318,40 @@ CURRENT ARTIFACT CONTEXT:
 
 This is the artifact currently displayed. When users reference "the form" or "this artifact", they mean this one.` : '';
 
-    return `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}${artifactContext}
+    const functionGuidelines = `
 
-You have access to various functions for database operations, artifact management, and agent switching. Use them appropriately to help the user.`;
+FUNCTION USAGE INSTRUCTIONS:
+
+**AGENT LISTING**: When users ask about available agents or what agents exist:
+- Use get_available_agents function to retrieve current agent list
+- Common phrases: "what agents are there?", "show me available agents", "list agents", "what agents do you have?", "what agents are available?", "agents available"
+- ALWAYS include agent IDs in your response when listing agents - users need these IDs to switch agents
+- Format: "**Agent Name** (access_level) - ID: agent_id"
+- Include restricted agents only if user specifically asks about premium/paid agents
+
+**AGENT SWITCHING**: When users explicitly request to switch agents or need specialized help:
+- Use switch_agent function with the session_id and appropriate agent_id
+- Common phrases: "switch to [agent name]", "I need the [role] agent", "change to [specialty] agent"
+- Agent IDs to use:
+  - RFP Design: 8c5f11cb-1395-4d67-821b-89dd58f0c8dc
+  - Technical Support: eca68e1b-9803-440c-acea-79831e9313c1
+  - Support: 2dbfa44a-a041-4167-8d3e-82aecd4d2424
+  - RFP Assistant: a12243de-f8ed-4630-baff-762e0ca51aa1
+  - Billing: 0fb62d0c-79fe-4995-a4ee-f6a462e2f05f
+  - Sourcing: 021c53a9-8f7f-4112-9ad6-bc86003fadf7
+  - Negotiation: 7b05b172-1ee6-4d58-a1e5-205993d16171
+  - Audit: 0b17fcf1-365b-459f-82bd-b5ab73c80b27
+
+**DATABASE OPERATIONS**: Use appropriate functions for data management:
+- store_message: Save important messages to session history
+- get_conversation_history: Retrieve past conversation context
+- supabase_select/insert/update: Direct database operations when needed
+
+**ARTIFACT MANAGEMENT**: Use artifact functions when users work with forms or documents.
+
+IMPORTANT: Always use session_id parameter when available for functions that require it.`;
+
+    return `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}${artifactContext}${functionGuidelines}`;
   }
 
   /**
@@ -463,13 +494,37 @@ You have access to various functions for database operations, artifact managemen
         sessionId: sessionId, // Pass session context to edge function
       };
 
+      // DEBUG: Log the params being sent to proxy
+      console.log('🔧 DEBUG CLIENT: Params being sent to claudeAPIProxy:', {
+        hasTools: !!params.tools,
+        toolsLength: params.tools?.length || 0,
+        toolNames: params.tools?.map((t: any) => t.name) || 'no tools',
+        paramsKeys: Object.keys(params)
+      });
+
       // Use the streaming proxy
       const result = await claudeAPIProxy.generateStreamingResponse(
         params,
         (chunk: string, isComplete: boolean, metadata?: any) => {
           console.log('🔄 Proxy streaming callback:', { chunk, isComplete, metadata });
           if (onChunk) {
-            onChunk(chunk, isComplete, metadata);
+            // Convert metadata to proper toolProcessing flag
+            // Only indicate tool processing if we actually have tool_use data
+            const actuallyProcessingTools = metadata && (
+              metadata.tool_use || 
+              (metadata.tool_results && metadata.tool_results.length > 0) ||
+              metadata.tools_processing === true
+            );
+            
+            console.log('🔄 Tool processing check:', {
+              hasMetadata: !!metadata,
+              hasTool_use: !!(metadata?.tool_use),
+              hasToolResults: !!(metadata?.tool_results?.length),
+              toolsProcessingFlag: metadata?.tools_processing,
+              actuallyProcessingTools
+            });
+            
+            onChunk(chunk, isComplete, actuallyProcessingTools);
           }
         },
         abortSignal

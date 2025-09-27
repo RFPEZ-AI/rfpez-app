@@ -443,7 +443,8 @@ export const useMessageHandling = () => {
         let uiTimeoutId: NodeJS.Timeout | null = null;
         
         const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, forceToolCompletion?: boolean) => {
-          console.log('📡 STREAMING CHUNK DEBUG:', {
+          
+          console.log('�📡 STREAMING CHUNK DEBUG:', {
             chunkLength: chunk.length,
             chunkPreview: chunk.length > 0 ? chunk.substring(0, 50) + '...' : '[empty]',
             isComplete,
@@ -453,7 +454,8 @@ export const useMessageHandling = () => {
             isWaitingForToolCompletion,
             currentMessageId: aiMessageId,
             toolProcessingMessageId,
-            bufferLength: streamingBuffer.length
+            bufferLength: streamingBuffer.length,
+
           });
           
           // Handle forced tool completion (e.g., from timeout)
@@ -539,7 +541,7 @@ export const useMessageHandling = () => {
               console.log('🔧 Set isWaitingForToolCompletion = true');
               
               // UI-LEVEL TIMEOUT: Force cleanup after 30 seconds regardless of API state
-              const uiTimeoutId = setTimeout(() => {
+              uiTimeoutId = setTimeout(() => {
                 console.log('⏰ UI TIMEOUT TRIGGERED - forcing tool processing cleanup after 30 seconds');
                 console.log('🔧 Timeout cleanup for processing message:', toolProcessingMessageId);
                 
@@ -573,17 +575,26 @@ export const useMessageHandling = () => {
               streamingCompleted = true;
               console.log('✅ Streaming phase complete for message:', aiMessageId);
               
-              // Remove tool processing message if it exists
-              if (toolProcessingMessageId) {
-                setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
-                toolProcessingMessageId = null;
-              }
-              
-              // Clear the UI timeout since tool processing completed successfully
-              if (uiTimeoutId) {
-                clearTimeout(uiTimeoutId);
-                uiTimeoutId = null;
-                console.log('⏰ UI timeout cleared - tool processing completed successfully');
+              // CRITICAL FIX: Always clear timeout and tool processing state on completion
+              // This handles the case where tools were executed but completion event doesn't indicate toolProcessing
+              if (isWaitingForToolCompletion) {
+                console.log('🔧 Tool completion detected - cleaning up tool processing state');
+                
+                // Remove tool processing message if it exists
+                if (toolProcessingMessageId) {
+                  setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
+                  toolProcessingMessageId = null;
+                }
+                
+                // Clear the UI timeout since tool processing completed successfully
+                if (uiTimeoutId) {
+                  clearTimeout(uiTimeoutId);
+                  uiTimeoutId = null;
+                  console.log('⏰ UI timeout cleared - tool processing completed successfully');
+                }
+                
+                // Reset tool processing state
+                isWaitingForToolCompletion = false;
               }
               
               // Final update with any remaining buffer
@@ -686,7 +697,16 @@ export const useMessageHandling = () => {
         // DISABLED: Debug logging causes memory pressure
         // console.error('🔥 ABOUT TO CALL CLAUDE API - This should appear!');
 
-        // FIXED: Always use streaming with proper tool handling
+        // STREAMING FIX: Detect tool-based queries and special handling
+        const isAgentQuery = /what agents?|agents are available|list agents|available agents|show agents/i.test(content);
+        const shouldUseStreaming = !isAgentQuery; // Disable streaming for agent queries
+        
+        console.log('🔧 STREAMING DECISION:', {
+          content: content.substring(0, 50) + '...',
+          isAgentQuery,
+          shouldUseStreaming
+        });
+
         const claudeResponse = await ClaudeService.generateResponse(
           content,
           agentForClaude,
@@ -706,8 +726,8 @@ export const useMessageHandling = () => {
           } : null,
           currentArtifact || null,
           undefined, // DISABLE ABORT SIGNAL - bypass AbortController issues
-          true, // ALWAYS use streaming with correct tool handling
-          onStreamingChunk // Stream callback
+          shouldUseStreaming, // Use streaming based on query type
+          shouldUseStreaming ? onStreamingChunk : undefined // Only provide callback if streaming
         );
         
         console.log('=== CLAUDE RESPONSE DEBUG ===');
