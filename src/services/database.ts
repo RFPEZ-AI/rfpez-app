@@ -42,7 +42,7 @@ export class DatabaseService {
 
     console.log('Attempting to insert session into database...');
     const sessionData: Omit<Session, 'id' | 'created_at' | 'updated_at' | 'is_archived'> = {
-      user_id: userProfile.id,
+      user_id: userProfile.id, // Use the user_profiles.id (internal UUID)
       title,
       description
     };

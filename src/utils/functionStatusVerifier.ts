@@ -103,17 +103,29 @@ export class FunctionStatusVerifier {
   }
 }
 
-// Auto-verify on module load in development
+// Auto-verify on module load in development (only for authenticated users)
 if (process.env.NODE_ENV === 'development' && typeof window !== 'undefined') {
-  // Delay to allow app to initialize
+  // Delay to allow app to initialize and check authentication
   setTimeout(async () => {
     try {
+      // Import supabase client dynamically to avoid circular dependencies
+      const { supabase } = await import('../supabaseClient');
+      
+      // Check if user is authenticated before running tests
+      const { data: { user }, error } = await supabase.auth.getUser();
+      
+      if (error || !user) {
+        console.log('🚀 Function Status Verifier: Skipping tests (anonymous user)');
+        return;
+      }
+      
+      console.log('🚀 Function Status Verifier: Running tests (authenticated user)');
       const verifier = new FunctionStatusVerifier();
       await verifier.displayStatus();
     } catch (error) {
       console.error('Failed to verify function status:', error);
     }
-  }, 3000);
+  }, 5000); // Increased delay to allow auth to load
 }
 
 export default FunctionStatusVerifier;

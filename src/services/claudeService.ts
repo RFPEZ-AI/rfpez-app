@@ -181,20 +181,7 @@ export class ClaudeService {
     onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean) => void
   ): Promise<ClaudeResponse> {
     
-    // CRITICAL: Check for RFP keywords IMMEDIATELY before any async operations
-    const lastUserMessage = conversationHistory[conversationHistory.length - 1] || { content: userMessage };
-    const userMessageContent = typeof lastUserMessage.content === 'string' ? lastUserMessage.content : userMessage;
-    const rfpKeywords = [
-      'create rfp', 'rfp for', 'procurement', 'procure', 'sourcing', 'source', 
-      'bid for', 'proposal for', 'vendor for', 'need to source',
-      'looking for', 'find supplier', 'find vendor', 'buy',
-      'purchase', 'need to buy', 'need to purchase', 'need to find',
-      'need to get', 'require', 'looking to', 'want to source',
-      'want to buy', 'want to purchase', 'need to procure'
-    ];
-    const shouldForceFunctionCall = rfpKeywords.some(keyword => 
-      userMessageContent.toLowerCase().includes(keyword.toLowerCase())
-    );
+
 
     // Check if function calling is needed for this message type
     
@@ -267,7 +254,7 @@ CONVERSATION MANAGEMENT (via MCP Server):
 - Access recent sessions (get_recent_sessions)
 
 AGENT MANAGEMENT:
-- Get available agents in the system (get_available_agents)
+- Get available agents in the system (get_available_agents) - ALWAYS show agent IDs when listing
 - Check which agent is currently active (get_current_agent)
 - Switch to a different agent when appropriate (switch_agent)
 - Recommend the best agent for specific topics (recommend_agent)
@@ -321,6 +308,19 @@ RFP MANAGEMENT FUNCTIONS - USE THESE ACTIVELY:
 
 Be helpful, accurate, and professional. When switching agents, make the transition smooth and explain the benefits.`;
 
+      // 🔍 DEBUG: Log the system prompt being sent to Claude
+      console.log('🔍 SYSTEM PROMPT DEBUG:', {
+        agentName: agent.name,
+        agentRole: agent.role,
+        instructionsLength: agent.instructions?.length || 0,
+        hasRfpCreationRule: (agent.instructions || '').includes('CRITICAL RFP CREATION RULE'),
+        hasCreateAndSetRfp: (agent.instructions || '').includes('create_and_set_rfp'),
+        hasTriggerWords: (agent.instructions || '').includes('MANDATORY TRIGGER WORDS'),
+        systemPromptLength: systemPrompt.length,
+        systemPromptPreview: systemPrompt.substring(0, 300) + '...',
+        fullSystemPrompt: systemPrompt // TEMPORARY - remove after debugging
+      });
+
       let response: Message | undefined = undefined;
       let streamedContent = '';
 
@@ -355,7 +355,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                 system: systemPrompt,
                 messages: validatedMessages,
                 tools: claudeApiFunctions,
-                tool_choice: shouldForceFunctionCall ? { type: 'any' } : { type: 'auto' }
+                tool_choice: { type: 'auto' }
               }, apiOptions);
             },
             {
@@ -932,7 +932,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
               system: systemPrompt,
               messages: validatedMessages,
               tools: claudeApiFunctions,
-              tool_choice: shouldForceFunctionCall ? { type: 'any' } : { type: 'auto' }
+              tool_choice: { type: 'auto' }
             }, apiOptions);
           },
           {

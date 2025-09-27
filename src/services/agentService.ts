@@ -167,8 +167,7 @@ export class AgentService {
       .from('agents')
       .select('*')
       .eq('is_active', true)
-      .eq('is_default', true)
-      .single();
+      .eq('is_default', true);
 
     if (error) {
       console.error('Error fetching default agent:', error);
@@ -177,8 +176,17 @@ export class AgentService {
       return agents.length > 0 ? agents[0] : null;
     }
 
-    console.log('Default agent fetched:', data);
-    return data;
+    // Handle multiple results by taking the first one
+    if (data && data.length > 0) {
+      if (data.length > 1) {
+        console.warn('Multiple default agents found, taking first one');
+      }
+      console.log('Default agent fetched:', data[0]);
+      return data[0];
+    }
+    
+    console.log('No default agent found');
+    return null;
   }
 
   /**
@@ -191,15 +199,50 @@ export class AgentService {
       .from('agents')
       .select('*')
       .eq('id', agentId)
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
 
     if (error) {
       console.error('Error fetching agent by ID:', error);
       return null;
     }
 
-    return data;
+    // Handle multiple results by taking the first one
+    if (data && data.length > 0) {
+      if (data.length > 1) {
+        console.warn('Multiple agents found with same ID:', agentId, 'taking first one');
+      }
+      return data[0];
+    }
+
+    return null;
+  }
+
+  /**
+   * Get agent by name (case-insensitive)
+   */
+  static async getAgentByName(agentName: string): Promise<Agent | null> {
+    console.log('AgentService.getAgentByName called with:', agentName);
+    
+    const { data, error } = await supabase
+      .from('agents')
+      .select('*')
+      .ilike('name', agentName)
+      .eq('is_active', true);
+
+    if (error) {
+      console.error('Error fetching agent by name:', error);
+      return null;
+    }
+
+    // Handle multiple results by taking the first one
+    if (data && data.length > 0) {
+      if (data.length > 1) {
+        console.warn('Multiple agents found with name:', agentName, 'taking first one');
+      }
+      return data[0];
+    }
+
+    return null;
   }
 
   /**
@@ -231,28 +274,35 @@ export class AgentService {
     console.log('AgentService.setSessionAgent called with:', { sessionId, agentId, supabaseUserId });
     
     // First verify the agent exists
-    const { data: agent, error: agentError } = await supabase
+    const { data: agents, error: agentError } = await supabase
       .from('agents')
       .select('id')
       .eq('id', agentId)
-      .eq('is_active', true)
-      .single();
+      .eq('is_active', true);
 
-    if (agentError || !agent) {
+    if (agentError || !agents || agents.length === 0) {
       console.error('Agent not found or inactive:', agentId, agentError);
       return false;
     }
     
+    if (agents.length > 1) {
+      console.warn('Multiple agents found with same ID during setSessionAgent:', agentId);
+    }
+    
     // Get the user profile to get the internal ID
-    const { data: userProfile, error: profileError } = await supabase
+    const { data: userProfiles, error: profileError } = await supabase
       .from('user_profiles')
       .select('id')
-      .eq('supabase_user_id', supabaseUserId)
-      .single();
+      .eq('supabase_user_id', supabaseUserId);
 
-    if (profileError || !userProfile) {
+    if (profileError || !userProfiles || userProfiles.length === 0) {
       console.error('User profile not found for Supabase user ID:', supabaseUserId);
       return false;
+    }
+    
+    const userProfile = userProfiles[0];
+    if (userProfiles.length > 1) {
+      console.warn('Multiple user profiles found for Supabase user ID:', supabaseUserId);
     }
 
     const { data, error } = await supabase
@@ -337,16 +387,17 @@ export class AgentService {
     const { data, error } = await supabase
       .from('agents')
       .insert(agent)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       console.error('Error creating agent:', error);
       return null;
     }
 
-    console.log('Agent created successfully:', data);
-    return data;
+    // Handle array result from insert
+    const createdAgent = data && data.length > 0 ? data[0] : null;
+    console.log('Agent created successfully:', createdAgent);
+    return createdAgent;
   }
 
   /**
@@ -359,13 +410,12 @@ export class AgentService {
     console.log('AgentService.updateAgent called with:', { agentId, updates });
     
     // First check if the agent exists
-    const { data: existingAgent, error: checkError } = await supabase
+    const { data: existingAgents, error: checkError } = await supabase
       .from('agents')
       .select('id')
-      .eq('id', agentId)
-      .single();
+      .eq('id', agentId);
 
-    if (checkError || !existingAgent) {
+    if (checkError || !existingAgents || existingAgents.length === 0) {
       console.error('Agent not found for update:', agentId, checkError);
       return null;
     }
@@ -374,8 +424,7 @@ export class AgentService {
       .from('agents')
       .update(updates)
       .eq('id', agentId)
-      .select()
-      .single();
+      .select();
 
     if (error) {
       console.error('Error updating agent:', error);
@@ -387,8 +436,10 @@ export class AgentService {
       return null;
     }
 
-    console.log('Agent updated successfully:', data);
-    return data;
+    // Handle array result from update
+    const updatedAgent = data && data.length > 0 ? data[0] : null;
+    console.log('Agent updated successfully:', updatedAgent);
+    return updatedAgent;
   }
 
   /**

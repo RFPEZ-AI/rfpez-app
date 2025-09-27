@@ -2,8 +2,6 @@
 // Claude API Edge Function v2 - Hybrid Architecture
 // Handles Claude API calls with client callback system
 
-/// <reference types="https://deno.land/x/types/deno.d.ts" />
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.29.0';
@@ -33,51 +31,10 @@ interface EdgeFunctionResponse {
   message?: string;
 }
 
-// Initialize Supabase client with timeout configurations
+// Initialize Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-
-// Configure Supabase client with database timeout settings
-const supabase = createClient(supabaseUrl, supabaseServiceKey, {
-  db: {
-    schema: 'public'
-  },
-  auth: {
-    persistSession: false // Disable session persistence for edge functions
-  },
-  global: {
-    headers: {
-      'X-Client-Info': 'supabase-edge-function'
-    }
-  }
-});
-
-// Database timeout utility - wraps database operations with timeout
-function withDatabaseTimeout<T>(operation: Promise<T>, timeoutMs: number = 25000): Promise<T> {
-  return Promise.race([
-    operation,
-    new Promise<T>((_, reject) => {
-      setTimeout(() => {
-        reject(new Error(`Database operation timeout after ${timeoutMs}ms`));
-      }, timeoutMs);
-    })
-  ]);
-}
-
-// Database operation wrapper with automatic timeout
-function dbQuery<T>(queryOperation: () => Promise<T>, operationName: string = 'Unknown'): Promise<T> {
-  console.log(`🔍 DB QUERY START: ${operationName} at ${new Date().toISOString()}`);
-  
-  return withDatabaseTimeout(queryOperation(), 25000)
-    .then(result => {
-      console.log(`✅ DB QUERY SUCCESS: ${operationName} at ${new Date().toISOString()}`);
-      return result;
-    })
-    .catch(error => {
-      console.error(`❌ DB QUERY FAILED: ${operationName} at ${new Date().toISOString()}:`, error);
-      throw error;
-    });
-}
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 // Initialize Anthropic client with server-side API key
 const anthropicApiKey = Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('CLAUDE_API_KEY');
@@ -127,20 +84,6 @@ class ClaudeAPIHandler {
   }): Promise<any> {
     console.log('🤖 Generating non-streaming Claude response');
     
-    // 🔍 DEBUG: Log system prompt details
-    console.log('🔍 CLAUDE API SYSTEM PROMPT DEBUG:', {
-      hasSystem: !!params.system,
-      systemLength: params.system?.length || 0,
-      hasRfpCreationRule: (params.system || '').includes('CRITICAL RFP CREATION RULE'),
-      hasCreateAndSetRfp: (params.system || '').includes('create_and_set_rfp'),
-      hasTriggerWords: (params.system || '').includes('MANDATORY TRIGGER WORDS'),
-      systemPreview: params.system?.substring(0, 300) + '...',
-      // 🔧 DEBUG: Show more of the RFP creation rules to verify they're complete
-      rfpRulesSection: params.system?.includes('CRITICAL RFP CREATION RULE') 
-        ? params.system.split('CRITICAL RFP CREATION RULE')[1]?.substring(0, 800) + '...'
-        : 'RFP rules not found'
-    });
-    
     try {
       const response = await anthropic.messages.create({
         model: params.model || 'claude-3-5-sonnet-20241022',
@@ -177,49 +120,10 @@ class ClaudeAPIHandler {
   }): Promise<ReadableStream> {
     console.log('🌊 Generating streaming Claude response');
     
-    // Note: Removed conditional tool_choice logic to match client behavior
-    // The agent instructions contain proper trigger rules for RFP creation
-    // Claude will use tools based on system prompt instructions and user requests
-
     const stream = new ReadableStream({
       start(controller) {
         (async () => {
           try {
-            // 🔍 DEBUG: Log streaming system prompt details
-            console.log('🔍 CLAUDE STREAMING API SYSTEM PROMPT DEBUG:', {
-              hasSystem: !!params.system,
-              systemLength: params.system?.length || 0,
-              hasRfpCreationRule: (params.system || '').includes('CRITICAL RFP CREATION RULE'),
-              hasCreateAndSetRfp: (params.system || '').includes('create_and_set_rfp'),
-              hasTriggerWords: (params.system || '').includes('MANDATORY TRIGGER WORDS'),
-              systemPreview: params.system?.substring(0, 300) + '...',
-              // 🔧 DEBUG: Show more of the RFP creation rules to verify they're complete
-              rfpRulesSection: params.system?.includes('CRITICAL RFP CREATION RULE') 
-                ? params.system.split('CRITICAL RFP CREATION RULE')[1]?.substring(0, 800) + '...'
-                : 'RFP rules not found',
-              // 🚨 TOOL DEBUG: Check if create_and_set_rfp tool is available
-              toolsCount: params.tools?.length || 0,
-              hasCreateAndSetRfpTool: params.tools?.some((tool: any) => tool.name === 'create_and_set_rfp') || false,
-              userMessage: params.messages?.[params.messages.length - 1]?.content || 'no user message',
-              messageCount: params.messages?.length || 0,
-              allToolNames: params.tools?.map((tool: any) => tool.name).join(', ') || 'no tools'
-            });
-            
-            // 🚨 DYNAMIC TOOL CHOICE: Force tool usage when RFP keywords detected
-            const lastUserMessage = params.messages?.[params.messages.length - 1]?.content?.toLowerCase() || '';
-            const hasRfpKeywords = ['rfp', 'create an rfp', 'make an rfp', 'procurement', 'sourcing'].some(keyword => 
-              lastUserMessage.includes(keyword)
-            );
-            const toolChoice = hasRfpKeywords && params.tools?.some((tool: any) => tool.name === 'create_and_set_rfp')
-              ? { type: 'any' }  // Force tool usage when RFP creation is needed
-              : { type: 'auto' }; // Normal auto behavior otherwise
-            
-            console.log('🎯 TOOL CHOICE DEBUG:', { 
-              hasRfpKeywords, 
-              toolChoice, 
-              lastUserMessage: lastUserMessage.substring(0, 100) 
-            });
-
             const stream = await anthropic.messages.create({
               model: params.model || 'claude-3-5-sonnet-20241022',
               max_tokens: params.max_tokens || 4000,
@@ -227,7 +131,6 @@ class ClaudeAPIHandler {
               system: params.system,
               messages: params.messages,
               tools: params.tools,
-              tool_choice: toolChoice,
               stream: true,
             });
 
@@ -238,7 +141,6 @@ class ClaudeAPIHandler {
             let currentToolUse: any = null;
             let toolResults: any[] = [];
             let toolsExecuted = false;
-            let anyToolsDetected = false;
             let contentBlocksFinished = 0;
             let totalContentBlocks = 0;
 
@@ -256,10 +158,7 @@ class ClaudeAPIHandler {
                   
                 } else if (messageStreamEvent.type === 'content_block_start') {
                   totalContentBlocks++;
-                  console.log('🔍 TOOL DEBUG - Content block start:', messageStreamEvent.content_block?.type);
                   if (messageStreamEvent.content_block?.type === 'tool_use') {
-                    console.log('🔧 TOOL DEBUG - Tool use detected:', messageStreamEvent.content_block.name);
-                    anyToolsDetected = true; // Mark that we found tools - prevent message_stop from completing
                     currentToolUse = {
                       id: messageStreamEvent.content_block.id,
                       name: messageStreamEvent.content_block.name,
@@ -270,27 +169,18 @@ class ClaudeAPIHandler {
                 } else if (messageStreamEvent.type === 'content_block_delta') {
                   if (messageStreamEvent.delta?.type === 'text_delta') {
                     const textChunk = messageStreamEvent.delta.text;
+                    fullContent += textChunk;
+                    tokenCount++;
                     
-                    // CRITICAL FIX: Don't accumulate or send text chunks when tools are expected
-                    // This prevents truncated responses from being sent to the client
-                    if (!anyToolsDetected) {
-                      fullContent += textChunk;
-                      tokenCount++;
-                      
-                      // Send text chunk only if no tools are involved
-                      const sseData = JSON.stringify({
-                        type: 'content_delta',
-                        delta: textChunk,
-                        full_content: fullContent,
-                        token_count: tokenCount,
-                      });
-                      const encoder = new TextEncoder();
-                      controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
-                    } else {
-                      // Tools detected - suppress text deltas but still count tokens
-                      tokenCount++;
-                      console.log('🚫 TOOL BYPASS - Suppressing text delta due to tool detection:', textChunk.substring(0, 50));
-                    }
+                    // Send text chunk
+                    const sseData = JSON.stringify({
+                      type: 'content_delta',
+                      delta: textChunk,
+                      full_content: fullContent,
+                      token_count: tokenCount,
+                    });
+                    const encoder = new TextEncoder();
+                    controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
                     
                   } else if (messageStreamEvent.delta?.type === 'input_json_delta') {
                     if (currentToolUse) {
@@ -306,11 +196,8 @@ class ClaudeAPIHandler {
                   
                 } else if (messageStreamEvent.type === 'content_block_stop') {
                   contentBlocksFinished++;
-                  console.log('🏁 TOOL DEBUG - Content block stop, currentToolUse:', currentToolUse?.name);
                   
                   if (currentToolUse) {
-                    const toolName = currentToolUse?.name || 'Unknown Tool';
-                    console.log('🚀 TOOL DEBUG - Executing tool:', toolName);
                     try {
                       currentToolUse.input = JSON.parse(currentToolUse.partial_input || '{}');
                       delete currentToolUse.partial_input;
@@ -324,58 +211,44 @@ class ClaudeAPIHandler {
                       controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
                       
                       // Execute tool function (if available)
-                      console.log(`🔧 DEBUG - Executing tool in streaming context: ${toolName}`);
+                      console.log(`🔧 DEBUG - Executing tool in streaming context: ${currentToolUse.name}`);
                       
                       try {
-                        console.log(`🔧 Starting tool execution: ${toolName} at ${new Date().toISOString()}`);
-                        
-                        // Add 30-second timeout to tool execution
-                        const toolExecutionPromise = handleFunction({
-                          functionName: toolName,
-                          parameters: currentToolUse?.input || {},
+                        // Execute the tool using our handleFunction system
+                        const toolResult = await handleFunction({
+                          functionName: currentToolUse.name,
+                          parameters: currentToolUse.input,
                           sessionContext: params.sessionContext
-                        }, params.userId || 'anonymous');
-                        const timeoutPromise = new Promise((_, reject) => {
-                          setTimeout(() => {
-                            reject(new Error(`Tool execution timeout after 30 seconds for ${toolName}`));
-                          }, 30000);
-                        });
-                        
-                        // Execute the tool with timeout
-                        const toolResult = await Promise.race([toolExecutionPromise, timeoutPromise]);
-                        
-                        console.log(`✅ Tool execution completed: ${toolName} at ${new Date().toISOString()}`);
-                        
-                        const typedResult = toolResult as EdgeFunctionResponse;
+                        }, params.userId || 'anonymous'); // Use the actual authenticated user ID
                         
                         console.log(`✅ DEBUG - Tool execution result:`, {
-                          functionName: toolName,
-                          success: typedResult.success,
-                          hasCallbacks: typedResult.clientCallbacks && typedResult.clientCallbacks.length > 0
+                          functionName: currentToolUse.name,
+                          success: toolResult.success,
+                          hasCallbacks: toolResult.clientCallbacks && toolResult.clientCallbacks.length > 0
                         });
                         
                         toolResults.push({
-                          tool_call_id: currentToolUse?.id || 'unknown',
-                          tool_name: toolName,
+                          tool_call_id: currentToolUse.id,
+                          tool_name: currentToolUse.name,
                           tool_input: currentToolUse.input,
-                          result: typedResult
+                          result: toolResult
                         });
                         
                         // Send tool result through streaming
                         const toolResultData = JSON.stringify({
                           type: 'tool_result',
                           tool_call_id: currentToolUse.id,
-                          result: typedResult,
+                          result: toolResult,
                         });
                         controller.enqueue(encoder.encode(`data: ${toolResultData}\n\n`));
                         
                         // If there are client callbacks, send them through streaming
-                        if (typedResult.clientCallbacks && typedResult.clientCallbacks.length > 0) {
-                          console.log(`📤 DEBUG - Sending ${typedResult.clientCallbacks.length} callbacks through streaming`);
+                        if (toolResult.clientCallbacks && toolResult.clientCallbacks.length > 0) {
+                          console.log(`📤 DEBUG - Sending ${toolResult.clientCallbacks.length} callbacks through streaming`);
                           
                           const callbackData = JSON.stringify({
                             type: 'client_callbacks',
-                            callbacks: typedResult.clientCallbacks,
+                            callbacks: toolResult.clientCallbacks,
                           });
                           controller.enqueue(encoder.encode(`data: ${callbackData}\n\n`));
                         }
@@ -383,12 +256,12 @@ class ClaudeAPIHandler {
                         toolsExecuted = true;
                         
                       } catch (toolError) {
-                        console.error(`❌ Tool execution error for ${toolName}:`, toolError);
+                        console.error(`❌ Tool execution error for ${currentToolUse.name}:`, toolError);
                         
                         const errorMessage = toolError instanceof Error ? toolError.message : String(toolError);
                         toolResults.push({
-                          tool_call_id: currentToolUse?.id || 'unknown',
-                          tool_name: toolName,
+                          tool_call_id: currentToolUse.id,
+                          tool_name: currentToolUse.name,
                           tool_input: currentToolUse.input,
                           error: errorMessage
                         });
@@ -414,111 +287,120 @@ class ClaudeAPIHandler {
                   if (contentBlocksFinished >= totalContentBlocks) {
                     console.log(`🔍 All content blocks finished: ${contentBlocksFinished}/${totalContentBlocks}, toolsExecuted: ${toolsExecuted}, toolResults: ${toolResults.length}`);
                     
-                    // If tools were executed, generate a fresh response and send through streaming
+                    // If tools were executed, send tool results directly as completion
                     if (toolsExecuted && toolResults.length > 0) {
-                      console.log('🚀 FRESH TOOL RESPONSE - Tools executed, generating fresh response');
-                      console.log('🚀 FRESH DEBUG - tool results:', JSON.stringify(toolResults, null, 2));
+                      console.log('� DEBUG - Tools executed, tool results:', JSON.stringify(toolResults, null, 2));
                       
-                      // Format tool results for user-friendly display
-                      let formattedResponse = '';
+                      // Create tool result messages for Claude continuation
+                      const toolResultMessages = toolResults.map(tr => ({
+                        type: 'tool_result',
+                        tool_use_id: tr.tool_call_id,
+                        content: tr.error ? 
+                          `Error: ${tr.error}` : 
+                          typeof (tr.result.data || tr.result) === 'object' ?
+                          JSON.stringify(tr.result.data || tr.result, null, 2) :
+                          String(tr.result.data || tr.result)
+                      }));
                       
-                      // For get_available_agents, use the enhanced function result with IDs
-                      const agentTool = toolResults.find(tr => tr.tool_name === 'get_available_agents');
-                      const switchAgentTool = toolResults.find(tr => tr.tool_name === 'switch_agent');
+                      // Add tool results to the conversation and continue with Claude
+                      const continuationMessages = [
+                        ...params.messages,
+                        {
+                          role: 'assistant',
+                          content: [
+                            { type: 'text', text: fullContent },
+                            ...toolResults.map(tr => ({
+                              type: 'tool_use',
+                              id: tr.tool_call_id,
+                              name: tr.tool_name,
+                              input: tr.tool_input
+                            }))
+                          ]
+                        },
+                        {
+                          role: 'user',
+                          content: toolResultMessages
+                        }
+                      ];
                       
-                      if (agentTool && !agentTool.error) {
-                        console.log('📋 FRESH RESPONSE - Using enhanced agent list with IDs');
-                        
-                        const agentData = agentTool.result;
-                        console.log('📋 DEBUG - Agent data received:', JSON.stringify(agentData, null, 2));
-                        
-                        // Handle both direct result and nested data structure
-                        const data = agentData.data || agentData;
-                        console.log('📋 DEBUG - Processed data structure:', { 
-                          hasFormattedList: !!data?.formatted_agent_list, 
-                          hasAgents: !!data?.agents,
-                          agentCount: data?.agents?.length || 0
+                      console.log('🔄 Starting continuation stream with tool results');
+                      
+                      try {
+                        // Start a new streaming request with tool results
+                        const continuationStream = await anthropic.messages.create({
+                          model: params.model || 'claude-3-5-sonnet-20241022',
+                          max_tokens: params.max_tokens || 4000,
+                          temperature: params.temperature || 0.7,
+                          system: params.system,
+                          messages: continuationMessages,
+                          tools: params.tools,
+                          stream: true,
                         });
                         
-                        // Use the pre-formatted agent list that includes IDs
-                        if (data && data.formatted_agent_list) {
-                          console.log('📋 DEBUG - Using formatted_agent_list');
-                          formattedResponse = data.formatted_agent_list;
-                        } else if (data && data.agents) {
-                          console.log('📋 DEBUG - Using manual formatting with agents array');
-                          // Enhanced formatting with IDs prominently displayed
-                          formattedResponse = 'Available agents (use ID for switching):\n\n';
-                          data.agents.forEach((agent: any) => {
-                            formattedResponse += `🤖 **${agent.name}** (ID: ${agent.id})\n`;
-                            formattedResponse += `   Access: ${agent.access_level || 'public'}\n`;
-                            formattedResponse += `   Role: ${agent.role || 'Assistant'}\n`;
-                            if (agent.instructions && agent.instructions.includes('Description:')) {
-                              const desc = agent.instructions.split('Description:')[1]?.split('\n')[0]?.trim() || 'AI Assistant';
-                              formattedResponse += `   Description: ${desc}\n\n`;
-                            } else {
-                              formattedResponse += `   Description: AI Assistant\n\n`;
-                            }
-                          });
-                          formattedResponse += '\n💡 To switch agents, use: switch_agent with the agent ID above';
-                        } else {
-                          // This should not happen with enhanced function
-                          formattedResponse = 'No agents available or error retrieving agent data.';
-                          formattedResponse += '**Technical Support** (public)\n';
-                          formattedResponse += 'Role: Technical Support\n';
-                          formattedResponse += 'Description: Provides technical assistance and troubleshooting\n\n';
+                        // Process continuation stream
+                        for await (const continuationEvent of continuationStream) {
+                          if (continuationEvent.type === 'content_block_delta' && 
+                              continuationEvent.delta?.type === 'text_delta') {
+                            const textChunk = continuationEvent.delta.text;
+                            fullContent += textChunk;
+                            tokenCount++;
+                            
+                            console.log(`📝 CONTINUATION DEBUG - Text chunk: "${textChunk}", Full content length: ${fullContent.length}`);
+                            
+                            // Send continuation text chunk
+                            const sseData = JSON.stringify({
+                              type: 'content_delta',
+                              delta: textChunk,
+                              full_content: fullContent,
+                              token_count: tokenCount,
+                            });
+                            const encoder = new TextEncoder();
+                            controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                            
+                          } else if (continuationEvent.type === 'message_stop') {
+                            console.log(`✅ Continuation stream completed - Final content length: ${fullContent.length}`);
+                            console.log(`📝 CONTINUATION DEBUG - Final full content: "${fullContent}"`);
+                            
+                            // Send final completion
+                            const sseData = JSON.stringify({
+                              type: 'complete',
+                              full_content: fullContent,
+                              token_count: tokenCount,
+                              tool_results: toolResults,
+                            });
+                            const encoder = new TextEncoder();
+                            controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                            
+                            console.log('✅ Claude streaming response completed with tool continuation');
+                            
+                            controller.close();
+                            return;
+                          }
                         }
+                      } catch (continuationError) {
+                        console.error('❌ Continuation stream error:', continuationError);
                         
-                        console.log('📋 FRESH RESPONSE - Formatted response length:', formattedResponse.length);
-                      } else if (switchAgentTool && !switchAgentTool.error) {
-                        console.log('🔄 FRESH RESPONSE - Agent switch formatting');
-                        
-                        const switchResult = switchAgentTool.result;
-                        if (switchResult.success && switchResult.new_agent) {
-                          const agentName = switchResult.new_agent.name || 'Unknown Agent';
-                          formattedResponse = `Successfully switched to ${agentName}. I'm now ready to help you with ${agentName.toLowerCase()} tasks.`;
-                        } else {
-                          formattedResponse = switchResult.message || 'Agent switch completed.';
-                        }
-                        
-                        console.log('🔄 FRESH RESPONSE - Switch formatted response:', formattedResponse);
-                      } else {
-                        // For other tools, show formatted results
-                        const directToolSummary = toolResults.map(tr => {
+                        // Fall back to sending tool results as completion
+                        const fallbackSummary = toolResults.map(tr => {
                           const result = tr.error ? `Error: ${tr.error}` : JSON.stringify(tr.result.data || tr.result, null, 2);
                           return `${tr.tool_name}: ${result}`;
                         }).join('\n\n');
-                        formattedResponse = 'Tool Results:\n' + directToolSummary;
+                        
+                        const sseData = JSON.stringify({
+                          type: 'complete',
+                          full_content: fullContent + '\n\nTool Results:\n' + fallbackSummary,
+                          token_count: tokenCount,
+                          tool_results: toolResults,
+                        });
+                        const encoder = new TextEncoder();
+                        controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
+                        
+                        console.log('✅ Claude streaming response completed with fallback tool results');
+                        
+                        controller.close();
                       }
                       
-                      console.log('🏁 FRESH RESPONSE - Final response length:', formattedResponse.length);
-                      console.log('🏁 FRESH RESPONSE - Final response preview:', formattedResponse.substring(0, 100));
-                      
-                      // CRITICAL: Replace fullContent with fresh response to prevent truncation
-                      fullContent = formattedResponse;
-                      
-                      // Send the fresh response through streaming instead of returning a Response
-                      const freshResponseData = JSON.stringify({
-                        type: 'fresh_response',
-                        content: formattedResponse,
-                        token_count: tokenCount,
-                        tool_results: toolResults,
-                      });
-                      const encoder = new TextEncoder();
-                      controller.enqueue(encoder.encode(`data: ${freshResponseData}\n\n`));
-                      
-                      // Send completion event with the fresh content
-                      const completionData = JSON.stringify({
-                        type: 'complete',
-                        full_content: formattedResponse,
-                        token_count: tokenCount,
-                        tool_results: toolResults,
-                        fresh_response: true
-                      });
-                      controller.enqueue(encoder.encode(`data: ${completionData}\n\n`));
-                      
-                      console.log('✅ Claude streaming response completed with fresh tool response');
-                      controller.close();
-                      return;
+                      return; // Exit after continuation is complete
                     }
                     
                     // If no tools were executed, we're done
@@ -556,14 +438,13 @@ class ClaudeAPIHandler {
                 } else if (messageStreamEvent.type === 'message_stop') {
                   console.log(`🛑 Message stop event - toolsExecuted: ${toolsExecuted}, toolResults: ${toolResults.length}`);
                   
-                  // NEVER complete here if any tools were detected at all
-                  // Let content_block_stop handle ALL tool-related completions
-                  if (anyToolsDetected) {
-                    console.log('🔄 Message stopped but tools detected - content_block_stop will handle all completions');
+                  // Don't complete here if tools were executed - let content_block_stop handle continuation
+                  if (toolsExecuted && toolResults.length > 0) {
+                    console.log('🔄 Message stopped but tools executed - content_block_stop will handle completion');
                     return;
                   }
                   
-                  // Only complete if absolutely no tools were detected anywhere
+                  // Only complete if no tools were executed
                   const sseData = JSON.stringify({
                     type: 'complete',
                     full_content: fullContent,
@@ -573,7 +454,7 @@ class ClaudeAPIHandler {
                   const encoder = new TextEncoder();
                   controller.enqueue(encoder.encode(`data: ${sseData}\n\n`));
                   
-                  console.log('✅ Claude streaming response completed (no tools detected anywhere)');
+                  console.log('✅ Claude streaming response completed (no tools)');
                   
                   controller.close();
                   return;
@@ -1056,212 +937,215 @@ class DatabaseHandler {
     };
   }
 
-  // Create and set RFP function - OPTIMIZED for performance (under 30 seconds)
+  // Create and set RFP function - server-side implementation for performance
   async createAndSetRfp(params: any, userId: string, sessionContext?: { sessionId: string; timestamp: string }) {
     const startTime = Date.now();
-    console.log('� OPTIMIZED createAndSetRfp called:', { name: params?.name, userId });
+    console.log('🔍 DEBUG: createAndSetRfp called with params:', JSON.stringify(params, null, 2));
+    console.log('🔍 DEBUG: createAndSetRfp called with userId:', userId);
     
-    // Quick parameter validation
-    if (!params?.name || typeof params.name !== 'string' || params.name.trim() === '') {
-      throw new Error('RFP name is required and must be a non-empty string');
+    // Robust parameter validation
+    if (!params || typeof params !== 'object') {
+      throw new Error('Invalid parameters provided to createAndSetRfp. Expected object with at least a name field.');
     }
     
     const { name, description = '', specification = '', due_date = null } = params;
     
-    console.log('� DEBUG: Parameters validated and extracted:', { name, description, specification, due_date, userId });
+    console.log('🚀 Creating and setting new RFP:', { name, userId });
+    
+    if (!name || typeof name !== 'string' || name.trim() === '') {
+      console.error('❌ DEBUG: Invalid name parameter:', { name, params });
+      throw new Error(`RFP name is required and must be a non-empty string. Received: ${typeof name === 'string' ? `"${name}"` : typeof name}`);
+    }
     
     try {
-      // OPTIMIZED: Single database operation to get user profile AND create session if needed
-      console.log(`⏱️ [${new Date().toISOString()}] Step 1: Getting user profile...`);
-      
-      // Get user profile with current_session_id (with timeout and detailed debugging)
-      console.log(`🔍 DEBUG: About to query user_profiles table for userId: ${userId}`);
-      
-      console.log('🔍 DEBUG: About to execute user profile query');
-      
-      const profileResult = await dbQuery(
-        () => {
-          console.log(`🔍 DEBUG: Executing user_profiles query at ${new Date().toISOString()}`);
-          return supabase
-            .from('user_profiles')
-            .select('id, current_session_id')
-            .eq('supabase_user_id', userId)
-            .single();
-        },
-        'Get user profile'
-      ) as any;
-      const { data: profile, error: profileError } = profileResult;
-      
-      console.log(`🔍 DEBUG: user_profiles query completed at ${new Date().toISOString()}`, { 
-        success: !profileError, 
-        profileId: profile?.id, 
-        error: profileError?.message 
-      });
-      
-      console.log('🔍 DEBUG: Profile query result processed');
-      
-      console.log(`⏱️ [${new Date().toISOString()}] Step 1 COMPLETE: User profile retrieved`, { profileId: profile?.id, hasSession: !!profile?.current_session_id });
+      // Step 1: Get the user profile and current session ID
+      console.log('⏱️ TIMING: Starting Step 1 - Get user profile and session at', Date.now() - startTime, 'ms');
+      const { data: profile, error: profileError } = await supabase
+        .from('user_profiles')
+        .select('id, current_session_id')
+        .eq('supabase_user_id', userId)
+        .single();
       
       if (profileError || !profile) {
-        throw new Error('User profile not found');
+        throw new Error('User profile not found. Please ensure you are authenticated.');
       }
       
-      // Use existing session or session context, create new session only if absolutely necessary
-      let session_id = profile.current_session_id || sessionContext?.sessionId;
-      console.log(`⏱️ [${new Date().toISOString()}] Step 2: Session handling - existing: ${session_id}`);
+      let session_id = profile.current_session_id;
       
-      // If no session exists, create one - but don't wait for RPC call
+      // Step 1a: Use session context as fallback if available
+      if (!session_id && sessionContext?.sessionId) {
+        console.log('⚡ Using session context as fallback:', sessionContext.sessionId);
+        session_id = sessionContext.sessionId;
+        
+        // Verify this session exists and belongs to the user
+        const { data: sessionCheck } = await supabase
+          .from('sessions')
+          .select('id')
+          .eq('id', session_id)
+          .eq('user_id', profile.id)
+          .single();
+        
+        if (sessionCheck) {
+          console.log('✅ Session context verified, setting as current session');
+          // Set as current session in user profile
+          await supabase.rpc('set_user_current_session', {
+            user_uuid: userId,
+            session_uuid: session_id
+          });
+        } else {
+          console.log('⚠️ Session context invalid, will create new session');
+          session_id = null;
+        }
+      }
+      
+      // Step 1b: If still no current session, create one automatically
       if (!session_id) {
-        console.log(`⏱️ [${new Date().toISOString()}] Step 2a: Creating new session...`);
-        console.log(`🔍 DEBUG: About to insert into sessions table for profile.id: ${profile.id}`);
+        console.log('⚠️ No current session found, creating new session automatically');
+        console.log('⏱️ TIMING: Starting Step 1a - Auto-create session at', Date.now() - startTime, 'ms');
         
-        console.log('🔍 DEBUG: About to create new session');
-        
-        const sessionInsertResult = await dbQuery(
-          () => {
-            console.log(`🔍 DEBUG: Executing sessions insert at ${new Date().toISOString()}`);
-            return supabase
-              .from('sessions')
-              .insert({
-                user_id: profile.id,
-                title: `RFP Session - ${name}`,
-                description: 'Auto-created for RFP'
-              })
-              .select('id')
-              .single();
-          },
-          'Create new session'
-        ) as any;
-        
-        const { data: newSession, error: sessionError } = sessionInsertResult;
-        
-        console.log(`🔍 DEBUG: sessions insert completed at ${new Date().toISOString()}`, {
-          success: !sessionError,
-          sessionId: newSession?.id,
-          error: sessionError?.message
-        });
-        console.log(`⏱️ [${new Date().toISOString()}] Step 2a COMPLETE: New session created`, { sessionId: newSession?.id });
+        const { data: newSession, error: sessionError } = await supabase
+          .from('sessions')
+          .insert({
+            user_id: profile.id,
+            title: `RFP Session - ${name}`,
+            description: 'Auto-created session for RFP creation'
+          })
+          .select()
+          .single();
         
         if (sessionError) {
           throw new Error(`Failed to create session: ${sessionError.message}`);
         }
-        session_id = newSession.id;
         
-        // Set as current session asynchronously (don't wait)
-        supabase.rpc('set_user_current_session', {
-          user_uuid: userId,
-          session_uuid: session_id
-        }).catch((err: any) => console.warn('Non-critical: Failed to set current session:', err));
+        session_id = newSession.id;
+        console.log('✅ New session created:', session_id);
+        
+        // Set as current session in user profile
+        const { error: setSessionError } = await supabase
+          .rpc('set_user_current_session', {
+            user_uuid: userId,
+            session_uuid: session_id
+          });
+        
+        if (setSessionError) {
+          console.warn('⚠️ Failed to set as current session, but continuing with RFP creation:', setSessionError);
+        } else {
+          console.log('✅ Session set as current for user');
+        }
+        
+        console.log('⏱️ TIMING: Step 1a completed at', Date.now() - startTime, 'ms');
+      } else {
+        console.log('✅ Found existing current session:', session_id);
       }
       
-      // OPTIMIZED: Create RFP and update session in parallel
-      const defaultDueDate = new Date();
-      defaultDueDate.setDate(defaultDueDate.getDate() + 30);
+      console.log('⏱️ TIMING: Step 1 completed at', Date.now() - startTime, 'ms');
       
-      const rfpData = {
+      // Step 2: Verify session exists and check if it already has a current RFP
+      console.log('⏱️ TIMING: Starting Step 2 - Verify session at', Date.now() - startTime, 'ms');
+      const { data: currentSession, error: sessionError } = await supabase
+        .from('sessions')
+        .select('id, current_rfp_id, user_id')
+        .eq('id', session_id)
+        .single();
+      
+      if (sessionError || !currentSession) {
+        throw new Error('Session not found. Please ensure you have a valid session.');
+      }
+      
+      if (currentSession.current_rfp_id) {
+        console.log('⚠️ Session already has current RFP:', currentSession.current_rfp_id);
+      }
+      console.log('⏱️ TIMING: Step 2 completed at', Date.now() - startTime, 'ms');
+      
+      // Step 3: Create new RFP with supabase_insert
+      console.log('⏱️ TIMING: Starting Step 3 - Create RFP at', Date.now() - startTime, 'ms');
+      
+      // ✅ FIX: Provide required fields that match database schema
+      // Database schema requires: name, due_date, description, specification as NOT NULL
+      const defaultDueDate = new Date();
+      defaultDueDate.setDate(defaultDueDate.getDate() + 30); // Default 30 days from now
+      
+      const insertData: {
+        name: string;
+        description: string;
+        specification: string;
+        due_date: string;
+      } = {
         name: name.trim(),
-        description: description?.trim() || 'Created via AI assistant',
-        specification: specification?.trim() || 'To be specified',
-        due_date: due_date || defaultDueDate.toISOString().split('T')[0]
+        description: description && description.trim() ? description.trim() : 'RFP created via AI assistant. Details to be filled in.',
+        specification: specification && specification.trim() ? specification.trim() : 'Specification details to be provided.',
+        due_date: due_date || defaultDueDate.toISOString().split('T')[0] // YYYY-MM-DD format
       };
       
-      console.log(`⏱️ [${new Date().toISOString()}] Step 3: Starting parallel RFP creation and session validation...`);
-      console.log(`🔍 DEBUG: About to execute parallel operations - RFP insert and session validation`);
-      console.log(`🔍 DEBUG: RFP data:`, rfpData);
-      console.log(`🔍 DEBUG: Session ID to validate:`, session_id);
+      const { data: newRfp, error: insertError } = await supabase
+        .from('rfps')
+        .insert(insertData)
+        .select('id, name, description, specification, due_date, created_at')
+        .single();
       
-      console.log('🔍 DEBUG: About to execute parallel RFP creation and session validation');
-      
-      // Execute RFP creation and session update in parallel with timeout wrapper
-      const [rfpResult, sessionResult] = await Promise.all([
-        dbQuery(
-          () => {
-            console.log(`🔍 DEBUG: Executing RFP insert at ${new Date().toISOString()}`);
-            return supabase
-              .from('rfps')
-              .insert(rfpData)
-              .select('id, name, description, specification, due_date, created_at')
-              .single();
-          },
-          'Create RFP'
-        ),
-        dbQuery(
-          () => {
-            console.log(`🔍 DEBUG: Executing session validation at ${new Date().toISOString()}`);
-            return supabase
-              .from('sessions')
-              .select('id')
-              .eq('id', session_id)
-              .single();
-          },
-          'Validate session'
-        )
-      ]) as [any, any];
-      
-      console.log(`🔍 DEBUG: Parallel operations completed at ${new Date().toISOString()}`, {
-        rfpSuccess: !rfpResult.error,
-        rfpId: rfpResult.data?.id,
-        sessionSuccess: !sessionResult.error,
-        sessionId: sessionResult.data?.id
-      });
-      console.log(`⏱️ [${new Date().toISOString()}] Step 3 COMPLETE: Parallel operations finished`, { rfpId: rfpResult.data?.id, sessionValid: !sessionResult.error });
-      
-      if (rfpResult.error) {
-        throw new Error(`Failed to create RFP: ${rfpResult.error.message}`);
+      if (insertError) {
+        console.error('❌ Failed to create RFP:', insertError);
+        throw new Error(`Failed to create RFP: ${insertError.message}`);
       }
       
-      if (sessionResult.error) {
-        throw new Error(`Session validation failed: ${sessionResult.error.message}`);
-      }
+      console.log('✅ RFP created successfully:', newRfp.id);
+      console.log('⏱️ TIMING: Step 3 completed at', Date.now() - startTime, 'ms');
       
-      const newRfp = rfpResult.data;
-      
-      console.log(`⏱️ [${new Date().toISOString()}] Step 4: Updating session with RFP ID...`);
-      console.log(`🔍 DEBUG: About to update session ${session_id} with RFP ID ${newRfp.id}`);
-      
-      // OPTIMIZED: Update session with new RFP (final step) with timeout wrapper
-      const updateResult = await dbQuery(
-        () => {
-          console.log(`🔍 DEBUG: Executing session update at ${new Date().toISOString()}`);
-          return supabase
-            .from('sessions')
-            .update({ current_rfp_id: newRfp.id })
-            .eq('id', session_id);
-        },
-        'Update session with RFP ID'
-      ) as any;
-      
-      const { error: updateError } = updateResult;
-      
-      console.log(`🔍 DEBUG: Session update completed at ${new Date().toISOString()}`, {
-        success: !updateError,
-        error: updateError?.message
-      });
-      console.log(`⏱️ [${new Date().toISOString()}] Step 4 COMPLETE: Session updated with RFP`, { updateSuccess: !updateError });
+      // Step 4: Set as current RFP for the session
+      console.log('⏱️ TIMING: Starting Step 4 - Set as current RFP at', Date.now() - startTime, 'ms');
+      const { error: updateError } = await supabase
+        .from('sessions')
+        .update({ current_rfp_id: newRfp.id })
+        .eq('id', session_id)
+        .select('id, current_rfp_id')
+        .single();
       
       if (updateError) {
-        console.warn('Non-critical: Failed to set as current RFP:', updateError);
-        // Don't throw - RFP was created successfully
+        console.error('❌ Failed to set as current RFP:', updateError);
+        throw new Error(`RFP created but failed to set as current: ${updateError.message}`);
       }
       
-      const totalTime = Date.now() - startTime;
-      const endTimeStamp = new Date().toISOString();
-      console.log(`✅ [${endTimeStamp}] RFP CREATION COMPLETE - Total time: ${totalTime}ms, RFP ID: ${newRfp.id}`);
+      console.log('✅ RFP set as current for session successfully');
+      console.log('⏱️ TIMING: Step 4 completed at', Date.now() - startTime, 'ms');
+      
+      // Step 5: Validation - verify RFP exists in database
+      console.log('⏱️ TIMING: Starting Step 5 - Validate creation at', Date.now() - startTime, 'ms');
+      const { data: verifyRfp, error: verifyError } = await supabase
+        .from('rfps')
+        .select('id, name, description')
+        .eq('id', newRfp.id)
+        .single();
+      
+      if (verifyError || !verifyRfp) {
+        throw new Error('RFP creation validation failed - RFP not found after creation');
+      }
+      
+      console.log('✅ RFP creation validated successfully');
+      console.log('⏱️ TIMING: Step 5 completed at', Date.now() - startTime, 'ms');
+      console.log('⏱️ TIMING: Total execution time:', Date.now() - startTime, 'ms');
+      
+      const wasSessionCreated = !profile.current_session_id;
+      const sessionMessage = wasSessionCreated ? ' (session auto-created)' : '';
       
       return {
         success: true,
         rfp: newRfp,
         current_rfp_id: newRfp.id,
         session_id: session_id,
-        session_auto_created: !profile.current_session_id,
-        message: `RFP "${newRfp.name}" created successfully`,
-        execution_time_ms: totalTime
+        session_auto_created: wasSessionCreated,
+        message: `RFP "${newRfp.name}" created successfully and set as current RFP${sessionMessage}`,
+        steps_completed: [
+          'retrieved_user_profile',
+          ...(wasSessionCreated ? ['auto_created_session', 'set_as_current_session'] : ['found_existing_session']),
+          'verified_session_exists',
+          'created_rfp_record', 
+          'set_as_current_rfp_for_session',
+          'validated_creation'
+        ]
       };
       
     } catch (error) {
-      const totalTime = Date.now() - startTime;
-      const errorTimeStamp = new Date().toISOString();
-      console.error(`❌ [${errorTimeStamp}] createAndSetRfp FAILED after ${totalTime}ms:`, error);
+      console.error('❌ Error in createAndSetRfp:', error);
       throw error;
     }
   }
@@ -1269,38 +1153,21 @@ class DatabaseHandler {
   // Agent management functions
   async getAvailableAgents(parameters: any, userId: string): Promise<any> {
     try {
-      console.log('🔍 DEBUG: getAvailableAgents called with parameters:', parameters, 'userId:', userId);
-      
       const { data: agents, error } = await supabase
         .from('agents')
-        .select('id, name, role, instructions, is_active')
+        .select('id, name, role, instructions, access_level, is_active')
         .eq('is_active', true)
         .order('name');
-      
-      console.log('🔍 DEBUG: Database query result - agents:', agents, 'error:', error);
       
       if (error) {
         throw new Error(`Failed to get available agents: ${error.message}`);
       }
       
-      // Create enhanced agent list with IDs for switching
-      const agentList = (agents || []).map((agent: any) => ({
-        ...agent,
-        display_name_with_id: `**${agent.name}** (public) - ID: ${agent.id}`
-      }));
-
-      const result = {
+      return {
         success: true,
-        agents: agentList,
-        count: agents?.length || 0,
-        formatted_agent_list: agentList.map((agent: any) => agent.display_name_with_id).join('\n'),
-        agent_switching_instructions: "To switch agents, use: switch_agent with session_id and one of the agent IDs shown above"
+        agents: agents || [],
+        count: agents?.length || 0
       };
-      
-      console.log('🔍 DEBUG: Final result being returned:', JSON.stringify(result, null, 2));
-      console.log('🔍 DEBUG: Result length:', JSON.stringify(result).length, 'characters');
-      
-      return result;
     } catch (error) {
       console.error('❌ Error getting available agents:', error);
       throw error;
@@ -1957,9 +1824,7 @@ async function handleFunction(functionCall: EdgeFunctionCall, userId: string): P
         break;
         
       case 'create_and_set_rfp':
-        console.log(`🚨 TIMEOUT TEST: About to call createAndSetRfp with database timeouts at ${new Date().toISOString()}`);
         result = await dbHandler.createAndSetRfp(parameters, userId, sessionContext);
-        console.log(`🚨 TIMEOUT TEST: createAndSetRfp completed at ${new Date().toISOString()}`);
         break;
         
       // MCP Protocol functions
@@ -2141,14 +2006,6 @@ serve(async (req: Request) => {
     // Handle streaming requests for Claude API calls
     if (stream && functionName === 'generate_response') {
       console.log('🌊 Handling streaming Claude API request');
-      
-      // DEBUG: Log the tools parameter
-      console.log('🔧 DEBUG: Tools parameter received:', {
-        hasTools: !!parameters.tools,
-        toolsLength: parameters.tools?.length || 0,
-        toolNames: parameters.tools?.map((t: any) => t.name) || 'no tools',
-        firstToolSchema: parameters.tools?.[0] || 'no first tool'
-      });
       
       const claudeHandler = new ClaudeAPIHandler();
       // Add sessionContext and userId to parameters for streaming
