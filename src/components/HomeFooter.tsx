@@ -1,8 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React from 'react';
-import { IonButton, IonIcon } from '@ionic/react';
-import { reorderTwoOutline } from 'ionicons/icons';
+import { IonButton } from '@ionic/react';
 import { RFP } from '../types/rfp';
 
 interface HomeFooterProps {

@@ -129,6 +129,22 @@ export class ClaudeService {
   private static client: Anthropic | null = null;
 
   /**
+   * Initialize and clean up authentication state
+   */
+  private static async initializeAuth(): Promise<void> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) {
+        // Clear any stale auth data for anonymous users
+        await supabase.auth.signOut();
+      }
+    } catch (error) {
+      // Ignore auth errors for anonymous usage
+      console.debug('Auth initialization (anonymous mode):', error);
+    }
+  }
+
+  /**
    * Initialize Claude client
    */
   private static getClient(): Anthropic {
@@ -148,6 +164,213 @@ export class ClaudeService {
     }
     
     return this.client;
+  }
+
+  /**
+   * Generate a response using claude-api-v3 edge function
+   */
+  private static async generateResponseViaEdgeFunction(
+    userMessage: string,
+    agent: Agent,
+    conversationHistory: MessageParam[] = [],
+    sessionId?: string,
+    userProfile?: {
+      id?: string;
+      email?: string;
+      full_name?: string;
+      role?: string;
+    },
+    currentRfp?: {
+      id: number;
+      name: string;
+      description: string;
+      specification: string;
+    } | null,
+    currentArtifact?: {
+      id: string;
+      name: string;
+      type: string;
+      content?: string;
+    } | null,
+    abortSignal?: AbortSignal,
+    stream = false,
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean) => void
+  ): Promise<ClaudeResponse> {
+    // Use centralized Supabase client to avoid multiple instance warnings
+    
+    const payload = {
+      userMessage,
+      agent,
+      conversationHistory,
+      sessionId,
+      userProfile,
+      currentRfp,
+      currentArtifact,
+      stream: stream // Enable streaming - claude-api-v3 supports proper streaming
+    };
+
+    console.log('🚀 Calling claude-api-v3 edge function with payload:', {
+      userMessage: userMessage.substring(0, 100) + '...',
+      agentId: agent?.id,
+      sessionId,
+      hasRfp: !!currentRfp,
+      hasArtifact: !!currentArtifact,
+      historyLength: conversationHistory.length
+    });
+
+    try {
+      if (stream && onChunk) {
+        // Use direct fetch for streaming responses
+        const session = await supabase.auth.getSession();
+        const response = await fetch(
+          `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/claude-api-v3`,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${session.data.session?.access_token || process.env.REACT_APP_SUPABASE_ANON_KEY}`
+            },
+            body: JSON.stringify(payload),
+            signal: abortSignal
+          }
+        );
+
+        if (!response.ok) {
+          throw new Error(`Edge function failed: ${response.status} ${response.statusText}`);
+        }
+
+        console.log('🚨 FETCH RESPONSE RECEIVED:', {
+          status: response.status,
+          statusText: response.statusText,
+          headers: response.headers,
+          hasBody: !!response.body
+        });
+
+        // Handle streaming response
+        const reader = response.body?.getReader();
+        const decoder = new TextDecoder();
+        let fullContent = '';
+        let toolsUsed: string[] = [];
+        const functionResults: any[] = [];
+
+        console.log('🚨 STARTING SSE READER LOOP - reader exists:', !!reader);
+        
+        if (reader) {
+          try {
+            // eslint-disable-next-line no-constant-condition
+            while (true) {
+              const { done, value } = await reader.read();
+              if (done) {
+                console.log('🚨 SSE STREAM DONE');
+                break;
+              }
+
+              const chunk = decoder.decode(value, { stream: true });
+              console.log('🚨 RAW CHUNK RECEIVED:', chunk.substring(0, 200) + '...');
+              const lines = chunk.split('\n');
+
+              for (const line of lines) {
+                console.log('🚨 PROCESSING SSE LINE:', line.substring(0, 100) + '...');
+                if (line.startsWith('data: ')) {
+                  console.log('🚨 FOUND DATA LINE, parsing...');
+                  try {
+                    const eventData = JSON.parse(line.slice(6));
+                    
+                    console.log('🔍 SSE EVENT DEBUG:', {
+                      eventType: eventData.type,
+                      hasContent: !!eventData.content,
+                      contentLength: eventData.content?.length || 0,
+                      contentPreview: eventData.content?.substring(0, 50) || '[no content]',
+                      rawLine: line.substring(0, 100) + '...'
+                    });
+                    
+                    if (eventData.type === 'text' && eventData.content) {
+                      fullContent += eventData.content;
+                      console.log('📝 CALLING onChunk with text:', eventData.content.substring(0, 50) + '...');
+                      onChunk(eventData.content, false);
+                    } else if (eventData.type === 'tool_invocation') {
+                      if (eventData.toolEvent?.type === 'tool_start') {
+                        const toolName = eventData.toolEvent.toolName;
+                        if (!toolsUsed.includes(toolName)) {
+                          toolsUsed.push(toolName);
+                        }
+                        onChunk('', false, true); // Indicate tool processing
+                      } else if (eventData.toolEvent?.type === 'tool_complete') {
+                        functionResults.push({
+                          function_name: eventData.toolEvent.toolName,
+                          parameters: eventData.toolEvent.parameters,
+                          result: eventData.toolEvent.result
+                        });
+                      }
+                    } else if (eventData.type === 'completion') {
+                      onChunk('', true); // Indicate completion
+                      if (eventData.metadata?.toolsUsed) {
+                        toolsUsed = [...new Set([...toolsUsed, ...eventData.metadata.toolsUsed])];
+                      }
+                    }
+                  } catch (parseError) {
+                    console.warn('Failed to parse SSE data:', line);
+                  }
+                }
+              }
+            }
+          } finally {
+            reader.releaseLock();
+          }
+        }
+
+        return {
+          content: fullContent,
+          metadata: {
+            model: 'claude-sonnet-4-20250514',
+            response_time: 0,
+            temperature: 0.7,
+            tokens_used: 0,
+            functions_called: toolsUsed,
+            function_results: functionResults,
+            is_streaming: true,
+            stream_complete: true,
+            agent_switch_occurred: false
+          }
+        };
+      } else {
+        // Use supabase invoke for non-streaming responses
+        const { data, error } = await supabase.functions.invoke('claude-api-v3', {
+          body: payload
+        });
+
+        if (error) {
+          console.error('🚨 Edge function error:', error);
+          throw new Error(`Edge function failed: ${error.message}`);
+        }
+
+        console.log('✅ Edge function response received:', {
+          hasResponse: !!data?.response,
+          responseLength: data?.response?.length || 0,
+          functionsExecuted: data?.functionsExecuted || [],
+          usage: data?.usage
+        });
+
+        return {
+          content: data.response || '',
+          metadata: {
+            model: 'claude-sonnet-4-20250514',
+            response_time: data.response_time || 0,
+            temperature: 0.7,
+            tokens_used: data.usage?.input_tokens || 0,
+            functions_called: data.functionsExecuted || [],
+            function_results: data.functionResults || [],
+            is_streaming: false,
+            stream_complete: true,
+            agent_switch_occurred: data.agent_switch_occurred || false
+          }
+        };
+      }
+    } catch (error) {
+      console.error('🚨 Error calling edge function:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      throw new Error(`Failed to call claude-api-v3: ${errorMessage}`);
+    }
   }
 
   /**
@@ -180,8 +403,8 @@ export class ClaudeService {
     stream = false,
     onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean) => void
   ): Promise<ClaudeResponse> {
-    
-
+    // Initialize and clean up authentication state
+    await this.initializeAuth();
 
     // Check if function calling is needed for this message type
     
@@ -196,6 +419,33 @@ export class ClaudeService {
     }
 
     try {
+      // 🔧 SMART ROUTING: Use edge function if no API key available, otherwise use direct SDK
+      const apiKey = process.env.REACT_APP_CLAUDE_API_KEY;
+      const useEdgeFunction = !apiKey || apiKey === 'your_claude_api_key_here';
+      
+      console.log('🔧 CLAUDE SERVICE ROUTING:', {
+        useEdgeFunction,
+        hasApiKey: !!apiKey,
+        streaming: stream
+      });
+      
+      if (useEdgeFunction) {
+        // Route to claude-api-v3 edge function
+        return this.generateResponseViaEdgeFunction(
+          userMessage,
+          agent,
+          conversationHistory,
+          sessionId,
+          userProfile,
+          currentRfp,
+          currentArtifact,
+          abortSignal,
+          stream,
+          onChunk
+        );
+      }
+      
+      // Use direct Anthropic SDK (fallback for when API key is available)
       const client = this.getClient();
       
       // Build the conversation context
@@ -292,19 +542,7 @@ RFP MANAGEMENT FUNCTIONS - USE THESE ACTIVELY:
 - For RFP questionnaires: use create_questionnaire_artifact
 - For supplier forms: use create_supplier_form_artifact
 
-🚨 CRITICAL RULE: When users request RFP creation, you MUST IMMEDIATELY call the create_and_set_rfp function with proper parameters. Do not just say you will create an RFP - actually call the function FIRST, then respond.
 
-🚨 MANDATORY TRIGGER WORDS: If the user says ANY of these phrases, IMMEDIATELY call create_and_set_rfp:
-- "create rfp"
-- "create an rfp" 
-- "make an rfp"
-- "new rfp"
-- "rfp test"
-- "create rfp test"
-- "need an rfp"
-- "build an rfp"
-
-🚨 REQUIRED ACTION: Upon seeing these trigger words, IMMEDIATELY call create_and_set_rfp function with a name parameter. Do not ask questions first - create the RFP immediately, then ask for details.
 
 Be helpful, accurate, and professional. When switching agents, make the transition smooth and explain the benefits.`;
 
@@ -313,12 +551,8 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         agentName: agent.name,
         agentRole: agent.role,
         instructionsLength: agent.instructions?.length || 0,
-        hasRfpCreationRule: (agent.instructions || '').includes('CRITICAL RFP CREATION RULE'),
-        hasCreateAndSetRfp: (agent.instructions || '').includes('create_and_set_rfp'),
-        hasTriggerWords: (agent.instructions || '').includes('MANDATORY TRIGGER WORDS'),
         systemPromptLength: systemPrompt.length,
-        systemPromptPreview: systemPrompt.substring(0, 300) + '...',
-        fullSystemPrompt: systemPrompt // TEMPORARY - remove after debugging
+        systemPromptPreview: systemPrompt.substring(0, 300) + '...'
       });
 
       let response: Message | undefined = undefined;
@@ -388,7 +622,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
           if (typeof (streamResponse as any).on === 'function') {
             console.log('🔧 Stream has EventEmitter pattern, trying alternative approach...');
             
-            const accumulatedText = '';
+            // const accumulatedText = ''; // Not used in current implementation
             let eventReceived = false;
             
             // Set up event listeners
@@ -501,7 +735,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
               return { 
                 content: currentTextContent,
                 metadata: {
-                  model: 'claude-3-5-sonnet-20241022',
+                  model: 'claude-sonnet-4-20250514',
                   response_time: Date.now() - startTime,
                   temperature: 0.7,
                   functions_called: [],

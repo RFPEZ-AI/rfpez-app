@@ -6,7 +6,7 @@ import { Message, ArtifactReference } from '../types/home';
 import { RFP } from '../types/rfp';
 import { SessionActiveAgent, UserProfile } from '../types/database';
 import DatabaseService from '../services/database';
-import { ClaudeService } from '../services/claudeServiceV2';
+import { ClaudeService } from '../services/claudeService';
 import { AgentService } from '../services/agentService';
 import { SmartAutoPromptManager } from '../utils/smartAutoPromptManager';
 import { categorizeError } from '../components/APIErrorHandler';
@@ -31,6 +31,7 @@ interface EnhancedFunctionResult {
 }
 
 export const useMessageHandling = () => {
+  console.log('🚨🚨🚨 MESSAGE HANDLING HOOK LOADED 🚨🚨🚨');
   const abortControllerRef = useRef<AbortController | null>(null);
   const isProcessingRef = useRef<boolean>(false); // Add processing guard
   
@@ -179,7 +180,7 @@ export const useMessageHandling = () => {
         setTimeout(async () => {
           // Try to find the newly created RFP by name after giving it time to be created
           const rfpName = input.name;
-          const foundRfpId = null;
+          // RFP ID lookup would go here if needed
           
           if (rfpName) {
             try {
@@ -443,8 +444,9 @@ export const useMessageHandling = () => {
         let uiTimeoutId: NodeJS.Timeout | null = null;
         
         const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, forceToolCompletion?: boolean) => {
+          console.log('🚨 STREAMING CHUNK HANDLER CALLED - This should appear if streaming works!');
           
-          console.log('�📡 STREAMING CHUNK DEBUG:', {
+          console.log('📡 STREAMING CHUNK RECEIVED:', {
             chunkLength: chunk.length,
             chunkPreview: chunk.length > 0 ? chunk.substring(0, 50) + '...' : '[empty]',
             isComplete,
@@ -455,7 +457,7 @@ export const useMessageHandling = () => {
             currentMessageId: aiMessageId,
             toolProcessingMessageId,
             bufferLength: streamingBuffer.length,
-
+            timestamp: new Date().toISOString()
           });
           
           // Handle forced tool completion (e.g., from timeout)
@@ -621,12 +623,15 @@ export const useMessageHandling = () => {
           if (isWaitingForToolCompletion && chunk.trim()) {
             console.log('📝 Creating new message for content after tool processing:', {
               chunk: chunk.substring(0, 50) + '...',
+              chunkLength: chunk.length,
               isWaitingForToolCompletion,
-              toolProcessingMessageId
+              toolProcessingMessageId,
+              currentAiMessageId: aiMessageId
             });
             
             // Remove tool processing message
             if (toolProcessingMessageId) {
+              console.log('🗑️ Removing tool processing message:', toolProcessingMessageId);
               setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
               toolProcessingMessageId = null;
             }
@@ -648,13 +653,26 @@ export const useMessageHandling = () => {
               agentName: agentForResponse?.agent_name || 'AI Assistant'
             };
             
-            setMessages(prev => [...prev, continuationMessage]);
+            console.log('✨ Created continuation message:', {
+              id: continuationMessageId,
+              contentLength: chunk.length,
+              contentPreview: chunk.substring(0, 100) + '...',
+              agentName: continuationMessage.agentName
+            });
+            
+            setMessages(prev => {
+              const newMessages = [...prev, continuationMessage];
+              console.log('📋 Updated messages array - new length:', newMessages.length);
+              return newMessages;
+            });
             
             // Switch to new message for further streaming
             aiMessageId = continuationMessageId;
             isWaitingForToolCompletion = false;
             streamingBuffer = '';
             lastUpdateTime = Date.now();
+            
+            console.log('🔄 Switched to continuation message ID:', aiMessageId);
             return;
           }
           
@@ -697,15 +715,16 @@ export const useMessageHandling = () => {
         // DISABLED: Debug logging causes memory pressure
         // console.error('🔥 ABOUT TO CALL CLAUDE API - This should appear!');
 
-        // STREAMING FIX: Detect tool-based queries and special handling
-        const isAgentQuery = /what agents?|agents are available|list agents|available agents|show agents/i.test(content);
-        const shouldUseStreaming = !isAgentQuery; // Disable streaming for agent queries
+        // Always enable streaming - let Claude handle all queries naturally
+        const shouldUseStreaming = true;
         
-        console.log('🔧 STREAMING DECISION:', {
+        console.log('🔧 STREAMING ENABLED:', {
           content: content.substring(0, 50) + '...',
-          isAgentQuery,
-          shouldUseStreaming
+          streaming: shouldUseStreaming
         });
+        
+        console.log('🚨 CRITICAL DEBUG: About to call ClaudeService.generateResponse');
+        console.log('🚨 onStreamingChunk callback provided:', typeof onStreamingChunk);
 
         const claudeResponse = await ClaudeService.generateResponse(
           content,

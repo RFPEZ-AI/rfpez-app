@@ -69,8 +69,8 @@ class ClaudeAPIProxyService {
   private baseUrl: string;
 
   constructor() {
-    // Use the edge function v2 endpoint
-    this.baseUrl = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/claude-api-v2`;
+    // Use the edge function v3 endpoint
+    this.baseUrl = `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/claude-api-v3`;
   }
 
   // Get authentication headers
@@ -354,7 +354,7 @@ class ClaudeAPIProxyService {
     
     // Use streaming internally but present as non-streaming interface
     let finalResult: any = null;
-    let finalMetadata: any = null;
+    const finalMetadata: any = null;
     
     try {
       const streamingResponse = await this.generateStreamingResponse(
@@ -369,7 +369,7 @@ class ClaudeAPIProxyService {
           
           if (isComplete) {
             console.log('✅ STREAMING COMPLETE: Final metadata received');
-            finalMetadata = metadata;
+            // finalMetadata = metadata; // Assigned but not used in current implementation
           }
         }
       );
@@ -724,13 +724,14 @@ class ClaudeAPIProxyService {
                     console.log('🔄 CLIENT DEBUG - Fresh response will be handled by completion event');
                     break;
 
-                  case 'error':
+                  case 'error': {
                     console.error('❌ Stream error:', eventData.error);
                     // Handle both string and object error formats
                     const errorMessage = typeof eventData.error === 'string' 
                       ? eventData.error 
                       : eventData.error?.message || JSON.stringify(eventData.error);
                     throw new Error(errorMessage);
+                  }
 
                   default:
                     console.log('📝 Unknown event type:', eventData.type);

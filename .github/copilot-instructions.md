@@ -45,7 +45,7 @@ npm run test:coverage  # Coverage reports
 
 # Supabase Edge Functions - use separate terminal
 supabase functions deploy mcp-server    # Deploy MCP server
-supabase functions deploy claude-api    # Deploy Claude API function
+supabase functions deploy claude-api-v3  # Deploy Claude API function (V3)
 npm run mcp:test   # Test MCP server connection
 
 # Available VS Code tasks
@@ -73,7 +73,7 @@ npm run mcp:test   # Test MCP server connection
 - All tables use RLS policies - ensure proper user context
 - Agent operations require session_id parameter for context
 - Form artifacts stored in `form_artifacts` table with JSON schema
-- Two Edge Functions: `mcp-server` (MCP protocol) and `claude-api` (HTTP REST)
+- Two Edge Functions: `mcp-server` (MCP protocol) and `claude-api-v3` (HTTP REST)
 
 ### MCP Integration Architecture
 - **MCP Server**: `supabase/functions/mcp-server/index.ts` - JSON-RPC 2.0 protocol
@@ -206,7 +206,7 @@ export default Component;
 - `database/agents-schema.sql` - Multi-agent database structure
 - `DOCUMENTATION/AGENTS.md` - Agent system documentation
 - `supabase/functions/mcp-server/index.ts` - MCP protocol implementation
-- `supabase/functions/claude-api/index.ts` - HTTP REST API for Claude integration
+- `supabase/functions/claude-api-v3/index.ts` - HTTP REST API for Claude integration (V3)
 
 ## Environment Configuration
 Required environment variables:

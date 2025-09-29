@@ -46,7 +46,7 @@ describe('ClaudeServiceV2 Streaming Tests', () => {
         }
       };
 
-      const { claudeAPIProxy } = require('../claudeAPIProxy');
+      const { claudeAPIProxy } = await import('../claudeAPIProxy');
       claudeAPIProxy.generateStreamingResponse.mockResolvedValue(mockResponse);
 
       const chunks: string[] = [];

@@ -2,12 +2,10 @@
 
 // Updated Claude API service with hybrid proxy pattern
 import Anthropic from '@anthropic-ai/sdk';
-import type { Message, ContentBlock, TextBlock, ToolUseBlock, MessageParam } from '@anthropic-ai/sdk/resources';
+import type { ToolUseBlock, MessageParam } from '@anthropic-ai/sdk/resources';
 import type { Agent } from '../types/database';
-import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
+import { claudeApiFunctions } from './claudeAPIFunctions';
 import { claudeAPIProxy } from './claudeAPIProxy';
-import { APIRetryHandler } from '../utils/apiRetry';
-import { supabase } from '../supabaseClient';
 
 // Response interface
 interface ClaudeResponse {
@@ -256,7 +254,7 @@ export class ClaudeService {
       return {
         content: finalContent,
         metadata: {
-          model: response.model || 'claude-3-5-sonnet-20241022',
+          model: response.model || 'claude-sonnet-4-20250514',
           tokens_used: response.usage?.input_tokens + response.usage?.output_tokens || 0,
           response_time: responseTime,
           temperature: 0.7,

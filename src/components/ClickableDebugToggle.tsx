@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState, useEffect } from 'react';
-import { IonButton, IonIcon, IonChip } from '@ionic/react';
+import { IonIcon, IonChip } from '@ionic/react';
 import { bugOutline } from 'ionicons/icons';
 
 interface ClickableDebugToggleProps {

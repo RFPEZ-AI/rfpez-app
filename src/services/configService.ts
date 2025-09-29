@@ -56,7 +56,7 @@ class ConfigService {
       environment: (process.env.NODE_ENV === 'production' ? 'production' : 'development') as 'development' | 'staging' | 'production',
       appVersion: process.env.REACT_APP_VERSION || '0.0.1',
       maxMessageHistory: parseInt(process.env.REACT_APP_MAX_MESSAGE_HISTORY || '50'),
-      defaultModel: process.env.REACT_APP_DEFAULT_MODEL || 'claude-3-5-sonnet-20241022'
+      defaultModel: process.env.REACT_APP_DEFAULT_MODEL || 'claude-sonnet-4-20250514'
     };
   }
 

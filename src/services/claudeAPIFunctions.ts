@@ -10,7 +10,7 @@ import { mcpClient } from './mcpClient';
 import { RFPService } from './rfpService';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages.mjs';
-import type { Agent } from '../types/database';
+// Agent type import removed as it's not used in this file
 
 // TypeScript interfaces for request generation
 interface SupplierInfo {
@@ -635,30 +635,28 @@ export const claudeApiFunctions: Tool[] = [
   },
   {
     "name": "create_and_set_rfp",
-    "description": "🚨 PRIORITY FUNCTION: Creates a new RFP and sets it as the current active RFP. MUST BE CALLED whenever user says 'create rfp', 'create an rfp', 'make an rfp', 'new rfp', 'rfp test', or similar. Automatically determines the current session context. REQUIRED: Must provide a name parameter. EXAMPLE: {\"name\": \"LED Bulb Procurement RFP\"}. CALL THIS IMMEDIATELY - do not ask questions first!",
+    "description": "CREATE RFP - Primary function for all sourcing, procurement, and purchasing requests. Always use first when user mentions needing to source, buy, or procure anything.",
     "input_schema": {
       "type": "object",
       "properties": {
         "name": {
           "type": "string",
-          "description": "The name/title of the RFP (REQUIRED - must be a non-empty string)",
-          "minLength": 1
+          "description": "Name of what needs to be procured (e.g. 'Asphalt for Construction Project')"
         },
         "description": {
           "type": "string",
-          "description": "Optional initial description of the RFP"
+          "description": "Brief description of requirements"
         },
         "specification": {
           "type": "string", 
-          "description": "Optional initial technical specification"
+          "description": "Technical specifications if known"
         },
         "due_date": {
           "type": "string",
-          "description": "Optional due date in ISO format (YYYY-MM-DD)"
+          "description": "Due date in YYYY-MM-DD format"
         }
       },
-      "required": ["name"],
-      "additionalProperties": false
+      "required": ["name"]
     }
   },
   {
