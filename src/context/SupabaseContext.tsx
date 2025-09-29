@@ -295,6 +295,19 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (error) {
           console.error('Error getting session:', error);
           
+          // Handle invalid refresh token errors
+          if (error.message.includes('Invalid Refresh Token') || 
+              error.message.includes('Refresh Token Not Found') ||
+              error.message.includes('refresh_token')) {
+            console.log('🧹 Invalid refresh token detected - clearing auth state...');
+            await clearAuthState();
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            return;
+          }
+          
           // Handle PKCE validation failures
           if (error.message.includes('code verifier') || 
               error.message.includes('pkce') || 

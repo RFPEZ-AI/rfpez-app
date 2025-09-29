@@ -1,36 +1,63 @@
 // Copyright Mark Skiba, 2025 All rights reserved
-// Claude API Edge Function v2 - Hybrid Architecture
-// Handles Claude API calls with client callback system
+// Claude API Edge Function v2 - Unified Architecture
+// Handles ALL Claude API calls and tool executions server-side with streaming transparency
 
 /// <reference types="https://deno.land/x/types/deno.d.ts" />
+/// <reference types="https://deno.land/std@0.168.0/types.d.ts" />
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import Anthropic from 'https://esm.sh/@anthropic-ai/sdk@0.29.0';
 
-// Types for the hybrid architecture
-interface EdgeFunctionCall {
-  functionName: string;
-  parameters: any;
-  clientCallbacks?: ClientCallback[];
-  sessionContext?: {
-    sessionId: string;
-    timestamp: string;
+// Global Deno environment access
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
+
+// Enhanced streaming protocol types
+interface ToolInvocationEvent {
+  type: 'tool_start' | 'tool_progress' | 'tool_complete' | 'tool_error';
+  toolName: string;
+  parameters?: any;
+  result?: any;
+  error?: string;
+  timestamp: string;
+  duration?: number;
+}
+
+interface StreamingResponse {
+  type: 'text' | 'tool_invocation' | 'completion' | 'error';
+  content?: string;
+  toolEvent?: ToolInvocationEvent;
+  metadata?: {
+    tokenCount?: number;
+    model?: string;
+    usage?: any;
   };
 }
 
 interface ClientCallback {
-  type: 'ui_refresh' | 'state_update' | 'notification';
+  type: 'ui_refresh' | 'state_update' | 'notification' | 'rfp_created';
   target: string;
   payload: any;
+  priority: 'low' | 'normal' | 'high';
 }
 
 interface EdgeFunctionResponse {
   success: boolean;
-  data: any;
+  data?: any;
+  streamingEvents?: StreamingResponse[];
   clientCallbacks?: ClientCallback[];
-  requiresClientAction?: boolean;
-  message?: string;
+  toolInvocations?: ToolInvocationEvent[];
+  error?: string;
+  metadata?: {
+    executionTime: number;
+    toolsUsed: string[];
+    model: string;
+    tokenUsage: any;
+  };
 }
 
 // Initialize Supabase client with timeout configurations
@@ -133,7 +160,6 @@ class ClaudeAPIHandler {
       systemLength: params.system?.length || 0,
       hasRfpCreationRule: (params.system || '').includes('CRITICAL RFP CREATION RULE'),
       hasCreateAndSetRfp: (params.system || '').includes('create_and_set_rfp'),
-      hasTriggerWords: (params.system || '').includes('MANDATORY TRIGGER WORDS'),
       systemPreview: params.system?.substring(0, 300) + '...',
       // 🔧 DEBUG: Show more of the RFP creation rules to verify they're complete
       rfpRulesSection: params.system?.includes('CRITICAL RFP CREATION RULE') 
@@ -177,9 +203,9 @@ class ClaudeAPIHandler {
   }): Promise<ReadableStream> {
     console.log('🌊 Generating streaming Claude response');
     
-    // Note: Removed conditional tool_choice logic to match client behavior
-    // The agent instructions contain proper trigger rules for RFP creation
-    // Claude will use tools based on system prompt instructions and user requests
+    // Note: Using 'auto' tool_choice to allow Claude autonomous tool selection
+    // Claude will intelligently choose appropriate tools based on context and system instructions
+    // No legacy keyword filtering - tools selected based on AI understanding of user intent
 
     const stream = new ReadableStream({
       start(controller) {
@@ -191,7 +217,6 @@ class ClaudeAPIHandler {
               systemLength: params.system?.length || 0,
               hasRfpCreationRule: (params.system || '').includes('CRITICAL RFP CREATION RULE'),
               hasCreateAndSetRfp: (params.system || '').includes('create_and_set_rfp'),
-              hasTriggerWords: (params.system || '').includes('MANDATORY TRIGGER WORDS'),
               systemPreview: params.system?.substring(0, 300) + '...',
               // 🔧 DEBUG: Show more of the RFP creation rules to verify they're complete
               rfpRulesSection: params.system?.includes('CRITICAL RFP CREATION RULE') 
@@ -205,17 +230,12 @@ class ClaudeAPIHandler {
               allToolNames: params.tools?.map((tool: any) => tool.name).join(', ') || 'no tools'
             });
             
-            // 🚨 DYNAMIC TOOL CHOICE: Force tool usage when RFP keywords detected
-            const lastUserMessage = params.messages?.[params.messages.length - 1]?.content?.toLowerCase() || '';
-            const hasRfpKeywords = ['rfp', 'create an rfp', 'make an rfp', 'procurement', 'sourcing'].some(keyword => 
-              lastUserMessage.includes(keyword)
-            );
-            const toolChoice = hasRfpKeywords && params.tools?.some((tool: any) => tool.name === 'create_and_set_rfp')
-              ? { type: 'any' }  // Force tool usage when RFP creation is needed
-              : { type: 'auto' }; // Normal auto behavior otherwise
+            // 🎯 TOOL CHOICE: Always use 'auto' to let Claude intelligently select tools
+            // Claude will autonomously choose appropriate tools based on context and system instructions
+            const toolChoice = { type: 'auto' };
             
+            const lastUserMessage = params.messages?.[params.messages.length - 1]?.content || '';
             console.log('🎯 TOOL CHOICE DEBUG:', { 
-              hasRfpKeywords, 
               toolChoice, 
               lastUserMessage: lastUserMessage.substring(0, 100) 
             });
@@ -2148,6 +2168,16 @@ serve(async (req: Request) => {
         toolsLength: parameters.tools?.length || 0,
         toolNames: parameters.tools?.map((t: any) => t.name) || 'no tools',
         firstToolSchema: parameters.tools?.[0] || 'no first tool'
+      });
+      
+      // DEBUG: Log system prompt with simplified instructions
+      console.log('🧪 DEBUG: System prompt details:', {
+        hasSystem: !!parameters.system,
+        systemLength: parameters.system?.length || 0,
+        systemPreview: parameters.system?.substring(0, 500) + '...',
+        hasRfpRule: (parameters.system || '').includes('CRITICAL RFP CREATION RULE'),
+        hasCreateTool: (parameters.system || '').includes('create_and_set_rfp'),
+        hasTriggerWords: (parameters.system || '').includes('MANDATORY TRIGGER WORDS')
       });
       
       const claudeHandler = new ClaudeAPIHandler();

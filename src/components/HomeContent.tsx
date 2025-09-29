@@ -6,6 +6,7 @@ import { useIsMobile } from '../utils/useMediaQuery';
 import SessionHistory from './SessionHistory';
 import SessionDialog from './SessionDialog';
 import ArtifactWindow from './ArtifactWindow';
+import { ToolInvocationEvent } from '../types/streamingProtocol';
 
 interface HomeContentProps {
   // Session management
@@ -42,6 +43,10 @@ interface HomeContentProps {
   onToggleArtifactCollapse?: () => void;
   forceSessionHistoryCollapsed?: boolean;
   onSessionHistoryToggle?: (expanded: boolean) => void;
+  
+  // Tool transparency props
+  toolInvocations?: ToolInvocationEvent[];
+  isToolExecutionActive?: boolean;
 }
 
 const HomeContent: React.FC<HomeContentProps> = ({
@@ -67,7 +72,10 @@ const HomeContent: React.FC<HomeContentProps> = ({
   onToggleArtifactWindow, // eslint-disable-line @typescript-eslint/no-unused-vars
   onToggleArtifactCollapse,
   forceSessionHistoryCollapsed = false,
-  onSessionHistoryToggle
+  onSessionHistoryToggle,
+  // Tool transparency props
+  toolInvocations = [],
+  isToolExecutionActive = false
 }) => {
   const isMobile = useIsMobile();
   // Use selected artifact based on window state if available, otherwise fall back to most recent
@@ -138,6 +146,8 @@ const HomeContent: React.FC<HomeContentProps> = ({
             onArtifactSelect={onArtifactSelect}
             currentAgent={currentAgent}
             onCancelRequest={onCancelRequest}
+            toolInvocations={toolInvocations}
+            isToolExecutionActive={isToolExecutionActive}
           />
         </div>
 

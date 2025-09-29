@@ -90,7 +90,24 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Utility function to handle auth errors gracefully
+export const handleAuthError = async () => {
+  try {
+    // Clear any invalid tokens
+    await supabase.auth.signOut();
+    console.log('🔄 Cleared invalid authentication tokens');
+  } catch (error) {
+    console.warn('Auth cleanup warning (expected for anonymous users):', error);
+  }
+};
 
+// Handle auth state changes and clear invalid tokens
+supabase.auth.onAuthStateChange(async (event, session) => {
+  if (event === 'TOKEN_REFRESHED' && !session) {
+    console.log('🔄 Token refresh failed, clearing invalid session');
+    await handleAuthError();
+  }
+});
 
 // (Remove the context code from this file.)
 // Move the context code to a new file: src/context/SupabaseContext.tsx

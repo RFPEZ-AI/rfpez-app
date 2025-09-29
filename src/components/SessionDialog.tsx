@@ -4,7 +4,9 @@ import React, { useEffect, useRef } from 'react';
 import { IonCard, IonCardContent } from '@ionic/react';
 import PromptComponent from './PromptComponent';
 import ArtifactReferenceTag from './ArtifactReferenceTag';
+import ToolTransparencyDisplay from './ToolTransparencyDisplay';
 import { ArtifactReference } from '../types/home';
+import { ToolInvocationEvent } from '../types/streamingProtocol';
 
 interface Message {
   id: string;
@@ -25,6 +27,9 @@ interface SessionDialogProps {
   onArtifactSelect?: (artifactRef: ArtifactReference) => void; // New prop for artifact selection
   currentAgent?: { agent_name: string } | null; // Current agent for dynamic thinking message
   onCancelRequest?: () => void; // Function to cancel the current request
+  // Tool transparency props
+  toolInvocations?: ToolInvocationEvent[];
+  isToolExecutionActive?: boolean;
 }
 
 const SessionDialog: React.FC<SessionDialogProps> = ({ 
@@ -35,7 +40,10 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   promptPlaceholder = "Type your message here...",
   onArtifactSelect,
   currentAgent,
-  onCancelRequest
+  onCancelRequest,
+  // Tool transparency props
+  toolInvocations = [],
+  isToolExecutionActive = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
@@ -200,6 +208,16 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
               </IonCardContent>
             </IonCard>
           )}
+          
+          {/* Tool Transparency Display */}
+          {(toolInvocations.length > 0 || isToolExecutionActive) && (
+            <ToolTransparencyDisplay
+              toolInvocations={toolInvocations}
+              isActive={isToolExecutionActive}
+              className="ion-margin-vertical"
+            />
+          )}
+          
           <div ref={messagesEndRef} />
           
           {/* Prompt Component positioned after last message */}

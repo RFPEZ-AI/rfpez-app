@@ -20,7 +20,7 @@ export const APP_CONSTANTS = {
   
   // API Constants
   CLAUDE_API: {
-    DEFAULT_MODEL: 'claude-3-5-sonnet-20241022',
+    DEFAULT_MODEL: 'claude-sonnet-4-20250514',
     MAX_TOKENS: 2000,
     DEFAULT_TEMPERATURE: 0.7,
     TIMEOUT_MS: 30000
