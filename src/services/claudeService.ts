@@ -129,6 +129,73 @@ export class ClaudeService {
   private static client: Anthropic | null = null;
 
   /**
+   * Detect if user has previously logged in on this device
+   */
+  private static detectPreviousLoginEvidence(): {
+    hasPreviousLogin: boolean;
+    lastLoginTime?: string;
+    loginCount?: number;
+  } {
+    try {
+      // Check for Supabase auth evidence in localStorage
+      const hasSupabaseAuth = Object.keys(localStorage).some(key => 
+        key.startsWith('supabase.auth.') || key.includes('supabase-auth-token')
+      );
+
+      // Check our custom login tracking
+      const loginHistory = localStorage.getItem('rfpez-login-history');
+      let parsedHistory = null;
+      
+      if (loginHistory) {
+        try {
+          parsedHistory = JSON.parse(loginHistory);
+        } catch {
+          // Invalid JSON, ignore
+        }
+      }
+
+      return {
+        hasPreviousLogin: hasSupabaseAuth || !!parsedHistory,
+        lastLoginTime: parsedHistory?.lastLogin,
+        loginCount: parsedHistory?.count || 0
+      };
+    } catch (error) {
+      console.debug('Error detecting previous login evidence:', error);
+      return { hasPreviousLogin: false };
+    }
+  }
+
+  /**
+   * Track successful login for future detection
+   */
+  private static trackLogin(): void {
+    try {
+      const now = new Date().toISOString();
+      const existing = localStorage.getItem('rfpez-login-history');
+      let history = { count: 0, firstLogin: now, lastLogin: now };
+      
+      if (existing) {
+        try {
+          const parsed = JSON.parse(existing);
+          history = {
+            count: (parsed.count || 0) + 1,
+            firstLogin: parsed.firstLogin || now,
+            lastLogin: now
+          };
+        } catch {
+          // Invalid JSON, use default
+        }
+      } else {
+        history.count = 1;
+      }
+      
+      localStorage.setItem('rfpez-login-history', JSON.stringify(history));
+    } catch (error) {
+      console.debug('Error tracking login:', error);
+    }
+  }
+
+  /**
    * Initialize and clean up authentication state
    */
   private static async initializeAuth(): Promise<void> {
@@ -198,6 +265,14 @@ export class ClaudeService {
   ): Promise<ClaudeResponse> {
     // Use centralized Supabase client to avoid multiple instance warnings
     
+    // Detect previous login evidence for anonymous users
+    const loginEvidence = this.detectPreviousLoginEvidence();
+    
+    // Track login if user is currently authenticated
+    if (userProfile?.id) {
+      this.trackLogin();
+    }
+    
     const payload = {
       userMessage,
       agent,
@@ -206,6 +281,7 @@ export class ClaudeService {
       userProfile,
       currentRfp,
       currentArtifact,
+      loginEvidence, // Add login evidence to payload
       stream: stream // Enable streaming - claude-api-v3 supports proper streaming
     };
 

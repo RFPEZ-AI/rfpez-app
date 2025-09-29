@@ -1053,7 +1053,21 @@ serve(async (req: Request) => {
           } else {
             systemPrompt += `\n\nUSER CONTEXT:`;
             systemPrompt += `\n- User Status: ANONYMOUS (not logged in)`;
-            systemPrompt += `\n- This user is a potential customer who has not yet signed up`;
+            
+            // Add previous login evidence for anonymous users
+            if (requestBody.loginEvidence?.hasPreviousLogin) {
+              systemPrompt += `\n- Previous Login History: YES - This user has logged in before on this device`;
+              if (requestBody.loginEvidence.loginCount) {
+                systemPrompt += `\n- Login Count: ${requestBody.loginEvidence.loginCount} previous logins`;
+              }
+              if (requestBody.loginEvidence.lastLoginTime) {
+                systemPrompt += `\n- Last Login: ${requestBody.loginEvidence.lastLoginTime}`;
+              }
+              systemPrompt += `\n- Recommendation: This is a returning user who should be encouraged to log back in rather than sign up`;
+            } else {
+              systemPrompt += `\n- Previous Login History: NO - This appears to be a new user`;
+              systemPrompt += `\n- Recommendation: This user is a potential customer who has not yet signed up`;
+            }
           }
           
           // Add session context to system prompt if available
