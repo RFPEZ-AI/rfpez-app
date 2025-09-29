@@ -1038,6 +1038,24 @@ serve(async (req: Request) => {
           // Build system prompt
           let systemPrompt = requestBody.agent?.instructions || 'You are a helpful AI assistant.';
           
+          // Add user authentication context to system prompt
+          if (requestBody.userProfile) {
+            systemPrompt += `\n\nUSER CONTEXT:`;
+            systemPrompt += `\n- User Status: AUTHENTICATED`;
+            systemPrompt += `\n- User ID: ${requestBody.userProfile.id}`;
+            systemPrompt += `\n- Email: ${requestBody.userProfile.email}`;
+            if (requestBody.userProfile.full_name) {
+              systemPrompt += `\n- Name: ${requestBody.userProfile.full_name}`;
+            }
+            if (requestBody.userProfile.role) {
+              systemPrompt += `\n- Role: ${requestBody.userProfile.role}`;
+            }
+          } else {
+            systemPrompt += `\n\nUSER CONTEXT:`;
+            systemPrompt += `\n- User Status: ANONYMOUS (not logged in)`;
+            systemPrompt += `\n- This user is a potential customer who has not yet signed up`;
+          }
+          
           // Add session context to system prompt if available
           if (requestBody.sessionId) {
             systemPrompt += `\n\nCurrent session: ${requestBody.sessionId}`;
