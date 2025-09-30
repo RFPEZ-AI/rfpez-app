@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { supabase } from '../supabaseClient';
 import type { RFP, FormSpec, Bid } from '../types/rfp';

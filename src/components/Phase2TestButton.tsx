@@ -1,5 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Phase 2 Test Button Component - Streaming Integration Test
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState } from 'react';
 import { IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonItem, IonLabel, IonSpinner, IonTextarea } from '@ionic/react';
