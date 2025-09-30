@@ -7,6 +7,118 @@ import { ClaudeAPIService, ToolExecutionService } from '../services/claude.ts';
 import { getToolDefinitions } from '../tools/definitions.ts';
 import type { ToolInvocationEvent, StreamingResponse, ClientCallback } from '../types.ts';
 
+// Handle streaming response with proper SSE format
+async function handleStreamingResponse(
+  messages: any[], 
+  supabase: any, 
+  userId: string, 
+  sessionId?: string, 
+  agentId?: string
+): Promise<Response> {
+  // Create readable stream for SSE
+  const stream = new ReadableStream({
+    async start(controller) {
+      try {
+        const claudeService = new ClaudeAPIService();
+        const toolService = new ToolExecutionService(supabase, userId);
+        const tools = getToolDefinitions();
+        
+        console.log('🌊 Starting streaming response...');
+        
+        // Stream response from Claude with proper formatting
+        let fullContent = '';
+        let toolsUsed: string[] = [];
+
+        await claudeService.streamMessage(messages, tools, (chunk) => {
+          try {
+            console.log('📡 Streaming chunk received:', chunk.type, chunk);
+            
+            // Convert Claude API streaming events to client-expected format
+            if (chunk.type === 'text' && chunk.content) {
+              fullContent += chunk.content;
+              
+              // Send content_delta event in expected format for client
+              const textEvent = {
+                type: 'content_delta',
+                delta: chunk.content,
+                full_content: fullContent
+              };
+              const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
+              console.log('📤 Sending to client:', JSON.stringify(textEvent));
+              controller.enqueue(new TextEncoder().encode(sseData));
+              
+            } else if (chunk.type === 'tool_use') {
+              console.log('🔧 Tool use detected:', chunk.name);
+              if (!toolsUsed.includes(chunk.name)) {
+                toolsUsed.push(chunk.name);
+              }
+              
+              // Send tool invocation start event
+              const toolEvent = {
+                type: 'tool_invocation',
+                toolEvent: {
+                  type: 'tool_start',
+                  toolName: chunk.name,
+                  input: chunk.input
+                }
+              };
+              const sseData = `data: ${JSON.stringify(toolEvent)}\n\n`;
+              controller.enqueue(new TextEncoder().encode(sseData));
+              
+              // Execute tool and send completion event
+              const toolService = new ToolExecutionService(supabase, userId);
+              toolService.executeTool(chunk, sessionId).then((result) => {
+                const toolCompleteEvent = {
+                  type: 'tool_invocation',
+                  toolEvent: {
+                    type: 'tool_complete',
+                    toolName: chunk.name,
+                    result: result
+                  }
+                };
+                const completeSseData = `data: ${JSON.stringify(toolCompleteEvent)}\n\n`;
+                controller.enqueue(new TextEncoder().encode(completeSseData));
+              }).catch((error) => {
+                console.error('Tool execution error:', error);
+              });
+            }
+          } catch (error) {
+            console.error('Error encoding chunk:', error);
+          }
+        });
+        
+        // Send completion event with metadata
+        const completeEvent = {
+          type: 'complete',
+          full_content: fullContent,
+          token_count: fullContent.length, // Approximate token count
+          tool_results: toolsUsed.map(name => ({ name, success: true }))
+        };
+        controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
+        
+        console.log('✅ Streaming completed successfully');
+        controller.close();
+        
+      } catch (error) {
+        console.error('Streaming error:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Unknown streaming error';
+        const errorEvent = JSON.stringify({ type: 'error', error: errorMessage });
+        controller.enqueue(new TextEncoder().encode(`data: ${errorEvent}\n\n`));
+        controller.close();
+      }
+    }
+  });
+
+  return new Response(stream, {
+    headers: {
+      ...corsHeaders,
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache',
+      'Connection': 'keep-alive',
+    },
+  });
+}
+
 // Handle OPTIONS request for CORS
 export function handleOptionsRequest(): Response {
   return new Response(null, { 
@@ -77,6 +189,12 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       hasClientCallback: !!clientCallback 
     });
 
+    // If streaming is requested, handle it separately
+    if (stream) {
+      console.log('🌊 Streaming requested - using streaming handler');
+      return handleStreamingResponse(processedMessages, supabase, userId, sessionId, effectiveAgentId);
+    }
+
     // Initialize services
     const claudeService = new ClaudeAPIService();
     const toolService = new ToolExecutionService(supabase, userId);
@@ -119,7 +237,6 @@ export async function handlePostRequest(request: Request): Promise<Response> {
         // Get final response from Claude
         const finalResponse = await claudeService.sendMessage(followUpMessages, tools);
         claudeResponse.textResponse = finalResponse.textResponse;
-        claudeResponse.finalToolCalls = finalResponse.toolCalls;
       }
     }
 
