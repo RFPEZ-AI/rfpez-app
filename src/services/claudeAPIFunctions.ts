@@ -1432,7 +1432,7 @@ export class ClaudeAPIFunctionHandler {
       user_type: userId === 'anonymous' ? 'anonymous' : 'authenticated',
       message: `Found ${agents.length} available agents with their IDs:`,
       formatted_agent_list: agentList.map(agent => agent.display_name_with_id).join('\n'),
-      agent_switching_instructions: "To switch agents, use: switch_agent with session_id and one of the agent IDs shown above"
+      agent_switching_instructions: "CRITICAL: When the user requests to switch agents, you MUST call the switch_agent function with session_id and agent_id. Do NOT just mention switching - you must execute the function call. Never say 'switching you to...' without calling switch_agent."
     };
   }
 
