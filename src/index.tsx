@@ -11,6 +11,11 @@ import './utils/websocketDebugger';
 import './utils/functionStatusVerifier';
 // Initialize Claude streaming test function for development
 import './utils/claudeStreamingTester';
+// Initialize agent switch debugging tools for development
+import './utils/agentSwitchTestUtil';
+import './utils/agentSwitchHelp';
+// Initialize Supabase health checker for debugging
+import './utils/supabaseHealthChecker';
 
 const container = document.getElementById('root');
 // eslint-disable-next-line @typescript-eslint/no-non-null-assertion

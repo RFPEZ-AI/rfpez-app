@@ -251,16 +251,44 @@ export class AgentService {
   static async getSessionActiveAgent(sessionId: string): Promise<SessionActiveAgent | null> {
     console.log('AgentService.getSessionActiveAgent called with:', sessionId);
     
-    const { data, error } = await supabase
-      .rpc('get_session_active_agent', { session_uuid: sessionId });
+    try {
+      const { data, error } = await supabase
+        .rpc('get_session_active_agent', { session_uuid: sessionId });
 
-    if (error) {
-      console.error('Error fetching session active agent:', error);
+      if (error) {
+        console.error('❌ Supabase RPC error in getSessionActiveAgent:', {
+          error,
+          sessionId,
+          errorCode: error.code,
+          errorMessage: error.message,
+          errorDetails: error.details,
+          errorHint: error.hint
+        });
+        
+        // Check if it's a network connectivity issue
+        if (error.message?.includes('Failed to fetch') || error.message?.includes('fetch')) {
+          console.error('🌐 Network connectivity issue detected. Check internet connection and Supabase status.');
+        }
+        
+        // Check if it's an RPC function issue
+        if (error.message?.includes('function') || error.code === 'PGRST202') {
+          console.error('🔧 RPC function issue. The get_session_active_agent function may not exist or has wrong signature.');
+        }
+        
+        return null;
+      }
+
+      console.log('Session active agent:', data);
+      return data && data.length > 0 ? data[0] : null;
+    } catch (networkError) {
+      console.error('❌ Network error in getSessionActiveAgent:', {
+        networkError,
+        sessionId,
+        errorType: networkError instanceof Error ? networkError.name : 'Unknown',
+        errorMessage: networkError instanceof Error ? networkError.message : 'Unknown error'
+      });
       return null;
     }
-
-    console.log('Session active agent:', data);
-    return data && data.length > 0 ? data[0] : null;
   }
 
   /**

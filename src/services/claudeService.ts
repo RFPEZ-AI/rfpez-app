@@ -328,6 +328,7 @@ export class ClaudeService {
         let fullContent = '';
         let toolsUsed: string[] = [];
         const functionResults: any[] = [];
+        let buffer = ''; // Buffer for incomplete lines
 
         console.log('🚨 STARTING SSE READER LOOP - reader exists:', !!reader);
         
@@ -343,7 +344,11 @@ export class ClaudeService {
 
               const chunk = decoder.decode(value, { stream: true });
               console.log('🚨 RAW CHUNK RECEIVED:', chunk.substring(0, 200) + '...');
-              const lines = chunk.split('\n');
+              buffer += chunk; // Add to buffer
+              const lines = buffer.split('\n');
+              
+              // Keep the last line in buffer (might be incomplete)
+              buffer = lines.pop() || '';
 
               for (const line of lines) {
                 console.log('🚨 PROCESSING SSE LINE:', line.substring(0, 100) + '...');
@@ -383,9 +388,27 @@ export class ClaudeService {
                       if (eventData.metadata?.toolsUsed) {
                         toolsUsed = [...new Set([...toolsUsed, ...eventData.metadata.toolsUsed])];
                       }
+                      
+                      // Process client callbacks if present
+                      if (eventData.metadata?.clientCallbacks) {
+                        console.log('🔄 Processing client callbacks:', eventData.metadata.clientCallbacks);
+                        eventData.metadata.clientCallbacks.forEach((callback: any) => {
+                          if (callback.type === 'ui_refresh') {
+                            console.log('🔄 Dispatching UI refresh event:', callback.data);
+                            window.dispatchEvent(new CustomEvent('ui_refresh', { 
+                              detail: callback.data 
+                            }));
+                          }
+                        });
+                      }
                     }
                   } catch (parseError) {
-                    console.warn('Failed to parse SSE data:', line);
+                    console.warn('Failed to parse SSE data:', {
+                      error: parseError,
+                      lineLength: line.length,
+                      linePreview: line.substring(0, 200) + '...',
+                      rawLine: line
+                    });
                   }
                 }
               }
@@ -597,6 +620,12 @@ AGENT SWITCHING GUIDELINES:
 - For sales/pricing questions: Switch to "Solutions" agent
 - For platform guidance: Switch to "Onboarding" agent
 - Always explain WHY you're switching and what the new agent can help with
+
+CRITICAL AGENT SWITCHING RULE:
+When switching agents, you MUST CALL the switch_agent function - do NOT just mention switching in text.
+WRONG: "I'll connect you with the RFP Designer..." (without calling switch_agent)
+RIGHT: Call switch_agent function AND explain the switch.
+If you mention switching agents, you MUST immediately call the switch_agent function.
 
 AGENT ACCESS LEVELS:
 - Default agents: Available to all users (even non-authenticated)
@@ -1350,6 +1379,16 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       if (agentSwitchOccurred) {
         // Find the agent switch result
         agentSwitchResult = allFunctionResults.find(result => result.function === 'switch_agent')?.result;
+      }
+
+      // Debug: Check for missed agent switches
+      if (!agentSwitchOccurred && finalContent) {
+        const agentSwitchDebugger = (await import('../utils/agentSwitchDebugger')).default;
+        const missedSwitch = agentSwitchDebugger.detectMissedAgentSwitch(finalContent, functionsExecuted);
+        
+        if (missedSwitch.shouldHaveSwitched) {
+          agentSwitchDebugger.logMissedSwitch(finalContent, missedSwitch.suggestedAgent);
+        }
       }
 
       return {

@@ -829,21 +829,45 @@ export const useMessageHandling = () => {
           
           if (activeSessionId) {
             try {
+              console.log('🔄 Agent switch detected, fetching new agent...');
               const newAgent = await AgentService.getSessionActiveAgent(activeSessionId);
+              
               if (newAgent) {
-                console.log('UI refresh after agent switch - loaded agent:', newAgent.agent_name);
+                console.log('✅ UI refresh after agent switch - loaded agent:', newAgent.agent_name);
                 const agentMessage = handleAgentChanged(newAgent);
                 if (agentMessage) {
                   setMessages(prev => [...prev, agentMessage]);
                 }
               } else {
-                console.warn('No agent found after switch, retrying...');
-                await new Promise(resolve => setTimeout(resolve, 300));
+                console.warn('⚠️ No agent found after switch, retrying with delay...');
+                await new Promise(resolve => setTimeout(resolve, 500));
+                
                 const retryAgent = await AgentService.getSessionActiveAgent(activeSessionId);
                 if (retryAgent) {
+                  console.log('✅ Retry successful - loaded agent:', retryAgent.agent_name);
                   const agentMessage = handleAgentChanged(retryAgent);
                   if (agentMessage) {
                     setMessages(prev => [...prev, agentMessage]);
+                  }
+                } else {
+                  // Fallback: Use agent info from Claude response if available
+                  console.warn('⚠️ Retry failed, attempting fallback...');
+                  const switchResult = claudeResponse.metadata.agent_switch_result;
+                  if (switchResult?.new_agent) {
+                    console.log('📋 Using agent info from Claude response as fallback');
+                    const fallbackAgent = {
+                      agent_id: switchResult.new_agent.id,
+                      agent_name: switchResult.new_agent.name,
+                      agent_instructions: switchResult.new_agent.instructions,
+                      agent_initial_prompt: switchResult.new_agent.initial_prompt,
+                      agent_avatar_url: undefined
+                    };
+                    const agentMessage = handleAgentChanged(fallbackAgent);
+                    if (agentMessage) {
+                      setMessages(prev => [...prev, agentMessage]);
+                    }
+                  } else {
+                    console.error('❌ No fallback agent data available');
                   }
                 }
               }
