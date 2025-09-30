@@ -1,5 +1,6 @@
 // Agent Switch Debugging and Fix Utility
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * This utility helps debug and fix agent switching issues where Claude

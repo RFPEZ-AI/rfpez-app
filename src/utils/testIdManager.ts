@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Utility script to manually add test IDs to specific components
 // This complements the automatic decorator by adding permanent test attributes

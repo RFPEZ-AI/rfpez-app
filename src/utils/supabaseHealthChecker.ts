@@ -1,5 +1,6 @@
 // Supabase Connection Health Check Utility
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 import { supabase } from '../supabaseClient';
 

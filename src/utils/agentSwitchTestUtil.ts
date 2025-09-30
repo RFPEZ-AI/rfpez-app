@@ -1,5 +1,6 @@
 // Quick Agent Switch Test Utility
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 /**
  * Quick utility to test agent switching manually

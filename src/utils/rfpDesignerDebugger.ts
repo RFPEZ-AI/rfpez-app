@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Debugging utility for RFP Designer agent issues
 // This helps identify why RFP Designer returns blank responses

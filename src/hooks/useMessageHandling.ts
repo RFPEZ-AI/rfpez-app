@@ -14,7 +14,7 @@ import { categorizeError } from '../components/APIErrorHandler';
 // Client update interfaces for edge function communication
 interface ClientAction {
   action: 'UPDATE_CURRENT_RFP' | 'SHOW_SUCCESS_MESSAGE' | 'REFRESH_UI_STATE';
-  data: any;
+  data: Record<string, unknown>;
 }
 
 interface ClientUpdates {
@@ -25,9 +25,9 @@ interface ClientUpdates {
 interface EnhancedFunctionResult {
   success?: boolean;
   current_rfp_id?: string | number;
-  rfp?: any;
+  rfp?: Record<string, unknown>;
   client_updates?: ClientUpdates;
-  [key: string]: any;
+  [key: string]: unknown;
 }
 
 export const useMessageHandling = () => {
@@ -59,10 +59,10 @@ export const useMessageHandling = () => {
     // Handle function results that contain forms/templates
     if (metadata.function_results && Array.isArray(metadata.function_results)) {
       console.log('� DEBUG: function_results found, length:', metadata.function_results.length);
-      metadata.function_results.forEach((func: unknown) => {
-        console.log('🔍 DEBUG: Processing function result:', func);
-        if (typeof func === 'object' && func !== null) {
-          const funcObj = func as Record<string, unknown>;
+            metadata.function_results.forEach((funcResult: Record<string, unknown>, index: number) => {
+        console.log('🔍 DEBUG: Processing function result:', funcResult);
+        if (typeof funcResult === 'object' && funcResult !== null) {
+          const funcObj = funcResult as Record<string, unknown>;
           const result = funcObj.result as Record<string, unknown>;
           
           console.log('🔍 DEBUG: Function object:', {

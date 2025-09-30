@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 // Claude MCP Test Utilities
 // Test Claude's ability to use MCP functions

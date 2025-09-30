@@ -123,10 +123,51 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       }
     }
 
+    // Prepare metadata in format expected by client
+    const metadata: any = {
+      model: 'claude-sonnet-4-20250514',
+      response_time: 0,
+      temperature: 0.3,
+      tokens_used: claudeResponse.usage?.output_tokens || 0,
+      functions_called: claudeResponse.toolCalls?.map((call: any) => call.name) || [],
+      function_results: toolResults,
+      is_streaming: false,
+      stream_complete: true,
+      agent_switch_occurred: false
+    };
+
+    // Add tool_use information for artifact reference generation
+    if (claudeResponse.toolCalls && claudeResponse.toolCalls.length > 0) {
+      // Use the first tool call for tool_use (client expects single tool_use object)
+      const firstToolCall = claudeResponse.toolCalls[0];
+      metadata.tool_use = {
+        name: firstToolCall.name,
+        input: firstToolCall.input
+      };
+    }
+
+    // Create artifacts array from form creation results
+    const artifacts: any[] = [];
+    toolResults.forEach((result: any) => {
+      if (result.function_name === 'create_form_artifact' && result.result?.success) {
+        artifacts.push({
+          name: result.result.artifact?.title || 'Form Artifact',
+          type: 'form',
+          id: result.result.artifact?.id,
+          created: true
+        });
+      }
+    });
+
+    if (artifacts.length > 0) {
+      metadata.artifacts = artifacts;
+    }
+
     // Prepare response
-    const responseData = {
+    const responseData: any = {
       success: true,
-      response: claudeResponse.textResponse,
+      content: claudeResponse.textResponse, // Changed from 'response' to 'content' for client compatibility
+      metadata: metadata, // Add metadata object with artifact info
       toolCalls: claudeResponse.toolCalls,
       toolResults: toolResults,
       usage: claudeResponse.usage,
@@ -210,7 +251,8 @@ export async function handleStreamingRequest(request: Request): Promise<Response
           controller.close();
         } catch (error) {
           console.error('Streaming error:', error);
-          const errorData = `data: ${JSON.stringify({ error: error.message })}\n\n`;
+          const errorMessage = error instanceof Error ? error.message : 'Unknown streaming error';
+          const errorData = `data: ${JSON.stringify({ error: errorMessage })}\n\n`;
           controller.enqueue(new TextEncoder().encode(errorData));
           controller.close();
         }
@@ -228,8 +270,9 @@ export async function handleStreamingRequest(request: Request): Promise<Response
 
   } catch (error) {
     console.error('Error in handleStreamingRequest:', error);
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: errorMessage }),
       { status: 500, headers: corsHeaders }
     );
   }

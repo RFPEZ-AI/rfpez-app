@@ -1,4 +1,5 @@
 // Test Claude function calling with minimal example
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import Anthropic from '@anthropic-ai/sdk';
 import { claudeApiFunctions } from './services/claudeAPIFunctions';
 
