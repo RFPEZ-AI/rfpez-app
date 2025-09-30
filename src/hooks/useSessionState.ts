@@ -75,7 +75,7 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
       console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id, 'and RFP:', currentRfpId);
       const session = await DatabaseService.createSessionWithAgent(
         userId, 
-        'New Chat Session',
+        'Chat Session', // Will be updated to message content when first message is sent
         currentAgent?.agent_id,
         undefined, // description
         currentRfpId
