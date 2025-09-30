@@ -179,6 +179,12 @@ async function storeMessage(parameters: any, userId: string, sessionContext?: an
       throw new Error(`Failed to store message: ${error.message}`);
     }
 
+    // Update session timestamp to maintain proper ordering
+    await supabase
+      .from('sessions')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', validSessionId);
+
     return {
       success: true,
       message_id: message.id,
