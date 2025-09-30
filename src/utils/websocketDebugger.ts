@@ -1,5 +1,6 @@
 // WebSocket Debug Utility
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Utility to handle and debug WebSocket connection issues

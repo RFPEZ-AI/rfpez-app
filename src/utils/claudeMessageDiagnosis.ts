@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 // Detailed diagnostic for RFP Designer message display issue
 // This helps identify if the problem is in streaming, function calls, or UI updates

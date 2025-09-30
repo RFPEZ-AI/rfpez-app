@@ -327,7 +327,10 @@ export class ClaudeService {
         const decoder = new TextDecoder();
         let fullContent = '';
         let toolsUsed: string[] = [];
-        const functionResults: any[] = [];
+        const functionResults: Array<{
+          function: string;
+          result: unknown;
+        }> = [];
         let buffer = ''; // Buffer for incomplete lines
 
         console.log('🚨 STARTING SSE READER LOOP - reader exists:', !!reader);
@@ -378,8 +381,7 @@ export class ClaudeService {
                         onChunk('', false, true); // Indicate tool processing
                       } else if (eventData.toolEvent?.type === 'tool_complete') {
                         functionResults.push({
-                          function_name: eventData.toolEvent.toolName,
-                          parameters: eventData.toolEvent.parameters,
+                          function: eventData.toolEvent.toolName,
                           result: eventData.toolEvent.result
                         });
                       }
@@ -392,7 +394,7 @@ export class ClaudeService {
                       // Process client callbacks if present
                       if (eventData.metadata?.clientCallbacks) {
                         console.log('🔄 Processing client callbacks:', eventData.metadata.clientCallbacks);
-                        eventData.metadata.clientCallbacks.forEach((callback: any) => {
+                        eventData.metadata.clientCallbacks.forEach((callback: Record<string, unknown>) => {
                           if (callback.type === 'ui_refresh') {
                             console.log('🔄 Dispatching UI refresh event:', callback.data);
                             window.dispatchEvent(new CustomEvent('ui_refresh', { 
@@ -444,25 +446,29 @@ export class ClaudeService {
         }
 
         console.log('✅ Edge function response received:', {
-          hasResponse: !!data?.response,
-          responseLength: data?.response?.length || 0,
-          functionsExecuted: data?.functionsExecuted || [],
+          hasContent: !!data?.content,
+          contentLength: data?.content?.length || 0,
+          hasMetadata: !!data?.metadata,
+          toolResults: data?.toolResults || [],
           usage: data?.usage
         });
 
+        // Use metadata from edge function response if available, otherwise construct it
+        const metadata = data.metadata || {
+          model: 'claude-sonnet-4-20250514',
+          response_time: data.response_time || 0,
+          temperature: 0.7,
+          tokens_used: data.usage?.input_tokens || 0,
+          functions_called: data.functionsExecuted || [],
+          function_results: data.functionResults || [],
+          is_streaming: false,
+          stream_complete: true,
+          agent_switch_occurred: data.agent_switch_occurred || false
+        };
+
         return {
-          content: data.response || '',
-          metadata: {
-            model: 'claude-sonnet-4-20250514',
-            response_time: data.response_time || 0,
-            temperature: 0.7,
-            tokens_used: data.usage?.input_tokens || 0,
-            functions_called: data.functionsExecuted || [],
-            function_results: data.functionResults || [],
-            is_streaming: false,
-            stream_complete: true,
-            agent_switch_occurred: data.agent_switch_occurred || false
-          }
+          content: data.content || data.response || '', // Support both old and new response formats
+          metadata: metadata
         };
       }
     } catch (error) {

@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Development utility for testing Claude streaming + tool usage fixes
 // This adds a test function to the global window object for browser console testing

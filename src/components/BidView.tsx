@@ -190,13 +190,14 @@ const BidView: React.FC<BidViewProps> = ({ currentRfpId, rfpName }) => {
         // (supplier_id column has caching issues)
 
         // Transform the data to include supplier name from response
-        const transformedBids = bidsData.map((bidRow): any => {
+        const transformedBids = bidsData.map((bidRow): Bid => {
           // Extract supplier name from response.supplier_info
           let supplierName = 'Anonymous Supplier';
           if (bidRow.response && typeof bidRow.response === 'object') {
-            const response = bidRow.response as any;
-            if (response.supplier_info?.name) {
-              supplierName = response.supplier_info.name;
+            const response = bidRow.response;
+            const supplierInfo = response.supplier_info as Record<string, unknown> | undefined;
+            if (supplierInfo && typeof supplierInfo.name === 'string') {
+              supplierName = supplierInfo.name;
             }
           }
           

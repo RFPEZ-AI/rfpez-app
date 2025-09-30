@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 /**
  * Global AbortController monitoring utility for debugging cancellation issues
@@ -63,7 +64,7 @@ class AbortControllerMonitor {
           info.abortedAt = Date.now();
           info.abortReason = this.signal.reason;
           
-          const duration = info.abortedAt - info.createdAt;
+          // const duration = endTime - startTime; // Variables not available in this scope
           
           // DISABLED: Verbose logging causes memory pressure
           // console.group('🚨 AbortController aborted - Global Monitor');

@@ -221,7 +221,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         }
       };
 
-      const handleError = (errors: any[]) => {
+      const handleError = (errors: Record<string, unknown>[]) => {
         console.error('Form validation failed:', errors);
         errors.forEach((error, index) => {
           console.error(`Validation error ${index + 1}:`, {

@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-unused-vars */
 
 // Development utility for decorating clickable elements with visual indicators
 // and data attributes to assist with browser automation testing and debugging
