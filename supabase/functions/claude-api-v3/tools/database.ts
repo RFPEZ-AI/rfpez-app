@@ -14,17 +14,22 @@ export async function createFormArtifact(supabase: any, sessionId: string, userI
     throw new Error(`Invalid artifact role: ${artifactRole}`);
   }
   
-  console.log('Creating form artifact:', { name, description, artifactRole, mappedRole, sessionId, userId });
+  // Generate a unique ID for the artifact (artifacts table uses text ID)
+  const artifactId = crypto.randomUUID();
+  
+  console.log('Creating form artifact:', { artifactId, name, description, artifactRole, mappedRole, sessionId, userId });
   
   const { data: artifact, error } = await supabase
-    .from('form_artifacts')
+    .from('artifacts')
     .insert({
+      id: artifactId, // Provide the required ID field
       session_id: sessionId,
       user_id: userId,
       name: name,
       description: description,
       artifact_role: mappedRole,
-      content: content,
+      schema: content, // Store the form schema in the schema field
+      type: 'form', // Set the type as 'form'
       created_at: new Date().toISOString()
     })
     .select()
