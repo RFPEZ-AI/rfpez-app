@@ -15,7 +15,7 @@ declare global {
 }
 
 // Store last Claude response for debugging
-let lastClaudeResponse: any = null;
+const lastClaudeResponse: any = null;
 
 // Test agent switching functionality  
 const testAgentSwitch = async (agentName: string) => {

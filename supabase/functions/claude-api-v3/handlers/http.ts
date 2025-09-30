@@ -27,23 +27,55 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     
     // Parse request body
     const body = await request.json();
-    const { messages, sessionId, agentId, stream = false, clientCallback } = body;
+    const { 
+      userMessage, 
+      agent, 
+      conversationHistory = [], 
+      sessionId, 
+      agentId, 
+      userProfile,
+      currentRfp,
+      currentArtifact,
+      loginEvidence,
+      stream = false, 
+      clientCallback,
+      // Legacy support for direct messages format
+      messages
+    } = body;
+    
+    // Convert ClaudeService format to messages format
+    let processedMessages: any[] = [];
+    
+    if (messages && Array.isArray(messages)) {
+      // Direct messages format (legacy)
+      processedMessages = messages;
+    } else if (userMessage) {
+      // ClaudeService format - convert to messages
+      processedMessages = [
+        ...conversationHistory,
+        { role: 'user', content: userMessage }
+      ];
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Either messages array or userMessage is required' }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    // Use agentId from payload, or extract from agent object
+    const effectiveAgentId = agentId || agent?.id;
     
     console.log('Request received:', { 
       userId, 
       sessionId, 
-      agentId, 
-      messageCount: messages?.length,
+      agentId: effectiveAgentId,
+      messageCount: processedMessages?.length,
+      hasUserMessage: !!userMessage,
+      hasAgent: !!agent,
+      hasConversationHistory: conversationHistory.length > 0,
       stream,
       hasClientCallback: !!clientCallback 
     });
-
-    if (!messages || !Array.isArray(messages)) {
-      return new Response(
-        JSON.stringify({ error: 'Messages array is required' }),
-        { status: 400, headers: corsHeaders }
-      );
-    }
 
     // Initialize services
     const claudeService = new ClaudeAPIService();
@@ -53,7 +85,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     const tools = getToolDefinitions();
     
     // Send request to Claude API
-    const claudeResponse = await claudeService.sendMessage(messages, tools);
+    const claudeResponse = await claudeService.sendMessage(processedMessages, tools);
     
     // Execute any tool calls
     let toolResults: any[] = [];
@@ -64,7 +96,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       // If there were tool calls, send follow-up message to Claude with results
       if (toolResults.length > 0) {
         const followUpMessages = [
-          ...messages,
+          ...processedMessages,
           {
             role: 'assistant',
             content: claudeResponse.toolCalls.map((call: any) => ({
@@ -99,7 +131,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       toolResults: toolResults,
       usage: claudeResponse.usage,
       sessionId: sessionId,
-      agentId: agentId
+      agentId: effectiveAgentId
     };
 
     // Handle client callback if provided
