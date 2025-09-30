@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 // Updated Claude API service with hybrid proxy pattern
 import Anthropic from '@anthropic-ai/sdk';

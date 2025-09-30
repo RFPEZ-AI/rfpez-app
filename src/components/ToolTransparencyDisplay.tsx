@@ -54,7 +54,7 @@ const ToolTransparencyDisplay: React.FC<ToolTransparencyDisplayProps> = ({
     setActiveTools(active);
   }, [toolInvocations]);
 
-  const getToolIcon = (type: string, toolName: string) => {
+  const getToolIcon = (type: string, _toolName: string) => {
     switch (type) {
       case 'tool_start':
         return <IonSpinner name="dots" color="primary" />;

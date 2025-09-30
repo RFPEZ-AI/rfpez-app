@@ -1,5 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Phase 1 Test Button Component
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import React, { useState } from 'react';
 import { IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonItem, IonLabel, IonSpinner } from '@ionic/react';

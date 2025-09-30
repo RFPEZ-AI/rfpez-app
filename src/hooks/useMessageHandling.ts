@@ -59,7 +59,7 @@ export const useMessageHandling = () => {
     // Handle function results that contain forms/templates
     if (metadata.function_results && Array.isArray(metadata.function_results)) {
       console.log('� DEBUG: function_results found, length:', metadata.function_results.length);
-            metadata.function_results.forEach((funcResult: Record<string, unknown>, index: number) => {
+            metadata.function_results.forEach((funcResult: Record<string, unknown>) => {
         console.log('🔍 DEBUG: Processing function result:', funcResult);
         if (typeof funcResult === 'object' && funcResult !== null) {
           const funcObj = funcResult as Record<string, unknown>;
@@ -94,7 +94,7 @@ export const useMessageHandling = () => {
             } else if (funcObj.function === 'create_and_set_rfp' && result.current_rfp_id) {
               // RFP creation - trigger UI refresh
               const enhancedResult = result as EnhancedFunctionResult;
-              const rfpData = enhancedResult.rfp as any;
+              const rfpData = enhancedResult.rfp as Record<string, unknown>;
               console.log('🐛 DEBUG: create_and_set_rfp detected in function_results - triggering context refresh', {
                 rfpId: enhancedResult.current_rfp_id,
                 rfpName: rfpData?.name,
