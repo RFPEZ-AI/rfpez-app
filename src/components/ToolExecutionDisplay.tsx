@@ -1,5 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
-// Tool Transparency Display Component - Shows real-time Claude tool invocations
+// Tool Execution Display Component - Shows real-time Claude tool invocations
 
 import React, { useState, useEffect } from 'react';
 import {
@@ -26,13 +26,13 @@ import {
 } from 'ionicons/icons';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
 
-interface ToolTransparencyDisplayProps {
+interface ToolExecutionDisplayProps {
   toolInvocations: ToolInvocationEvent[];
   isActive: boolean;
   className?: string;
 }
 
-const ToolTransparencyDisplay: React.FC<ToolTransparencyDisplayProps> = ({
+const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({
   toolInvocations,
   isActive,
   className = ''
@@ -54,7 +54,7 @@ const ToolTransparencyDisplay: React.FC<ToolTransparencyDisplayProps> = ({
     setActiveTools(active);
   }, [toolInvocations]);
 
-  const getToolIcon = (type: string, _toolName: string) => {
+  const getToolIcon = (type: string) => {
     switch (type) {
       case 'tool_start':
         return <IonSpinner name="dots" color="primary" />;
@@ -115,11 +115,11 @@ const ToolTransparencyDisplay: React.FC<ToolTransparencyDisplayProps> = ({
   }
 
   return (
-    <IonCard className={`tool-transparency-display ${className}`}>
+    <IonCard className={`tool-execution-display ${className}`}>
       <IonCardHeader>
         <IonCardTitle>
           <IonIcon icon={flashOutline} color="primary" className="mr-2" />
-          Tool Execution Transparency
+          Tool Execution
           {activeTools.size > 0 && (
             <IonBadge color="primary" className="ml-2">
               {activeTools.size} active
@@ -144,7 +144,7 @@ const ToolTransparencyDisplay: React.FC<ToolTransparencyDisplayProps> = ({
             {visibleTools.map((tool, index) => (
               <IonItem key={`${tool.toolName}-${index}-${tool.timestamp}`}>
                 <div slot="start">
-                  {getToolIcon(tool.type, tool.toolName)}
+                  {getToolIcon(tool.type)}
                 </div>
                 
                 <IonLabel>
@@ -197,4 +197,4 @@ const ToolTransparencyDisplay: React.FC<ToolTransparencyDisplayProps> = ({
   );
 };
 
-export default ToolTransparencyDisplay;
+export default ToolExecutionDisplay;

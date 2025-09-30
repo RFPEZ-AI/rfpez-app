@@ -542,6 +542,12 @@ class ClaudeAPIProxyService {
 
       // Check if we got a non-streaming fallback response (regular JSON)
       const contentType = response.headers.get('content-type');
+      console.log('🔍 RESPONSE DEBUG:', {
+        status: response.status,
+        contentType,
+        headers: Object.fromEntries(response.headers.entries())
+      });
+      
       if (contentType && contentType.includes('application/json')) {
         console.log('🚀 NON-STREAMING FALLBACK detected - handling as regular JSON response');
         
@@ -596,6 +602,7 @@ class ClaudeAPIProxyService {
 
                 
                 const eventData = JSON.parse(rawData);
+                console.log('📥 Client received event:', eventData.type, eventData);
                 
                 switch (eventData.type) {
                   case 'start':

@@ -363,16 +363,17 @@ export class ClaudeService {
                     
                     console.log('🔍 SSE EVENT DEBUG:', {
                       eventType: eventData.type,
-                      hasContent: !!eventData.content,
-                      contentLength: eventData.content?.length || 0,
-                      contentPreview: eventData.content?.substring(0, 50) || '[no content]',
+                      hasContent: !!(eventData.content || eventData.delta),
+                      contentLength: (eventData.content || eventData.delta)?.length || 0,
+                      contentPreview: (eventData.content || eventData.delta)?.substring(0, 50) || '[no content]',
                       rawLine: line.substring(0, 100) + '...'
                     });
                     
-                    if (eventData.type === 'text' && eventData.content) {
-                      fullContent += eventData.content;
-                      console.log('📝 CALLING onChunk with text:', eventData.content.substring(0, 50) + '...');
-                      onChunk(eventData.content, false);
+                    if ((eventData.type === 'text' && eventData.content) || (eventData.type === 'content_delta' && eventData.delta)) {
+                      const content = eventData.content || eventData.delta;
+                      fullContent += content;
+                      console.log('📝 CALLING onChunk with content:', content.substring(0, 50) + '...');
+                      onChunk(content, false);
                     } else if (eventData.type === 'tool_invocation') {
                       if (eventData.toolEvent?.type === 'tool_start') {
                         const toolName = eventData.toolEvent.toolName;
@@ -386,7 +387,8 @@ export class ClaudeService {
                           result: eventData.toolEvent.result
                         });
                       }
-                    } else if (eventData.type === 'completion') {
+                    } else if (eventData.type === 'completion' || eventData.type === 'complete') {
+                      console.log('✅ Stream completion detected:', eventData.type);
                       onChunk('', true); // Indicate completion
                       if (eventData.metadata?.toolsUsed) {
                         toolsUsed = [...new Set([...toolsUsed, ...eventData.metadata.toolsUsed])];

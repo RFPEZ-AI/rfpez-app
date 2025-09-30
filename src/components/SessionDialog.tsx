@@ -4,7 +4,7 @@ import React, { useEffect, useRef } from 'react';
 import { IonCard, IonCardContent } from '@ionic/react';
 import PromptComponent from './PromptComponent';
 import ArtifactReferenceTag from './ArtifactReferenceTag';
-import ToolTransparencyDisplay from './ToolTransparencyDisplay';
+import ToolExecutionDisplay from './ToolExecutionDisplay';
 import { ArtifactReference } from '../types/home';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
 
@@ -27,7 +27,7 @@ interface SessionDialogProps {
   onArtifactSelect?: (artifactRef: ArtifactReference) => void; // New prop for artifact selection
   currentAgent?: { agent_name: string } | null; // Current agent for dynamic thinking message
   onCancelRequest?: () => void; // Function to cancel the current request
-  // Tool transparency props
+  // Tool execution props
   toolInvocations?: ToolInvocationEvent[];
   isToolExecutionActive?: boolean;
 }
@@ -41,7 +41,7 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   onArtifactSelect,
   currentAgent,
   onCancelRequest,
-  // Tool transparency props
+  // Tool execution props
   toolInvocations = [],
   isToolExecutionActive = false
 }) => {
@@ -209,9 +209,9 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
             </IonCard>
           )}
           
-          {/* Tool Transparency Display */}
+          {/* Tool Execution Display */}
           {(toolInvocations.length > 0 || isToolExecutionActive) && (
-            <ToolTransparencyDisplay
+            <ToolExecutionDisplay
               toolInvocations={toolInvocations}
               isActive={isToolExecutionActive}
               className="ion-margin-vertical"

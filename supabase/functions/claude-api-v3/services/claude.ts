@@ -62,24 +62,129 @@ export class ClaudeAPIService {
     };
   }
 
-  // Stream message to Claude API (for future streaming implementation)
+  // Stream message to Claude API with real streaming support
   async streamMessage(messages: any[], tools: any[], onChunk: (chunk: any) => void) {
-    // For now, use regular message and simulate streaming
-    const result = await this.sendMessage(messages, tools);
-    
-    // Simulate streaming by sending chunks
-    const textChunks = result.textResponse.split(' ');
-    for (const chunk of textChunks) {
-      onChunk({ type: 'text_delta', text: chunk + ' ' });
-      await new Promise(resolve => setTimeout(resolve, 50)); // Simulate delay
-    }
-    
-    // Send tool calls as chunks
-    for (const toolCall of result.toolCalls) {
-      onChunk({ type: 'tool_use', ...toolCall });
+    console.log('🌊 Starting real streaming to Claude API:', { 
+      messageCount: messages.length, 
+      toolCount: tools.length 
+    });
+
+    // Convert messages to Claude format
+    const formattedMessages = messages.map(mapMessageToClaudeFormat);
+
+    const requestBody = {
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 4000,
+      temperature: 0.3,
+      messages: formattedMessages,
+      tools: tools,
+      stream: true  // Enable streaming
+    };
+
+    console.log('Claude API streaming request initiated');
+
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': this.apiKey,
+        'anthropic-version': '2023-06-01'
+      },
+      body: JSON.stringify(requestBody)
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Claude API streaming error:', response.status, errorText);
+      throw new Error(`Claude API streaming error: ${response.status} ${errorText}`);
     }
 
-    return result;
+    if (!response.body) {
+      throw new Error('No response body available for streaming');
+    }
+
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+    let fullTextResponse = '';
+    const toolCalls: any[] = [];
+
+    try {
+      while (true) {
+        const { done, value } = await reader.read();
+        
+        if (done) {
+          console.log('✅ Claude streaming completed');
+          break;
+        }
+
+        const chunk = decoder.decode(value, { stream: true });
+        buffer += chunk;
+
+        // Process complete lines (SSE format)
+        const lines = buffer.split('\n');
+        buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const eventData = line.slice(6).trim();
+            
+            if (eventData === '[DONE]') {
+              console.log('🏁 Received streaming end marker');
+              break;
+            }
+
+            try {
+              const parsed = JSON.parse(eventData);
+              console.log('📡 Streaming event:', parsed.type);
+
+              if (parsed.type === 'content_block_delta') {
+                if (parsed.delta?.type === 'text_delta') {
+                  const textChunk = parsed.delta.text;
+                  fullTextResponse += textChunk;
+                  
+                  // Send text chunk to client
+                  onChunk({ 
+                    type: 'text', 
+                    content: textChunk,
+                    delta: true 
+                  });
+                }
+              } else if (parsed.type === 'content_block_start') {
+                if (parsed.content_block?.type === 'tool_use') {
+                  console.log('🔧 Tool use detected:', parsed.content_block.name);
+                  toolCalls.push(parsed.content_block);
+                  
+                  // Send tool use event to client
+                  onChunk({ 
+                    type: 'tool_use', 
+                    ...parsed.content_block 
+                  });
+                }
+              } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason) {
+                console.log('🛑 Message stopped:', parsed.delta.stop_reason);
+              }
+            } catch (parseError) {
+              console.error('Error parsing streaming data:', parseError, 'Data:', eventData);
+            }
+          }
+        }
+      }
+    } finally {
+      reader.releaseLock();
+    }
+
+    console.log('📊 Streaming summary:', {
+      textLength: fullTextResponse.length,
+      toolCallCount: toolCalls.length
+    });
+
+    return {
+      textResponse: fullTextResponse,
+      toolCalls: toolCalls,
+      usage: { output_tokens: 0 }, // Usage not available in streaming
+      rawResponse: null
+    };
   }
 }
 
@@ -142,7 +247,7 @@ export class ToolExecutionService {
       console.error(`Error executing tool ${name}:`, error);
       return {
         success: false,
-        error: error.message || 'Tool execution failed'
+        error: error instanceof Error ? error.message : 'Tool execution failed'
       };
     }
   }
