@@ -3,26 +3,21 @@
 
 import React, { useState, useEffect } from 'react';
 import {
-  IonCard,
-  IonCardContent,
-  IonCardHeader,
-  IonCardTitle,
   IonChip,
   IonIcon,
   IonItem,
   IonLabel,
   IonList,
-  IonProgressBar,
   IonSpinner,
   IonText,
-  IonBadge
+  IonButton
 } from '@ionic/react';
 import {
   constructOutline,
   checkmarkCircleOutline,
   alertCircleOutline,
-  timeOutline,
-  flashOutline
+  chevronDownOutline,
+  chevronUpOutline
 } from 'ionicons/icons';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
 
@@ -37,13 +32,10 @@ const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({
   isActive,
   className = ''
 }) => {
-  const [visibleTools, setVisibleTools] = useState<ToolInvocationEvent[]>([]);
+  const [expanded, setExpanded] = useState<boolean>(false);
   const [activeTools, setActiveTools] = useState<Set<string>>(new Set());
 
   useEffect(() => {
-    // Update visible tools when new invocations arrive
-    setVisibleTools(toolInvocations);
-    
     // Track active tools
     const active = new Set<string>();
     toolInvocations.forEach(tool => {
@@ -57,15 +49,15 @@ const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({
   const getToolIcon = (type: string) => {
     switch (type) {
       case 'tool_start':
-        return <IonSpinner name="dots" color="primary" />;
+        return <IonSpinner name="dots" color="primary" style={{ width: '14px', height: '14px' }} />;
       case 'tool_progress':
-        return <IonIcon icon={timeOutline} color="warning" />;
+        return <IonIcon icon={constructOutline} color="warning" style={{ fontSize: '14px' }} />;
       case 'tool_complete':
-        return <IonIcon icon={checkmarkCircleOutline} color="success" />;
+        return <IonIcon icon={checkmarkCircleOutline} color="success" style={{ fontSize: '14px' }} />;
       case 'tool_error':
-        return <IonIcon icon={alertCircleOutline} color="danger" />;
+        return <IonIcon icon={alertCircleOutline} color="danger" style={{ fontSize: '14px' }} />;
       default:
-        return <IonIcon icon={constructOutline} color="medium" />;
+        return <IonIcon icon={constructOutline} color="medium" style={{ fontSize: '14px' }} />;
     }
   };
 
@@ -114,86 +106,99 @@ const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({
     return null;
   }
 
-  return (
-    <IonCard className={`tool-execution-display ${className}`}>
-      <IonCardHeader>
-        <IonCardTitle>
-          <IonIcon icon={flashOutline} color="primary" className="mr-2" />
-          Tool Execution
-          {activeTools.size > 0 && (
-            <IonBadge color="primary" className="ml-2">
-              {activeTools.size} active
-            </IonBadge>
-          )}
-        </IonCardTitle>
-      </IonCardHeader>
-      
-      <IonCardContent>
-        {toolInvocations.length === 0 && isActive && (
-          <IonItem>
-            <IonSpinner name="dots" slot="start" />
-            <IonLabel>
-              <h3>Waiting for Claude to select tools...</h3>
-              <p>Claude will automatically choose the appropriate tools based on your request</p>
-            </IonLabel>
-          </IonItem>
-        )}
+  // Group tools by name and get latest status for each
+  const toolSummary = toolInvocations.reduce((acc: Record<string, ToolInvocationEvent>, tool) => {
+    if (!acc[tool.toolName] || new Date(tool.timestamp) > new Date(acc[tool.toolName].timestamp)) {
+      acc[tool.toolName] = tool;
+    }
+    return acc;
+  }, {});
 
+  const toolNames = Object.keys(toolSummary);
+  const completedCount = toolNames.filter(name => toolSummary[name].type === 'tool_complete').length;
+  const activeCount = toolNames.filter(name => toolSummary[name].type === 'tool_start').length;
+
+  return (
+    <div className={`tool-execution-compact ${className}`} style={{ margin: '8px 0' }}>
+      {/* Compact one-line display */}
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '8px',
+        padding: '4px 8px',
+        backgroundColor: 'var(--ion-color-light)',
+        borderRadius: '8px',
+        fontSize: '14px'
+      }}>
+        {/* Status icon */}
+        {activeCount > 0 ? (
+          <IonSpinner name="dots" style={{ width: '16px', height: '16px' }} />
+        ) : (
+          <IonIcon icon={checkmarkCircleOutline} color="success" style={{ fontSize: '16px' }} />
+        )}
+        
+        {/* Tool names and status */}
+        <IonText style={{ flex: 1 }}>
+          {toolNames.length === 0 && 'Tools: Waiting...'}
+          {toolNames.length > 0 && (
+            <>
+              Tools: {toolNames.map(name => getToolDisplayName(name)).join(', ')}
+              {activeCount > 0 && <span style={{ color: 'var(--ion-color-primary)' }}> (running)</span>}
+              {activeCount === 0 && completedCount > 0 && <span style={{ color: 'var(--ion-color-success)' }}> (completed)</span>}
+            </>
+          )}
+        </IonText>
+        
+        {/* Expand/collapse button */}
         {toolInvocations.length > 0 && (
-          <IonList>
-            {visibleTools.map((tool, index) => (
-              <IonItem key={`${tool.toolName}-${index}-${tool.timestamp}`}>
+          <IonButton 
+            fill="clear" 
+            size="small"
+            onClick={() => setExpanded(!expanded)}
+            style={{ margin: 0, height: '24px' }}
+          >
+            <IonIcon icon={expanded ? chevronUpOutline : chevronDownOutline} />
+          </IonButton>
+        )}
+      </div>
+      
+      {/* Expandable details */}
+      {expanded && toolInvocations.length > 0 && (
+        <div style={{ 
+          marginTop: '8px', 
+          padding: '8px',
+          backgroundColor: 'var(--ion-color-light-shade)',
+          borderRadius: '8px',
+          fontSize: '12px'
+        }}>
+          <IonList style={{ padding: 0 }}>
+            {toolInvocations.map((tool, index) => (
+              <IonItem key={`${tool.toolName}-${index}-${tool.timestamp}`} lines="none" style={{ fontSize: '12px' }}>
                 <div slot="start">
                   {getToolIcon(tool.type)}
                 </div>
                 
                 <IonLabel>
-                  <h3>
+                  <h3 style={{ fontSize: '12px', margin: '2px 0' }}>
                     {getToolDisplayName(tool.toolName)}
-                    {tool.type === 'tool_start' && (
-                      <IonProgressBar className="ml-2" />
-                    )}
                   </h3>
                   
-                  <p className="tool-status">
-                    {tool.type === 'tool_start' && 'Starting execution...'}
-                    {tool.type === 'tool_progress' && 'In progress...'}
+                  <p style={{ fontSize: '11px', margin: '1px 0', color: 'var(--ion-color-medium)' }}>
+                    {tool.type === 'tool_start' && 'Starting...'}
                     {tool.type === 'tool_complete' && `Completed ${getExecutionTime(tool) ? `in ${getExecutionTime(tool)}` : ''}`}
                     {tool.type === 'tool_error' && `Error: ${tool.error || 'Unknown error'}`}
                   </p>
-                  
-                  {tool.parameters && Object.keys(tool.parameters).length > 0 && (
-                    <div className="tool-parameters">
-                      {Object.entries(tool.parameters).slice(0, 2).map(([key, value]) => (
-                        <IonChip key={key} color="light">
-                          <IonText className="text-xs">
-                            {key}: {typeof value === 'string' ? value.substring(0, 20) + (value.length > 20 ? '...' : '') : JSON.stringify(value).substring(0, 20)}
-                          </IonText>
-                        </IonChip>
-                      ))}
-                    </div>
-                  )}
                 </IonLabel>
                 
-                <IonChip slot="end" color={getToolColor(tool.type)}>
+                <IonChip slot="end" color={getToolColor(tool.type)} style={{ fontSize: '10px', height: '20px' }}>
                   {tool.type.replace('tool_', '')}
                 </IonChip>
               </IonItem>
             ))}
           </IonList>
-        )}
-        
-        {!isActive && toolInvocations.length > 0 && (
-          <IonItem>
-            <IonIcon icon={checkmarkCircleOutline} slot="start" color="success" />
-            <IonLabel>
-              <h3>All tools completed</h3>
-              <p>{toolInvocations.length} tool{toolInvocations.length !== 1 ? 's' : ''} executed successfully</p>
-            </IonLabel>
-          </IonItem>
-        )}
-      </IonCardContent>
-    </IonCard>
+        </div>
+      )}
+    </div>
   );
 };
 

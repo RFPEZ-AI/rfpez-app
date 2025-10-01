@@ -1,7 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Core tools and database operations for Claude API v3
 
-import { config } from '../config.ts';
 import { mapArtifactRole } from '../utils/mapping.ts';
 
 // Type definitions for database operations
@@ -109,16 +108,19 @@ interface SwitchAgentData {
 export async function createFormArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: FormArtifactData) {
   const { name, description, content, artifactRole } = data;
   
+  // Default to buyer_questionnaire if artifactRole is not provided
+  const effectiveArtifactRole = artifactRole || 'buyer_questionnaire';
+  
   // Map artifact role to valid database value
-  const mappedRole = mapArtifactRole(artifactRole);
+  const mappedRole = mapArtifactRole(effectiveArtifactRole);
   if (!mappedRole) {
-    throw new Error(`Invalid artifact role: ${artifactRole}`);
+    throw new Error(`Invalid artifact role: ${effectiveArtifactRole}`);
   }
   
   // Generate a unique ID for the artifact (artifacts table uses text ID)
   const artifactId = crypto.randomUUID();
   
-  console.log('Creating form artifact:', { artifactId, name, description, artifactRole, mappedRole, sessionId, userId });
+  console.log('Creating form artifact:', { artifactId, name, description, artifactRole: effectiveArtifactRole, mappedRole, sessionId, userId });
   
   const { data: artifact, error } = await supabase
     .from('artifacts')
