@@ -33,7 +33,6 @@ const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({
   className = ''
 }) => {
   const [expanded, setExpanded] = useState<boolean>(false);
-  const [activeTools, setActiveTools] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     // Track active tools
@@ -43,7 +42,7 @@ const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({
         active.add(tool.toolName);
       }
     });
-    setActiveTools(active);
+    // Active tools tracking removed - was unused
   }, [toolInvocations]);
 
   const getToolIcon = (type: string) => {
