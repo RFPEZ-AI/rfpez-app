@@ -5,6 +5,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import type { Message, ContentBlock, TextBlock, ToolUseBlock, MessageParam } from '@anthropic-ai/sdk/resources';
 import type { Agent } from '../types/database';
+import { ToolInvocationEvent } from '../types/streamingProtocol';
 import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
 import { APIRetryHandler } from '../utils/apiRetry';
 import { supabase } from '../supabaseClient';
@@ -262,7 +263,7 @@ export class ClaudeService {
     } | null,
     abortSignal?: AbortSignal,
     stream = false,
-    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean) => void
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void
   ): Promise<ClaudeResponse> {
     // Use centralized Supabase client to avoid multiple instance warnings
     
@@ -381,12 +382,15 @@ export class ClaudeService {
                         if (!toolsUsed.includes(toolName)) {
                           toolsUsed.push(toolName);
                         }
-                        onChunk('', false, true); // Indicate tool processing
+                        // Pass the actual tool event data to the UI
+                        onChunk('', false, true, eventData.toolEvent);
                       } else if (eventData.toolEvent?.type === 'tool_complete') {
                         functionResults.push({
                           function: eventData.toolEvent.toolName,
                           result: eventData.toolEvent.result
                         });
+                        // Pass the tool completion event to the UI
+                        onChunk('', false, true, eventData.toolEvent);
                       }
                     } else if (eventData.type === 'completion' || eventData.type === 'complete') {
                       console.log('✅ Stream completion detected:', eventData.type);
@@ -521,7 +525,7 @@ export class ClaudeService {
     } | null,
     abortSignal?: AbortSignal,
     stream = false,
-    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean) => void
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void
   ): Promise<ClaudeResponse> {
     // Initialize and clean up authentication state
     await this.initializeAuth();
@@ -1595,7 +1599,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       content?: string;
     } | null,
     abortSignal?: AbortSignal,
-    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean) => void
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void
   ): Promise<ClaudeResponse> {
     return this.generateResponse(
       userMessage,

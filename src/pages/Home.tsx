@@ -222,7 +222,7 @@ const Home: React.FC = () => {
   const [forceSessionHistoryCollapsed, setForceSessionHistoryCollapsed] = useState(false);
   const [isCreatingNewSession, setIsCreatingNewSession] = useState(false);
 
-  const { handleSendMessage, sendAutoPrompt, cancelRequest } = useMessageHandling();
+  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, setToolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling();
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -302,6 +302,9 @@ const Home: React.FC = () => {
     await loadSessionMessages(sessionId);
     await loadSessionAgent(sessionId);
     const sessionArtifacts = await loadSessionArtifacts(sessionId);
+    
+    // Load tool invocations for this session
+    loadToolInvocationsForSession(sessionId);
     
     // Try to restore the session's current artifact first, then fall back to saved or most recent
     const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
@@ -865,6 +868,10 @@ const Home: React.FC = () => {
           // CRITICAL: Update ref immediately for synchronous access
           currentSessionIdRef.current = newSessionId;
           console.log('📌 Session ID ref updated immediately:', newSessionId);
+          
+          // Clear tool invocations for the new session (start fresh)
+          clearToolInvocations(newSessionId);
+          loadToolInvocationsForSession(newSessionId);
           
           console.log('⏳ State set, isCreatingNewSession should be cleared by useEffect when currentSessionId updates');
           
@@ -1507,6 +1514,7 @@ const Home: React.FC = () => {
             onFormSubmit={handleFormSubmissionWithAutoPrompt}
             currentAgent={currentAgent}
             onCancelRequest={cancelRequest}
+            toolInvocations={toolInvocations}
             // New artifact window state props
             artifactWindowOpen={artifactWindowState.isOpen}
             artifactWindowCollapsed={artifactWindowState.isCollapsed}

@@ -1,7 +1,35 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Tool definitions for Claude API integration
 
-export const TOOL_DEFINITIONS = [
+import { ClaudeToolDefinition } from '../types.ts';
+
+export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
+  {
+    name: 'create_and_set_rfp',
+    description: 'Create a new RFP and set it as the current active RFP for the session. CRITICAL: You MUST provide a descriptive name that includes what is being procured (e.g., "Asphalt Procurement RFP", "Diesel Fuel RFP", "Office Supplies RFP"). NEVER use generic names like "New RFP". Use this when user mentions RFP, procurement, sourcing, or proposal creation.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        name: {
+          type: 'string',
+          description: 'The descriptive name/title of the RFP that MUST include what is being procured. Examples: "Asphalt Procurement RFP", "LED Bulbs RFP", "Diesel Fuel Procurement RFP". NEVER use "New RFP" or other generic names. (REQUIRED)'
+        },
+        description: {
+          type: 'string',
+          description: 'Detailed description of what is being procured and why'
+        },
+        specification: {
+          type: 'string',
+          description: 'Technical specifications or requirements if known'
+        },
+        due_date: {
+          type: 'string',
+          description: 'Optional due date in YYYY-MM-DD format'
+        }
+      },
+      required: ['name']
+    }
+  },
   {
     name: 'create_form_artifact',
     description: 'Create a form artifact (questionnaire, bid form, etc.) and store it in the database',
@@ -208,12 +236,12 @@ export const TOOL_DEFINITIONS = [
 ];
 
 // Get tool definitions for Claude API
-export function getToolDefinitions(): any[] {
+export function getToolDefinitions(): ClaudeToolDefinition[] {
   return TOOL_DEFINITIONS;
 }
 
 // Validate tool call input against schema
-export function validateToolInput(toolName: string, input: any): boolean {
+export function validateToolInput(toolName: string, input: Record<string, unknown>): boolean {
   const toolDef = TOOL_DEFINITIONS.find(tool => tool.name === toolName);
   if (!toolDef) {
     return false;

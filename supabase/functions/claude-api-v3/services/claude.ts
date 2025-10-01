@@ -1,9 +1,30 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Claude API service integration for Edge Function
 
-import { config } from '../config.ts';
 import { mapMessageToClaudeFormat, extractTextFromClaudeResponse, extractToolCallsFromClaudeResponse } from '../utils/mapping.ts';
-import type { ToolInvocationEvent } from '../types.ts';
+import type { ClaudeMessage, ClaudeToolDefinition, ClaudeResponse, ToolResult } from '../types.ts';
+
+interface ClaudeToolCall {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+interface StreamChunk {
+  type: string;
+  content?: string;
+  delta?: { text?: string };
+  content_block?: { type: string; text?: string };
+  message?: { content: ClaudeToolCall[] };
+}
+
+interface ClaudeServiceResponse {
+  textResponse: string;
+  toolCalls: ClaudeToolCall[];
+  usage: ClaudeResponse['usage'];
+  rawResponse: ClaudeResponse | null;
+}
 
 // Claude API integration
 export class ClaudeAPIService {
@@ -11,11 +32,11 @@ export class ClaudeAPIService {
   private baseUrl = 'https://api.anthropic.com/v1/messages';
 
   constructor() {
-    this.apiKey = config.anthropicApiKey!;
+    this.apiKey = Deno.env.get('CLAUDE_API_KEY')!;
   }
 
   // Send message to Claude API with tool definitions
-  async sendMessage(messages: any[], tools: any[], maxTokens = 4000) {
+  async sendMessage(messages: ClaudeMessage[], tools: ClaudeToolDefinition[], maxTokens = 4000): Promise<ClaudeServiceResponse> {
     console.log('Sending to Claude API:', { 
       messageCount: messages.length, 
       toolCount: tools.length,
@@ -63,7 +84,7 @@ export class ClaudeAPIService {
   }
 
   // Stream message to Claude API with real streaming support
-  async streamMessage(messages: any[], tools: any[], onChunk: (chunk: any) => void) {
+  async streamMessage(messages: ClaudeMessage[], tools: ClaudeToolDefinition[], onChunk: (chunk: StreamChunk) => void): Promise<ClaudeServiceResponse> {
     console.log('🌊 Starting real streaming to Claude API:', { 
       messageCount: messages.length, 
       toolCount: tools.length 
@@ -107,7 +128,7 @@ export class ClaudeAPIService {
     const decoder = new TextDecoder();
     let buffer = '';
     let fullTextResponse = '';
-    const toolCalls: any[] = [];
+    const toolCalls: ClaudeToolCall[] = [];
 
     try {
       while (true) {
@@ -147,7 +168,7 @@ export class ClaudeAPIService {
                   onChunk({ 
                     type: 'text', 
                     content: textChunk,
-                    delta: true 
+                    delta: { text: textChunk } 
                   });
                 }
               } else if (parsed.type === 'content_block_start') {
@@ -182,7 +203,7 @@ export class ClaudeAPIService {
     return {
       textResponse: fullTextResponse,
       toolCalls: toolCalls,
-      usage: { output_tokens: 0 }, // Usage not available in streaming
+      usage: { input_tokens: 0, output_tokens: 0 }, // Usage not available in streaming
       rawResponse: null
     };
   }
@@ -190,79 +211,101 @@ export class ClaudeAPIService {
 
 // Tool execution service
 export class ToolExecutionService {
-  private supabase: any;
+  // @ts-ignore - Supabase client type compatibility
+  private supabase: unknown;
   private userId: string;
   private userMessage?: string;
 
-  constructor(supabase: any, userId: string, userMessage?: string) {
+  // @ts-ignore - Supabase client type compatibility
+  constructor(supabase: unknown, userId: string, userMessage?: string) {
     this.supabase = supabase;
     this.userId = userId;
     this.userMessage = userMessage;
   }
 
   // Execute a tool call and return the result
-  async executeTool(toolCall: any, sessionId?: string): Promise<any> {
+  async executeTool(toolCall: ClaudeToolCall, sessionId?: string): Promise<ToolResult> {
     const { name, input } = toolCall;
     
     console.log(`Executing tool: ${name}`, input);
 
     try {
       switch (name) {
-        case 'create_form_artifact':
+        case 'create_form_artifact': {
           const { createFormArtifact } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await createFormArtifact(this.supabase, sessionId!, this.userId, input);
+        }
 
-        case 'get_conversation_history':
+        case 'get_conversation_history': {
           const { getConversationHistory } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await getConversationHistory(this.supabase, input.sessionId || sessionId!);
+        }
 
-        case 'store_message':
+        case 'store_message': {
           const { storeMessage } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await storeMessage(this.supabase, {
             ...input,
             userId: this.userId,
-            sessionId: sessionId
+            sessionId: sessionId || ''
           });
+        }
 
-        case 'create_session':
+        case 'create_session': {
           const { createSession } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await createSession(this.supabase, {
             ...input,
             userId: this.userId
           });
+        }
 
-        case 'search_messages':
+        case 'search_messages': {
           const { searchMessages } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await searchMessages(this.supabase, {
             ...input,
             userId: this.userId
           });
+        }
 
-        case 'get_available_agents':
+        case 'get_available_agents': {
           const { getAvailableAgents } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await getAvailableAgents(this.supabase, input);
+        }
 
-        case 'get_current_agent':
+        case 'get_current_agent': {
           const { getCurrentAgent } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await getCurrentAgent(this.supabase, {
             ...input,
-            session_id: sessionId
+            session_id: sessionId || ''
           });
+        }
 
-        case 'debug_agent_switch':
+        case 'debug_agent_switch': {
           const { debugAgentSwitch } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await debugAgentSwitch(this.supabase, this.userId, input);
+        }
 
-        case 'switch_agent':
+        case 'switch_agent': {
           const { switchAgent } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await switchAgent(this.supabase, this.userId, {
             ...input,
-            session_id: sessionId
+            session_id: sessionId || ''
           }, this.userMessage);
+        }
 
-        case 'recommend_agent':
+        case 'recommend_agent': {
           const { recommendAgent } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
           return await recommendAgent(this.supabase, input);
+        }
 
         default:
           console.log(`Unknown tool: ${name}`);
@@ -281,15 +324,12 @@ export class ToolExecutionService {
   }
 
   // Execute multiple tool calls in sequence
-  async executeToolCalls(toolCalls: any[], sessionId?: string): Promise<any[]> {
-    const results = [];
+  async executeToolCalls(toolCalls: ClaudeToolCall[], sessionId?: string): Promise<ToolResult[]> {
+    const results: ToolResult[] = [];
     
     for (const toolCall of toolCalls) {
       const result = await this.executeTool(toolCall, sessionId);
-      results.push({
-        tool_call_id: toolCall.id,
-        output: result
-      });
+      results.push(result);
     }
     
     return results;

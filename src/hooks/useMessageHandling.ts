@@ -1,10 +1,11 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Message, ArtifactReference } from '../types/home';
 import { RFP } from '../types/rfp';
 import { SessionActiveAgent, UserProfile } from '../types/database';
+import { ToolInvocationEvent } from '../types/streamingProtocol';
 import DatabaseService from '../services/database';
 import { ClaudeService } from '../services/claudeService';
 import { AgentService } from '../services/agentService';
@@ -34,6 +35,75 @@ export const useMessageHandling = () => {
   console.log('🚨🚨🚨 MESSAGE HANDLING HOOK LOADED 🚨🚨🚨');
   const abortControllerRef = useRef<AbortController | null>(null);
   const isProcessingRef = useRef<boolean>(false); // Add processing guard
+  
+  // Tool invocations state for real-time tool execution tracking with session persistence
+  const [toolInvocations, setToolInvocations] = useState<ToolInvocationEvent[]>([]);
+  
+  // Helper function to get session-specific storage key
+  const getToolInvocationsStorageKey = (sessionId?: string) => {
+    return sessionId ? `rfpez-tool-invocations-${sessionId}` : 'rfpez-tool-invocations-default';
+  };
+  
+  // Track current session ID for tool invocations persistence
+  const currentSessionIdForTools = useRef<string | undefined>(undefined);
+  
+  // Load tool invocations for a specific session
+  const loadToolInvocationsForSession = useCallback((sessionId?: string) => {
+    try {
+      const storageKey = getToolInvocationsStorageKey(sessionId);
+      const stored = sessionStorage.getItem(storageKey);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        // Filter out invocations older than 1 hour to prevent stale data
+        const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+        const filtered = parsed.filter((inv: ToolInvocationEvent) => inv.timestamp > oneHourAgo);
+        setToolInvocations(filtered);
+        
+        // Update current session tracking
+        currentSessionIdForTools.current = sessionId;
+        console.log('📋 Loaded tool invocations for session:', sessionId, 'count:', filtered.length);
+        return;
+      }
+      setToolInvocations([]);
+      currentSessionIdForTools.current = sessionId;
+      console.log('📋 No stored tool invocations for session:', sessionId);
+    } catch (error) {
+      console.warn('Failed to load tool invocations from session storage:', error);
+      setToolInvocations([]);
+    }
+  }, []);
+
+  // Persist tool invocations to session-specific sessionStorage whenever they change
+  useEffect(() => {
+    // Only persist if we have a session to associate with
+    if (currentSessionIdForTools.current !== undefined) {
+      try {
+        const storageKey = getToolInvocationsStorageKey(currentSessionIdForTools.current);
+        sessionStorage.setItem(storageKey, JSON.stringify(toolInvocations));
+        console.log('📋 Persisted tool invocations for session:', currentSessionIdForTools.current, 'count:', toolInvocations.length);
+      } catch (error) {
+        console.warn('Failed to save tool invocations to session storage:', error);
+      }
+    }
+  }, [toolInvocations]);
+
+  // Clear tool invocations manually (for session changes, etc.)
+  const clearToolInvocations = useCallback((sessionId?: string) => {
+    setToolInvocations([]);
+    try {
+      // Clear the specific session's tool invocations from storage
+      const storageKey = getToolInvocationsStorageKey(sessionId || currentSessionIdForTools.current);
+      sessionStorage.removeItem(storageKey);
+      console.log('📋 Cleared tool invocations for session:', sessionId || currentSessionIdForTools.current);
+      
+      // Reset current session tracking if clearing current session
+      if (!sessionId || sessionId === currentSessionIdForTools.current) {
+        currentSessionIdForTools.current = undefined;
+      }
+    } catch (error) {
+      console.warn('Failed to clear tool invocations from session storage:', error);
+    }
+  }, []);
   
   // Cleanup effect to abort any ongoing requests when component unmountss
   useEffect(() => {
@@ -263,6 +333,12 @@ export const useMessageHandling = () => {
     // Set processing flag
     isProcessingRef.current = true;
     
+    // Load tool invocations for current session if session changed
+    if (currentSessionId && currentSessionIdForTools.current !== currentSessionId) {
+      console.log('📋 Session changed from', currentSessionIdForTools.current, 'to', currentSessionId, '- loading tool invocations');
+      loadToolInvocationsForSession(currentSessionId);
+    }
+    
     // Check if there's already an active request and abort it safely
     if (abortControllerRef.current && !abortControllerRef.current.signal.aborted) {
       console.error('🚨 ABORTING PREVIOUS REQUEST due to new request starting', {
@@ -420,6 +496,9 @@ export const useMessageHandling = () => {
           metadata: {}
         };
 
+        // Clear any previous tool invocations when starting a new AI response
+        setToolInvocations([]);
+        
         // Create a temporary AI message for streaming updates
         let aiMessageId = (Date.now() + 1).toString();
         const aiMessage: Message = {
@@ -443,7 +522,7 @@ export const useMessageHandling = () => {
         let isWaitingForToolCompletion = false;
         let uiTimeoutId: NodeJS.Timeout | null = null;
         
-        const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, forceToolCompletion?: boolean) => {
+        const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean) => {
           console.log('🚨 STREAMING CHUNK HANDLER CALLED - This should appear if streaming works!');
           
           console.log('📡 STREAMING CHUNK RECEIVED:', {
@@ -451,6 +530,7 @@ export const useMessageHandling = () => {
             chunkPreview: chunk.length > 0 ? chunk.substring(0, 50) + '...' : '[empty]',
             isComplete,
             toolProcessing,
+            toolEvent: toolEvent ? { type: toolEvent.type, toolName: toolEvent.toolName } : undefined,
             forceToolCompletion,
             streamingCompleted,
             isWaitingForToolCompletion,
@@ -459,6 +539,32 @@ export const useMessageHandling = () => {
             bufferLength: streamingBuffer.length,
             timestamp: new Date().toISOString()
           });
+          
+          // Handle tool invocation events
+          if (toolEvent) {
+            console.log('🔧 Tool invocation event received:', toolEvent);
+            
+            setToolInvocations(prev => {
+              const existing = prev.find(t => t.toolName === toolEvent.toolName && t.type === 'tool_start');
+              
+              if (toolEvent.type === 'tool_start') {
+                // Add new tool start event
+                return [...prev, toolEvent];
+              } else if (toolEvent.type === 'tool_complete' && existing) {
+                // Update existing tool to completed status
+                return prev.map(t => 
+                  t.toolName === toolEvent.toolName && t.type === 'tool_start'
+                    ? { ...toolEvent } // Replace with completion event
+                    : t
+                );
+              } else if (toolEvent.type === 'tool_complete') {
+                // Add completion event if no start event found
+                return [...prev, toolEvent];
+              }
+              
+              return prev;
+            });
+          }
           
           // Handle forced tool completion (e.g., from timeout)
           if (forceToolCompletion && isWaitingForToolCompletion && toolProcessingMessageId) {
@@ -574,8 +680,14 @@ export const useMessageHandling = () => {
               }, 180000); // 3 minute timeout - debugging slow database operations
               
             } else {
-              streamingCompleted = true;
-              console.log('✅ Streaming phase complete for message:', aiMessageId);
+              // Only mark streaming complete if we're not waiting for tool completion
+              // When tools are executed, Claude sends a continuation response, so we must not mark complete yet
+              if (!isWaitingForToolCompletion) {
+                streamingCompleted = true;
+                console.log('✅ Streaming phase complete for message:', aiMessageId);
+              } else {
+                console.log('🔧 Streaming segment complete, but waiting for tool completion continuation');
+              }
               
               // CRITICAL FIX: Always clear timeout and tool processing state on completion
               // This handles the case where tools were executed but completion event doesn't indicate toolProcessing
@@ -1135,9 +1247,15 @@ export const useMessageHandling = () => {
       handleAgentChanged,
       null // currentArtifact - not available in auto-prompt context
     );
-  };  return {
+  };
+  
+  return {
     handleSendMessage,
     sendAutoPrompt,
-    cancelRequest
+    cancelRequest,
+    toolInvocations,
+    setToolInvocations,
+    clearToolInvocations,
+    loadToolInvocationsForSession
   };
 };
