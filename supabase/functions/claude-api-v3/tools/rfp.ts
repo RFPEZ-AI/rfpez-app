@@ -16,9 +16,20 @@ export async function createAndSetRfp(parameters: RFPFormData, sessionContext?: 
   console.log('🔍 DEBUG: full parameters object:', JSON.stringify(parameters, null, 2));
   
   try {
+    // Validate required name parameter
+    if (!parameters.name || parameters.name.trim() === '') {
+      throw new Error('RFP name is required. Please provide a descriptive name that includes what is being procured.');
+    }
+
+    // Reject generic names
+    const genericNames = ['New RFP', 'RFP', 'Untitled RFP', 'Draft RFP'];
+    if (genericNames.includes(parameters.name.trim())) {
+      throw new Error(`Generic RFP name "${parameters.name}" is not allowed. Please provide a descriptive name like "Industrial Use Alcohol RFP" or "Floor Tiles RFP".`);
+    }
+    
     // Build RFP data using actual database schema
     const rfpData = {
-      name: parameters.name || 'New RFP',
+      name: parameters.name.trim(),
       description: parameters.description || null,
       specification: parameters.specification || null,
       due_date: parameters.due_date || null,

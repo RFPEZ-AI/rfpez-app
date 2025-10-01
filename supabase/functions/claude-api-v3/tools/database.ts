@@ -501,6 +501,11 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
 
   console.log('✅ Agent switch completed successfully');
 
+  // Create context message for the new agent if user_input is provided
+  const contextMessage = data.user_input ? 
+    `User context from previous agent: "${data.user_input}". Please continue assisting with this request.` : 
+    '';
+
   return {
     success: true,
     session_id,
@@ -513,7 +518,9 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
       initial_prompt: (agent as unknown as Agent).initial_prompt
     },
     switch_reason: reason,
-    message: `Successfully switched to ${(agent as unknown as Agent).name} agent. The ${(agent as unknown as Agent).name} will respond in the next message.`,
+    user_context: data.user_input,
+    context_message: contextMessage,
+    message: `Successfully switched to ${(agent as unknown as Agent).name} agent. ${contextMessage} The ${(agent as unknown as Agent).name} will respond in the next message.`,
     stop_processing: true // Signal to stop generating additional content
   };
 }
