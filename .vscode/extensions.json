@@ -1,7 +1,5 @@
 {
-    "recommendations": [
-        "Webnative.webnative",
-        "Orta.vscode-jest",
-        "ms-vscode.test-adapter-converter"
-    ]
+  "recommendations": [
+    "denoland.vscode-deno"
+  ]
 }
