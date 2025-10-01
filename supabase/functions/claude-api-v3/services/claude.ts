@@ -192,10 +192,12 @@ export class ClaudeAPIService {
 export class ToolExecutionService {
   private supabase: any;
   private userId: string;
+  private userMessage?: string;
 
-  constructor(supabase: any, userId: string) {
+  constructor(supabase: any, userId: string, userMessage?: string) {
     this.supabase = supabase;
     this.userId = userId;
+    this.userMessage = userMessage;
   }
 
   // Execute a tool call and return the result
@@ -235,6 +237,32 @@ export class ToolExecutionService {
             ...input,
             userId: this.userId
           });
+
+        case 'get_available_agents':
+          const { getAvailableAgents } = await import('../tools/database.ts');
+          return await getAvailableAgents(this.supabase, input);
+
+        case 'get_current_agent':
+          const { getCurrentAgent } = await import('../tools/database.ts');
+          return await getCurrentAgent(this.supabase, {
+            ...input,
+            session_id: sessionId
+          });
+
+        case 'debug_agent_switch':
+          const { debugAgentSwitch } = await import('../tools/database.ts');
+          return await debugAgentSwitch(this.supabase, this.userId, input);
+
+        case 'switch_agent':
+          const { switchAgent } = await import('../tools/database.ts');
+          return await switchAgent(this.supabase, this.userId, {
+            ...input,
+            session_id: sessionId
+          }, this.userMessage);
+
+        case 'recommend_agent':
+          const { recommendAgent } = await import('../tools/database.ts');
+          return await recommendAgent(this.supabase, input);
 
         default:
           console.log(`Unknown tool: ${name}`);

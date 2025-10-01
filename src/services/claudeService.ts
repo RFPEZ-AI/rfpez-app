@@ -333,6 +333,7 @@ export class ClaudeService {
           result: unknown;
         }> = [];
         let buffer = ''; // Buffer for incomplete lines
+        let streamingCompletionMetadata: any = null; // Store completion metadata from Edge Function
 
         console.log('🚨 STARTING SSE READER LOOP - reader exists:', !!reader);
         
@@ -389,6 +390,17 @@ export class ClaudeService {
                       }
                     } else if (eventData.type === 'completion' || eventData.type === 'complete') {
                       console.log('✅ Stream completion detected:', eventData.type);
+                      
+                      // 🔧 CAPTURE COMPLETION METADATA for agent switching detection
+                      if (eventData.metadata) {
+                        streamingCompletionMetadata = eventData.metadata;
+                        console.log('📋 Captured streaming completion metadata:', {
+                          hasAgentSwitch: !!eventData.metadata.agent_switch_occurred,
+                          functionsCallled: eventData.metadata.functions_called,
+                          functionResultsCount: eventData.metadata.function_results?.length || 0
+                        });
+                      }
+                      
                       onChunk('', true); // Indicate completion
                       if (eventData.metadata?.toolsUsed) {
                         toolsUsed = [...new Set([...toolsUsed, ...eventData.metadata.toolsUsed])];
@@ -434,7 +446,7 @@ export class ClaudeService {
             function_results: functionResults,
             is_streaming: true,
             stream_complete: true,
-            agent_switch_occurred: false
+            agent_switch_occurred: streamingCompletionMetadata?.agent_switch_occurred || false
           }
         };
       } else {

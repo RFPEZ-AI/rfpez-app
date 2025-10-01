@@ -7,33 +7,36 @@ import { ClaudeAPIService, ToolExecutionService } from '../services/claude.ts';
 import { getToolDefinitions } from '../tools/definitions.ts';
 import type { ToolInvocationEvent, StreamingResponse, ClientCallback } from '../types.ts';
 
-// Handle streaming response with proper SSE format
+// Handle streaming response with proper SSE format and tool execution
 async function handleStreamingResponse(
   messages: any[], 
   supabase: any, 
   userId: string, 
   sessionId?: string, 
-  agentId?: string
+  agentId?: string,
+  userMessage?: string
 ): Promise<Response> {
   // Create readable stream for SSE
   const stream = new ReadableStream({
     async start(controller) {
       try {
         const claudeService = new ClaudeAPIService();
-        const toolService = new ToolExecutionService(supabase, userId);
+        const toolService = new ToolExecutionService(supabase, userId, userMessage);
         const tools = getToolDefinitions();
         
         console.log('🌊 Starting streaming response...');
         
-        // Stream response from Claude with proper formatting
         let fullContent = '';
         let toolsUsed: string[] = [];
+        let pendingToolCalls: any[] = [];
+        let executedToolResults: any[] = []; // Track actual tool execution results
 
-        await claudeService.streamMessage(messages, tools, (chunk) => {
+        // First, get response from Claude (might include tool calls)
+        const response = await claudeService.streamMessage(messages, tools, (chunk) => {
           try {
             console.log('📡 Streaming chunk received:', chunk.type, chunk);
             
-            // Convert Claude API streaming events to client-expected format
+            // Handle text content
             if (chunk.type === 'text' && chunk.content) {
               fullContent += chunk.content;
               
@@ -49,9 +52,13 @@ async function handleStreamingResponse(
               
             } else if (chunk.type === 'tool_use') {
               console.log('🔧 Tool use detected:', chunk.name);
+              console.log('📡 Streaming chunk received:', chunk.type, JSON.stringify(chunk, null, 2));
               if (!toolsUsed.includes(chunk.name)) {
                 toolsUsed.push(chunk.name);
               }
+              
+              // Store tool call for execution
+              pendingToolCalls.push(chunk);
               
               // Send tool invocation start event
               const toolEvent = {
@@ -59,44 +66,253 @@ async function handleStreamingResponse(
                 toolEvent: {
                   type: 'tool_start',
                   toolName: chunk.name,
-                  input: chunk.input
+                  parameters: chunk.input,
+                  timestamp: new Date().toISOString()
                 }
               };
               const sseData = `data: ${JSON.stringify(toolEvent)}\n\n`;
               controller.enqueue(new TextEncoder().encode(sseData));
-              
-              // Execute tool and send completion event
-              const toolService = new ToolExecutionService(supabase, userId);
-              toolService.executeTool(chunk, sessionId).then((result) => {
-                const toolCompleteEvent = {
-                  type: 'tool_invocation',
-                  toolEvent: {
-                    type: 'tool_complete',
-                    toolName: chunk.name,
-                    result: result
-                  }
-                };
-                const completeSseData = `data: ${JSON.stringify(toolCompleteEvent)}\n\n`;
-                controller.enqueue(new TextEncoder().encode(completeSseData));
-              }).catch((error) => {
-                console.error('Tool execution error:', error);
-              });
             }
           } catch (error) {
             console.error('Error encoding chunk:', error);
           }
         });
+
+        // If there are tool calls, execute them and get final response from Claude
+        if (pendingToolCalls.length > 0) {
+          console.log(`🔧 Executing ${pendingToolCalls.length} tool calls...`);
+          
+          // Execute all tool calls
+          const toolResults = [];
+          for (const toolCall of pendingToolCalls) {
+            try {
+              const result = await toolService.executeTool(toolCall, sessionId);
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: toolCall.id,
+                content: JSON.stringify(result)
+              });
+              
+              // Store tool execution result for metadata
+              executedToolResults.push({
+                function_name: toolCall.name,
+                result: result
+              });
+              
+              // Send tool completion event
+              const toolCompleteEvent = {
+                type: 'tool_invocation',
+                toolEvent: {
+                  type: 'tool_complete',
+                  toolName: toolCall.name,
+                  result: result,
+                  timestamp: new Date().toISOString()
+                }
+              };
+              const completeSseData = `data: ${JSON.stringify(toolCompleteEvent)}\n\n`;
+              controller.enqueue(new TextEncoder().encode(completeSseData));
+              
+            } catch (error) {
+              console.error(`Tool execution error for ${toolCall.name}:`, error);
+              const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
+              const errorResult = { success: false, error: errorMessage };
+              toolResults.push({
+                type: 'tool_result',
+                tool_use_id: toolCall.id,
+                content: JSON.stringify(errorResult)
+              });
+              
+              // Store failed tool execution result for metadata
+              executedToolResults.push({
+                function_name: toolCall.name,
+                result: errorResult
+              });
+            }
+          }
+
+          // Create new message with tool results and get final response
+          const messagesWithToolResults = [
+            ...messages,
+            {
+              role: 'assistant',
+              content: response.toolCalls.map(tc => ({
+                type: 'tool_use',
+                id: tc.id,
+                name: tc.name,
+                input: tc.input
+              }))
+            },
+            {
+              role: 'user',
+              content: toolResults
+            }
+          ];
+
+          console.log('🔄 Getting final response from Claude with tool results...');
+          
+          // Reset for potential additional tool calls
+          const additionalToolCalls: any[] = [];
+          
+          // Get final response from Claude
+          await claudeService.streamMessage(messagesWithToolResults, tools, (chunk) => {
+            try {
+              if (chunk.type === 'text' && chunk.content) {
+                fullContent += chunk.content;
+                
+                const textEvent = {
+                  type: 'content_delta',
+                  delta: chunk.content,
+                  full_content: fullContent
+                };
+                const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
+                console.log('📤 Final response to client:', JSON.stringify(textEvent));
+                controller.enqueue(new TextEncoder().encode(sseData));
+                
+              } else if (chunk.type === 'tool_use') {
+                console.log('🔧 Additional tool use detected:', chunk.name);
+                if (!toolsUsed.includes(chunk.name)) {
+                  toolsUsed.push(chunk.name);
+                }
+                
+                // Store additional tool call for execution
+                additionalToolCalls.push(chunk);
+                
+                // Send tool invocation start event
+                const toolEvent = {
+                  type: 'tool_invocation',
+                  toolEvent: {
+                    type: 'tool_start',
+                    toolName: chunk.name,
+                    parameters: chunk.input,
+                    timestamp: new Date().toISOString()
+                  }
+                };
+                const sseData = `data: ${JSON.stringify(toolEvent)}\n\n`;
+                controller.enqueue(new TextEncoder().encode(sseData));
+              }
+            } catch (error) {
+              console.error('Error encoding final chunk:', error);
+            }
+          });
+          
+          // Handle additional tool calls if any
+          if (additionalToolCalls.length > 0) {
+            console.log(`🔧 Executing ${additionalToolCalls.length} additional tool calls...`);
+            
+            // Execute additional tool calls
+            const additionalToolResults = [];
+            for (const toolCall of additionalToolCalls) {
+              try {
+                const result = await toolService.executeTool(toolCall, sessionId);
+                additionalToolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: toolCall.id,
+                  content: JSON.stringify(result)
+                });
+                
+                // Store additional tool execution result for metadata
+                executedToolResults.push({
+                  function_name: toolCall.name,
+                  result: result
+                });
+                
+                // Send tool completion event
+                const toolCompleteEvent = {
+                  type: 'tool_invocation',
+                  toolEvent: {
+                    type: 'tool_complete',
+                    toolName: toolCall.name,
+                    result: result,
+                    timestamp: new Date().toISOString()
+                  }
+                };
+                const completeSseData = `data: ${JSON.stringify(toolCompleteEvent)}\n\n`;
+                controller.enqueue(new TextEncoder().encode(completeSseData));
+                
+              } catch (error) {
+                console.error(`Additional tool execution error for ${toolCall.name}:`, error);
+                const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
+                additionalToolResults.push({
+                  type: 'tool_result',
+                  tool_use_id: toolCall.id,
+                  content: JSON.stringify({ success: false, error: errorMessage })
+                });
+              }
+            }
+            
+            // Get final response with additional tool results
+            const finalMessages = [
+              ...messagesWithToolResults,
+              {
+                role: 'assistant',
+                content: additionalToolCalls.map(tc => ({
+                  type: 'tool_use',
+                  id: tc.id,
+                  name: tc.name,
+                  input: tc.input
+                }))
+              },
+              {
+                role: 'user',
+                content: additionalToolResults
+              }
+            ];
+            
+            console.log('🔄 Getting final response after additional tools...');
+            await claudeService.streamMessage(finalMessages, tools, (chunk) => {
+              try {
+                if (chunk.type === 'text' && chunk.content) {
+                  fullContent += chunk.content;
+                  
+                  const textEvent = {
+                    type: 'content_delta',
+                    delta: chunk.content,
+                    full_content: fullContent
+                  };
+                  const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
+                  console.log('📤 Final response to client:', JSON.stringify(textEvent));
+                  controller.enqueue(new TextEncoder().encode(sseData));
+                }
+              } catch (error) {
+                console.error('Error encoding additional final chunk:', error);
+              }
+            });
+          }
+        }
         
-        // Send completion event with metadata
+        // Detect if an agent switch occurred during streaming
+        const agentSwitchOccurred = executedToolResults.some((result: any) => {
+          return result.function_name === 'switch_agent' && result.result?.success === true;
+        });
+
+        // DEBUG: Log completion event details
+        console.log('🏁 COMPLETION EVENT DEBUG:', {
+          toolsUsedCount: toolsUsed.length,
+          executedToolResultsCount: executedToolResults.length,
+          executedToolResults: executedToolResults,
+          agentSwitchOccurred: agentSwitchOccurred,
+          pendingToolCallsCount: pendingToolCalls.length
+        });
+
+        // Send completion event with metadata including agent switch detection
         const completeEvent = {
           type: 'complete',
           full_content: fullContent,
           token_count: fullContent.length, // Approximate token count
-          tool_results: toolsUsed.map(name => ({ name, success: true }))
+          tool_results: toolsUsed.map(name => ({ name, success: true })),
+          metadata: {
+            agent_switch_occurred: agentSwitchOccurred,
+            functions_called: toolsUsed,
+            function_results: executedToolResults
+          }
         };
         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
         
         console.log('✅ Streaming completed successfully');
+        console.log('📊 Streaming summary:', {
+          textLength: fullContent.length,
+          toolCallCount: pendingToolCalls.length
+        });
         controller.close();
         
       } catch (error) {
@@ -192,12 +408,12 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     // If streaming is requested, handle it separately
     if (stream) {
       console.log('🌊 Streaming requested - using streaming handler');
-      return handleStreamingResponse(processedMessages, supabase, userId, sessionId, effectiveAgentId);
+      return handleStreamingResponse(processedMessages, supabase, userId, sessionId, effectiveAgentId, userMessage);
     }
 
     // Initialize services
     const claudeService = new ClaudeAPIService();
-    const toolService = new ToolExecutionService(supabase, userId);
+    const toolService = new ToolExecutionService(supabase, userId, userMessage);
     
     // Get tool definitions
     const tools = getToolDefinitions();
@@ -240,6 +456,11 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       }
     }
 
+    // Detect if an agent switch occurred successfully
+    const agentSwitchOccurred = toolResults.some((result: any) => {
+      return result.function_name === 'switch_agent' && result.result?.success === true;
+    });
+
     // Prepare metadata in format expected by client
     const metadata: any = {
       model: 'claude-sonnet-4-20250514',
@@ -250,7 +471,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       function_results: toolResults,
       is_streaming: false,
       stream_complete: true,
-      agent_switch_occurred: false
+      agent_switch_occurred: agentSwitchOccurred
     };
 
     // Add tool_use information for artifact reference generation
@@ -356,7 +577,7 @@ export async function handleStreamingRequest(request: Request): Promise<Response
       async start(controller) {
         try {
           const claudeService = new ClaudeAPIService();
-          const toolService = new ToolExecutionService(supabase, userId);
+          const toolService = new ToolExecutionService(supabase, userId, undefined);
           const tools = getToolDefinitions();
           
           // Stream response from Claude
