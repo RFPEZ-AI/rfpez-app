@@ -222,7 +222,7 @@ const Home: React.FC = () => {
   const [forceSessionHistoryCollapsed, setForceSessionHistoryCollapsed] = useState(false);
   const [isCreatingNewSession, setIsCreatingNewSession] = useState(false);
 
-  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, setToolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling();
+  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling();
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
