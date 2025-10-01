@@ -36,7 +36,7 @@ RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend
 ### Development Commands & Terminal Management
 ```bash
 # Start development with API server - ALWAYS use dedicated terminal
-npx kill-port 3000 && npm start  # kill any existing instance and start a new one
+npx kill-port 3100 && npm start  # kill any existing instance and start a new one
 # CRITICAL: Never run additional commands in the server terminal after starting
 
 # Testing patterns - use separate terminal
@@ -99,18 +99,18 @@ npm run mcp:test   # Test MCP server connection
 ```typescript
 // Track server startup
 mcp_memory_create_entities([{
-  name: "DevServer_Port3000", 
+  name: "DevServer_Port3100", 
   entityType: "Process",
   observations: ["Started at [timestamp]", "Terminal ID: [id]", "Status: Running"]
 }]);
 
 // Before running commands, check process status
-mcp_memory_search_nodes({ query: "DevServer port 3000 status" });
+mcp_memory_search_nodes({ query: "DevServer port 3100 status" });
 
 // Update process observations
 mcp_memory_add_observations({
   observations: [{
-    entityName: "DevServer_Port3000",
+    entityName: "DevServer_Port3100",
     contents: ["Status check: Still running", "Last checked: [timestamp]"]
   }]
 });
@@ -227,10 +227,9 @@ The project includes comprehensive browser automation through MCP (Model Context
 
 ### Prerequisites for Browser MCP Testing
 ```bash
-# Ensure the main application is running
-npx kill-port 3000 && npm start  # Starts app on http://localhost:3000
-note: do not use sleep in the same terminal as it will block the app start
-
+# Ensure the main application is restarted
+npx kill-port 3100 && npm start  # Starts app on http://localhost:3100
+Important: switch to a new terminal for the next commands to avoid killing the server
 # For authentication tests, use test account:
 # Email: mskiba@esphere.com
 # Password: thisisatest
@@ -258,17 +257,16 @@ await activate_mcp_browser_content_tools();
 await activate_mcp_browser_visual_tools();
 
 // Example usage
-await mcp_browser_navigate({ url: 'http://localhost:3000' });
+await mcp_browser_navigate({ url: 'http://localhost:3100' });
 await mcp_browser_screenshot({ name: 'homepage' });
 const elements = await mcp_browser_get_clickable_elements();
 await mcp_browser_click({ index: elements[0].index });
 ```
 
 ## Testing Notes
-- Tests expect Supabase mocks in test environment
 - Console warnings for Ionic/Stencil components are expected
 - Use `test-utils.tsx` render wrapper for component tests
-- MCP tests in separate automation project for integration testing
+- MCP tests in separate automation project for integration testing integrated into the debug page
 - VS Code tasks available for automated test execution and MCP validation
 - When sending message prompts using the mcp browser tools, add the enter key to submit the message
 
@@ -282,10 +280,16 @@ await mcp_browser_click({ index: elements[0].index });
 5. **Maintain process awareness**: Keep track of background processes to prevent conflicts
 
 ### Memory Entity Naming Conventions
-- **Processes**: `DevServer_Port3000`, `TestRunner_Jest`, `EdgeFunction_Deploy`
+- **Processes**: `DevServer_Port3100`, `TestRunner_Jest`, `EdgeFunction_Deploy`
 - **Terminals**: `Terminal_[ID]_[Purpose]` (e.g., `Terminal_1_DevServer`)
 - **Workflows**: `Workflow_[Name]` (e.g., `Workflow_Testing`, `Workflow_Deployment`)
 - **Guidelines**: `Rules_[Category]` (e.g., `Rules_TerminalManagement`)
+
+### IO  Port Usage
+- Dev server: Port 3100
+- subabase mcp: port 3000
+- api-server port 3001
+
 
 ### Error Prevention Through Memory
 - Before starting dev server: Check if already running via memory search

@@ -4,8 +4,8 @@
 export interface ToolInvocationEvent {
   type: 'tool_start' | 'tool_progress' | 'tool_complete' | 'tool_error';
   toolName: string;
-  parameters?: any;
-  result?: any;
+  parameters?: Record<string, unknown>;
+  result?: Record<string, unknown>;
   error?: string;
   timestamp: string;
   duration?: number;
@@ -18,7 +18,11 @@ export interface StreamingResponse {
   metadata?: {
     tokenCount?: number;
     model?: string;
-    usage?: any;
+    usage?: {
+      input_tokens?: number;
+      output_tokens?: number;
+      total_tokens?: number;
+    };
   };
 }
 
@@ -42,14 +46,14 @@ export interface StreamingResponse {
 export interface ClientCallback {
   type: 'ui_refresh' | 'state_update' | 'notification' | 'rfp_created';
   target: string; // Component or state to update
-  payload: any;
+  payload: Record<string, unknown>;
   priority: 'low' | 'normal' | 'high';
 }
 
 // Edge function tool execution with streaming
 export interface EdgeToolExecution {
   toolName: string;
-  parameters: any;
+  parameters: Record<string, unknown>;
   sessionContext: {
     sessionId: string;
     userId: string;
@@ -62,7 +66,7 @@ export interface EdgeToolExecution {
 // Enhanced edge function response
 export interface EdgeFunctionResponse {
   success: boolean;
-  data?: any;
+  data?: Record<string, unknown>;
   streamingEvents?: StreamingResponse[];
   clientCallbacks?: ClientCallback[];
   toolInvocations?: ToolInvocationEvent[];
@@ -71,6 +75,10 @@ export interface EdgeFunctionResponse {
     executionTime: number;
     toolsUsed: string[];
     model: string;
-    tokenUsage: any;
+    tokenUsage: {
+      input_tokens?: number;
+      output_tokens?: number;
+      total_tokens?: number;
+    };
   };
 }

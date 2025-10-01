@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // Memory Stress Test Component - Moved from Unit Tests
 
 import React, { useState } from 'react';

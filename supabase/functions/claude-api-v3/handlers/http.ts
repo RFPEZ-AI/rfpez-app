@@ -390,6 +390,30 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       );
     }
     
+    // Validate message format
+    if (processedMessages.length === 0) {
+      return new Response(
+        JSON.stringify({ error: 'Messages array cannot be empty' }),
+        { status: 400, headers: corsHeaders }
+      );
+    }
+    
+    // Validate message roles
+    for (const message of processedMessages) {
+      if (!message.role || !['user', 'assistant', 'system'].includes(message.role)) {
+        return new Response(
+          JSON.stringify({ error: `Invalid message role: ${message.role}. Must be 'user', 'assistant', or 'system'` }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+      if (!message.content) {
+        return new Response(
+          JSON.stringify({ error: 'Message content is required' }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
+    }
+    
     // Use agentId from payload, or extract from agent object
     const effectiveAgentId = agentId || agent?.id;
     

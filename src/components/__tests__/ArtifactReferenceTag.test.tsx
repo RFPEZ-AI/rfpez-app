@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
 import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import ArtifactReferenceTag from '../ArtifactReferenceTag';

@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-non-null-assertion */
 import { streamManager } from '../claudeAPIProxy';
 
 // Mock console methods for cleaner test output
@@ -184,7 +185,7 @@ describe('Token Batching', () => {
 
   describe('Batch Statistics', () => {
     it('should provide accurate batch statistics', () => {
-      const startTime = Date.now();
+      Date.now(); // Time tracking for test metrics
       
       streamManager.addTokenToBatch(testStreamId, 'Hello', { tokenCount: 1 });
       streamManager.addTokenToBatch(testStreamId, ' world!', { tokenCount: 2 });

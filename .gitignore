@@ -31,6 +31,9 @@ yarn-error.log*
 .eslintcache
 test-automation/led-bulb-test-report-1757738266071.json
 
+# Supabase edge function coverage
+supabase/functions/claude-api-v3/coverage/
+
 # Temporary files
 /temp
 temp/
