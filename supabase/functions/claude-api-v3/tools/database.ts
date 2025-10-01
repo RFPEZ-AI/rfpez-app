@@ -4,8 +4,109 @@
 import { config } from '../config.ts';
 import { mapArtifactRole } from '../utils/mapping.ts';
 
+// Type definitions for database operations
+interface Agent {
+  id: string;
+  name: string;
+  description?: string;
+  is_free?: boolean;
+  is_restricted?: boolean;
+  role?: string;
+  instructions?: string;
+  initial_prompt?: string;
+}
+
+interface SupabaseClient {
+  from: (table: string) => {
+    select: (columns?: string) => SupabaseQuery;
+    insert: (data: Record<string, unknown>) => SupabaseQuery;
+    update: (data: Record<string, unknown>) => SupabaseQuery;
+    delete: () => SupabaseQuery;
+    eq: (column: string, value: unknown) => SupabaseQuery;
+    in: (column: string, values: unknown[]) => SupabaseQuery;
+    order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
+    limit: (count: number) => SupabaseQuery;
+    single: () => SupabaseQuery;
+  };
+  auth: {
+    getUser: () => Promise<{ data: { user: Record<string, unknown> } | null; error: unknown }>;
+  };
+}
+
+interface SupabaseQuery {
+  select: (columns?: string) => SupabaseQuery;
+  insert: (data: Record<string, unknown>) => SupabaseQuery;
+  update: (data: Record<string, unknown>) => SupabaseQuery;
+  delete: () => SupabaseQuery;
+  eq: (column: string, value: unknown) => SupabaseQuery;
+  in: (column: string, values: unknown[]) => SupabaseQuery;
+  order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
+  limit: (count: number) => SupabaseQuery;
+  single: () => SupabaseQuery;
+  textSearch: (column: string, query: string) => SupabaseQuery;
+  ilike: (column: string, pattern: string) => SupabaseQuery;
+  then: <T>(onfulfilled?: (value: { data: T; error: unknown }) => T | PromiseLike<T>) => Promise<T>;
+}
+
+interface FormArtifactData {
+  name: string;
+  description?: string;
+  content: string;
+  artifactRole: string;
+  form_schema?: Record<string, unknown>;
+  form_data?: Record<string, unknown>;
+  artifact_type?: string;
+  title?: string;
+}
+
+interface MessageData {
+  sessionId: string;
+  agentId?: string;
+  userId: string;
+  sender: 'user' | 'assistant';
+  content: string;
+  session_id?: string;
+  message?: string;
+  role?: 'user' | 'assistant';
+  agent_id?: string;
+  function_name?: string;
+  function_arguments?: Record<string, unknown>;
+  artifacts?: Record<string, unknown>[];
+}
+
+interface SessionData {
+  userId: string;
+  title?: string;
+  agentId?: string;
+  name?: string;
+  initial_message?: string;
+}
+
+interface SearchData {
+  userId: string;
+  query: string;
+  session_id?: string;
+  limit?: number;
+}
+
+interface AgentData {
+  session_id: string;
+  user_access_tier?: string;
+  include_restricted?: boolean;
+}
+
+interface SwitchAgentData {
+  session_id: string;
+  agent_id: string;
+  agent_name?: string;
+  user_input?: string;
+  extracted_keywords?: string[];
+  confusion_reason?: string;
+  reason?: string;
+}
+
 // Create a form artifact in the database
-export async function createFormArtifact(supabase: any, sessionId: string, userId: string, data: any) {
+export async function createFormArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: FormArtifactData) {
   const { name, description, content, artifactRole } = data;
   
   // Map artifact role to valid database value
@@ -42,13 +143,13 @@ export async function createFormArtifact(supabase: any, sessionId: string, userI
 
   return {
     success: true,
-    artifact_id: artifact.id,
+    artifact_id: (artifact as unknown as { id: string }).id,
     message: `Created ${mappedRole} artifact: ${name}`
   };
 }
 
 // Get conversation history for a session
-export async function getConversationHistory(supabase: any, sessionId: string, limit = 50) {
+export async function getConversationHistory(supabase: SupabaseClient, sessionId: string, limit = 50) {
   const { data: messages, error } = await supabase
     .from('conversation_messages')
     .select(`
@@ -78,7 +179,7 @@ export async function getConversationHistory(supabase: any, sessionId: string, l
 }
 
 // Store a message in the conversation
-export async function storeMessage(supabase: any, data: any) {
+export async function storeMessage(supabase: SupabaseClient, data: MessageData) {
   const { sessionId, agentId, userId, sender, content } = data;
   
   console.log('Storing message:', { sessionId, agentId, userId, sender, contentLength: content?.length });
@@ -103,13 +204,13 @@ export async function storeMessage(supabase: any, data: any) {
 
   return {
     success: true,
-    message_id: message.id,
+    message_id: (message as unknown as { id: string }).id,
     message: 'Message stored successfully'
   };
 }
 
 // Create a new conversation session
-export async function createSession(supabase: any, data: any) {
+export async function createSession(supabase: SupabaseClient, data: SessionData) {
   const { userId, title, agentId } = data;
   
   console.log('Creating session:', { userId, title, agentId });
@@ -134,7 +235,7 @@ export async function createSession(supabase: any, data: any) {
     const { error: agentError } = await supabase
       .from('session_agents')
       .insert({
-        session_id: session.id,
+        session_id: (session as unknown as { id: string }).id,
         agent_id: agentId,
         created_at: new Date().toISOString()
       });
@@ -147,13 +248,13 @@ export async function createSession(supabase: any, data: any) {
 
   return {
     success: true,
-    session_id: session.id,
+    session_id: (session as unknown as { id: string }).id,
     message: 'Session created successfully'
   };
 }
 
 // Search messages across conversations
-export async function searchMessages(supabase: any, data: any) {
+export async function searchMessages(supabase: SupabaseClient, data: SearchData) {
   const { userId, query, limit = 20 } = data;
   
   console.log('Searching messages:', { userId, query, limit });
@@ -190,7 +291,7 @@ export async function searchMessages(supabase: any, data: any) {
 }
 
 // Get available agents
-export async function getAvailableAgents(supabase: any, data: any) {
+export async function getAvailableAgents(supabase: SupabaseClient, data: AgentData) {
   const { include_restricted = false } = data;
   
   console.log('Getting available agents:', { include_restricted });
@@ -212,7 +313,7 @@ export async function getAvailableAgents(supabase: any, data: any) {
   }
 
   // Format agents for display with IDs
-  const formattedAgentList = (agents || []).map(agent => 
+  const formattedAgentList = ((agents as Agent[]) || []).map((agent: Agent) => 
     `**${agent.name}** (${agent.is_free ? 'free' : agent.is_restricted ? 'premium' : 'default'}) - ID: ${agent.id}${agent.description ? ' - ' + agent.description : ''}`
   );
 
@@ -225,7 +326,7 @@ export async function getAvailableAgents(supabase: any, data: any) {
 }
 
 // Get current agent for a session
-export async function getCurrentAgent(supabase: any, data: any) {
+export async function getCurrentAgent(supabase: SupabaseClient, data: AgentData) {
   const { session_id } = data;
   
   console.log('Getting current agent for session:', session_id);
@@ -262,17 +363,17 @@ export async function getCurrentAgent(supabase: any, data: any) {
   return {
     success: true,
     current_agent: {
-      id: sessionAgent.agents.id,
-      name: sessionAgent.agents.name,
-      description: sessionAgent.agents.description,
-      role: sessionAgent.agents.role,
-      initial_prompt: sessionAgent.agents.initial_prompt
+      id: (sessionAgent as unknown as { agents: Agent }).agents.id,
+      name: (sessionAgent as unknown as { agents: Agent }).agents.name,
+      description: (sessionAgent as unknown as { agents: Agent }).agents.description,
+      role: (sessionAgent as unknown as { agents: Agent }).agents.role,
+      initial_prompt: (sessionAgent as unknown as { agents: Agent }).agents.initial_prompt
     }
   };
 }
 
 // Debug agent switch parameters
-export async function debugAgentSwitch(supabase: any, userId: string, data: any) {
+export function debugAgentSwitch(_supabase: SupabaseClient, userId: string, data: SwitchAgentData) {
   const { user_input, extracted_keywords, confusion_reason } = data;
   
   console.log('🐛 DEBUG AGENT SWITCH:', {
@@ -296,7 +397,7 @@ export async function debugAgentSwitch(supabase: any, userId: string, data: any)
 }
 
 // Switch to a different agent
-export async function switchAgent(supabase: any, userId: string, data: any, userMessage?: string) {
+export async function switchAgent(supabase: SupabaseClient, userId: string, data: SwitchAgentData, userMessage?: string) {
   const { session_id, agent_id, agent_name, reason } = data;
   let targetAgent = agent_name || agent_id; // Support both parameter names
   
@@ -381,11 +482,11 @@ export async function switchAgent(supabase: any, userId: string, data: any, user
     .eq('is_active', true);
 
   // Activate new agent for this session
-  const { data: sessionAgent, error: insertError } = await supabase
+  const { data: _sessionAgent, error: insertError } = await supabase
     .from('session_agents')
     .insert({
       session_id,
-      agent_id: agent.id,
+      agent_id: (agent as unknown as Agent).id,
       is_active: true
     })
     .select()
@@ -393,7 +494,7 @@ export async function switchAgent(supabase: any, userId: string, data: any, user
 
   if (insertError) {
     console.error('❌ Failed to switch agent:', insertError);
-    throw new Error(`Failed to switch agent: ${insertError.message}`);
+    throw new Error(`Failed to switch agent: ${(insertError as Error)?.message || 'Unknown error'}`);
   }
 
   console.log('✅ Agent switch completed successfully');
@@ -403,21 +504,21 @@ export async function switchAgent(supabase: any, userId: string, data: any, user
     session_id,
     previous_agent_id: null, // Could track this if needed
     new_agent: {
-      id: agent.id,
-      name: agent.name,
-      role: agent.role,
-      instructions: agent.instructions,
-      initial_prompt: agent.initial_prompt
+      id: (agent as unknown as Agent).id,
+      name: (agent as unknown as Agent).name,
+      role: (agent as unknown as Agent).role,
+      instructions: (agent as unknown as Agent).instructions,
+      initial_prompt: (agent as unknown as Agent).initial_prompt
     },
     switch_reason: reason,
-    message: `Successfully switched to ${agent.name} agent. The ${agent.name} will respond in the next message.`,
+    message: `Successfully switched to ${(agent as unknown as Agent).name} agent. The ${(agent as unknown as Agent).name} will respond in the next message.`,
     stop_processing: true // Signal to stop generating additional content
   };
 }
 
 // Recommend agent for a topic
-export async function recommendAgent(supabase: any, data: any) {
-  const { topic, conversation_context } = data;
+export async function recommendAgent(supabase: SupabaseClient, data: { topic: string; conversation_context?: string }) {
+  const { topic, conversation_context: _conversation_context } = data;
   
   console.log('Recommending agent for topic:', topic);
   
@@ -448,14 +549,14 @@ export async function recommendAgent(supabase: any, data: any) {
 
   for (const matching of agentMatching) {
     if (matching.keywords.some(keyword => topicLower.includes(keyword))) {
-      recommendedAgent = agents?.find(agent => matching.agentNames.includes(agent.name));
+      recommendedAgent = (agents as unknown as Agent[])?.find((agent: Agent) => matching.agentNames.includes(agent.name));
       if (recommendedAgent) break;
     }
   }
 
   // Default to RFP Assistant if no specific match
-  if (!recommendedAgent && agents && agents.length > 0) {
-    recommendedAgent = agents.find(agent => agent.name === 'RFP Assistant') || agents[0];
+  if (!recommendedAgent && agents && (agents as unknown as Agent[]).length > 0) {
+    recommendedAgent = (agents as unknown as Agent[]).find((agent: Agent) => agent.name === 'RFP Assistant') || (agents as unknown as Agent[])[0];
   }
 
   return {

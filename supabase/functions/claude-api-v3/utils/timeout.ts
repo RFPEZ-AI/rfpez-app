@@ -1,8 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Database timeout utilities for Claude API v3
 
-import { supabase } from './config.ts';
-
 // Database timeout utility - wraps database operations with timeout
 export function withDatabaseTimeout<T>(operation: Promise<T>, timeoutMs: number = 25000): Promise<T> {
   return Promise.race([

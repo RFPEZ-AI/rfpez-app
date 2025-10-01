@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "lib": ["deno.window"],
+    "strict": true
+  },
+  "test": {
+    "include": ["**/*test.ts", "**/*test.js", "tests/**/*.ts", "tests/**/*.js"]
+  },
+  "tasks": {
+    "test": "deno test --allow-net --allow-env --allow-read",
+    "test:watch": "deno test --allow-net --allow-env --allow-read --watch",
+    "test:coverage": "deno test --allow-net --allow-env --allow-read --coverage=coverage",
+    "coverage": "deno coverage coverage"
+  },
+  "imports": {
+    "std/": "https://deno.land/std@0.168.0/",
+    "supabase": "https://esm.sh/@supabase/supabase-js@2"
+  }
+}

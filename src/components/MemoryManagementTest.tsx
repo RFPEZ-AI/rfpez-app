@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
 // Memory Management Test Component
 
 import React, { useState, useEffect } from 'react';
@@ -87,8 +88,8 @@ const MemoryManagementTest: React.FC<MemoryManagementTestProps> = () => {
   const [alertMessage, setAlertMessage] = useState('');
   
   // Stress test state
-  const [stressTesting, setStressTesting] = useState(false);
-  const [stressTestResults, setStressTestResults] = useState<StressTestResults | null>(null);
+  const [, setStressTesting] = useState(false);
+  const [, setStressTestResults] = useState<StressTestResults | null>(null);
   const [selectedStressTests, setSelectedStressTests] = useState({
     memoryPressure: false,
     aggressiveCleanup: false,
@@ -102,7 +103,6 @@ const MemoryManagementTest: React.FC<MemoryManagementTestProps> = () => {
 
     const interval = setInterval(() => {
       const memoryMetrics = streamManager.getMemoryMetrics();
-      const healthMetrics = streamManager.getStreamingHealthMetrics();
       
       setMetrics(prev => ({
         allocatedBuffers: memoryMetrics.bufferCount,

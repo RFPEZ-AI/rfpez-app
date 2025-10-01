@@ -1,6 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { streamManager as StreamManagerInstance } from '../claudeAPIProxy';
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
+import StreamManager, { StreamManagerInstance } from '../streamManager';
 
 // Since we're testing a singleton, we need to create a fresh instance for testing
 class StreamManager {

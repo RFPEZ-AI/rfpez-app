@@ -1,7 +1,8 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Memory Management Tests for StreamManager
 
-import { streamManager } from '../claudeAPIProxy';
+/* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
+import { StreamManager, MemoryBuffer } from '../memoryManager';
 
 // MemoryBuffer interface for type safety
 interface MemoryBuffer {

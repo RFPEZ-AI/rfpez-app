@@ -1,5 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
+/* eslint-disable @typescript-eslint/no-unused-vars */
 import React from 'react';
 import { render, screen, waitFor } from '@testing-library/react';
 import PerformanceMonitoringDashboard from '../PerformanceMonitoringDashboard';

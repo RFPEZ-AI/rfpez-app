@@ -8,10 +8,12 @@ The original monolithic 1,543-line `index.ts` file has been refactored into the 
 
 ```
 claude-api-v3/
-├── index.ts              # Original monolithic implementation (preserved)
-├── index-modular.ts      # New modular entry point
+├── index.ts              # Main entry point (current implementation)
 ├── config.ts             # Environment configuration and Supabase setup
 ├── types.ts              # TypeScript interface definitions
+├── deno.json             # Deno configuration with test tasks
+├── run-tests.sh          # Linux/Mac test runner
+├── run-tests.bat         # Windows test runner
 ├── auth/
 │   └── auth.ts          # Authentication utilities
 ├── handlers/
@@ -24,6 +26,13 @@ claude-api-v3/
 ├── utils/
 │   ├── mapping.ts       # Data mapping utilities
 │   └── timeout.ts       # Database timeout utilities
+├── tests/
+│   ├── test-utils.ts            # Test utilities and helpers
+│   ├── http-handlers.test.ts     # HTTP handler tests
+│   ├── claude-service.test.ts    # Claude API service tests
+│   ├── utilities.test.ts         # Utility function tests
+│   └── mocks/
+│       └── responses.ts          # Mock response data
 └── README.md            # This documentation
 ```
 
@@ -109,13 +118,115 @@ The original `index.ts` file remains unchanged and functional.
 ### New (Modular)
 To use the modular version, rename `index-modular.ts` to `index.ts` or update the import structure in the main `index.ts` file.
 
+## Testing
+
+### Test Suite Overview
+
+The edge function includes a comprehensive test suite using Deno's built-in testing framework:
+
+#### Test Files
+- **`tests/http-handlers.test.ts`**: Tests for HTTP request handling, CORS, authentication, and routing
+- **`tests/claude-service.test.ts`**: Tests for Claude API integration, tool execution, and streaming
+- **`tests/utilities.test.ts`**: Tests for utility functions, mapping, timeout handling, and configuration
+
+#### Test Utilities
+- **`tests/test-utils.ts`**: Mock helpers for Supabase client, HTTP requests, and streaming responses
+- **`tests/mocks/responses.ts`**: Mock data for Claude API responses and database operations
+
+### Running Tests
+
+#### Quick Start
+```bash
+# Linux/Mac
+chmod +x run-tests.sh
+./run-tests.sh
+
+# Windows
+run-tests.bat
+```
+
+#### Manual Commands
+```bash
+# Run all tests
+deno test --allow-net --allow-env --allow-read tests/
+
+# Run specific test file
+deno test --allow-net --allow-env --allow-read tests/http-handlers.test.ts
+
+# Run with coverage
+deno test --allow-net --allow-env --allow-read --coverage=coverage tests/
+deno coverage coverage
+
+# Watch mode (re-run tests on file changes)
+deno test --allow-net --allow-env --allow-read --watch tests/
+```
+
+#### Deno Tasks (from deno.json)
+```bash
+deno task test          # Run all tests
+deno task test:watch    # Run tests in watch mode
+deno task test:coverage # Run tests with coverage
+deno task coverage      # Generate coverage report
+```
+
+### VS Code Integration
+
+**Automated Testing Tasks** - Access via `Ctrl+Shift+P` → "Tasks: Run Task":
+
+- **Run Edge Function Tests** - Execute all tests once with proper environment setup
+- **Run Edge Function Tests (Watch Mode)** - Continuous testing with file watching for development
+- **Run Edge Function Tests with Coverage** - Generate comprehensive test coverage reports
+- **Test Specific Edge Function File** - Run individual test files (utilities, http-handlers, claude-service)
+- **Generate Coverage Report** - Create HTML coverage report after running coverage tests
+
+**Quick Access**: Terminal → Run Task → Select Edge Function test task
+
+**Features**:
+- Automatic environment variable setup (no manual configuration needed)
+- Proper TypeScript type checking during test execution
+- Integrated problem detection and error reporting
+- Background/watch mode for continuous development
+- Coverage report generation with HTML output
+
+### Test Coverage
+
+The test suite covers:
+
+✅ **HTTP Handlers**
+- OPTIONS and POST request handling
+- CORS header validation
+- Authentication and authorization
+- Request validation and error handling
+- Streaming and non-streaming responses
+
+✅ **Claude API Service**
+- Message sending with and without tools
+- Streaming response handling
+- Error handling and timeout management
+- Tool execution and result processing
+
+✅ **Utilities**
+- Data mapping and transformation
+- Timeout and database query wrapping
+- Authentication token validation
+- Configuration and environment setup
+
+### Continuous Integration
+
+Tests are designed to run in CI/CD environments with:
+- No external dependencies required
+- Mock implementations for all external services
+- Environment variable configuration for test mode
+- Comprehensive error case coverage
+
 ## Development Benefits
 
 1. **Easier Debugging**: Issues can be isolated to specific modules
-2. **Better Testing**: Individual modules can be unit tested
+2. **Better Testing**: Individual modules can be unit tested with comprehensive coverage
 3. **Improved Collaboration**: Multiple developers can work on different modules
 4. **Future Extensions**: New tools and features can be added as separate modules
 5. **Code Reusability**: Modules can be reused in other edge functions
+6. **Quality Assurance**: Automated testing ensures reliability and prevents regressions
 
 ## TypeScript Considerations
 

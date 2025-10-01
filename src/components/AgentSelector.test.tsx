@@ -17,10 +17,20 @@ jest.mock('../services/agentService', () => ({
 }));
 
 // Mock Ionic React components
+interface MockIonModalProps {
+  children: React.ReactNode;
+  isOpen: boolean;
+}
+
+interface MockIonToastProps {
+  isOpen: boolean;
+  message: string;
+}
+
 jest.mock('@ionic/react', () => ({
   ...jest.requireActual('@ionic/react'),
-  IonModal: ({ children, isOpen }: any) => isOpen ? <div data-testid="modal">{children}</div> : null,
-  IonToast: ({ isOpen, message }: any) => isOpen ? <div data-testid="toast">{message}</div> : null
+  IonModal: ({ children, isOpen }: MockIonModalProps) => isOpen ? <div data-testid="modal">{children}</div> : null,
+  IonToast: ({ isOpen, message }: MockIonToastProps) => isOpen ? <div data-testid="toast">{message}</div> : null
 }));
 
 describe('AgentSelector', () => {
