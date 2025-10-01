@@ -121,6 +121,89 @@ export const TOOL_DEFINITIONS = [
       },
       required: ['query']
     }
+  },
+  {
+    name: 'get_available_agents',
+    description: 'Get all available agents with their IDs and details. Call this when users ask about agents, agent lists, available agents, or similar questions. CRITICAL: Always display the \'formatted_agent_list\' field from the response to show users the agent IDs they need for switching.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        include_restricted: {
+          type: 'boolean',
+          description: 'Whether to include restricted/premium agents (default: false)',
+          default: false
+        }
+      }
+    }
+  },
+  {
+    name: 'get_current_agent',
+    description: 'Get the currently active agent for a specific session',
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'The UUID of the session to get the current agent for'
+        }
+      },
+      required: ['session_id']
+    }
+  },
+  {
+    name: 'switch_agent',
+    description: 'Switch to a different AI agent. Extract agent name from user request: "switch to the rfp designer" → agent_name: "RFP Designer", "switch to solutions" → agent_name: "Solutions", "switch to support" → agent_name: "Support"',
+    input_schema: {
+      type: 'object',
+      properties: {
+        agent_name: {
+          type: 'string',
+          description: 'REQUIRED: Extract exact agent name. Map user input to exact enum value: "rfp designer/design" → "RFP Designer", "solutions/sales" → "Solutions", "support/help" → "Support"',
+          enum: ['RFP Designer', 'Solutions', 'Support', 'Technical Support', 'RFP Assistant']
+        }
+      },
+      required: ['agent_name']
+    }
+  },
+  {
+    name: 'debug_agent_switch',
+    description: 'Test tool: When user asks to switch agents but you cannot determine which agent they want, use this to debug parameter extraction',
+    input_schema: {
+      type: 'object',
+      properties: {
+        user_input: {
+          type: 'string',
+          description: 'The exact user input about switching agents'
+        },
+        extracted_keywords: {
+          type: 'string',
+          description: 'What keywords you found in the input (e.g., "rfp", "designer", "support")'
+        },
+        confusion_reason: {
+          type: 'string',
+          description: 'Why you cannot determine the target agent'
+        }
+      },
+      required: ['user_input', 'extracted_keywords', 'confusion_reason']
+    }
+  },
+  {
+    name: 'recommend_agent',
+    description: 'Recommend the best agent for handling a specific topic or user request',
+    input_schema: {
+      type: 'object',
+      properties: {
+        topic: {
+          type: 'string',
+          description: 'The topic or user request to find the best agent for'
+        },
+        conversation_context: {
+          type: 'string',
+          description: 'Optional context from the current conversation'
+        }
+      },
+      required: ['topic']
+    }
   }
 ];
 
