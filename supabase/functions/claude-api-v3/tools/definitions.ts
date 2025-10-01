@@ -6,13 +6,13 @@ import { ClaudeToolDefinition } from '../types.ts';
 export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   {
     name: 'create_and_set_rfp',
-    description: 'Create a new RFP and set it as the current active RFP for the session. CRITICAL: You MUST provide a descriptive name that includes what is being procured (e.g., "Asphalt Procurement RFP", "Diesel Fuel RFP", "Office Supplies RFP"). NEVER use generic names like "New RFP". Use this when user mentions RFP, procurement, sourcing, or proposal creation.',
+    description: 'Create a new RFP and set it as the current active RFP for the session. CRITICAL: You MUST extract the procurement subject from the user message and create a descriptive name. For "industrial use alcohol" create "Industrial Use Alcohol RFP". For "floor tiles" create "Floor Tiles RFP". NEVER use generic names like "New RFP".',
     input_schema: {
       type: 'object' as const,
       properties: {
         name: {
           type: 'string',
-          description: 'The descriptive name/title of the RFP that MUST include what is being procured. Examples: "Asphalt Procurement RFP", "LED Bulbs RFP", "Diesel Fuel Procurement RFP". NEVER use "New RFP" or other generic names. (REQUIRED)'
+          description: 'REQUIRED: Descriptive RFP name based on what is being procured. Extract from user message: "industrial use alcohol" → "Industrial Use Alcohol RFP", "LED bulbs" → "LED Bulbs RFP", "office supplies" → "Office Supplies RFP". Must include the procurement subject + "RFP".'
         },
         description: {
           type: 'string',
@@ -180,7 +180,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'switch_agent',
-    description: 'Switch to a different AI agent. Extract agent name from user request: "switch to the rfp designer" → agent_name: "RFP Designer", "switch to solutions" → agent_name: "Solutions", "switch to support" → agent_name: "Support"',
+    description: 'Switch to a different AI agent. Extract agent name from user request: "switch to the rfp designer" → agent_name: "RFP Designer", "switch to solutions" → agent_name: "Solutions", "switch to support" → agent_name: "Support". Include user context to help the new agent understand the request.',
     input_schema: {
       type: 'object',
       properties: {
@@ -188,6 +188,14 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           type: 'string',
           description: 'REQUIRED: Extract exact agent name. Map user input to exact enum value: "rfp designer/design" → "RFP Designer", "solutions/sales" → "Solutions", "support/help" → "Support"',
           enum: ['RFP Designer', 'Solutions', 'Support', 'Technical Support', 'RFP Assistant']
+        },
+        user_input: {
+          type: 'string',
+          description: 'The original user request that prompted the agent switch (e.g., "I need to source floor tile", "create an RFP for office supplies")'
+        },
+        reason: {
+          type: 'string',
+          description: 'Brief reason for switching agents (e.g., "User needs RFP creation assistance", "User requires technical support")'
         }
       },
       required: ['agent_name']
@@ -235,9 +243,62 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   }
 ];
 
-// Get tool definitions for Claude API
-export function getToolDefinitions(): ClaudeToolDefinition[] {
-  return TOOL_DEFINITIONS;
+// Define role-based tool restrictions
+const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: string[] }> = {
+  'sales': {
+    // Solutions agent (sales role) should NOT create RFPs directly - must switch to RFP Designer
+    blocked: ['create_and_set_rfp', 'create_form_artifact']
+  },
+  'design': {
+    // RFP Designer has access to all RFP creation tools
+    allowed: ['create_and_set_rfp', 'create_form_artifact', 'switch_agent', 'get_available_agents', 'get_conversation_history', 'store_message', 'create_session', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
+  },
+  'support': {
+    // Support agents don't need RFP creation tools
+    blocked: ['create_and_set_rfp', 'create_form_artifact']
+  }
+};
+
+// Get tool definitions for Claude API, filtered by agent role
+export function getToolDefinitions(agentRole?: string): ClaudeToolDefinition[] {
+  console.log(`🔍 getToolDefinitions called with agentRole: '${agentRole}'`);
+  console.log(`🔍 Type of agentRole: ${typeof agentRole}`);
+  
+  if (!agentRole) {
+    console.log(`⚠️ No agent role provided, returning ALL ${TOOL_DEFINITIONS.length} tools`);
+    return TOOL_DEFINITIONS; // Return all tools if no role specified
+  }
+
+  const restrictions = ROLE_TOOL_RESTRICTIONS[agentRole];
+  if (!restrictions) {
+    console.log(`⚠️ No restrictions found for role '${agentRole}', returning ALL ${TOOL_DEFINITIONS.length} tools`);
+    return TOOL_DEFINITIONS; // Return all tools if role not found
+  }
+
+  console.log(`🔒 Found restrictions for role '${agentRole}':`, restrictions);
+
+  const filteredTools = TOOL_DEFINITIONS.filter(tool => {
+    // If there's an allowed list, only include tools in that list
+    if (restrictions.allowed) {
+      const allowed = restrictions.allowed.includes(tool.name);
+      console.log(`✓ Tool '${tool.name}' allowed: ${allowed}`);
+      return allowed;
+    }
+    
+    // If there's a blocked list, exclude tools in that list
+    if (restrictions.blocked) {
+      const blocked = restrictions.blocked.includes(tool.name);
+      console.log(`❌ Tool '${tool.name}' blocked: ${blocked}`);
+      return !blocked;
+    }
+    
+    console.log(`✓ Tool '${tool.name}' included (no restrictions)`);
+    return true; // Include tool if no restrictions apply
+  });
+
+  console.log(`🔧 Filtered tools for role '${agentRole}': [${filteredTools.map(t => t.name).join(', ')}]`);
+  console.log(`📊 Tool count: ${filteredTools.length} out of ${TOOL_DEFINITIONS.length} total tools`);
+  return filteredTools;
 }
 
 // Validate tool call input against schema

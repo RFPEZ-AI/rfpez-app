@@ -14,7 +14,8 @@ async function handleStreamingResponse(
   userId: string, 
   sessionId?: string, 
   agentId?: string,
-  userMessage?: string
+  userMessage?: string,
+  agent?: { role?: string }
 ): Promise<Response> {
   // Create readable stream for SSE
   const stream = new ReadableStream({
@@ -22,7 +23,12 @@ async function handleStreamingResponse(
       try {
         const claudeService = new ClaudeAPIService();
         const toolService = new ToolExecutionService(supabase, userId, userMessage);
-        const tools = getToolDefinitions();
+        
+        console.log(`🧩 STREAMING: Agent object received:`, agent);
+        console.log(`🧩 STREAMING: Agent role:`, agent?.role);
+        console.log(`🧩 STREAMING: Agent type:`, typeof agent);
+        
+        const tools = getToolDefinitions(agent?.role);
         
         console.log('🌊 Starting streaming response...');
         
@@ -432,15 +438,19 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     // If streaming is requested, handle it separately
     if (stream) {
       console.log('🌊 Streaming requested - using streaming handler');
-      return handleStreamingResponse(processedMessages, supabase, userId, sessionId, effectiveAgentId, userMessage);
+      return handleStreamingResponse(processedMessages, supabase, userId, sessionId, effectiveAgentId, userMessage, agent);
     }
 
     // Initialize services
     const claudeService = new ClaudeAPIService();
     const toolService = new ToolExecutionService(supabase, userId, userMessage);
     
-    // Get tool definitions
-    const tools = getToolDefinitions();
+    // Get tool definitions filtered by agent role
+    console.log(`🧩 NON-STREAMING: Agent object received:`, agent);
+    console.log(`🧩 NON-STREAMING: Agent role:`, agent?.role);
+    console.log(`🧩 NON-STREAMING: Agent type:`, typeof agent);
+    
+    const tools = getToolDefinitions(agent?.role);
     
     // Send request to Claude API
     const claudeResponse = await claudeService.sendMessage(processedMessages, tools);

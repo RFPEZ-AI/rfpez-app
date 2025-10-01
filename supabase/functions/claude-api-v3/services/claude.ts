@@ -2,6 +2,7 @@
 // Claude API service integration for Edge Function
 
 import { mapMessageToClaudeFormat, extractTextFromClaudeResponse, extractToolCallsFromClaudeResponse } from '../utils/mapping.ts';
+import { config } from '../config.ts';
 import type { ClaudeMessage, ClaudeToolDefinition, ClaudeResponse, ToolResult } from '../types.ts';
 
 interface ClaudeToolCall {
@@ -32,7 +33,7 @@ export class ClaudeAPIService {
   private baseUrl = 'https://api.anthropic.com/v1/messages';
 
   constructor() {
-    this.apiKey = Deno.env.get('CLAUDE_API_KEY')!;
+    this.apiKey = config.anthropicApiKey!;
   }
 
   // Send message to Claude API with tool definitions
@@ -305,6 +306,14 @@ export class ToolExecutionService {
           const { recommendAgent } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
           return await recommendAgent(this.supabase, input);
+        }
+
+        case 'create_and_set_rfp': {
+          const { createAndSetRfp } = await import('../tools/rfp.ts');
+          // @ts-ignore - RFP function type compatibility
+          return await createAndSetRfp(input, { 
+            sessionId: sessionId || ''
+          });
         }
 
         default:
