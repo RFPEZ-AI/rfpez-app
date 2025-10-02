@@ -1,10 +1,16 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // System prompt construction utilities
+// deno-lint-ignore-file no-explicit-any
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-// Minimal SupabaseClient interface for our needs
+// Interface for Supabase client - using unknown for complex API types
+interface SupabaseAuth {
+  getUser(): Promise<{ data: { user: Record<string, unknown> | null }; error: unknown }>;
+}
+
 interface SupabaseClient {
-  from: (table: string) => unknown;
+  from(table: string): unknown;
+  auth: SupabaseAuth;
 }
 
 export interface Agent {
@@ -138,6 +144,7 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
       if (error) {
         console.error('Error loading session agent:', error);
         // Try to get default agent
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { data: defaultAgent } = await (supabase as any)
           .from('agents')
           .select('id, name, instructions, role')
@@ -172,8 +179,7 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
 export async function loadUserProfile(supabase: unknown): Promise<UserProfile | null> {
   try {
     // Get current user from authenticated session
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { data: { user }, error: userError } = await (supabase as any).auth.getUser();
+    const { data: { user }, error: userError } = await (supabase as SupabaseClient).auth.getUser();
     
     if (userError || !user) {
       console.log('No authenticated user found');
@@ -181,11 +187,14 @@ export async function loadUserProfile(supabase: unknown): Promise<UserProfile | 
     }
 
     // Try to get additional profile information
+    const userObj = user as Record<string, unknown>;
+    const userMeta = (userObj.user_metadata as Record<string, unknown>) || {};
+    
     const userProfile: UserProfile = {
-      id: user.id,
-      email: user.email || 'Unknown email',
-      full_name: user.user_metadata?.full_name || user.user_metadata?.name || undefined,
-      role: user.user_metadata?.role || undefined
+      id: String(userObj.id || ''),
+      email: String(userObj.email || 'Unknown email'),
+      full_name: String(userMeta.full_name || userMeta.name || '') || undefined,
+      role: String(userMeta.role || '') || undefined
     };
 
     console.log('✅ Loaded user profile:', {
