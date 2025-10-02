@@ -4,13 +4,34 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 import { RFPFormData, SessionContext, ToolResult } from '../types.ts'
 
+// Interface for Supabase client operations
+interface SupabaseClient {
+  from: (table: string) => SupabaseQueryBuilder;
+  auth: {
+    getUser: () => Promise<{ data: { user: Record<string, unknown> } | null; error: unknown }>;
+  };
+}
+
+interface SupabaseQueryBuilder {
+  select: (columns?: string) => SupabaseQueryBuilder;
+  insert: (data: unknown) => SupabaseQueryBuilder;
+  update: (data: Record<string, unknown>) => SupabaseQueryBuilder;
+  delete: () => SupabaseQueryBuilder;
+  eq: (column: string, value: unknown) => SupabaseQueryBuilder;
+  in: (column: string, values: unknown[]) => SupabaseQueryBuilder;
+  order: (column: string, options?: Record<string, unknown>) => SupabaseQueryBuilder;
+  limit: (count: number) => SupabaseQueryBuilder;
+  single: () => Promise<{ data: unknown; error: unknown }>;
+  then: (callback: (result: { data: unknown; error: unknown }) => unknown) => Promise<unknown>;
+}
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL')!,
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
 // Version that accepts an authenticated Supabase client
-export async function createAndSetRfpWithClient(authenticatedSupabase: any, parameters: RFPFormData, sessionContext?: SessionContext): Promise<ToolResult> {
+export async function createAndSetRfpWithClient(authenticatedSupabase: SupabaseClient, parameters: RFPFormData, sessionContext?: SessionContext): Promise<ToolResult> {
   console.log('🎯 Creating and setting RFP with authenticated client:', parameters);
   console.log('🔍 DEBUG: parameters.name received:', parameters.name);
   console.log('🔍 DEBUG: typeof parameters.name:', typeof parameters.name);
@@ -52,10 +73,14 @@ export async function createAndSetRfpWithClient(authenticatedSupabase: any, para
     
     if (insertError) {
       console.error('❌ RFP creation error:', insertError);
-      throw new Error(`Failed to create RFP: ${insertError.message}`);
+      const errorMessage = (insertError as { message?: string }).message || 'Unknown error';
+      throw new Error(`Failed to create RFP: ${errorMessage}`);
     }
     
     console.log('✅ RFP created successfully:', newRfp);
+    
+    // Type cast newRfp for safe property access
+    const rfpRecord = newRfp as Record<string, unknown>;
     
     // Update session to set current RFP if sessionId is provided
     if (sessionContext?.sessionId) {
@@ -63,7 +88,7 @@ export async function createAndSetRfpWithClient(authenticatedSupabase: any, para
       
       const { error: updateError } = await authenticatedSupabase
         .from('sessions')
-        .update({ current_rfp_id: newRfp.id })
+        .update({ current_rfp_id: rfpRecord.id })
         .eq('id', sessionContext.sessionId);
       
       if (updateError) {
@@ -77,19 +102,19 @@ export async function createAndSetRfpWithClient(authenticatedSupabase: any, para
     // Return success response with client callbacks
     return {
       success: true,
-      data: newRfp,
-      current_rfp_id: newRfp.id,
-      rfp: newRfp,
-      message: `RFP "${newRfp.name}" created successfully with ID ${newRfp.id}`,
+      data: rfpRecord,
+      current_rfp_id: rfpRecord.id as number,
+      rfp: undefined,
+      message: `RFP "${String(rfpRecord.name || 'Untitled')}" created successfully with ID ${String(rfpRecord.id || '')}`,
       clientCallbacks: [
         {
           type: 'ui_refresh',
           target: 'rfp_context',
           payload: {
-            rfp_id: newRfp.id,
-            rfp_name: newRfp.name,
-            rfp_data: newRfp,
-            message: `RFP "${newRfp.name}" has been created successfully`
+            rfp_id: rfpRecord.id as number,
+            rfp_name: String(rfpRecord.name || 'Untitled'),
+            rfp_data: rfpRecord,
+            message: `RFP "${String(rfpRecord.name || 'Untitled')}" has been created successfully`
           },
           priority: 'high'
         }
