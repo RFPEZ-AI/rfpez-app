@@ -9,6 +9,7 @@ import { ToolInvocationEvent } from '../types/streamingProtocol';
 import { claudeApiFunctions, claudeAPIHandler } from './claudeAPIFunctions';
 import { APIRetryHandler } from '../utils/apiRetry';
 import { supabase } from '../supabaseClient';
+import { AgentService } from './agentService';
 
 // Isolated storage function that's immune to abort signal interference
 const storeMessageIsolated = async (
@@ -275,6 +276,23 @@ export class ClaudeService {
       this.trackLogin();
     }
     
+    // If sessionId is provided, verify it has an agent assigned (brief delay for database consistency)
+    if (sessionId && userProfile?.id) {
+      try {
+        // Small delay to ensure database writes are committed
+        await new Promise(resolve => setTimeout(resolve, 100));
+        
+        const sessionAgent = await AgentService.getSessionActiveAgent(sessionId);
+        if (!sessionAgent) {
+          console.warn('Session has no agent assigned, edge function will use fallback logic:', sessionId);
+        } else {
+          console.log('Session agent verified:', { sessionId, agentId: sessionAgent.agent_id, agentName: sessionAgent.agent_name });
+        }
+      } catch (error) {
+        console.warn('Could not verify session agent, proceeding anyway:', error);
+      }
+    }
+    
     const payload = {
       userMessage,
       agent,
@@ -415,10 +433,23 @@ export class ClaudeService {
                         console.log('🔄 Processing client callbacks:', eventData.metadata.clientCallbacks);
                         eventData.metadata.clientCallbacks.forEach((callback: Record<string, unknown>) => {
                           if (callback.type === 'ui_refresh') {
-                            console.log('🔄 Dispatching UI refresh event:', callback.data);
-                            window.dispatchEvent(new CustomEvent('ui_refresh', { 
-                              detail: callback.data 
-                            }));
+                            console.log('🔄 Dispatching UI refresh callback via window message:', callback);
+                            
+                            // Use proper EDGE_FUNCTION_CALLBACK message structure that Home.tsx expects
+                            const message = {
+                              type: 'EDGE_FUNCTION_CALLBACK',
+                              callbackType: callback.type,
+                              target: callback.target,
+                              payload: callback.payload,
+                              debugInfo: {
+                                timestamp: new Date().toISOString(),
+                                source: 'claudeService.streaming.completion',
+                                originalCallbackType: callback.type
+                              }
+                            };
+                            
+                            console.log('📤 Posting EDGE_FUNCTION_CALLBACK message:', message);
+                            window.postMessage(message, '*');
                           }
                         });
                       }

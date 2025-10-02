@@ -433,6 +433,28 @@ export const claudeApiFunctions: Tool[] = [
     }
   },
   {
+    "name": "update_form_data",
+    "description": "Update the form data (default_values) for an existing form artifact. This populates the form with sample or real data while keeping the schema intact. Useful for demo purposes or pre-filling forms with known values.",
+    "input_schema": {
+      "type": "object",
+      "properties": {
+        "artifact_id": {
+          "type": "string",
+          "description": "ID of the form artifact to update with new data"
+        },
+        "session_id": {
+          "type": "string",
+          "description": "Current session ID for context"
+        },
+        "form_data": {
+          "type": "object",
+          "description": "Complete form data object with field names matching the form schema. This will replace the current default_values completely."
+        }
+      },
+      "required": ["artifact_id", "session_id", "form_data"]
+    }
+  },
+  {
     "name": "get_form_submission",
     "description": "Retrieve form submission data and schema from a specific artifact. Use this BEFORE update_form_artifact to understand the current schema structure and field names.",
     "input_schema": {
@@ -1125,6 +1147,8 @@ export class ClaudeAPIFunctionHandler {
         return await this.generateRequestArtifact(parameters, userId);
       case 'update_form_artifact':
         return await this.updateFormArtifact(parameters, userId);
+      case 'update_form_data':
+        return await this.updateFormData(parameters, userId);
       case 'get_form_submission':
         return await this.getFormSubmission(parameters, userId);
       case 'validate_form_data':
@@ -2231,6 +2255,82 @@ Please retry the create_form_artifact call with the complete form_schema paramet
       };
     } catch (error) {
       console.error('❌ Error creating form artifact:', error);
+      throw error;
+    }
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private async updateFormData(params: any, userId: string) {
+    console.log('🔄 Starting updateFormData with params:', JSON.stringify(params, null, 2));
+    
+    const { artifact_id, form_data, session_id } = params;
+    
+    console.log('🔄 Updating form data:', { artifact_id, userId, session_id });
+    console.log('🔍 Form data to set:', form_data);
+    
+    if (!artifact_id) {
+      throw new Error('Artifact ID is required for updating form data');
+    }
+    
+    if (!form_data || typeof form_data !== 'object') {
+      throw new Error('Form data must be a valid object');
+    }
+    
+    if (!session_id) {
+      throw new Error('Session ID is required for updating form data');
+    }
+    
+    try {
+      // Use the imported supabase client
+      
+      // First verify the artifact exists and is a form
+      const { data: existingArtifact, error: fetchError } = await supabase
+        .from('artifacts')
+        .select('id, name, type, artifact_role, schema')
+        .eq('id', artifact_id)
+        .eq('type', 'form')
+        .single();
+      
+      if (fetchError) {
+        console.error('❌ Error fetching artifact:', fetchError);
+        throw new Error(`Artifact not found: ${artifact_id}`);
+      }
+      
+      if (!existingArtifact) {
+        throw new Error(`Form artifact not found: ${artifact_id}`);
+      }
+      
+      console.log('✅ Found existing form artifact:', existingArtifact.name);
+      
+      // Update the default_values field with the new form data
+      const { error: updateError } = await supabase
+        .from('artifacts')
+        .update({
+          default_values: form_data,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', artifact_id)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('❌ Error updating form data:', updateError);
+        throw updateError;
+      }
+      
+      console.log('✅ Form data updated successfully:', { artifact_id, name: existingArtifact.name });
+      
+      return {
+        success: true,
+        artifact_id,
+        name: existingArtifact.name,
+        form_data,
+        session_id,
+        updated_at: new Date().toISOString(),
+        message: `Form data for "${existingArtifact.name}" updated successfully with sample values`
+      };
+    } catch (error) {
+      console.error('❌ Error updating form data:', error);
       throw error;
     }
   }

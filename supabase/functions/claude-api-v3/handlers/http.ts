@@ -53,17 +53,32 @@ function handleStreamingResponse(
         console.log(`🧩 STREAMING: Agent type:`, typeof agent);
         
         // Load agent context and user profile, then build system prompt
-        const agentContext = await loadAgentContext(supabase, agentId);
+        const agentContext = await loadAgentContext(supabase, sessionId, agentId);
         const userProfile = await loadUserProfile(supabase);
+        
+        // Extract user message for agent switch context detection
+        const lastUserMessage = messages && messages.length > 0 ? 
+          messages[messages.length - 1] : null;
+        const userMessageText = lastUserMessage && 
+          typeof lastUserMessage === 'object' && 
+          'content' in lastUserMessage ? 
+          String((lastUserMessage as Record<string, unknown>).content) : undefined;
+        
         const systemPrompt = buildSystemPrompt({ 
           agent: agentContext || undefined,
           userProfile: userProfile || undefined,
           sessionId: sessionId,
           isAnonymous: !userProfile
-        });
+        }, userMessageText);
         console.log('🎯 STREAMING: System prompt built:', systemPrompt ? 'Yes' : 'No');
+        console.log('🔄 STREAMING: Agent switch context detection:', userMessageText?.includes('User context from previous agent:') || false);
         
-        const tools = getToolDefinitions(agent?.role);
+        // 🔍 DEBUG: Log agent role before getting tools - USE agentContext not agent from request
+        console.log('🔧 DEBUG: Request agent role:', agent?.role, typeof agent?.role);
+        console.log('🔧 DEBUG: AgentContext role:', agentContext?.role, typeof agentContext?.role);
+        console.log('🔧 DEBUG: AgentContext object:', { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role });
+        
+        const tools = getToolDefinitions(agentContext?.role);
         
         console.log('🌊 Starting streaming response...');
         
@@ -76,7 +91,7 @@ function handleStreamingResponse(
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const response = await claudeService.streamMessage(messages as ClaudeMessage[], tools, (chunk) => {
           try {
-            console.log('📡 Streaming chunk received:', chunk.type, chunk);
+            console.log('🎯 HTTP HANDLER onChunk called with:', chunk.type, JSON.stringify(chunk, null, 2));
             
             // Handle text content
             if (chunk.type === 'text' && chunk.content) {
@@ -93,8 +108,9 @@ function handleStreamingResponse(
               controller.enqueue(new TextEncoder().encode(sseData));
               
             } else if (chunk.type === 'tool_use' && chunk.name) {
-              console.log('🔧 Tool use detected:', chunk.name);
-              console.log('📡 Streaming chunk received:', chunk.type, JSON.stringify(chunk, null, 2));
+              console.log('🔧 HTTP Handler - Tool use detected:', chunk.name);
+              console.log('� HTTP Handler - Tool chunk input:', JSON.stringify(chunk.input, null, 2));
+              console.log('🔧 HTTP Handler - Full chunk:', JSON.stringify(chunk, null, 2));
               if (!toolsUsed.includes(chunk.name)) {
                 toolsUsed.push(chunk.name);
               }
@@ -119,6 +135,10 @@ function handleStreamingResponse(
             console.error('Error encoding chunk:', error);
           }
         }, systemPrompt);
+
+        // 🔍 DEBUG: Check what tool calls we got from the response
+        console.log('🔍 DEBUG response.toolCalls:', JSON.stringify(response.toolCalls, null, 2));
+        console.log('🔍 DEBUG pendingToolCalls:', JSON.stringify(pendingToolCalls, null, 2));
 
         // If there are tool calls, execute them and get final response from Claude
         if (pendingToolCalls.length > 0) {
@@ -426,8 +446,16 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     } = body;
     
     // Load agent context and user profile, then build system prompt
-    const agentContext = await loadAgentContext(supabase, agentId);
+    const agentContext = await loadAgentContext(supabase, sessionId, agentId);
     const loadedUserProfile = await loadUserProfile(supabase);
+    
+    // 🔍 LOADED AGENT CONTEXT DEBUG
+    console.log('🗄️🗄️🗄️ DATABASE AGENT CONTEXT 🗄️🗄️🗄️');
+    console.log('Loaded agentContext.name:', agentContext?.name);
+    console.log('Loaded agentContext.role:', agentContext?.role);
+    console.log('Loaded agentContext.instructions preview:', agentContext?.instructions?.substring(0, 100) + '...');
+    console.log('🗄️🗄️🗄️ END DATABASE AGENT CONTEXT 🗄️🗄️🗄️');
+    
     const systemPrompt = buildSystemPrompt({ 
       agent: agentContext || undefined,
       userProfile: loadedUserProfile || undefined,
@@ -483,6 +511,15 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     // Use agentId from payload, or extract from agent object
     const effectiveAgentId = agentId || agent?.id;
     
+    // 🔍 BROWSER vs API DEBUG: Compare agent sources
+    console.log('🔍🔍🔍 AGENT CONTEXT DEBUG 🔍🔍🔍');
+    console.log('AgentId from payload:', agentId);
+    console.log('Agent.id from payload:', agent?.id);
+    console.log('Agent.name from payload:', agent?.name);
+    console.log('Agent.instructions preview:', agent?.instructions?.substring(0, 100) + '...');
+    console.log('Effective agentId being used:', effectiveAgentId);
+    console.log('🔍🔍🔍 END AGENT CONTEXT DEBUG 🔍🔍🔍');
+    
     console.log('Request received:', { 
       userId, 
       sessionId, 
@@ -505,12 +542,13 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     const claudeService = new ClaudeAPIService();
     const toolService = new ToolExecutionService(supabase, userId, userMessage);
     
-    // Get tool definitions filtered by agent role
-    console.log(`🧩 NON-STREAMING: Agent object received:`, agent);
-    console.log(`🧩 NON-STREAMING: Agent role:`, agent?.role);
-    console.log(`🧩 NON-STREAMING: Agent type:`, typeof agent);
+    // Get tool definitions filtered by agent role - USE agentContext not agent from request
+    console.log(`🧩 NON-STREAMING: Request agent object:`, agent);
+    console.log(`🧩 NON-STREAMING: Request agent role:`, agent?.role);
+    console.log(`🧩 NON-STREAMING: AgentContext role:`, agentContext?.role);
+    console.log(`🧩 NON-STREAMING: AgentContext object:`, { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role });
     
-    const tools = getToolDefinitions(agent?.role);
+    const tools = getToolDefinitions(agentContext?.role);
     
     // Send request to Claude API
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -537,10 +575,10 @@ export async function handlePostRequest(request: Request): Promise<Response> {
           },
           {
             role: 'user',
-            content: toolResults.map((result: unknown) => ({
+            content: toolResults.map((result: unknown, index: number) => ({
               type: 'tool_result',
-              tool_use_id: (result as Record<string, unknown>).tool_call_id as string,
-              content: JSON.stringify((result as Record<string, unknown>).output)
+              tool_use_id: claudeResponse.toolCalls[index].id, // Use the original tool call ID
+              content: JSON.stringify(result) // The result itself is the output
             }))
           }
         ];
@@ -553,8 +591,24 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     }
 
     // Detect if an agent switch occurred successfully
-    const agentSwitchOccurred = toolResults.some((result: unknown) => {
-      return isToolExecutionResult(result) && result.function_name === 'switch_agent' && result.result?.success === true;
+    // In non-streaming mode, we need to check both the tool calls and the results
+    const agentSwitchOccurred = claudeResponse.toolCalls?.some((call: unknown, index: number) => {
+      const toolCall = call as Record<string, unknown>;
+      const result = toolResults[index] as Record<string, unknown>;
+      console.log('🔍 Checking tool call for agent switch:', {
+        tool_name: toolCall.name,
+        result_success: result?.success,
+        result_keys: Object.keys(result || {}),
+        is_switch_agent: toolCall.name === 'switch_agent',
+        success_check: result?.success === true
+      });
+      return toolCall.name === 'switch_agent' && result?.success === true;
+    }) || false;
+    
+    console.log('🔍 Agent switch detection result:', {
+      agentSwitchOccurred,
+      total_tool_calls: claudeResponse.toolCalls?.length || 0,
+      tool_names: claudeResponse.toolCalls?.map((call: unknown) => (call as Record<string, unknown>).name)
     });
 
     // Prepare metadata in format expected by client
@@ -669,7 +723,7 @@ export async function handleStreamingRequest(request: Request): Promise<Response
     const { messages, sessionId, agentId } = body;
     
     // Load agent context and build system prompt
-    const agentContext = await loadAgentContext(supabase, agentId);
+    const agentContext = await loadAgentContext(supabase, sessionId, agentId);
     const systemPrompt = buildSystemPrompt({ 
       agent: agentContext || undefined,
       sessionId: sessionId
@@ -682,7 +736,10 @@ export async function handleStreamingRequest(request: Request): Promise<Response
         try {
           const claudeService = new ClaudeAPIService();
           const _toolService = new ToolExecutionService(supabase, userId, undefined);
-          const tools = getToolDefinitions();
+          
+          // 🔍 DEBUG: Log agent role for this streaming handler too
+          console.log('🔧 DEBUG: STREAMING REQUEST - AgentContext role:', agentContext?.role);
+          const tools = getToolDefinitions(agentContext?.role);
           
           // Stream response from Claude
           await claudeService.streamMessage(messages, tools, (chunk) => {

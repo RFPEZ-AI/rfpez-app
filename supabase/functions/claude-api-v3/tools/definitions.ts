@@ -180,25 +180,33 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'switch_agent',
-    description: 'Switch to a different AI agent. Extract agent name from user request: "switch to the rfp designer" → agent_name: "RFP Designer", "switch to solutions" → agent_name: "Solutions", "switch to support" → agent_name: "Support". Include user context to help the new agent understand the request.',
+    description: 'Switch to a different AI agent. CRITICAL: You MUST provide agent_name parameter. WORKFLOW: When user needs procurement/sourcing/RFP creation (keywords: source, buy, purchase, procure, RFP, equipment, supplies, computers, etc.), use agent_name: "RFP Design". For sales questions about our platform, use agent_name: "Solutions". For technical help, use agent_name: "Technical Support".',
     input_schema: {
       type: 'object',
       properties: {
+        session_id: {
+          type: 'string',
+          description: 'The UUID of the session to switch agents in'
+        },
         agent_name: {
           type: 'string',
-          description: 'REQUIRED: Extract exact agent name. Map user input to exact enum value: "rfp designer/design" → "RFP Designer", "solutions/sales" → "Solutions", "support/help" → "Support"',
-          enum: ['RFP Designer', 'Solutions', 'Support', 'Technical Support', 'RFP Assistant']
+          description: 'The name of the agent to switch to. Use "RFP Design" for RFP creation, "Solutions" for sales questions, "Support" for help.',
+          enum: ['RFP Design', 'Solutions', 'Support', 'Technical Support', 'RFP Assistant']
+        },
+        agent_id: {
+          type: 'string',
+          description: 'Alternative: The UUID of the agent to switch to (use either agent_name or agent_id)'
         },
         user_input: {
           type: 'string',
-          description: 'The original user request that prompted the agent switch (e.g., "I need to source floor tile", "create an RFP for office supplies")'
+          description: 'The original user request that triggered the agent switch. This context will be passed to the new agent to continue assisting with the request.'
         },
         reason: {
           type: 'string',
-          description: 'Brief reason for switching agents (e.g., "User needs RFP creation assistance", "User requires technical support")'
+          description: 'Optional reason for switching agents'
         }
       },
-      required: ['agent_name']
+      required: ['session_id', 'agent_name']
     }
   },
   {
@@ -246,12 +254,12 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
 // Define role-based tool restrictions
 const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: string[] }> = {
   'sales': {
-    // Solutions agent (sales role) should NOT create RFPs directly - must switch to RFP Designer
-    blocked: ['create_and_set_rfp', 'create_form_artifact']
+    // Solutions agent (sales role) can now create forms but should NOT create RFPs directly - must switch to RFP Design for RFP creation
+    blocked: ['create_and_set_rfp']
   },
   'design': {
-    // RFP Designer has access to all RFP creation tools
-    allowed: ['create_and_set_rfp', 'create_form_artifact', 'switch_agent', 'get_available_agents', 'get_conversation_history', 'store_message', 'create_session', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
+    // RFP Design has access to all RFP creation tools - REMOVED switch_agent to prevent self-switching loops
+    allowed: ['create_and_set_rfp', 'create_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'create_session', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
   },
   'support': {
     // Support agents don't need RFP creation tools
@@ -263,6 +271,8 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
 export function getToolDefinitions(agentRole?: string): ClaudeToolDefinition[] {
   console.log(`🔍 getToolDefinitions called with agentRole: '${agentRole}'`);
   console.log(`🔍 Type of agentRole: ${typeof agentRole}`);
+  console.log(`🔍 ROLE_TOOL_RESTRICTIONS keys:`, Object.keys(ROLE_TOOL_RESTRICTIONS));
+  console.log(`🔍 Looking for restrictions for role '${agentRole}':`, ROLE_TOOL_RESTRICTIONS[agentRole || '']);
   
   if (!agentRole) {
     console.log(`⚠️ No agent role provided, returning ALL ${TOOL_DEFINITIONS.length} tools`);
@@ -278,17 +288,25 @@ export function getToolDefinitions(agentRole?: string): ClaudeToolDefinition[] {
   console.log(`🔒 Found restrictions for role '${agentRole}':`, restrictions);
 
   const filteredTools = TOOL_DEFINITIONS.filter(tool => {
+    console.log(`🧪 FILTERING TOOL: ${tool.name} for role ${agentRole}`);
+    
+    // 🚨 ABSOLUTE BLOCK: Never allow switch_agent for design role - THIS IS THE MAIN FIX
+    if (agentRole === 'design' && tool.name === 'switch_agent') {
+      console.log(`🚨 ABSOLUTE BLOCK: Preventing switch_agent for design role - this should work!`);
+      return false;
+    }
+    
     // If there's an allowed list, only include tools in that list
     if (restrictions.allowed) {
       const allowed = restrictions.allowed.includes(tool.name);
-      console.log(`✓ Tool '${tool.name}' allowed: ${allowed}`);
+      console.log(`✓ Tool '${tool.name}' allowed: ${allowed} (in allowed list)`);
       return allowed;
     }
     
     // If there's a blocked list, exclude tools in that list
     if (restrictions.blocked) {
       const blocked = restrictions.blocked.includes(tool.name);
-      console.log(`❌ Tool '${tool.name}' blocked: ${blocked}`);
+      console.log(`❌ Tool '${tool.name}' blocked: ${blocked} (in blocked list)`);
       return !blocked;
     }
     

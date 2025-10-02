@@ -37,3 +37,5 @@ supabase/functions/claude-api-v3/coverage/
 # Temporary files
 /temp
 temp/
+
+.fake

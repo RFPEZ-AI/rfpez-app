@@ -209,21 +209,11 @@ describe('AgentService', () => {
       
       mockSupabase.from.mockReturnValue({
         select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockImplementation((field) => {
-            if (field === 'is_active') {
-              return {
-                eq: jest.fn().mockImplementation((field2) => {
-                  if (field2 === 'is_default') {
-                    return {
-                      single: jest.fn().mockResolvedValue({
-                        data: defaultAgent,
-                        error: null
-                      })
-                    };
-                  }
-                })
-              };
-            }
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({
+              data: [defaultAgent],
+              error: null
+            })
           })
         })
       } as any);
@@ -235,21 +225,19 @@ describe('AgentService', () => {
     });
 
     it('should fallback to first active agent if no default is set', async () => {
-      // Mock no default agent found
+      // Mock no default agent found - return error to trigger fallback
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
-            eq: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({
-                data: null,
-                error: { message: 'No default agent' }
-              })
+            eq: jest.fn().mockResolvedValue({
+              data: null,
+              error: { message: 'No default agent' }
             })
           })
         })
       } as any);
 
-      // Mock getActiveAgents call
+      // Mock getActiveAgents call that is triggered by the fallback
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({

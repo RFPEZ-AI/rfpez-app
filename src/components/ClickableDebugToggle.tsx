@@ -53,6 +53,8 @@ const ClickableDebugToggle: React.FC<ClickableDebugToggleProps> = ({ className, 
     }
   };
 
+
+
   if (process.env.NODE_ENV !== 'development') {
     return null; // Don't show in production
   }

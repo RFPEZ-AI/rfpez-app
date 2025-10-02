@@ -120,32 +120,25 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
 
   // Check if artifact is a buyer questionnaire form (not a document/proposal)
   const isBuyerQuestionnaire = (artifact: Artifact): boolean => {
-    console.log('🔍 isBuyerQuestionnaire - Checking artifact:', {
-      id: artifact.id,
-      name: artifact.name,
-      type: artifact.type,
-      hasContent: !!artifact.content,
-      contentPreview: artifact.content?.substring(0, 100) + '...'
-    });
-    
     try {
       // First check: if explicitly marked as form type, it should be a form
       if (artifact.type === 'form') {
-        console.log('🔍 Artifact type is "form", proceeding with content validation');
+        // Check for database artifact format (has schema/ui_schema properties)
+        const dbArtifact = artifact as Artifact & {schema?: object};
+        if (dbArtifact.schema && typeof dbArtifact.schema === 'object') {
+          return true;
+        }
         
-        // If no content, assume it's a valid but empty form
+        // Check legacy content format
         if (!artifact.content) {
-          console.log('🔍 Form artifact has no content, treating as valid empty form');
           return true;
         }
         
         // Try to parse the content
         const parsed = JSON.parse(artifact.content);
-        console.log('🔍 Parsed content keys:', Object.keys(parsed));
         
         // If the parsed content has 'content' and 'content_type' properties, it's a document artifact
         if (parsed.content !== undefined && parsed.content_type !== undefined) {
-          console.log('🔍 Document artifact detected (has content/content_type), not a form');
           return false; // This is a document artifact, not a questionnaire
         }
         
@@ -154,28 +147,18 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
         const isEmpty = Object.keys(parsed).length === 0;
         const isValidForm = hasSchema || isEmpty;
         
-        console.log('🔍 Form validation result:', {
-          hasSchema,
-          isEmpty,
-          isValidForm,
-          schemaType: typeof parsed.schema
-        });
-        
         return isValidForm;
       }
       
       // Legacy check: if named 'Buyer Questionnaire', it should be a form
       if (artifact.name === 'Buyer Questionnaire') {
-        console.log('🔍 Named "Buyer Questionnaire", treating as form');
         return true;
       }
       
-      console.log('🔍 Type/name check failed - type:', artifact.type, 'name:', artifact.name);
     } catch (e) {
-      console.log('🔍 JSON parse failed or other error:', e);
+      console.error('Error parsing artifact content:', e);
       // If we can't parse it but it's marked as form type, assume it's a form
       if (artifact.type === 'form') {
-        console.log('🔍 Parse failed but type is form, treating as valid form');
         return true;
       }
     }
@@ -209,10 +192,23 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
     }, []);
 
     try {
-      console.log('🎯 FormRenderer: parsing artifact content:', artifact.content);
-      const formSpec: BuyerQuestionnaireData = JSON.parse(artifact.content || '{}');
-      console.log('🎯 FormRenderer: parsed formSpec:', formSpec);
-      console.log('🎯 FormRenderer: formData being used:', formSpec.formData);
+      let formSpec: BuyerQuestionnaireData;
+
+      // Handle database Artifact (has schema/ui_schema properties)
+      const dbArtifact = artifact as Artifact & {schema?: object; ui_schema?: object; default_values?: object};
+      if (dbArtifact.schema && typeof dbArtifact.schema === 'object') {
+        formSpec = {
+          schema: dbArtifact.schema,
+          uiSchema: dbArtifact.ui_schema || {},
+          formData: (dbArtifact.default_values || {}) as Record<string, unknown>
+        };
+      } else if (artifact.content) {
+        // Handle legacy content-based format
+        formSpec = JSON.parse(artifact.content);
+      } else {
+        // Fallback to empty form
+        formSpec = { schema: {}, uiSchema: {}, formData: {} };
+      }
       
       const handleSubmit = (data: FormSubmissionData) => {
         console.log('Form submitted:', data.formData);

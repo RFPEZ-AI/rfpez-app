@@ -16,7 +16,7 @@ const debugRFPDesignerIssue = async () => {
     const allAgents = await AgentService.getActiveAgents();
     console.log('📋 All active agents:', allAgents.map(a => ({ name: a.name, id: a.id })));
     
-    const rfpDesigner = allAgents.find(agent => agent.name === 'RFP Designer');
+    const rfpDesigner = allAgents.find(agent => agent.name === 'RFP Design');
     if (!rfpDesigner) {
       console.error('❌ RFP Designer agent not found!');
       return { success: false, error: 'RFP Designer agent not found' };
