@@ -8,6 +8,29 @@ import { getAuthenticatedSupabaseClient, getUserId, validateAuthHeader } from '.
 import { ClaudeAPIService, ToolExecutionService } from '../services/claude.ts';
 import { getToolDefinitions } from '../tools/definitions.ts';
 import { buildSystemPrompt, loadAgentContext, loadUserProfile } from '../utils/system-prompt.ts';
+import { ClaudeMessage } from '../types.ts';
+
+// Interface for tool calls (matching Claude service)
+interface ClaudeToolCall {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
+// Type guards for runtime type checking
+function isClaudeToolCall(obj: unknown): obj is ClaudeToolCall {
+  return typeof obj === 'object' && obj !== null &&
+         'id' in obj && 'name' in obj && 'input' in obj &&
+         typeof (obj as Record<string, unknown>).id === 'string' &&
+         typeof (obj as Record<string, unknown>).name === 'string';
+}
+
+function isToolExecutionResult(obj: unknown): obj is { function_name: string; result?: { success?: boolean; artifact?: { id?: string; title?: string } }; output?: unknown } {
+  return typeof obj === 'object' && obj !== null &&
+         'function_name' in obj &&
+         typeof (obj as Record<string, unknown>).function_name === 'string';
+}
 // Handle streaming response with proper SSE format and tool execution
 function handleStreamingResponse(
   messages: unknown[], 
@@ -51,7 +74,7 @@ function handleStreamingResponse(
 
         // First, get response from Claude (might include tool calls)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const response = await claudeService.streamMessage(messages as any, tools, (chunk) => {
+        const response = await claudeService.streamMessage(messages as ClaudeMessage[], tools, (chunk) => {
           try {
             console.log('📡 Streaming chunk received:', chunk.type, chunk);
             
@@ -104,6 +127,11 @@ function handleStreamingResponse(
           // Execute all tool calls
           const toolResults = [];
           for (const toolCall of pendingToolCalls) {
+            if (!isClaudeToolCall(toolCall)) {
+              console.error('Invalid tool call format:', toolCall);
+              continue;
+            }
+            
             try {
               const result = await toolService.executeTool(toolCall, sessionId);
               toolResults.push({
@@ -174,7 +202,7 @@ function handleStreamingResponse(
           
           // Get final response from Claude
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await claudeService.streamMessage(messagesWithToolResults as any, tools, (chunk) => {
+          await claudeService.streamMessage(messagesWithToolResults as ClaudeMessage[], tools, (chunk) => {
             try {
               if (chunk.type === 'text' && chunk.content) {
                 fullContent += chunk.content;
@@ -222,6 +250,11 @@ function handleStreamingResponse(
             // Execute additional tool calls
             const additionalToolResults = [];
             for (const toolCall of additionalToolCalls) {
+              if (!isClaudeToolCall(toolCall)) {
+                console.error('Invalid additional tool call format:', toolCall);
+                continue;
+              }
+              
               try {
                 const result = await toolService.executeTool(toolCall, sessionId);
                 additionalToolResults.push({
@@ -267,9 +300,9 @@ function handleStreamingResponse(
                 role: 'assistant',
                 content: additionalToolCalls.map(tc => ({
                   type: 'tool_use',
-                  id: tc.id,
-                  name: tc.name,
-                  input: tc.input
+                  id: isClaudeToolCall(tc) ? tc.id : String((tc as Record<string, unknown>).id || ''),
+                  name: isClaudeToolCall(tc) ? tc.name : String((tc as Record<string, unknown>).name || ''),
+                  input: isClaudeToolCall(tc) ? tc.input : (tc as Record<string, unknown>).input || {}
                 }))
               },
               {
@@ -280,7 +313,7 @@ function handleStreamingResponse(
             
             console.log('🔄 Getting final response after additional tools...');
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await claudeService.streamMessage(finalMessages as any, tools, (chunk) => {
+            await claudeService.streamMessage(finalMessages as ClaudeMessage[], tools, (chunk) => {
               try {
                 if (chunk.type === 'text' && chunk.content) {
                   fullContent += chunk.content;
@@ -303,7 +336,7 @@ function handleStreamingResponse(
         
         // Detect if an agent switch occurred during streaming
         const agentSwitchOccurred = executedToolResults.some((result: unknown) => {
-          return result.function_name === 'switch_agent' && result.result?.success === true;
+          return isToolExecutionResult(result) && result.function_name === 'switch_agent' && result.result?.success === true;
         });
 
         // DEBUG: Log completion event details
@@ -432,13 +465,14 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     
     // Validate message roles
     for (const message of processedMessages) {
-      if (!message.role || !['user', 'assistant', 'system'].includes(message.role)) {
+      const messageObj = message as Record<string, unknown>;
+      if (!messageObj.role || !['user', 'assistant', 'system'].includes(messageObj.role as string)) {
         return new Response(
-          JSON.stringify({ error: `Invalid message role: ${message.role}. Must be 'user', 'assistant', or 'system'` }),
+          JSON.stringify({ error: `Invalid message role: ${messageObj.role}. Must be 'user', 'assistant', or 'system'` }),
           { status: 400, headers: corsHeaders }
         );
       }
-      if (!message.content) {
+      if (!messageObj.content) {
         return new Response(
           JSON.stringify({ error: 'Message content is required' }),
           { status: 400, headers: corsHeaders }
@@ -480,7 +514,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     
     // Send request to Claude API
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const claudeResponse = await claudeService.sendMessage(processedMessages as any, tools);
+    const claudeResponse = await claudeService.sendMessage(processedMessages as ClaudeMessage[], tools);
     
     // Execute any tool calls
     let toolResults: unknown[] = [];
@@ -496,31 +530,31 @@ export async function handlePostRequest(request: Request): Promise<Response> {
             role: 'assistant',
             content: claudeResponse.toolCalls.map((call: unknown) => ({
               type: 'tool_use',
-              id: call.id,
-              name: call.name,
-              input: call.input
+              id: isClaudeToolCall(call) ? call.id : String((call as Record<string, unknown>).id || ''),
+              name: isClaudeToolCall(call) ? call.name : String((call as Record<string, unknown>).name || ''),
+              input: isClaudeToolCall(call) ? call.input : (call as Record<string, unknown>).input || {}
             }))
           },
           {
             role: 'user',
             content: toolResults.map((result: unknown) => ({
               type: 'tool_result',
-              tool_use_id: result.tool_call_id,
-              content: JSON.stringify(result.output)
+              tool_use_id: (result as Record<string, unknown>).tool_call_id as string,
+              content: JSON.stringify((result as Record<string, unknown>).output)
             }))
           }
         ];
         
         // Get final response from Claude
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const finalResponse = await claudeService.sendMessage(followUpMessages as any, tools);
+        const finalResponse = await claudeService.sendMessage(followUpMessages as ClaudeMessage[], tools);
         claudeResponse.textResponse = finalResponse.textResponse;
       }
     }
 
     // Detect if an agent switch occurred successfully
     const agentSwitchOccurred = toolResults.some((result: unknown) => {
-      return result.function_name === 'switch_agent' && result.result?.success === true;
+      return isToolExecutionResult(result) && result.function_name === 'switch_agent' && result.result?.success === true;
     });
 
     // Prepare metadata in format expected by client
@@ -549,7 +583,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     // Create artifacts array from form creation results
     const artifacts: unknown[] = [];
     toolResults.forEach((result: unknown) => {
-      if (result.function_name === 'create_form_artifact' && result.result?.success) {
+      if (isToolExecutionResult(result) && result.function_name === 'create_form_artifact' && result.result?.success) {
         artifacts.push({
           name: result.result.artifact?.title || 'Form Artifact',
           type: 'form',
