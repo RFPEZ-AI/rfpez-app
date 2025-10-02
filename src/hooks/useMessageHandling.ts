@@ -16,6 +16,7 @@ import { categorizeError } from '../components/APIErrorHandler';
 interface ClientAction {
   action: 'UPDATE_CURRENT_RFP' | 'SHOW_SUCCESS_MESSAGE' | 'REFRESH_UI_STATE';
   data: Record<string, unknown>;
+  delay?: number; // Optional delay in milliseconds for spacing UI updates
 }
 
 interface ClientUpdates {
@@ -161,66 +162,88 @@ export const useMessageHandling = () => {
                 isCreated: true,
                 displayText: result.title as string
               });
-            } else if (funcObj.function === 'create_and_set_rfp' && result.current_rfp_id) {
+            } else if (funcObj.function === 'create_and_set_rfp') {
               // RFP creation - trigger UI refresh
-              const enhancedResult = result as EnhancedFunctionResult;
-              const rfpData = enhancedResult.rfp as Record<string, unknown>;
-              console.log('🐛 DEBUG: create_and_set_rfp detected in function_results - triggering context refresh', {
-                rfpId: enhancedResult.current_rfp_id,
-                rfpName: rfpData?.name,
-                fullResult: enhancedResult
+              console.log('🎯 create_and_set_rfp detected - checking result format:', {
+                hasCurrentRfpId: !!result.current_rfp_id,
+                resultKeys: Object.keys(result),
+                fullResult: result,
+                resultType: typeof result
               });
               
-              // ENHANCED: Process client_updates if present
-              if (enhancedResult.client_updates && enhancedResult.client_updates.immediate_actions) {
-                console.log('🎯 DEBUG: Processing client_updates from edge function', {
-                  updateType: enhancedResult.client_updates.type,
-                  actionCount: enhancedResult.client_updates.immediate_actions.length
+              if (result.current_rfp_id) {
+                const enhancedResult = result as EnhancedFunctionResult;
+                const rfpData = enhancedResult.rfp as Record<string, unknown>;
+                console.log('🐛 DEBUG: create_and_set_rfp detected in function_results - triggering context refresh', {
+                  rfpId: enhancedResult.current_rfp_id,
+                  rfpName: rfpData?.name,
+                  fullResult: enhancedResult
                 });
                 
-                // Process each immediate action
-                enhancedResult.client_updates.immediate_actions.forEach((action: ClientAction, index: number) => {
-                  console.log(`🔄 DEBUG: Processing client action ${index + 1}:`, action);
+                // ENHANCED: Process client_updates if present
+                if (enhancedResult.client_updates && enhancedResult.client_updates.immediate_actions) {
+                  console.log('🎯 DEBUG: Processing client_updates from edge function', {
+                    updateType: enhancedResult.client_updates.type,
+                    actionCount: enhancedResult.client_updates.immediate_actions.length
+                  });
                   
-                  setTimeout(() => {
-                    switch (action.action) {
-                      case 'UPDATE_CURRENT_RFP':
-                        window.postMessage({ 
-                          type: 'UPDATE_CURRENT_RFP_DIRECT', 
-                          rfp_data: action.data,
-                          source: 'edge_function_direct_update'
-                        }, '*');
-                        break;
-                      case 'SHOW_SUCCESS_MESSAGE':
-                        window.postMessage({ 
-                          type: 'SHOW_SUCCESS_MESSAGE', 
-                          message: action.data.message,
-                          duration: action.data.duration
-                        }, '*');
-                        break;
-                      case 'REFRESH_UI_STATE':
-                        window.postMessage({ 
-                          type: 'REFRESH_UI_STATE', 
-                          component: action.data.component,
-                          force_refresh: action.data.force_refresh
-                        }, '*');
-                        break;
-                      default:
-                        console.log('🔄 Unknown client action:', action.action);
-                    }
-                  }, index * 50); // Stagger actions by 50ms each
-                });
-              } else {
-                // Fallback to original method if no client_updates
-                setTimeout(() => {
+                  // Process each immediate action
+                  enhancedResult.client_updates.immediate_actions.forEach((action: ClientAction, index: number) => {
+                    console.log(`🔄 DEBUG: Processing client action ${index + 1}:`, action);
+                    
+                    setTimeout(() => {
+                      switch (action.action) {
+                        case 'UPDATE_CURRENT_RFP':
+                          window.postMessage({ 
+                            type: 'UPDATE_CURRENT_RFP_DIRECT', 
+                            rfp_data: action.data,
+                            source: 'edge_function_direct_update'
+                          }, '*');
+                          break;
+                        case 'SHOW_SUCCESS_MESSAGE':
+                          window.postMessage({ 
+                            type: 'SHOW_SUCCESS_MESSAGE', 
+                            message: action.data.message,
+                            duration: action.data.duration
+                          }, '*');
+                          break;
+                        case 'REFRESH_UI_STATE':
+                          window.postMessage({ 
+                            type: 'REFRESH_UI_STATE', 
+                            component: action.data.component,
+                            force_refresh: action.data.force_refresh
+                          }, '*');
+                          break;
+                        default:
+                          console.log('🔄 Unknown client action:', action.action);
+                      }
+                    }, action.delay || 100);
+                  });
+                }
+                
+                // ENHANCED: Send context refresh message
+                if (enhancedResult.current_rfp_id) {
+                  console.log('🔄 DEBUG: Sending context refresh message for RFP:', enhancedResult.current_rfp_id);
+                  
                   window.postMessage({ 
-                    type: 'REFRESH_CURRENT_RFP', 
+                    type: 'RFP_CREATED_SUCCESS',
                     rfp_id: enhancedResult.current_rfp_id,
                     rfp_name: rfpData?.name,
                     message: `New RFP created: ${rfpData?.name || 'Unknown'}`
                   }, '*');
-                  console.log('🐛 DEBUG: Posting REFRESH_CURRENT_RFP message to window (fallback)');
-                }, 100);
+                  
+                  // Also trigger context refresh in useSessionState
+                  window.postMessage({ 
+                    type: 'REFRESH_SESSION_CONTEXT',
+                    trigger: 'rfp_creation_success',
+                    data: {
+                      current_rfp_id: enhancedResult.current_rfp_id,
+                      rfp_name: rfpData?.name
+                    }
+                  }, '*');
+                }
+              } else {
+                console.error('❌ create_and_set_rfp result missing current_rfp_id field!', result);
               }
             }
           }

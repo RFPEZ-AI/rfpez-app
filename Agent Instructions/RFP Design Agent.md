@@ -107,19 +107,48 @@ create_and_set_rfp({
 - Status auto-advances: draft → gathering_requirements → generating_forms
 
 ### Phase 3: Interactive Questionnaire
-**🚨 CRITICAL: When calling create_form_artifact, you MUST include:**
-- session_id: Current session UUID (REQUIRED for database persistence)
-- title: "Descriptive Form Name"
-- form_schema: Complete JSON Schema object with properties and required fields
-- ui_schema: UI configuration (can be empty {})
-- submit_action: "save"
-- artifact_role: "buyer_questionnaire" (REQUIRED for buyer forms)
+**🚨 CRITICAL: When calling create_form_artifact, you MUST use these EXACT parameters:**
+- name: "Descriptive Form Name" (REQUIRED)
+- description: "Brief description of the form"
+- content: Complete JSON Schema object with properties and required fields (example below)
+- artifactRole: "buyer_questionnaire" (REQUIRED for buyer forms)
+
+**Example create_form_artifact call:**
+```json
+{
+  "name": "LED Desk Lamp Requirements Questionnaire",
+  "description": "Buyer questionnaire to collect detailed requirements for LED desk lamp procurement",
+  "content": {
+    "type": "object",
+    "properties": {
+      "quantity": {
+        "type": "number",
+        "title": "Quantity Needed",
+        "minimum": 1
+      },
+      "budget": {
+        "type": "number",
+        "title": "Total Budget ($)",
+        "minimum": 0
+      },
+      "color_temperature": {
+        "type": "string",
+        "title": "Preferred Color Temperature",
+        "enum": ["warm", "neutral", "cool", "variable"],
+        "default": "neutral"
+      }
+    },
+    "required": ["quantity", "budget"]
+  },
+  "artifactRole": "buyer_questionnaire"
+}
+```
 
 **Actions:**
 - Create interactive form using create_form_artifact in artifacts window
-- ALWAYS pass current session_id for proper database persistence
-- ALWAYS set artifact_role to "buyer_questionnaire" for buyer forms
-- Configure form with title, JSON schema, UI schema, and submission handling
+- ALWAYS set artifactRole to "buyer_questionnaire" for buyer forms
+- Put the JSON Schema in the content parameter (not form_schema)
+- Session ID is automatically handled by the function
 - Store form specification in database using supabase_update
 - **CRITICAL: When user asks to "load" any form, IMMEDIATELY call create_form_artifact - "load" means "create and display"**
 - Ensure form includes auto-progress triggers for workflow automation
@@ -136,9 +165,8 @@ create_and_set_rfp({
 
 **Step 1: Create Supplier Bid Form**
 - Call: `create_form_artifact` to generate supplier bid form
-- MUST include session_id parameter for database persistence
-- MUST set artifact_role to "bid_form" for supplier bid forms
-- Include buyer details as read-only context fields in the form
+- Use parameters: name, description, content (JSON Schema), artifactRole: "bid_form"
+- Include buyer details as read-only context fields in the form content
 - Call: `supabase_update` to store bid form specification in bid_form_questionaire field
 
 **Step 2: Generate Bid Submission URL**

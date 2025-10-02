@@ -278,18 +278,27 @@ export const useArtifactManagement = (
   }, [currentRfp]);
 
   // Load form artifacts from database when user or authentication changes
+  // DISABLED for session isolation - artifacts should only be session-specific
   useEffect(() => {
-    console.log('=== USER CONTEXT CHANGED - LOADING FORM ARTIFACTS ===');
+    console.log('=== USER CONTEXT CHANGED - FORM ARTIFACTS LOADING DISABLED FOR SESSION ISOLATION ===');
     console.log('isAuthenticated:', isAuthenticated, 'user:', user?.id);
     
-    // Skip form artifacts loading if not authenticated or no user
+    // Skip global form artifacts loading to ensure session isolation
+    // Each session should only show artifacts created within that session
     if (!isAuthenticated || !user?.id) {
       console.log('👤 User not authenticated - skipping form artifacts load');
       return;
     }
     
+    console.log('🚫 Global form artifacts loading disabled for session isolation');
+    return; // Exit early to disable global form loading
+    
     const loadFormArtifacts = async () => {
       try {
+        // Skip global form artifacts loading to maintain session isolation
+        console.log('⏭️ Skipping global form artifacts loading for session isolation');
+        return;
+        
         console.log('🔄 Attempting to load form artifacts...');
         const formArtifactsData = await DatabaseService.getFormArtifacts(user?.id);
         
@@ -430,12 +439,11 @@ export const useArtifactManagement = (
         };
       });
       
-      // Merge with existing artifacts, avoiding duplicates
-      setArtifacts(prev => {
-        const existingIds = new Set(prev.map(a => a.id));
-        const newArtifacts = formattedArtifacts.filter(a => !existingIds.has(a.id));
-        return [...prev, ...newArtifacts];
-      });
+      // Replace ALL artifacts with only session-specific artifacts
+      // This ensures that switching sessions shows ONLY artifacts for that session
+      console.log(`📋 Loading ${formattedArtifacts.length} artifacts for session:`, sessionId);
+      console.log(`📋 Previous artifact count: ${artifacts.length}`);
+      setArtifacts(formattedArtifacts);
 
       // Return the artifacts so the caller can handle selection
       return formattedArtifacts;

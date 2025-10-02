@@ -9,6 +9,105 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
+// Version that accepts an authenticated Supabase client
+export async function createAndSetRfpWithClient(authenticatedSupabase: any, parameters: RFPFormData, sessionContext?: SessionContext): Promise<ToolResult> {
+  console.log('🎯 Creating and setting RFP with authenticated client:', parameters);
+  console.log('🔍 DEBUG: parameters.name received:', parameters.name);
+  console.log('🔍 DEBUG: typeof parameters.name:', typeof parameters.name);
+  console.log('🔍 DEBUG: full parameters object:', JSON.stringify(parameters, null, 2));
+  
+  try {
+    // Validate required name parameter
+    if (!parameters.name || parameters.name.trim() === '') {
+      throw new Error('RFP name is required. Please provide a descriptive name that includes what is being procured.');
+    }
+
+    // Reject generic names
+    const genericNames = ['New RFP', 'RFP', 'Untitled RFP', 'Draft RFP'];
+    if (genericNames.includes(parameters.name.trim())) {
+      throw new Error(`Generic RFP name "${parameters.name}" is not allowed. Please provide a descriptive name like "Industrial Use Alcohol RFP" or "Floor Tiles RFP".`);
+    }
+    
+    // Build RFP data using actual database schema
+    const rfpData = {
+      name: parameters.name.trim(),
+      description: parameters.description || null,
+      specification: parameters.specification || null,
+      due_date: parameters.due_date || null,
+      status: 'draft',
+      created_at: new Date().toISOString(),
+      is_template: false,
+      is_public: false,
+      completion_percentage: 0
+    };
+    
+    console.log('📝 Inserting RFP with authenticated client:', rfpData);
+    
+    // Insert RFP into database using authenticated client
+    const { data: newRfp, error: insertError } = await authenticatedSupabase
+      .from('rfps')
+      .insert([rfpData])
+      .select()
+      .single();
+    
+    if (insertError) {
+      console.error('❌ RFP creation error:', insertError);
+      throw new Error(`Failed to create RFP: ${insertError.message}`);
+    }
+    
+    console.log('✅ RFP created successfully:', newRfp);
+    
+    // Update session to set current RFP if sessionId is provided
+    if (sessionContext?.sessionId) {
+      console.log('🔗 Setting current RFP in session:', sessionContext.sessionId);
+      
+      const { error: updateError } = await authenticatedSupabase
+        .from('sessions')
+        .update({ current_rfp_id: newRfp.id })
+        .eq('id', sessionContext.sessionId);
+      
+      if (updateError) {
+        console.warn('⚠️ Failed to set current RFP in session:', updateError);
+        // Don't fail the whole operation for this
+      } else {
+        console.log('✅ Current RFP set in session');
+      }
+    }
+    
+    // Return success response with client callbacks
+    return {
+      success: true,
+      data: newRfp,
+      current_rfp_id: newRfp.id,
+      rfp: newRfp,
+      message: `RFP "${newRfp.name}" created successfully with ID ${newRfp.id}`,
+      clientCallbacks: [
+        {
+          type: 'ui_refresh',
+          target: 'rfp_context',
+          payload: {
+            rfp_id: newRfp.id,
+            rfp_name: newRfp.name,
+            rfp_data: newRfp,
+            message: `RFP "${newRfp.name}" has been created successfully`
+          },
+          priority: 'high'
+        }
+      ]
+    };
+    
+  } catch (error) {
+    console.error('❌ createAndSetRfpWithClient error:', error);
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      data: null
+    };
+  }
+}
+
+// Original version using service role client (kept for backward compatibility)
 export async function createAndSetRfp(parameters: RFPFormData, sessionContext?: SessionContext): Promise<ToolResult> {
   console.log('🎯 Creating and setting RFP:', parameters);
   console.log('🔍 DEBUG: parameters.name received:', parameters.name);

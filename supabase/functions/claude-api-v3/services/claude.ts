@@ -18,6 +18,10 @@ interface StreamChunk {
   delta?: { text?: string };
   content_block?: { type: string; text?: string };
   message?: { content: ClaudeToolCall[] };
+  // Tool use properties (spread from content_block when type is 'tool_use')
+  name?: string;
+  input?: Record<string, unknown>;
+  id?: string;
 }
 
 interface ClaudeServiceResponse {
@@ -37,11 +41,12 @@ export class ClaudeAPIService {
   }
 
   // Send message to Claude API with tool definitions
-  async sendMessage(messages: ClaudeMessage[], tools: ClaudeToolDefinition[], maxTokens = 4000): Promise<ClaudeServiceResponse> {
+  async sendMessage(messages: ClaudeMessage[], tools: ClaudeToolDefinition[], maxTokens = 4000, systemPrompt?: string): Promise<ClaudeServiceResponse> {
     console.log('Sending to Claude API:', { 
       messageCount: messages.length, 
       toolCount: tools.length,
-      maxTokens 
+      maxTokens,
+      hasSystemPrompt: !!systemPrompt
     });
 
     // Convert messages to Claude format
@@ -52,8 +57,14 @@ export class ClaudeAPIService {
       max_tokens: maxTokens,
       temperature: 0.3,
       messages: formattedMessages,
-      tools: tools
+      tools: tools,
+      ...(systemPrompt && { system: systemPrompt })
     };
+
+    // Log system prompt if provided
+    if (systemPrompt) {
+      console.log('🎯 Including system prompt:', systemPrompt.substring(0, 200) + '...');
+    }
 
     console.log('Claude API request body:', JSON.stringify(requestBody, null, 2));
 
@@ -85,10 +96,11 @@ export class ClaudeAPIService {
   }
 
   // Stream message to Claude API with real streaming support
-  async streamMessage(messages: ClaudeMessage[], tools: ClaudeToolDefinition[], onChunk: (chunk: StreamChunk) => void): Promise<ClaudeServiceResponse> {
+  async streamMessage(messages: ClaudeMessage[], tools: ClaudeToolDefinition[], onChunk: (chunk: StreamChunk) => void, systemPrompt?: string): Promise<ClaudeServiceResponse> {
     console.log('🌊 Starting real streaming to Claude API:', { 
       messageCount: messages.length, 
-      toolCount: tools.length 
+      toolCount: tools.length,
+      hasSystemPrompt: !!systemPrompt
     });
 
     // Convert messages to Claude format
@@ -100,8 +112,14 @@ export class ClaudeAPIService {
       temperature: 0.3,
       messages: formattedMessages,
       tools: tools,
-      stream: true  // Enable streaming
+      stream: true,  // Enable streaming
+      ...(systemPrompt && { system: systemPrompt })
     };
+
+    // Log system prompt if provided
+    if (systemPrompt) {
+      console.log('🎯 Including system prompt:', systemPrompt.substring(0, 200) + '...');
+    }
 
     console.log('Claude API streaming request initiated');
 
@@ -309,11 +327,13 @@ export class ToolExecutionService {
         }
 
         case 'create_and_set_rfp': {
-          const { createAndSetRfp } = await import('../tools/rfp.ts');
+          const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
           // @ts-ignore - RFP function type compatibility
-          return await createAndSetRfp(input, { 
+          const toolResult = await createAndSetRfpWithClient(this.supabase, input, { 
             sessionId: sessionId || ''
           });
+          console.log('🎯 create_and_set_rfp tool result:', JSON.stringify(toolResult, null, 2));
+          return toolResult;
         }
 
         default:

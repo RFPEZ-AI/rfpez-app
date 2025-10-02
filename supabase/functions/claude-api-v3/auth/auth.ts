@@ -38,6 +38,15 @@ export function getAuthenticatedSupabaseClient(request: Request) {
   const supabaseUrl = config.supabaseUrl;
   const supabaseServiceKey = config.supabaseServiceKey;
   
+  // Check if this is the anonymous key - use service role for anonymous users
+  const anonymousKey = config.supabaseAnonKey;
+  if (token === anonymousKey) {
+    console.log('🔓 Anonymous token detected, using service role client');
+    // Create service role client for anonymous users
+    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    return supabase;
+  }
+  
   // Create client with user token for RLS
   const supabase = createClient(supabaseUrl, supabaseServiceKey, {
     global: {
@@ -57,8 +66,33 @@ interface SupabaseAuth {
   }
 }
 
-// Extract user ID from authenticated Supabase client
-export async function getUserId(supabase: SupabaseAuth): Promise<string> {
+// Type guard to check if object has auth property
+function hasAuthMethod(obj: unknown): obj is SupabaseAuth {
+  return typeof obj === 'object' && obj != null && 'auth' in obj;
+}
+
+// Extract user ID from authenticated Supabase client or return anonymous user ID
+export async function getUserId(supabase: unknown, request: Request): Promise<string> {
+  // Check if this is an anonymous request
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader) {
+    const token = authHeader.substring(7);
+    const anonymousKey = config.supabaseAnonKey;
+    
+    if (token === anonymousKey) {
+      // For anonymous users, use the dedicated anonymous user profile
+      // This UUID is seeded in the database specifically for anonymous sessions
+      const anonymousUserId = '00000000-0000-0000-0000-000000000001';
+      console.log(`🔓 Using dedicated anonymous user profile: ${anonymousUserId}`);
+      return anonymousUserId;
+    }
+  }
+  
+  // For authenticated users, get the actual user ID
+  if (!hasAuthMethod(supabase)) {
+    throw new Error('Invalid Supabase client - missing auth methods');
+  }
+  
   const { data: { user }, error } = await supabase.auth.getUser();
   
   if (error || !user) {
@@ -68,11 +102,13 @@ export async function getUserId(supabase: SupabaseAuth): Promise<string> {
   return user.id;
 }
 
-// Validate request has proper authentication
+// Validate request has proper authentication (allows anonymous)
 export function validateAuthHeader(request: Request): string {
   const authHeader = request.headers.get('Authorization');
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('Missing or invalid Authorization header');
+    // For anonymous users, return the default anonymous key
+    console.log('🔓 No auth header found, assuming anonymous user');
+    return config.supabaseAnonKey;
   }
   
   return authHeader.substring(7);
