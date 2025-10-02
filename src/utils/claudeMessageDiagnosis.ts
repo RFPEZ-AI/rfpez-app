@@ -38,7 +38,7 @@ const diagnoseClaudeMessageDisplay = async () => {
   try {
     // Step 1: Get RFP Designer agent
     const allAgents = await AgentService.getActiveAgents();
-    const rfpDesigner = allAgents.find(agent => agent.name === 'RFP Designer');
+    const rfpDesigner = allAgents.find(agent => agent.name === 'RFP Design');
     
     if (!rfpDesigner) {
       console.error('❌ RFP Designer agent not found!');

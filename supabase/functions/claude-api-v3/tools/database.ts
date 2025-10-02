@@ -96,12 +96,141 @@ interface AgentData {
 
 interface SwitchAgentData {
   session_id: string;
-  agent_id: string;
+  agent_id?: string;
   agent_name?: string;
   user_input?: string;
   extracted_keywords?: string[];
   confusion_reason?: string;
   reason?: string;
+}
+
+// Transform custom form structure to standard JSON Schema
+function transformToJsonSchema(customForm: Record<string, unknown>): { 
+  schema: Record<string, unknown>, 
+  uiSchema: Record<string, unknown>, 
+  defaultValues: Record<string, unknown> 
+} {
+  // Check if it's already a valid JSON Schema
+  if (customForm.type === 'object' && customForm.properties) {
+    return {
+      schema: customForm,
+      uiSchema: {},
+      defaultValues: {}
+    };
+  }
+
+  // Check if it's our custom sections/fields structure
+  if (customForm.sections && Array.isArray(customForm.sections)) {
+    const properties: Record<string, unknown> = {};
+    const required: string[] = [];
+    const uiSchema: Record<string, unknown> = {};
+    const defaultValues: Record<string, unknown> = {};
+
+    // Process each section
+    (customForm.sections as Record<string, unknown>[]).forEach((section: Record<string, unknown>) => {
+      if (section.fields && Array.isArray(section.fields)) {
+        (section.fields as Record<string, unknown>[]).forEach((field: Record<string, unknown>) => {
+          const fieldId = field.id as string;
+          if (!fieldId || typeof fieldId !== 'string') return;
+
+          // Convert field to JSON Schema property
+          const property: Record<string, unknown> = {
+            title: field.label || fieldId,
+            description: field.placeholder || field.description
+          };
+
+          // Map field types to JSON Schema types
+          switch (field.type) {
+            case 'text':
+            case 'email':
+            case 'tel':
+              property.type = 'string';
+              if (field.type === 'email') property.format = 'email';
+              break;
+            case 'textarea':
+              property.type = 'string';
+              uiSchema[fieldId] = { 'ui:widget': 'textarea' };
+              break;
+            case 'number':
+              property.type = 'number';
+              if (typeof field.min === 'number') property.minimum = field.min;
+              if (typeof field.max === 'number') property.maximum = field.max;
+              break;
+            case 'checkbox':
+              if (field.options && Array.isArray(field.options)) {
+                property.type = 'array';
+                // Handle both simple strings and objects with value property
+                const enumValues = field.options.length > 0 && 
+                  typeof field.options[0] === 'object' && 
+                  (field.options[0] as Record<string, unknown>)?.value
+                    ? field.options.map((opt: Record<string, unknown>) => opt.value as string)
+                    : field.options;
+                property.items = { type: 'string', enum: enumValues };
+                property.uniqueItems = true;
+                uiSchema[fieldId] = { 'ui:widget': 'checkboxes' };
+              } else {
+                property.type = 'boolean';
+              }
+              break;
+            case 'radio': {
+              property.type = 'string';
+              // Handle both simple strings and objects with value property
+              const radioEnumValues = Array.isArray(field.options) && field.options.length > 0 && 
+                typeof field.options[0] === 'object' && 
+                (field.options[0] as Record<string, unknown>)?.value
+                  ? field.options.map((opt: Record<string, unknown>) => opt.value as string)
+                  : field.options || [];
+              property.enum = radioEnumValues;
+              uiSchema[fieldId] = { 'ui:widget': 'radio' };
+              break;
+            }
+            case 'select': {
+              property.type = 'string';
+              // Handle both simple strings and objects with value property
+              const selectEnumValues = Array.isArray(field.options) && field.options.length > 0 && 
+                typeof field.options[0] === 'object' && 
+                (field.options[0] as Record<string, unknown>)?.value
+                  ? field.options.map((opt: Record<string, unknown>) => opt.value as string)
+                  : field.options || [];
+              property.enum = selectEnumValues;
+              break;
+            }
+            default:
+              property.type = 'string';
+          }
+
+          properties[fieldId] = property;
+
+          // Add to required if field is required
+          if (field.required === true) {
+            required.push(fieldId);
+          }
+
+          // Set default value if provided
+          if (field.default !== undefined) {
+            defaultValues[fieldId] = field.default;
+          }
+        });
+      }
+    });
+
+    const schema = {
+      type: 'object',
+      title: customForm.title || 'Form',
+      description: customForm.description,
+      properties,
+      required: required.length > 0 ? required : undefined
+    };
+
+    return { schema, uiSchema, defaultValues };
+  }
+
+  // Fallback: treat as direct schema
+  return {
+    schema: customForm,
+    uiSchema: {},
+    defaultValues: {}
+  };
 }
 
 // Create a form artifact in the database
@@ -122,6 +251,38 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
   
   console.log('Creating form artifact:', { artifactId, name, description, artifactRole: effectiveArtifactRole, mappedRole, sessionId, userId });
   
+  // Parse the content to extract schema components
+  let schema: Record<string, unknown> = {};
+  let ui_schema: Record<string, unknown> = {};
+  let default_values: Record<string, unknown> = {};
+  let submit_action: Record<string, unknown> = { type: 'save_session' };
+  
+  if (content && typeof content === 'object') {
+    const contentObj = content as Record<string, unknown>;
+    
+    // If content already has the expected structure
+    if (contentObj.schema) {
+      schema = contentObj.schema as Record<string, unknown>;
+      ui_schema = (contentObj.uiSchema || contentObj.ui_schema || {}) as Record<string, unknown>;
+      default_values = (contentObj.formData || contentObj.default_values || {}) as Record<string, unknown>;
+      submit_action = (contentObj.submitAction || contentObj.submit_action || { type: 'save_session' }) as Record<string, unknown>;
+    } else {
+      // Transform any custom structure to JSON Schema
+      const transformed = transformToJsonSchema(contentObj);
+      schema = transformed.schema;
+      ui_schema = transformed.uiSchema;
+      default_values = transformed.defaultValues;
+      submit_action = { type: 'save_session' };
+    }
+  }
+  
+  console.log('Parsed form components:', { 
+    hasSchema: !!schema && Object.keys(schema).length > 0,
+    hasUiSchema: !!ui_schema && Object.keys(ui_schema).length > 0,
+    hasDefaultValues: !!default_values && Object.keys(default_values).length > 0,
+    schemaType: (schema as Record<string, unknown>)?.type
+  });
+  
   const { data: artifact, error } = await supabase
     .from('artifacts')
     .insert({
@@ -131,8 +292,13 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
       name: name,
       description: description,
       artifact_role: mappedRole,
-      schema: content, // Store the form schema in the schema field
+      schema: schema, // Store the JSON Schema
+      ui_schema: ui_schema, // Store the UI Schema
+      default_values: default_values, // Store the default form data
+      submit_action: submit_action, // Store the submit action
       type: 'form', // Set the type as 'form'
+      status: 'active', // Required by constraint
+      processing_status: 'completed', // Required by constraint
       created_at: new Date().toISOString()
     })
     .select()
@@ -146,6 +312,7 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
   return {
     success: true,
     artifact_id: (artifact as unknown as { id: string }).id,
+    artifact_name: name, // Include the name in the response
     message: `Created ${mappedRole} artifact: ${name}`
   };
 }
@@ -402,37 +569,68 @@ export function debugAgentSwitch(_supabase: SupabaseClient, userId: string, data
       extracted_keywords,
       confusion_reason,
       message: 'Debug tool executed - this helps identify why agent switching fails',
-      suggestion: 'Common patterns: "rfp designer" → "RFP Designer", "solutions" → "Solutions", "support" → "Support"'
+      suggestion: 'Common patterns: "rfp design" → "RFP Design", "solutions" → "Solutions", "support" → "Technical Support"'
     }
   };
+}
+
+// Intelligent agent detection based on user message keywords
+function detectAgentFromMessage(userMessage: string): string | null {
+  const message = userMessage.toLowerCase();
+  
+  // RFP Design agent keywords (procurement, sourcing, buying)
+  const rfpKeywords = ['source', 'buy', 'purchase', 'procure', 'rfp', 'equipment', 'supplies', 'computers', 'office', 'furniture', 'materials', 'construction', 'procurement', 'sourcing', 'need to buy', 'need to source', 'need to purchase'];
+  
+  // Solutions agent keywords (sales, product info)
+  const salesKeywords = ['sell', 'products', 'services', 'pricing', 'demo', 'features', 'capabilities', 'what do you offer', 'how does it work'];
+  
+  // Support agent keywords  
+  const supportKeywords = ['help', 'support', 'problem', 'issue', 'bug', 'error', 'how to', 'tutorial'];
+  
+  if (rfpKeywords.some(keyword => message.includes(keyword))) {
+    return 'RFP Design';
+  }
+  
+  if (salesKeywords.some(keyword => message.includes(keyword))) {
+    return 'Solutions';
+  }
+  
+  if (supportKeywords.some(keyword => message.includes(keyword))) {
+    return 'Support';
+  }
+  
+  return null;
 }
 
 // Switch to a different agent
 export async function switchAgent(supabase: SupabaseClient, userId: string, data: SwitchAgentData, userMessage?: string) {
   const { session_id, agent_id, agent_name, reason } = data;
-  let targetAgent = agent_name || agent_id; // Support both parameter names
+  let targetAgent = agent_id || agent_name; // Prioritize agent_id over agent_name
   
-  // If no targetAgent and we have user message, try to extract from user input
+  // If no agent specified, try to detect from user message
   if (!targetAgent && userMessage) {
-    console.log('🔍 Attempting to extract agent from user message:', userMessage);
-    const message = userMessage.toLowerCase();
-    
-    if (message.includes('rfp') && (message.includes('designer') || message.includes('design'))) {
-      targetAgent = 'RFP Designer';
-      console.log('✅ Extracted agent from user message:', targetAgent);
-    } else if (message.includes('solution') || message.includes('sales')) {
-      targetAgent = 'Solutions';
-      console.log('✅ Extracted agent from user message:', targetAgent);
-    } else if (message.includes('support') || message.includes('help')) {
-      targetAgent = 'Support';
-      console.log('✅ Extracted agent from user message:', targetAgent);
-    } else if (message.includes('technical')) {
-      targetAgent = 'Technical Support';
-      console.log('✅ Extracted agent from user message:', targetAgent);
-    } else if (message.includes('assistant')) {
-      targetAgent = 'RFP Assistant';
-      console.log('✅ Extracted agent from user message:', targetAgent);
+    const detectedAgent = detectAgentFromMessage(userMessage);
+    if (detectedAgent) {
+      console.log(`🤖 Auto-detected agent "${detectedAgent}" from user message: "${userMessage.substring(0, 100)}"`);
+      targetAgent = detectedAgent;
     }
+  }
+  
+  console.log('🔄 AGENT SWITCH REQUEST:', {
+    session_id,
+    agent_id: agent_id || 'not provided',
+    agent_name: agent_name || 'not provided', 
+    targetAgent: targetAgent || 'not determined',
+    reason: reason || 'not provided',
+    userId,
+    userMessage: userMessage ? userMessage.substring(0, 100) + '...' : 'not provided'
+  });
+  
+  // If no targetAgent was provided by Claude, this is a critical error
+  if (!targetAgent && userMessage) {
+    console.log('❌ Claude failed to provide agent_name parameter');
+    console.log('📝 User message was:', userMessage);
+    console.log('💡 This suggests Claude is not following the switch_agent tool instructions properly');
   }
   
   console.log('🔄 AGENT SWITCH ATTEMPT:', {
@@ -448,9 +646,12 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
 
   // Validate required parameters
   if (!targetAgent) {
-    console.error('❌ Agent switch failed: agent_name/agent_id is required but was undefined or empty');
-    throw new Error('Agent switch failed: agent_name is required. Please specify which agent to switch to (e.g., "RFP Designer", "Solutions", "Support")');
+    console.error('❌ Agent switch failed: Neither agent_name nor agent_id provided');
+    console.error('❌ Input data:', { agent_id, agent_name, session_id });
+    throw new Error('Agent switch failed: either agent_name or agent_id is required. Please specify which agent to switch to (e.g., "RFP Design", "Solutions", "Technical Support").');
   }
+  
+  console.log('✅ Target agent determined:', targetAgent);
 
   // Verify agent exists and is active (support both UUID and name)
   let agent, agentError;
@@ -469,13 +670,25 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
     agent = result.data;
     agentError = result.error;
   } else {
-    // Look up by name (case insensitive)
-    const result = await supabase
+    // Look up by name (exact case match first, then case insensitive)
+    let result = await supabase
       .from('agents')
       .select('id, name, role, instructions, initial_prompt, is_active, is_free, is_restricted')
-      .ilike('name', targetAgent)
+      .eq('name', targetAgent)
       .eq('is_active', true)
       .single();
+    
+    // If exact match fails, try case insensitive
+    if (result.error) {
+      console.log('🔍 Exact match failed, trying case insensitive search for:', targetAgent);
+      result = await supabase
+        .from('agents')
+        .select('id, name, role, instructions, initial_prompt, is_active, is_free, is_restricted')
+        .ilike('name', targetAgent)
+        .eq('is_active', true)
+        .single();
+    }
+    
     agent = result.data;
     agentError = result.error;
   }
@@ -483,6 +696,60 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
   if (agentError || !agent) {
     console.error('❌ Agent not found:', agentError);
     throw new Error(`Agent not found with identifier: ${targetAgent}`);
+  }
+
+  // CHECK IF WE'RE ALREADY ON THE REQUESTED AGENT - PREVENT REDUNDANT SWITCHES
+  const { data: currentSessionAgent, error: currentAgentError } = await supabase
+    .from('session_agents')
+    .select(`
+      agent_id,
+      agents!inner (
+        id,
+        name
+      )
+    `)
+    .eq('session_id', session_id)
+    .eq('is_active', true)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single();
+
+  if (!currentAgentError && currentSessionAgent) {
+    const currentAgentId = (currentSessionAgent as Record<string, unknown>).agent_id as string;
+    const currentAgentName = ((currentSessionAgent as Record<string, unknown>).agents as Record<string, unknown>)?.name as string;
+    const targetAgentId = (agent as unknown as Agent).id;
+    
+    console.log('🔍 Current vs Target agent check:', {
+      current_agent_id: currentAgentId,
+      current_agent_name: currentAgentName,
+      target_agent_id: targetAgentId,
+      target_agent_name: (agent as unknown as Agent).name,
+      already_active: currentAgentId === targetAgentId
+    });
+
+    // If we're already on the requested agent, return early without switching
+    if (currentAgentId === targetAgentId) {
+      console.log('⚠️ REDUNDANT AGENT SWITCH DETECTED - Already on target agent:', currentAgentName);
+      
+      return {
+        success: true,
+        session_id,
+        already_active: true, // Flag to indicate no switch was needed
+        previous_agent_id: currentAgentId,
+        new_agent: {
+          id: (agent as unknown as Agent).id,
+          name: (agent as unknown as Agent).name,
+          role: (agent as unknown as Agent).role,
+          instructions: (agent as unknown as Agent).instructions,
+          initial_prompt: (agent as unknown as Agent).initial_prompt
+        },
+        switch_reason: reason,
+        user_context: data.user_input,
+        context_message: `You are already connected to the ${(agent as unknown as Agent).name} agent. How can I help you with your request?`,
+        message: `You are already connected to the ${(agent as unknown as Agent).name} agent. How can I help you with your request?`,
+        stop_processing: true // Signal that no switch was needed
+      };
+    }
   }
 
   // Deactivate current agent for this session
@@ -510,10 +777,29 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
 
   console.log('✅ Agent switch completed successfully');
 
-  // Create context message for the new agent if user_input is provided
-  const contextMessage = data.user_input ? 
-    `User context from previous agent: "${data.user_input}". Please continue assisting with this request.` : 
-    '';
+  // Create ACTIONABLE context message for the new agent to auto-process the original request
+  let contextMessage = '';
+  let autoProcessMessage = '';
+  
+  if (data.user_input) {
+    contextMessage = `User context from previous agent: "${data.user_input}". Please continue assisting with this request.`;
+    
+    // Generate specific instructions based on the new agent's role and the user request
+    const userRequest = data.user_input.toLowerCase();
+    const newAgentRole = (agent as unknown as Agent).role;
+    const newAgentName = (agent as unknown as Agent).name;
+    
+    if (newAgentRole === 'design' && (userRequest.includes('rfp') || userRequest.includes('questionnaire') || userRequest.includes('form') || userRequest.includes('procurement') || userRequest.includes('source') || userRequest.includes('buy'))) {
+      // RFP Design agent should auto-create RFP and forms
+      autoProcessMessage = `\n\n🤖 AUTO-PROCESSING: Based on the user's request "${data.user_input}", I will now create the RFP and generate the necessary forms. Please execute the appropriate create_and_set_rfp and create_form_artifact functions to fulfill this request.`;
+    } else if (newAgentRole === 'sales' && (userRequest.includes('help') || userRequest.includes('what') || userRequest.includes('how'))) {
+      // Solutions agent should provide information
+      autoProcessMessage = `\n\n🤖 AUTO-PROCESSING: I'll help answer the user's question: "${data.user_input}". Let me provide comprehensive information about our platform and services.`;
+    } else {
+      // Generic auto-processing message
+      autoProcessMessage = `\n\n🤖 AUTO-PROCESSING: I'll now assist with the user's request: "${data.user_input}". Let me take the appropriate actions based on my role as ${newAgentName}.`;
+    }
+  }
 
   return {
     success: true,
@@ -528,9 +814,11 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
     },
     switch_reason: reason,
     user_context: data.user_input,
-    context_message: contextMessage,
-    message: `Successfully switched to ${(agent as unknown as Agent).name} agent. ${contextMessage} The ${(agent as unknown as Agent).name} will respond in the next message.`,
-    stop_processing: true // Signal to stop generating additional content
+    context_message: contextMessage + autoProcessMessage,
+    message: `Successfully switched to ${(agent as unknown as Agent).name} agent.  The ${(agent as unknown as Agent).name} will respond in the next message.`,
+    stop_processing: false, // Allow streaming to continue
+    auto_process_context: data.user_input, // Include the original request for auto-processing
+    trigger_continuation: true // Flag to trigger continuation with new agent
   };
 }
 

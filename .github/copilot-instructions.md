@@ -3,6 +3,9 @@
 ## Project Overview
 RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend, Supabase backend, and Claude API integration via MCP (Model Context Protocol). The system features specialized AI agents for different RFP workflows.
 
+## Current goal
+The current goal is to get the product demo ready following the instructions in DEMO-INSTRUCTIONS.md
+
 ## Architecture Patterns
 
 ### Service Layer Pattern
@@ -41,7 +44,7 @@ supabase start
 # Or manually edit .env.local to use local URLs
 
 # 3. Start React Development Server
-npm start  # Runs on localhost:3100, connects to local Supabase
+use task "Start Dev Server" in VS Code tasks (Ctrl+Shift+B)
 ```
 
 #### **Edge Function Development Workflow**
@@ -129,6 +132,99 @@ Before deploying to remote, ensure:
 - ✅ Agent system functions correctly with local database
 - ✅ MCP integration works with local endpoints
 
+### Debugging and Logging Patterns
+
+#### **Edge Function Logging & Debugging**
+```bash
+# LOCAL Edge Function Debugging:
+
+# 1. Serve Functions Locally with Logs
+supabase functions serve claude-api-v3 --debug  # Shows detailed logs in terminal
+
+# 2. Monitor Function Logs in Real-time
+supabase functions logs claude-api-v3 --follow  # Stream logs (remote only)
+
+# 3. View Recent Function Logs  
+supabase functions logs claude-api-v3 --limit 50  # Last 50 log entries
+
+# 4. Function Error Debugging
+# - Check console.log/console.error output in serve terminal
+# - Verify function deployment with 'supabase functions list'
+# - Test with curl against local endpoint first
+```
+
+#### **Database Debugging with Direct SQL**
+```sql
+
+-- Check recent artifacts and their schema structure
+SELECT id, name, type, created_at, 
+  LENGTH(schema::text) as schema_length,
+  LEFT(schema::text, 200) as schema_preview
+FROM artifacts 
+ORDER BY created_at DESC LIMIT 10;
+
+-- Verify session and message relationships
+SELECT s.id, s.title, s.created_at, 
+  COUNT(m.id) as message_count,
+  COUNT(a.id) as artifact_count
+FROM sessions s
+LEFT JOIN messages m ON s.id = m.session_id
+LEFT JOIN artifacts a ON s.id = a.session_id
+GROUP BY s.id, s.title, s.created_at
+ORDER BY s.created_at DESC LIMIT 10;
+
+-- Debug artifact loading issues
+SELECT id, name, type, status, processing_status,
+  schema_type, LENGTH(schema::text) as schema_size,
+  CASE 
+    WHEN schema IS NULL THEN 'NULL_SCHEMA'
+    WHEN schema::text = '{}' THEN 'EMPTY_SCHEMA'
+    WHEN schema ? 'type' THEN 'HAS_TYPE'
+    ELSE 'UNKNOWN_FORMAT'
+  END as schema_status
+FROM artifacts 
+WHERE type = 'form'
+ORDER BY created_at DESC LIMIT 5;
+```
+
+#### **MCP Browser Access for Log Inspection**
+```javascript
+// Use MCP browser tools to access Supabase Dashboard logs
+// when immediate log access is needed during debugging
+
+// 1. Navigate to Supabase Dashboard
+await mcp_browser_navigate({ 
+  url: 'https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc/logs/edge-functions' 
+});
+
+// 2. Access Edge Function Logs via Browser
+await mcp_browser_click({ element: 'claude-api-v3 function', ref: '[function-link]' });
+await mcp_browser_screenshot(); // Capture current log state
+
+// 3. Browser Console Access for Client-side Errors
+const consoleLogs = await mcp_browser_get_console_logs();
+// Check for JavaScript errors, network failures, API call issues
+
+// 4. Real-time Log Monitoring
+// Use browser automation to refresh logs page and capture new entries
+// Useful when supabase CLI logs are not accessible or delayed
+```
+
+#### **Logging Best Practices**
+- **Edge Functions**: Use `console.log()` for debugging info, `console.error()` for errors
+- **Database Issues**: Use direct SQL queries via `mcp_supabase-offi_execute_sql` instead of MCP tools
+- **Client-side Debugging**: Use browser MCP tools to access console logs and network requests
+- **Log Timing**: Edge function logs appear immediately in local serve, may have delays in remote
+- **Error Context**: Always include session_id, user_id, and timestamp context in logs
+
+#### **Troubleshooting Workflow**
+1. **Local First**: Always debug with local Supabase stack when possible
+2. **Function Logs**: Check edge function logs via `supabase functions serve --debug`
+3. **Database State**: Use direct SQL to verify data integrity and relationships
+4. **Browser Inspection**: Use MCP browser tools for dashboard access and console monitoring
+5. **Network Analysis**: Monitor API calls and responses through browser dev tools via MCP
+6. **Schema Validation**: Verify JSON Schema structure and transformation in database
+
 ### Memory MCP Integration
 - **Knowledge Graph**: Use memory MCP tools to track session state, terminal processes, and workflow context
 - **Terminal Session Tracking**: Maintain awareness of which terminals have active processes
@@ -136,10 +232,6 @@ Before deploying to remote, ensure:
 - **Command Context**: Remember command execution context to avoid conflicts
 
 ### Development Commands & Terminal Management
-```bash
-# Start development with API server - ALWAYS use dedicated terminal
-npx kill-port 3100 && npm start  # kill any existing instance and start a new one
-# CRITICAL: Never run additional commands in the server terminal after starting
 
 # Testing patterns - use separate terminal
 npm test           # Jest tests with watch mode
@@ -157,18 +249,8 @@ npm run mcp:test   # Test MCP server connection
 ```
 
 ### Terminal Session Management Rules
-**CRITICAL SERVER PROTECTION RULES:**
-1. **Server Terminal Isolation**: Once dev server starts with `npm start`, NEVER run additional commands in that terminal
-2. **New Terminal for Commands**: Always open new terminal or use different terminal for any subsequent commands
-3. **Memory Tracking**: Use memory MCP tools to track which terminals have active processes
-4. **Background Process Awareness**: Track background processes to prevent conflicts
-5. **Status Verification**: Before starting server, check if already running to avoid duplicate instances
+Use the vs code tasks for starting the dev server to ensure it runs in a protected terminal session.
 
-**Command Execution Pattern:**
-- Terminal 1: Dev server (`npm start`) - PROTECTED, no other commands
-- Terminal 2+: All other commands (tests, builds, deployments, one-off commands)
-- Use `get_terminal_output` to check terminal status before command execution
-- Use memory to track terminal assignments and active processes
 
 ### Database Operations
 - Use Supabase MCP tools for SQL operations, not raw queries
@@ -183,6 +265,13 @@ npm run mcp:test   # Test MCP server connection
 - **Protocol**: Model Context Protocol 2024-11-05 for Claude Desktop integration
 - **Tools**: get_conversation_history, store_message, create_session, search_messages
 - **Testing**: MCPTestComponent for browser-based MCP debugging
+
+#### **MCP Tool Usage Guidelines**
+- **Preferred**: Use `mcp_supabase-offi_execute_sql` for direct SQL queries and database operations
+- **Avoid**: supabase-local MCP tools - they have limitations and timing constraints (1-minute log window)
+- **Database Operations**: Always use direct SQL execution instead of supabase-local MCP wrappers
+- **Log Access**: Use browser MCP tools to access Supabase Dashboard when CLI logs are insufficient
+- **Real-time Debugging**: Combine direct SQL queries with browser automation for comprehensive debugging
 
 ### Memory MCP Workflow Patterns
 - **Session State Tracking**: Use `mcp_memory_create_entities` to track terminal sessions, server processes, and workflow states
@@ -238,6 +327,12 @@ try {
   // Handle based on category
 }
 ```
+
+### Pre Commit Cleanup
+- Remove temporary test files from `/temp` & / folder
+- Fix all linting errors before commit
+- Ensure all unit tests are passing app and edge functions
+- Update documentation if significant design changes are made
 
 ### File Organization
 - Place temporary test files in `/temp` folder to avoid clutter

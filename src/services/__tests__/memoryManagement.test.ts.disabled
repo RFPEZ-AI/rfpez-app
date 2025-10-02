@@ -2,7 +2,9 @@
 // Memory Management Tests for StreamManager
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any, @typescript-eslint/no-non-null-assertion */
-import { StreamManager, MemoryBuffer } from '../memoryManager';
+import { streamManager } from '../claudeAPIProxy';
+
+// Define MemoryBuffer interface locally since it's not exported
 
 // MemoryBuffer interface for type safety
 interface MemoryBuffer {

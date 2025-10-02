@@ -256,6 +256,33 @@ The system includes comprehensive console logging. Check browser console for:
 - Session agent assignments
 - Message saving with agent attribution
 
+## Naming Conventions
+
+### Agent Names
+
+**IMPORTANT**: Agent names stored in the database should **NOT** include the word "Agent" as a suffix.
+
+- ✅ **Correct**: "Solutions", "RFP Design", "Technical Support", "RFP Assistant"
+- ❌ **Incorrect**: "Solutions Agent", "RFP Design Agent", "Technical Support Agent"
+
+**Rationale**: The React UI will conditionally add "Agent" to the display name when there is sufficient screen space. This approach:
+- Keeps agent names concise in constrained UI spaces
+- Provides flexibility for responsive design
+- Maintains clean, professional naming in the database
+- Allows the UI to adapt based on available space
+
+**Example**:
+- Database: `name: "Technical Support"`
+- UI (desktop): "Technical Support Agent"
+- UI (mobile): "Technical Support"
+
+### File Naming
+
+Agent instruction files should follow the pattern: `[Agent Name] Agent.md`
+- Example: "Technical Support Agent.md", "Solutions Agent.md"
+
+This maintains consistency in the file system while keeping database names clean.
+
 ## Contributing
 
 When extending the agent system:
@@ -265,6 +292,7 @@ When extending the agent system:
 3. **Service Methods**: Extend `AgentService` for new functionality
 4. **UI Components**: Follow the existing design patterns
 5. **Testing**: Test agent switching and message attribution
+6. **Naming**: Follow the naming conventions above for consistency
 
 ## License
 

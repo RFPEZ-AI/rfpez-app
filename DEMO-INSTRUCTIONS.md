@@ -3,6 +3,7 @@
 ## Overview
 This document provides step-by-step instructions for demonstrating the complete RFPEZ.AI RFP workflow, from initial user engagement through bid submission and review. The demo can be executed manually by a human or automated using browser MCP tools.
 
+
 ## Prerequisites
 - RFPEZ.AI application running on http://localhost:3100
 - Test account credentials:

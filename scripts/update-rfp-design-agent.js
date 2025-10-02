@@ -387,11 +387,11 @@ async function updateRFPDesignAgent() {
   console.log('🔄 Updating RFP Design Agent instructions in Supabase...');
   
   try {
-    // First, let's find the RFP Designer Agent
+    // First, let's find the RFP Design Agent
     const { data: agents, error: findError } = await supabase
       .from('agents')
       .select('id, name, role')
-      .eq('name', 'RFP Designer');
+      .eq('name', 'RFP Design');
 
     if (findError) {
       console.error('❌ Error finding RFP Design Agent:', findError);
@@ -424,7 +424,7 @@ async function updateRFPDesignAgent() {
     }
 
     if (data && data.length > 0) {
-      console.log('✅ Successfully updated RFP Designer Agent:');
+      console.log('✅ Successfully updated RFP Design Agent:');
       console.log(`   - ID: ${data[0].id}`);
       console.log(`   - Name: ${data[0].name}`);
       console.log(`   - Role: ${data[0].role}`);
@@ -447,13 +447,13 @@ async function updateRFPDesignAgent() {
  * Verify the update was successful
  */
 async function verifyUpdate() {
-  console.log('🔍 Verifying RFP Designer Agent update...');
+  console.log('🔍 Verifying RFP Design Agent update...');
   
   try {
     const { data: agent, error } = await supabase
       .from('agents')
       .select('id, name, role, updated_at, instructions, initial_prompt')
-      .eq('name', 'RFP Designer')
+      .eq('name', 'RFP Design')
       .single();
 
     if (error) {

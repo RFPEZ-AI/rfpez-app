@@ -149,7 +149,7 @@ class ClickableElementDecorator {
     } else if (element.closest('[data-session]') || text.includes('PM') || text.includes('AM')) {
       type = 'session';
       testId = `session-${this.generateSessionId(text)}`;
-    } else if (text.includes('Agent') || text.includes('RFP Designer') || text.includes('Solutions')) {
+    } else if (text.includes('Agent') || text.includes('RFP Design') || text.includes('Solutions')) {
       type = 'agent';
       testId = `agent-${text.toLowerCase().replace(/\s+/g, '-')}`;
     } else if (text.includes('RFP') || text.includes('rfp')) {

@@ -558,7 +558,7 @@ export const useArtifactManagement = (
             console.log('📝 Processing new form artifact:', artifactId);
             const formArtifact: Artifact = {
               id: artifactId,
-              name: result.title || 'Generated Form',
+              name: (result.artifact_name as string) || (result.title as string) || 'Generated Form',
               type: 'form',
               size: 'Interactive Form',
               content: JSON.stringify({
@@ -905,7 +905,7 @@ export const useArtifactManagement = (
             
             const templateArtifact: Artifact = {
               id: templateArtifactId,
-              name: result.template_name || 'Generated Template',
+              name: (result.artifact_name as string) || (result.template_name as string) || 'Generated Template',
               type: result.template_type as 'document' | 'image' | 'pdf' | 'other' | 'form' || 'document',
               size: 'Template',
               content: JSON.stringify({
@@ -931,7 +931,7 @@ export const useArtifactManagement = (
             // Create artifact reference for the message
             const artifactRef: ArtifactReference = {
               artifactId: templateArtifactId,
-              artifactName: result.template_name || 'Generated Template',
+              artifactName: (result.artifact_name as string) || (result.template_name as string) || 'Generated Template',
               artifactType: templateArtifact.type
             };
             newArtifactRefs.push(artifactRef);

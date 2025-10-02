@@ -86,8 +86,20 @@ export class DatabaseService {
     }
 
     // Initialize with agent (use default if none specified)
+    let agentAssignmentSuccess = false;
     if (agentId) {
-      await AgentService.setSessionAgent(session.id, agentId, supabaseUserId);
+      agentAssignmentSuccess = await AgentService.setSessionAgent(session.id, agentId, supabaseUserId);
+      
+      if (!agentAssignmentSuccess) {
+        console.error('[DatabaseService] Failed to assign agent to session, retrying...', { sessionId: session.id, agentId });
+        
+        // Retry once
+        agentAssignmentSuccess = await AgentService.setSessionAgent(session.id, agentId, supabaseUserId);
+        if (!agentAssignmentSuccess) {
+          console.error('[DatabaseService] Failed to assign agent after retry, using default agent', { sessionId: session.id, agentId });
+          await AgentService.initializeSessionWithDefaultAgent(session.id, supabaseUserId);
+        }
+      }
     } else {
       await AgentService.initializeSessionWithDefaultAgent(session.id, supabaseUserId);
     }

@@ -145,13 +145,16 @@ export const useMessageHandling = () => {
           // Handle different types of function results
           if (result && result.success) {
             if (funcObj.function === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
-              // Form artifacts
+              // Form artifacts - use artifact_name from result
+              const functionArgs = funcObj.arguments as Record<string, unknown>;
+              const artifactName = (result.artifact_name as string) || (functionArgs?.name as string) || (result.template_name as string) || (result.title as string) || 'Generated Template';
+              
               refs.push({
                 artifactId: result.artifact_id as string || `template-${Date.now()}`,
-                artifactName: result.template_name as string || result.title as string || 'Generated Template',
+                artifactName: artifactName,
                 artifactType: 'form',
                 isCreated: true,
-                displayText: result.template_name as string || result.title as string
+                displayText: artifactName
               });
             } else if ((funcObj.function === 'create_text_artifact' || funcObj.function === 'generate_proposal_artifact') && result.artifact_id) {
               // Document artifacts
@@ -356,7 +359,7 @@ export const useMessageHandling = () => {
     // Set processing flag
     isProcessingRef.current = true;
     
-    // Load tool invocations for current session if session changed
+    // Load tool invocations for current session if session changed  
     if (currentSessionId && currentSessionIdForTools.current !== currentSessionId) {
       console.log('📋 Session changed from', currentSessionIdForTools.current, 'to', currentSessionId, '- loading tool invocations');
       loadToolInvocationsForSession(currentSessionId);
@@ -426,7 +429,7 @@ export const useMessageHandling = () => {
           console.log('No current session, creating new one with RFP context:', currentRfp?.id);
           const newSessionId = await createNewSession(currentAgent, currentRfp?.id);
           if (newSessionId) {
-            activeSessionId = newSessionId;
+            activeSessionId = newSessionId; // Use immediately for this request
             setCurrentSessionId(newSessionId);
             setSelectedSessionId(newSessionId);
             console.log('New session created with ID:', newSessionId, 'and RFP:', currentRfp?.id);
@@ -438,6 +441,11 @@ export const useMessageHandling = () => {
             } catch (error) {
               console.warn('⚠️ Failed to save current session to user profile:', error);
             }
+            
+            // Update tool invocation session tracking to use the new session
+            loadToolInvocationsForSession(newSessionId);
+          } else {
+            console.error('❌ Failed to create new session - proceeding with null sessionId');
           }
         }
 
@@ -890,6 +898,14 @@ export const useMessageHandling = () => {
         console.log('3. Was streaming:', claudeResponse.metadata.is_streaming);
         console.log('4. Stream complete:', claudeResponse.metadata.stream_complete);
         console.log('5. Functions executed:', claudeResponse.metadata.functions_called);
+        
+        // 🚨 BROWSER vs API COMPARISON DEBUG
+        console.log('🔍🔍🔍 BROWSER INTERFACE FUNCTION CALLS 🔍🔍🔍');
+        console.log('Functions called by Claude:', JSON.stringify(claudeResponse.metadata.functions_called));
+        console.log('Agent name:', agentForResponse?.agent_name);
+        console.log('User message:', content.substring(0, 100) + '...');
+        console.log('🔍🔍🔍 END BROWSER INTERFACE DEBUG 🔍🔍🔍');
+        
         console.log('✅ COMPLETE CLAUDE RESPONSE FINISHED (including all function calls and streaming)');
         
         // CRITICAL FIX: Get the current message content that was built up during streaming
@@ -969,9 +985,20 @@ export const useMessageHandling = () => {
               
               if (newAgent) {
                 console.log('✅ UI refresh after agent switch - loaded agent:', newAgent.agent_name);
+                
+                // Check if this is a contextual switch (agent responds immediately) 
+                // vs a manual switch (agent should introduce itself)
+                const isContextualSwitch = claudeResponse.content && claudeResponse.content.trim().length > 0;
+                
+                // Always call handleAgentChanged to update agent state
                 const agentMessage = handleAgentChanged(newAgent);
-                if (agentMessage) {
+                
+                // Only add the welcome message if it's NOT a contextual switch
+                if (!isContextualSwitch && agentMessage) {
+                  console.log('🔄 Manual agent switch - adding welcome message');
                   setMessages(prev => [...prev, agentMessage]);
+                } else {
+                  console.log('🔄 Contextual agent switch - agent state updated, no welcome message needed');
                 }
               } else {
                 console.warn('⚠️ No agent found after switch, retrying with delay...');

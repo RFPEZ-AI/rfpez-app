@@ -1,10 +1,10 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 /* eslint-disable @typescript-eslint/no-unused-vars, @typescript-eslint/no-explicit-any */
-import StreamManager, { StreamManagerInstance } from '../streamManager';
+import { streamManager } from '../claudeAPIProxy';
 
-// Since we're testing a singleton, we need to create a fresh instance for testing
-class StreamManager {
+// Mock StreamManager class for testing
+class TestStreamManager {
   private connectionPool = new Map<string, any>();
   private poolConfig = {
     maxPoolSize: 15,
@@ -198,10 +198,10 @@ class StreamManager {
 }
 
 describe('Advanced Connection Pooling Tests', () => {
-  let streamManager: StreamManager;
+  let testStreamManager: any;
 
   beforeEach(() => {
-    streamManager = new StreamManager();
+    testStreamManager = streamManager;
   });
 
   afterEach(() => {

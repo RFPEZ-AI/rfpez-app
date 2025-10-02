@@ -148,6 +148,7 @@ export class ClaudeAPIService {
     let buffer = '';
     let fullTextResponse = '';
     const toolCalls: ClaudeToolCall[] = [];
+    const activeToolCall: Record<string, unknown> = {}; // Track current tool call being built
 
     try {
       while (true) {
@@ -179,6 +180,8 @@ export class ClaudeAPIService {
               console.log('📡 Streaming event:', parsed.type);
 
               if (parsed.type === 'content_block_delta') {
+                console.log('🔧 Delta event type:', parsed.delta?.type, 'activeToolCall.id:', activeToolCall.id);
+                
                 if (parsed.delta?.type === 'text_delta') {
                   const textChunk = parsed.delta.text;
                   fullTextResponse += textChunk;
@@ -189,17 +192,64 @@ export class ClaudeAPIService {
                     content: textChunk,
                     delta: { text: textChunk } 
                   });
+                } else if (parsed.delta?.type === 'input_json_delta' && activeToolCall.id) {
+                  // Accumulate input parameters for the active tool call
+                  const partialJson = parsed.delta.partial_json || '';
+                  console.log('🔧 Tool input delta received:', partialJson);
+                  
+                  try {
+                    // Try to parse the accumulated JSON
+                    const inputStr = (activeToolCall.inputJson || '') + partialJson;
+                    activeToolCall.inputJson = inputStr;
+                    console.log('🔧 Accumulated JSON so far:', inputStr);
+                    
+                    // Try to parse complete JSON
+                    try {
+                      activeToolCall.input = JSON.parse(inputStr);
+                      console.log('🔧 Tool input successfully parsed:', JSON.stringify(activeToolCall.input, null, 2));
+                    } catch {
+                      // JSON not complete yet, continue accumulating
+                      console.log('🔧 JSON not complete yet, continuing accumulation...');
+                    }
+                  } catch (error) {
+                    console.error('Error processing input_json_delta:', error);
+                  }
+                } else {
+                  console.log('🔧 Other delta type:', parsed.delta?.type);
                 }
               } else if (parsed.type === 'content_block_start') {
                 if (parsed.content_block?.type === 'tool_use') {
                   console.log('🔧 Tool use detected:', parsed.content_block.name);
-                  toolCalls.push(parsed.content_block);
+                  // Store the initial tool call metadata
+                  activeToolCall.id = parsed.content_block.id;
+                  activeToolCall.name = parsed.content_block.name;
+                  activeToolCall.type = parsed.content_block.type;
+                  activeToolCall.input = {}; // Initialize empty input object
+                  activeToolCall.inputJson = ''; // Initialize input JSON accumulator
                   
-                  // Send tool use event to client
+                  console.log('🔧 Started tool call:', JSON.stringify(activeToolCall, null, 2));
+                }
+              } else if (parsed.type === 'content_block_stop') {
+                if (activeToolCall.id) {
+                  // Finalize the tool call and add to array
+                  const finalToolCall = {
+                    id: activeToolCall.id,
+                    name: activeToolCall.name,
+                    type: activeToolCall.type,
+                    input: activeToolCall.input || {}
+                  } as ClaudeToolCall;
+                  
+                  toolCalls.push(finalToolCall);
+                  console.log('🔧 Completed tool call:', JSON.stringify(finalToolCall, null, 2));
+                  
+                  // Send tool use event to client with complete data
                   onChunk({ 
                     type: 'tool_use', 
-                    ...parsed.content_block 
+                    ...finalToolCall 
                   });
+                  
+                  // Reset for next tool call
+                  Object.keys(activeToolCall).forEach(key => delete activeToolCall[key]);
                 }
               } else if (parsed.type === 'message_delta' && parsed.delta?.stop_reason) {
                 console.log('🛑 Message stopped:', parsed.delta.stop_reason);
@@ -312,6 +362,13 @@ export class ToolExecutionService {
         }
 
         case 'switch_agent': {
+          console.log('🔍 SWITCH_AGENT INPUT DEBUG:', {
+            raw_input: input,
+            input_type: typeof input,
+            input_keys: Object.keys(input || {}),
+            session_id: sessionId,
+            user_message: this.userMessage?.substring(0, 100)
+          });
           const { switchAgent } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
           return await switchAgent(this.supabase, this.userId, {
