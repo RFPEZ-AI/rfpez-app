@@ -174,10 +174,19 @@ export async function getConversationHistory(supabase: SupabaseClient, sessionId
 
   if (error) {
     console.error('Error fetching conversation history:', error);
-    throw error;
+    return {
+      success: false,
+      error: String(error),
+      data: null
+    };
   }
 
-  return { messages: messages || [] };
+  const messageList = Array.isArray(messages) ? messages : [];
+  return {
+    success: true,
+    data: { messages: messageList },
+    message: `Retrieved ${messageList.length} messages`
+  };
 }
 
 // Store a message in the conversation
