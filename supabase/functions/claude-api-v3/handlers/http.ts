@@ -1,16 +1,17 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // HTTP request handlers for Claude API v3
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
-import { config, corsHeaders } from '../config.ts';
+import { corsHeaders } from '../config.ts';
 import { getAuthenticatedSupabaseClient, getUserId, validateAuthHeader } from '../auth/auth.ts';
 import { ClaudeAPIService, ToolExecutionService } from '../services/claude.ts';
 import { getToolDefinitions } from '../tools/definitions.ts';
-import type { ToolInvocationEvent, StreamingResponse, ClientCallback } from '../types.ts';
-
+import { buildSystemPrompt, loadAgentContext, loadUserProfile } from '../utils/system-prompt.ts';
 // Handle streaming response with proper SSE format and tool execution
-async function handleStreamingResponse(
-  messages: any[], 
-  supabase: any, 
+function handleStreamingResponse(
+  messages: unknown[], 
+  supabase: unknown, 
   userId: string, 
   sessionId?: string, 
   agentId?: string,
@@ -28,17 +29,29 @@ async function handleStreamingResponse(
         console.log(`🧩 STREAMING: Agent role:`, agent?.role);
         console.log(`🧩 STREAMING: Agent type:`, typeof agent);
         
+        // Load agent context and user profile, then build system prompt
+        const agentContext = await loadAgentContext(supabase, agentId);
+        const userProfile = await loadUserProfile(supabase);
+        const systemPrompt = buildSystemPrompt({ 
+          agent: agentContext || undefined,
+          userProfile: userProfile || undefined,
+          sessionId: sessionId,
+          isAnonymous: !userProfile
+        });
+        console.log('🎯 STREAMING: System prompt built:', systemPrompt ? 'Yes' : 'No');
+        
         const tools = getToolDefinitions(agent?.role);
         
         console.log('🌊 Starting streaming response...');
         
         let fullContent = '';
-        let toolsUsed: string[] = [];
-        let pendingToolCalls: any[] = [];
-        let executedToolResults: any[] = []; // Track actual tool execution results
+        const toolsUsed: string[] = [];
+        const pendingToolCalls: unknown[] = [];
+        const executedToolResults: unknown[] = []; // Track actual tool execution results
 
         // First, get response from Claude (might include tool calls)
-        const response = await claudeService.streamMessage(messages, tools, (chunk) => {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const response = await claudeService.streamMessage(messages as any, tools, (chunk) => {
           try {
             console.log('📡 Streaming chunk received:', chunk.type, chunk);
             
@@ -56,7 +69,7 @@ async function handleStreamingResponse(
               console.log('📤 Sending to client:', JSON.stringify(textEvent));
               controller.enqueue(new TextEncoder().encode(sseData));
               
-            } else if (chunk.type === 'tool_use') {
+            } else if (chunk.type === 'tool_use' && chunk.name) {
               console.log('🔧 Tool use detected:', chunk.name);
               console.log('📡 Streaming chunk received:', chunk.type, JSON.stringify(chunk, null, 2));
               if (!toolsUsed.includes(chunk.name)) {
@@ -82,7 +95,7 @@ async function handleStreamingResponse(
           } catch (error) {
             console.error('Error encoding chunk:', error);
           }
-        });
+        }, systemPrompt);
 
         // If there are tool calls, execute them and get final response from Claude
         if (pendingToolCalls.length > 0) {
@@ -157,10 +170,11 @@ async function handleStreamingResponse(
           console.log('🔄 Getting final response from Claude with tool results...');
           
           // Reset for potential additional tool calls
-          const additionalToolCalls: any[] = [];
+          const additionalToolCalls: unknown[] = [];
           
           // Get final response from Claude
-          await claudeService.streamMessage(messagesWithToolResults, tools, (chunk) => {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          await claudeService.streamMessage(messagesWithToolResults as any, tools, (chunk) => {
             try {
               if (chunk.type === 'text' && chunk.content) {
                 fullContent += chunk.content;
@@ -174,7 +188,7 @@ async function handleStreamingResponse(
                 console.log('📤 Final response to client:', JSON.stringify(textEvent));
                 controller.enqueue(new TextEncoder().encode(sseData));
                 
-              } else if (chunk.type === 'tool_use') {
+              } else if (chunk.type === 'tool_use' && chunk.name) {
                 console.log('🔧 Additional tool use detected:', chunk.name);
                 if (!toolsUsed.includes(chunk.name)) {
                   toolsUsed.push(chunk.name);
@@ -199,7 +213,7 @@ async function handleStreamingResponse(
             } catch (error) {
               console.error('Error encoding final chunk:', error);
             }
-          });
+          }, systemPrompt);
           
           // Handle additional tool calls if any
           if (additionalToolCalls.length > 0) {
@@ -265,7 +279,8 @@ async function handleStreamingResponse(
             ];
             
             console.log('🔄 Getting final response after additional tools...');
-            await claudeService.streamMessage(finalMessages, tools, (chunk) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            await claudeService.streamMessage(finalMessages as any, tools, (chunk) => {
               try {
                 if (chunk.type === 'text' && chunk.content) {
                   fullContent += chunk.content;
@@ -282,12 +297,12 @@ async function handleStreamingResponse(
               } catch (error) {
                 console.error('Error encoding additional final chunk:', error);
               }
-            });
+            }, systemPrompt);
           }
         }
         
         // Detect if an agent switch occurred during streaming
-        const agentSwitchOccurred = executedToolResults.some((result: any) => {
+        const agentSwitchOccurred = executedToolResults.some((result: unknown) => {
           return result.function_name === 'switch_agent' && result.result?.success === true;
         });
 
@@ -331,14 +346,14 @@ async function handleStreamingResponse(
     }
   });
 
-  return new Response(stream, {
+  return Promise.resolve(new Response(stream, {
     headers: {
       ...corsHeaders,
       'Content-Type': 'text/event-stream',
       'Cache-Control': 'no-cache',
       'Connection': 'keep-alive',
     },
-  });
+  }));
 }
 
 // Handle OPTIONS request for CORS
@@ -353,11 +368,11 @@ export function handleOptionsRequest(): Response {
 export async function handlePostRequest(request: Request): Promise<Response> {
   try {
     // Validate authentication
-    const token = validateAuthHeader(request);
+    const _token = validateAuthHeader(request);
     
     // Get authenticated Supabase client
     const supabase = await getAuthenticatedSupabaseClient(request);
-    const userId = await getUserId(supabase);
+    const userId = await getUserId(supabase, request);
     
     // Parse request body
     const body = await request.json();
@@ -367,18 +382,29 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       conversationHistory = [], 
       sessionId, 
       agentId, 
-      userProfile,
-      currentRfp,
-      currentArtifact,
-      loginEvidence,
+      userProfile: _userProfile,
+      currentRfp: _currentRfp,
+      currentArtifact: _currentArtifact,
+      loginEvidence: _loginEvidence,
       stream = false, 
       clientCallback,
       // Legacy support for direct messages format
       messages
     } = body;
     
+    // Load agent context and user profile, then build system prompt
+    const agentContext = await loadAgentContext(supabase, agentId);
+    const loadedUserProfile = await loadUserProfile(supabase);
+    const systemPrompt = buildSystemPrompt({ 
+      agent: agentContext || undefined,
+      userProfile: loadedUserProfile || undefined,
+      sessionId: sessionId,
+      isAnonymous: !loadedUserProfile
+    });
+    console.log('🎯 POST REQUEST: System prompt built:', systemPrompt ? 'Yes' : 'No');
+    
     // Convert ClaudeService format to messages format
-    let processedMessages: any[] = [];
+    let processedMessages: unknown[] = [];
     
     if (messages && Array.isArray(messages)) {
       // Direct messages format (legacy)
@@ -453,10 +479,11 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     const tools = getToolDefinitions(agent?.role);
     
     // Send request to Claude API
-    const claudeResponse = await claudeService.sendMessage(processedMessages, tools);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const claudeResponse = await claudeService.sendMessage(processedMessages as any, tools);
     
     // Execute any tool calls
-    let toolResults: any[] = [];
+    let toolResults: unknown[] = [];
     if (claudeResponse.toolCalls && claudeResponse.toolCalls.length > 0) {
       console.log('Executing tool calls:', claudeResponse.toolCalls.length);
       toolResults = await toolService.executeToolCalls(claudeResponse.toolCalls, sessionId);
@@ -467,7 +494,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
           ...processedMessages,
           {
             role: 'assistant',
-            content: claudeResponse.toolCalls.map((call: any) => ({
+            content: claudeResponse.toolCalls.map((call: unknown) => ({
               type: 'tool_use',
               id: call.id,
               name: call.name,
@@ -476,7 +503,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
           },
           {
             role: 'user',
-            content: toolResults.map((result: any) => ({
+            content: toolResults.map((result: unknown) => ({
               type: 'tool_result',
               tool_use_id: result.tool_call_id,
               content: JSON.stringify(result.output)
@@ -485,23 +512,24 @@ export async function handlePostRequest(request: Request): Promise<Response> {
         ];
         
         // Get final response from Claude
-        const finalResponse = await claudeService.sendMessage(followUpMessages, tools);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const finalResponse = await claudeService.sendMessage(followUpMessages as any, tools);
         claudeResponse.textResponse = finalResponse.textResponse;
       }
     }
 
     // Detect if an agent switch occurred successfully
-    const agentSwitchOccurred = toolResults.some((result: any) => {
+    const agentSwitchOccurred = toolResults.some((result: unknown) => {
       return result.function_name === 'switch_agent' && result.result?.success === true;
     });
 
     // Prepare metadata in format expected by client
-    const metadata: any = {
+    const metadata: Record<string, unknown> = {
       model: 'claude-sonnet-4-20250514',
       response_time: 0,
       temperature: 0.3,
       tokens_used: claudeResponse.usage?.output_tokens || 0,
-      functions_called: claudeResponse.toolCalls?.map((call: any) => call.name) || [],
+      functions_called: claudeResponse.toolCalls?.map((call: unknown) => (call as Record<string, unknown>).name) || [],
       function_results: toolResults,
       is_streaming: false,
       stream_complete: true,
@@ -519,8 +547,8 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     }
 
     // Create artifacts array from form creation results
-    const artifacts: any[] = [];
-    toolResults.forEach((result: any) => {
+    const artifacts: unknown[] = [];
+    toolResults.forEach((result: unknown) => {
       if (result.function_name === 'create_form_artifact' && result.result?.success) {
         artifacts.push({
           name: result.result.artifact?.title || 'Form Artifact',
@@ -536,7 +564,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     }
 
     // Prepare response
-    const responseData: any = {
+    const responseData: Record<string, unknown> = {
       success: true,
       content: claudeResponse.textResponse, // Changed from 'response' to 'content' for client compatibility
       metadata: metadata, // Add metadata object with artifact info
@@ -598,27 +626,35 @@ export async function handlePostRequest(request: Request): Promise<Response> {
 export async function handleStreamingRequest(request: Request): Promise<Response> {
   try {
     // Validate authentication
-    const token = validateAuthHeader(request);
+    const _token = validateAuthHeader(request);
     const supabase = await getAuthenticatedSupabaseClient(request);
-    const userId = await getUserId(supabase);
+    const userId = await getUserId(supabase, request);
     
     // Parse request body
     const body = await request.json();
     const { messages, sessionId, agentId } = body;
+    
+    // Load agent context and build system prompt
+    const agentContext = await loadAgentContext(supabase, agentId);
+    const systemPrompt = buildSystemPrompt({ 
+      agent: agentContext || undefined,
+      sessionId: sessionId
+    });
+    console.log('🎯 STREAMING REQUEST: System prompt built:', systemPrompt ? 'Yes' : 'No');
     
     // Create readable stream
     const stream = new ReadableStream({
       async start(controller) {
         try {
           const claudeService = new ClaudeAPIService();
-          const toolService = new ToolExecutionService(supabase, userId, undefined);
+          const _toolService = new ToolExecutionService(supabase, userId, undefined);
           const tools = getToolDefinitions();
           
           // Stream response from Claude
           await claudeService.streamMessage(messages, tools, (chunk) => {
             const data = `data: ${JSON.stringify(chunk)}\n\n`;
             controller.enqueue(new TextEncoder().encode(data));
-          });
+          }, systemPrompt);
           
           controller.close();
         } catch (error) {

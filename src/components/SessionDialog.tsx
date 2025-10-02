@@ -7,6 +7,8 @@ import ArtifactReferenceTag from './ArtifactReferenceTag';
 import ToolExecutionDisplay from './ToolExecutionDisplay';
 import { ArtifactReference } from '../types/home';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 interface Message {
   id: string;
@@ -108,9 +110,15 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                   </div>
                 )}
                 <div style={{ 
-                  whiteSpace: 'pre-wrap'
+                  whiteSpace: message.isUser ? 'pre-wrap' : 'normal'
                 }}>
-                  {message.content}
+                  {message.isUser ? (
+                    message.content
+                  ) : (
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                      {message.content}
+                    </ReactMarkdown>
+                  )}
                   {/* Show typing indicator for streaming messages that are still being written */}
                   {!message.isUser && message.content.length > 0 && isLoading && (
                     <span style={{

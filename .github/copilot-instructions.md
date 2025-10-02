@@ -27,6 +27,108 @@ RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend
 
 ## Critical Workflows
 
+### Local-First Development Strategy ⭐
+**ALWAYS DEVELOP LOCALLY FIRST** before deploying to remote Supabase. This ensures rapid iteration, safe testing, and proper validation before production changes.
+
+#### **Local Development Setup**
+```bash
+# 1. Start Local Supabase Stack (if not already running)
+supabase start
+# This starts: DB (54322), API (54321), Studio (54323)
+
+# 2. Switch to Local Configuration
+# Use scripts: ./scripts/supabase-local.bat (Windows) or ./scripts/supabase-local.sh (Linux/Mac)
+# Or manually edit .env.local to use local URLs
+
+# 3. Start React Development Server
+npm start  # Runs on localhost:3100, connects to local Supabase
+```
+
+#### **Edge Function Development Workflow**
+```bash
+# LOCAL-FIRST Edge Function Development:
+
+# 1. Develop & Test Functions Locally
+supabase functions serve claude-api-v3  # Serves locally on port 54321
+# Test against local function endpoint: http://127.0.0.1:54321/functions/v1/claude-api-v3
+
+# 2. Local Function Testing
+curl -X POST http://127.0.0.1:54321/functions/v1/claude-api-v3 \
+  -H "Content-Type: application/json" \
+  -d '{"test": "data"}'
+
+# 3. Only Deploy to Remote After Local Testing
+supabase functions deploy claude-api-v3  # Deploy to production
+
+# ❌ NEVER: Deploy directly to remote without local testing
+# ✅ ALWAYS: Local development → Local testing → Remote deployment
+```
+
+#### **Database Change Workflow**
+```bash
+# LOCAL-FIRST Database Development:
+
+# 1. Create Migration Locally
+supabase migration new add_new_feature
+# Edit the generated SQL file in supabase/migrations/
+
+# 2. Apply Migration Locally
+supabase db reset  # Apply all migrations to local DB
+# OR
+supabase migration up  # Apply latest migration
+
+# 3. Test Changes Locally
+# - Run React app against local DB
+# - Execute test queries in local Studio (localhost:54323)
+# - Validate RLS policies and permissions
+
+# 4. Deploy to Remote Only After Local Validation
+supabase db push  # Push schema changes to remote
+# OR
+supabase migration repair  # If needed to sync migration state
+```
+
+#### **Local Configuration Management**
+```bash
+# Environment Switching (Use provided scripts)
+./scripts/supabase-local.bat    # Switch to LOCAL (Windows)
+./scripts/supabase-local.sh     # Switch to LOCAL (Linux/Mac)
+./scripts/supabase-remote.bat   # Switch to REMOTE (Windows)
+./scripts/supabase-remote.sh    # Switch to REMOTE (Linux/Mac)
+
+# Manual Configuration Check
+# LOCAL URLs:
+# - API: http://127.0.0.1:54321
+# - Studio: http://127.0.0.1:54323
+# - Database: localhost:54322
+
+# REMOTE URLs:
+# - API: https://jxlutaztoukwbbgtoulc.supabase.co
+# - Studio: https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc
+```
+
+#### **Data Synchronization Patterns**
+```bash
+# Sync Remote Data to Local (for testing with real data)
+supabase db pull  # Pull schema from remote
+supabase db dump --data-only > data.sql  # Export remote data
+psql -h 127.0.0.1 -p 54322 -U postgres -d postgres < data.sql  # Import to local
+
+# Sync Local Schema to Remote (after local development)
+supabase db push  # Push schema changes
+supabase functions deploy  # Deploy function changes
+```
+
+#### **Local Testing Validation Checklist**
+Before deploying to remote, ensure:
+- ✅ Functions work locally with `supabase functions serve`
+- ✅ Database migrations apply cleanly with `supabase db reset`
+- ✅ React app connects to local services without errors
+- ✅ RLS policies work correctly in local Studio
+- ✅ Edge Functions handle authentication properly
+- ✅ Agent system functions correctly with local database
+- ✅ MCP integration works with local endpoints
+
 ### Memory MCP Integration
 - **Knowledge Graph**: Use memory MCP tools to track session state, terminal processes, and workflow context
 - **Terminal Session Tracking**: Maintain awareness of which terminals have active processes

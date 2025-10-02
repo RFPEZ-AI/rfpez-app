@@ -50,7 +50,7 @@ interface SupabaseQuery {
 interface FormArtifactData {
   name: string;
   description?: string;
-  content: string;
+  content: Record<string, unknown>; // JSON object for form schema
   artifactRole: string;
   form_schema?: Record<string, unknown>;
   form_data?: Record<string, unknown>;

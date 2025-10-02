@@ -46,7 +46,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         },
         content: {
           type: 'object',
-          description: 'Form content including fields, structure, and validation rules'
+          description: 'Form schema object containing fields, structure, and validation rules'
         },
         artifactRole: {
           type: 'string',
