@@ -244,7 +244,7 @@ Please provide detailed feedback on each step including whether each function ca
    - MCP failure: `❌ MCP client failed for`
 
 2. **Network Monitoring**:
-   - Watch for calls to `/functions/v1/mcp-server`
+   - Watch for calls to `/functions/v1/supabase-mcp-server`
    - Check request/response structure
    - Monitor response times
 

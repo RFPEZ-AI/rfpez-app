@@ -132,6 +132,94 @@ Before deploying to remote, ensure:
 - ✅ Agent system functions correctly with local database
 - ✅ MCP integration works with local endpoints
 
+#### **Local-to-Remote Deployment Workflow** 🚀
+**Complete deployment process to push all local changes to remote Supabase:**
+
+```bash
+# STEP 1: Verify Local Development Complete
+# Ensure all local testing validation checklist items are complete ✅
+
+# STEP 2: Check Migration Status
+supabase migration list
+# Identify any local migrations not yet on remote (missing from Remote column)
+
+# STEP 3: Push Database Changes
+supabase db push
+# Pushes all pending migrations to remote database
+# ⚠️ Review and confirm migration changes when prompted
+
+# STEP 4: Deploy Edge Functions
+# Deploy primary functions (order matters for dependencies):
+supabase functions deploy claude-api-v3    # Primary Claude API endpoint (V3)
+supabase functions deploy supabase-mcp-server       # MCP protocol server
+
+# Optional: Deploy other functions as needed:
+# supabase functions deploy claude-api-v2  # Legacy V2 endpoint
+# supabase functions deploy debug-claude   # Debug utilities
+
+# STEP 5: Update Agent Instructions (if modified)
+# Use direct SQL to update agent instructions in remote database:
+# UPDATE agents SET instructions = 'new_instructions' WHERE name = 'Agent Name';
+
+# STEP 6: Verify Deployment Success
+supabase migration list    # Confirm all migrations now show in Remote column
+supabase functions list    # Verify function versions updated with recent timestamps
+
+# STEP 7: Test Remote Environment
+# Switch to remote configuration and verify functionality:
+./scripts/supabase-remote.bat  # (Windows) or ./scripts/supabase-remote.sh (Linux/Mac)
+npm start  # Test against remote Supabase
+# ✅ Verify core functionality works with remote endpoints
+```
+
+**🎯 Agent Instructions Deployment Pattern:**
+```bash
+# When agent instructions are updated in Agent Instructions/*.md files:
+
+# 1. Read local agent instruction files
+# 2. Update remote database directly via SQL:
+UPDATE agents 
+SET instructions = 'FULL_AGENT_INSTRUCTIONS_HERE'
+WHERE id = 'agent-uuid-here';
+
+# 3. Verify updates with:
+SELECT name, LEFT(instructions, 100) as preview, updated_at 
+FROM agents 
+WHERE name IN ('Solutions', 'RFP Design', 'Agent Name');
+```
+
+**🚨 Critical Deployment Rules:**
+- **Always test locally first** - Never deploy untested code to remote
+- **Migrations are one-way** - Database changes cannot be easily reverted
+- **Function versioning** - Each deployment increments version number
+- **Agent instructions** - Must be updated via direct SQL, not migrations
+- **Validate after deployment** - Always verify functionality in remote environment
+- **Rollback plan** - Keep note of previous function versions for emergency rollback
+
+**📊 Deployment Success Verification:**
+```bash
+# Database: All migrations synchronized
+supabase migration list  # Local and Remote columns should match
+
+# Edge Functions: Version numbers incremented
+supabase functions list  # Check updated timestamps and version numbers
+
+# Agent Instructions: Updated timestamps
+SELECT name, updated_at FROM agents WHERE name IN ('Solutions', 'RFP Design');
+
+# Application: Remote functionality verified
+# Test core workflows against remote endpoints
+```
+
+**🎯 Recent Deployment Example (October 2025):**
+Successfully deployed local changes to remote:
+- ✅ **Database Migration**: `20251002030545_populate_agents_local.sql` pushed to remote
+- ✅ **Edge Functions**: `claude-api-v3` (version 120) and `supabase-mcp-server` (version 13→14) deployed
+- ✅ **Agent Instructions**: Solutions and RFP Design agents updated with latest local instructions
+- ✅ **Verification**: All migrations synchronized, function versions incremented, agent timestamps updated
+
+This demonstrates the complete local-to-remote workflow ensuring all development work is properly deployed to production.
+
 ### Debugging and Logging Patterns
 
 #### **Edge Function Logging & Debugging**
@@ -238,7 +326,7 @@ npm test           # Jest tests with watch mode
 npm run test:coverage  # Coverage reports
 
 # Supabase Edge Functions - use separate terminal
-supabase functions deploy mcp-server    # Deploy MCP server
+supabase functions deploy supabase-mcp-server    # Deploy MCP server
 supabase functions deploy claude-api-v3  # Deploy Claude API function (V3)
 npm run mcp:test   # Test MCP server connection
 
@@ -257,10 +345,10 @@ Use the vs code tasks for starting the dev server to ensure it runs in a protect
 - All tables use RLS policies - ensure proper user context
 - Agent operations require session_id parameter for context
 - Form artifacts stored in `form_artifacts` table with JSON schema
-- Two Edge Functions: `mcp-server` (MCP protocol) and `claude-api-v3` (HTTP REST)
+- Two Edge Functions: `supabase-mcp-server` (MCP protocol) and `claude-api-v3` (HTTP REST)
 
 ### MCP Integration Architecture
-- **MCP Server**: `supabase/functions/mcp-server/index.ts` - JSON-RPC 2.0 protocol
+- **MCP Server**: `supabase/functions/supabase-mcp-server/index.ts` - JSON-RPC 2.0 protocol
 - **MCP Client**: `src/services/mcpClient.ts` - TypeScript client for React app
 - **Protocol**: Model Context Protocol 2024-11-05 for Claude Desktop integration
 - **Tools**: get_conversation_history, store_message, create_session, search_messages
@@ -279,6 +367,8 @@ Use the vs code tasks for starting the dev server to ensure it runs in a protect
 - **Terminal Assignment**: Track which terminals are assigned to which processes to prevent conflicts
 - **Command Context**: Store command execution context and results for continuity
 - **Error Prevention**: Use memory to avoid repeating failed commands or interrupting critical processes
+- ** Temporary Files**: Use memory to track temporary files for cleanup before commits
+- ** Temporary Logging**: Use memory to track temporary logging/debug cleanup before commits
 
 **Memory Entity Types:**
 - `Process`: Active processes like dev server, test runners
@@ -402,7 +492,7 @@ export default Component;
 - `src/hooks/useMessageHandling.ts` - Message processing workflow
 - `database/agents-schema.sql` - Multi-agent database structure
 - `DOCUMENTATION/AGENTS.md` - Agent system documentation
-- `supabase/functions/mcp-server/index.ts` - MCP protocol implementation
+- `supabase/functions/supabase-mcp-server/index.ts` - MCP protocol implementation
 - `supabase/functions/claude-api-v3/index.ts` - HTTP REST API for Claude integration (V3)
 
 ## Environment Configuration

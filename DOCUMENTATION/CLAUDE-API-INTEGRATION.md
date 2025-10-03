@@ -93,7 +93,7 @@ const response = await fetch(`${supabaseUrl}/functions/v1/claude-api`, {
 ### 1. Deploy the Claude API Endpoint
 ```bash
 # Deploy both edge functions
-supabase functions deploy mcp-server     # For Claude Desktop
+supabase functions deploy supabase-mcp-server     # For Claude Desktop
 supabase functions deploy claude-api     # For Claude API
 ```
 
@@ -168,7 +168,7 @@ import { claudeApiFunctions } from './services/claudeAPIFunctions';
 ### **Option B: Both Approaches**
 ```bash
 # Deploy both endpoints
-supabase functions deploy mcp-server    # Claude Desktop
+supabase functions deploy supabase-mcp-server    # Claude Desktop
 supabase functions deploy claude-api    # Claude API
 
 # Configure both integrations
@@ -177,7 +177,7 @@ supabase functions deploy claude-api    # Claude API
 ### **Option C: Desktop MCP Only** 
 ```bash
 # Use existing MCP implementation
-supabase functions deploy mcp-server
+supabase functions deploy supabase-mcp-server
 # Configure Claude Desktop with mcp-client.js
 ```
 

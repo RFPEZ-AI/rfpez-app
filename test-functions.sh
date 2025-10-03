@@ -13,8 +13,8 @@ curl -X POST "http://127.0.0.1:54321/functions/v1/claude-api-v3" \
     "max_tokens": 100
   }'
 
-echo -e "\n\nTesting mcp-server function..."
-curl -X POST "http://127.0.0.1:54321/functions/v1/mcp-server" \
+echo -e "\n\nTesting supabase-mcp-server function..."
+curl -X POST "http://127.0.0.1:54321/functions/v1/supabase-mcp-server" \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer sb_publishable_ACJWlzQHlZjBrEguHvfOxg_3BJgxAaH" \
   -d '{

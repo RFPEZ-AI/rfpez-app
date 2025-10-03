@@ -50,7 +50,7 @@ supabase db push
 
 # Deploy Edge Functions to remote
 supabase functions deploy claude-api-v3
-supabase functions deploy mcp-server
+supabase functions deploy supabase-mcp-server
 
 # Verify changes worked
 supabase migration list --remote

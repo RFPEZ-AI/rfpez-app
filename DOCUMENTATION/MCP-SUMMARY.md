@@ -3,7 +3,7 @@
 ## ✅ What's Been Implemented
 
 ### 1. **Supabase Edge Function MCP Server**
-- **File**: `supabase/functions/mcp-server/index.ts`
+- **File**: `supabase/functions/supabase-mcp-server/index.ts`
 - **Features**: Full MCP 2024-11-05 protocol implementation
 - **Tools Available**:
   - `get_conversation_history` - Retrieve session messages
@@ -101,7 +101,7 @@ Agent: "Let me check our previous conversation about deployment..."
 ```
 📦 RFPEZ.AI MCP Implementation
 ├── 🔧 supabase/
-│   ├── functions/mcp-server/index.ts    # MCP Server
+│   ├── functions/supabase-mcp-server/index.ts    # MCP Server
 │   └── config.toml                      # Supabase config
 ├── 🎨 src/
 │   ├── services/mcpClient.ts           # TS MCP Client

@@ -75,7 +75,7 @@ Claude Session → MCP Client → Supabase Edge Function MCP Server → Supabase
 
 4. **MCP Server**: The MCP client connects to the Supabase Edge Function at:
    ```
-   ${supabaseUrl}/functions/v1/mcp-server
+   ${supabaseUrl}/functions/v1/supabase-mcp-server
    ```
 
 ## Testing

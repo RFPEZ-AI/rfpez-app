@@ -9,7 +9,7 @@ Claude Desktop App
         ↓ (MCP Protocol over stdio)
     mcp-client.js (Node.js)
         ↓ (HTTP/JSON-RPC)
-    Supabase Edge Function (mcp-server)
+    Supabase Edge Function (supabase-mcp-server)
         ↓ (SQL queries)
     Supabase Database (conversations, sessions, messages)
 ```
@@ -174,10 +174,10 @@ The MCP server provides detailed error responses:
 supabase start
 
 # Deploy function locally
-supabase functions serve mcp-server
+supabase functions serve supabase-mcp-server
 
 # Test with curl
-curl -X POST http://localhost:54321/functions/v1/mcp-server \
+curl -X POST http://localhost:54321/functions/v1/supabase-mcp-server \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer YOUR_TOKEN" \
   -d '{"jsonrpc":"2.0","id":1,"method":"tools/list"}'
@@ -188,7 +188,7 @@ curl -X POST http://localhost:54321/functions/v1/mcp-server \
 ```
 supabase/
 ├── functions/
-│   └── mcp-server/
+│   └── supabase-mcp-server/
 │       └── index.ts          # Main MCP server implementation
 ├── config.toml               # Supabase configuration
 src/services/
