@@ -131,7 +131,10 @@ function transformToJsonSchema(customForm: Record<string, unknown>): {
       if (section.fields && Array.isArray(section.fields)) {
         (section.fields as Record<string, unknown>[]).forEach((field: Record<string, unknown>) => {
           const fieldId = field.id as string;
-          if (!fieldId || typeof fieldId !== 'string') return;
+          if (!fieldId || typeof fieldId !== 'string') {
+            console.warn('Skipping field with invalid or missing id:', field);
+            return;
+          }
 
           // Convert field to JSON Schema property
           const property: Record<string, unknown> = {
@@ -139,8 +142,12 @@ function transformToJsonSchema(customForm: Record<string, unknown>): {
             description: field.placeholder || field.description
           };
 
+          // Normalize field type to prevent undefined types
+          const fieldType = field.type || 'text';
+          console.log(`Processing field: ${fieldId}, type: ${fieldType}`);
+
           // Map field types to JSON Schema types
-          switch (field.type) {
+          switch (fieldType) {
             case 'text':
             case 'email':
             case 'tel':
@@ -196,7 +203,14 @@ function transformToJsonSchema(customForm: Record<string, unknown>): {
               break;
             }
             default:
+              console.warn(`Unknown field type "${fieldType}" for field "${fieldId}", defaulting to string`);
               property.type = 'string';
+          }
+
+          // Ensure every property has a valid type
+          if (!property.type) {
+            console.warn(`Field "${fieldId}" missing type after processing, defaulting to string`);
+            property.type = 'string';
           }
 
           properties[fieldId] = property;
@@ -221,6 +235,20 @@ function transformToJsonSchema(customForm: Record<string, unknown>): {
       properties,
       required: required.length > 0 ? required : undefined
     };
+
+    // Validate schema properties to prevent "Unknown field type undefined" errors
+    Object.entries(properties).forEach(([key, prop]) => {
+      const property = prop as Record<string, unknown>;
+      if (!property.type) {
+        console.error(`Property "${key}" has no type, fixing to string`);
+        property.type = 'string';
+      }
+    });
+
+    console.log('Generated schema with properties:', Object.keys(properties).map(key => {
+      const prop = properties[key] as Record<string, unknown>;
+      return `${key}:${prop.type}`;
+    }).join(', '));
 
     return { schema, uiSchema, defaultValues };
   }
@@ -276,11 +304,24 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
     }
   }
   
+  // Validate schema structure to prevent frontend errors
+  if (schema && typeof schema === 'object' && schema.properties) {
+    const properties = schema.properties as Record<string, unknown>;
+    Object.entries(properties).forEach(([key, prop]) => {
+      const property = prop as Record<string, unknown>;
+      if (!property.type) {
+        console.warn(`Schema property "${key}" missing type, defaulting to string`);
+        property.type = 'string';
+      }
+    });
+  }
+
   console.log('Parsed form components:', { 
     hasSchema: !!schema && Object.keys(schema).length > 0,
     hasUiSchema: !!ui_schema && Object.keys(ui_schema).length > 0,
     hasDefaultValues: !!default_values && Object.keys(default_values).length > 0,
-    schemaType: (schema as Record<string, unknown>)?.type
+    schemaType: (schema as Record<string, unknown>)?.type,
+    propertyCount: schema && schema.properties ? Object.keys(schema.properties as Record<string, unknown>).length : 0
   });
   
   const { data: artifact, error } = await supabase
