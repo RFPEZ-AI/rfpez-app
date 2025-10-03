@@ -25,6 +25,12 @@ WDS_SOCKET_PORT=3100
 FAST_REFRESH=true
 EOF
 
+# Update MCP configuration for local development
+echo "🔧 Updating MCP configuration for LOCAL..."
+
+# Update MCP configuration for local using Node.js
+node -e "const fs=require('fs'); let content=fs.readFileSync('.vscode/mcp.json','utf8'); content=content.replace(/^(\s*)(\"supabase-remote\")/gm,'\$1/*     \$2').replace(/(\"supabase-remote\"[\s\S]*?)(},)/gm,'\$1\$2 */').replace(/\/\*\s*(\"supabase-local\")/gm,'    \$1').replace(/(\"supabase-local\"[\s\S]*?)(},)\s*\*\//gm,'\$1\$2'); fs.writeFileSync('.vscode/mcp.json',content); console.log('✅ MCP configuration updated for LOCAL');"
+
 echo "✅ Switched to LOCAL Supabase"
 echo "🚀 Starting local Supabase stack..."
 
@@ -36,4 +42,5 @@ echo "  - API: http://127.0.0.1:54321"
 echo "  - Studio: http://127.0.0.1:54323"
 echo "  - Database: http://127.0.0.1:54322"
 echo ""
-echo "💡 Restart your React app to connect to local Supabase"
+echo "� MCP Configuration: supabase-local ACTIVE, supabase-remote INACTIVE"
+echo "�💡 Restart your React app to connect to local Supabase"

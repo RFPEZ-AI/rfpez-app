@@ -30,12 +30,19 @@ WDS_SOCKET_PORT=3100
 FAST_REFRESH=true
 EOF
 
+# Update MCP configuration for remote production
+echo "🔧 Updating MCP configuration for REMOTE..."
+
+# Update MCP configuration for remote using Node.js
+node -e "const fs=require('fs'); let content=fs.readFileSync('.vscode/mcp.json','utf8'); content=content.replace(/\/\*\s*(\"supabase-remote\")/gm,'    \$1').replace(/(\"supabase-remote\"[\s\S]*?)(},)\s*\*\//gm,'\$1\$2').replace(/^(\s*)(\"supabase-local\")/gm,'\$1/*     \$2').replace(/(\"supabase-local\"[\s\S]*?)(},)/gm,'\$1\$2 */'); fs.writeFileSync('.vscode/mcp.json',content); console.log('✅ MCP configuration updated for REMOTE');"
+
 echo "✅ Switched to REMOTE Supabase"
 echo "🔗 Remote Supabase URLs:"
 echo "  - API: https://jxlutaztoukwbbgtoulc.supabase.co"
 echo "  - Studio: https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc"
 echo ""
-echo "💡 Restart your React app to connect to remote Supabase"
+echo "� MCP Configuration: supabase-remote ACTIVE, supabase-local INACTIVE"
+echo "�💡 Restart your React app to connect to remote Supabase"
 
 # Optionally stop local Supabase
 read -p "❓ Stop local Supabase stack? (y/N): " -n 1 -r
