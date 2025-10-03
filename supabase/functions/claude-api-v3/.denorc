@@ -1,0 +1,9 @@
+# Deno Runtime Configuration
+# Default permissions for development environment
+
+--allow-net
+--allow-env  
+--allow-read
+--allow-write
+--allow-run
+--unstable

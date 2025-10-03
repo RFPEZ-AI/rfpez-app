@@ -3,14 +3,17 @@
     "lib": ["deno.window"],
     "strict": true
   },
+
   "test": {
     "include": ["**/*test.ts", "**/*test.js", "tests/**/*.ts", "tests/**/*.js"]
   },
   "tasks": {
-    "test": "deno test --allow-net --allow-env --allow-read",
-    "test:watch": "deno test --allow-net --allow-env --allow-read --watch",
-    "test:coverage": "deno test --allow-net --allow-env --allow-read --coverage=coverage",
-    "coverage": "deno coverage coverage"
+    "test": "deno test --allow-all",
+    "test:watch": "deno test --allow-all --watch",
+    "test:coverage": "deno test --allow-all --coverage=coverage",
+    "coverage": "deno coverage coverage",
+    "dev": "deno run --allow-all",
+    "serve": "deno run --allow-all --watch"
   },
   "imports": {
     "std/": "https://deno.land/std@0.168.0/",
