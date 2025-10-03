@@ -39,7 +39,7 @@ function GenericMenu<T extends { id: string | number }>({
     <>
       <IonPopover isOpen={showPopover} onDidDismiss={() => setShowPopover(false)} style={{ '--width': 'min(90vw, 700px)', '--min-width': '500px' }}>
         <IonList>
-          <IonItem button onClick={() => { setShowPopover(false); onNew(); }}>
+          <IonItem button onClick={() => { setShowPopover(false); onNew(); }} data-testid={`new-${title.toLowerCase()}-button`}>
             <IonIcon icon={add} slot="start" />
             <IonLabel>New {title}</IonLabel>
           </IonItem>
@@ -55,6 +55,7 @@ function GenericMenu<T extends { id: string | number }>({
                     color={currentItemId === item.id ? "primary" : "medium"}
                     onClick={() => { setShowPopover(false); onSetCurrent(item); }}
                     style={{ '--padding-start': '4px', '--padding-end': '4px', margin: 0 }}
+                    data-testid={`set-current-${title.toLowerCase()}-${item.id}`}
                   >
                     <IonIcon icon={currentItemId === item.id ? radioButtonOn : radioButtonOff} />
                   </IonButton>

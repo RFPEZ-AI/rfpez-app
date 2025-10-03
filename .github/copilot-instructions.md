@@ -569,12 +569,50 @@ const elements = await mcp_browser_get_clickable_elements();
 await mcp_browser_click({ index: elements[0].index });
 ```
 
+### UI Test Automation Identifiers
+Key UI elements are decorated with `data-testid` attributes for reliable MCP browser testing:
+
+**Core Navigation & Actions:**
+- `data-testid="new-rfp-button"` - New RFP creation button in RFP menu
+- `data-testid="message-input"` - Main message input textarea
+- `data-testid="submit-message-button"` - Message submit button (or use ENTER key)
+- `data-testid="agent-selector"` - Agent indicator/selector (click to switch agents)
+- `data-testid="select-agent-button"` - Explicit agent selection button (when no agent selected)
+
+**RFP & Context Management:**
+- `data-testid="rfp-context-footer"` - Footer container showing current RFP context
+- `data-testid="current-rfp-display"` - Specific text showing "Current RFP: [name]"
+- `data-testid="set-current-rfp-{id}"` - Buttons to set specific RFP as current
+- `data-testid="artifact-window-toggle"` - Button to show/hide artifact panel
+
+**Artifact & Form Interaction:**
+- `data-testid="artifact-window"` - Main artifact panel container
+- `data-testid="artifact-item-{name}"` - Individual artifact items (name slugified)
+- `data-testid="form-submit-button"` - Form submission button in artifacts
+- `data-testid="artifact-toggle"` - Artifact panel expand/collapse button
+
+**Usage in MCP Browser Tests:**
+```javascript
+// Navigate and interact with key elements
+await mcp_browser_click({ selector: '[data-testid="new-rfp-button"]' });
+await mcp_browser_form_input_fill({ selector: '[data-testid="message-input"]', value: 'test message' });
+await mcp_browser_press_key({ key: 'Enter' }); // Submit message
+await mcp_browser_click({ selector: '[data-testid="agent-selector"]' }); // Switch agent
+await mcp_browser_click({ selector: '[data-testid="artifact-item-led-lighting-requirements-assessment"]' });
+await mcp_browser_click({ selector: '[data-testid="form-submit-button"]' });
+
+// Verify state changes
+const footer = await mcp_browser_get_text({ selector: '[data-testid="current-rfp-display"]' });
+// Should show "Current RFP: [name]" immediately after creation
+```
+
 ## Testing Notes
 - Console warnings for Ionic/Stencil components are expected
 - Use `test-utils.tsx` render wrapper for component tests
 - MCP tests in separate automation project for integration testing integrated into the debug page
 - VS Code tasks available for automated test execution and MCP validation
 - When sending message prompts using the mcp browser tools, add the enter key to submit the message
+- Test identifiers follow kebab-case naming: `data-testid="element-name-action"`
 
 ## Memory MCP Best Practices
 

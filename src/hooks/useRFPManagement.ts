@@ -98,12 +98,22 @@ export const useRFPManagement = (currentSessionId?: string) => {
   const handleCancelRFP = () => setShowRFPModal(false);
   const handleClosePreview = () => setShowRFPPreviewModal(false);
   
-  const handleSetCurrentRfp = async (rfpId: number) => {
-    console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId);
+  const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP) => {
+    console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId, 'rfpData provided:', !!rfpData);
     try {
-      console.log('🔍 DEBUG: Calling RFPService.getById with id:', rfpId);
-      const rfp = await RFPService.getById(rfpId);
-      console.log('📦 DEBUG: RFPService.getById returned:', rfp);
+      let rfp: RFP | null = null;
+      
+      if (rfpData) {
+        // Use provided RFP data directly to avoid database timing issues
+        console.log('📦 DEBUG: Using provided RFP data directly:', rfpData.name);
+        rfp = rfpData;
+      } else {
+        // Fallback to database query
+        console.log('🔍 DEBUG: Calling RFPService.getById with id:', rfpId);
+        rfp = await RFPService.getById(rfpId);
+        console.log('📦 DEBUG: RFPService.getById returned:', rfp);
+      }
+      
       if (rfp) {
         console.log('✅ DEBUG: RFP found, setting state - rfp.name:', rfp.name, 'rfp.id:', rfp.id);
         setCurrentRfpId(rfpId);

@@ -244,8 +244,8 @@ export class ClaudeAPIService {
                   
                   // Send tool use event to client with complete data
                   onChunk({ 
-                    type: 'tool_use', 
-                    ...finalToolCall 
+                    ...finalToolCall,
+                    type: 'tool_use'
                   });
                   
                   // Reset for next tool call

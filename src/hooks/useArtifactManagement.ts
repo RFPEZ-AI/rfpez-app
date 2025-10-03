@@ -18,7 +18,7 @@ export const useArtifactManagement = (
   onArtifactAdded?: (artifactId: string) => void, // New callback for when artifacts are added
   onArtifactSelected?: (sessionId: string, artifactId: string | null) => void, // New callback for artifact selection
   currentRfpId?: number | null, // Add current RFP ID
-  handleSetCurrentRfp?: (rfpId: number) => Promise<void> // Add RFP setter function
+  handleSetCurrentRfp?: (rfpId: number, rfpData?: RFP) => Promise<void> // Add RFP setter function
 ) => {
   const [artifacts, setArtifacts] = useState<Artifact[]>([]);
   const [selectedArtifactId, setSelectedArtifactId] = useState<string | null>(null);

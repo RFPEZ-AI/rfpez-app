@@ -31,7 +31,7 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
 }) => {
   if (!agent) {
     return (
-      <IonChip className="agent-indicator no-agent" color="warning">
+      <IonChip className="agent-indicator no-agent" color="warning" data-testid="agent-selector">
         <IonIcon icon={informationCircleOutline} />
         <IonLabel>No agent selected</IonLabel>
         {showSwitchButton && (
@@ -39,6 +39,7 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
             fill="clear" 
             size="small" 
             onClick={onSwitchAgent}
+            data-testid="select-agent-button"
           >
             Select Agent
           </IonButton>
@@ -52,6 +53,7 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
       <IonChip 
         className="agent-indicator compact" 
         color="primary"
+        data-testid="agent-selector"
         onClick={showSwitchButton ? onSwitchAgent : undefined}
         style={{ cursor: showSwitchButton ? 'pointer' : 'default' }}
       >

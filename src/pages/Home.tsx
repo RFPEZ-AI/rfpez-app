@@ -545,8 +545,8 @@ const Home: React.FC = () => {
                     hasFullData: true
                   });
                   
-                  // Call handleSetCurrentRfp - it will work because the RFP exists now
-                  await handleSetCurrentRfp(event.data.payload.rfp_id);
+                  // Call handleSetCurrentRfp with direct RFP data to avoid database timing issues
+                  await handleSetCurrentRfp(event.data.payload.rfp_id, event.data.payload.rfp_data);
                   
                   // Update session context if we have an active session
                   if (currentSessionId) {
@@ -702,7 +702,7 @@ const Home: React.FC = () => {
         console.log('🎯 DEBUG: Direct RFP update from edge function:', event.data);
         if (event.data.rfp_data) {
           try {
-            await handleSetCurrentRfp(event.data.rfp_data.id);
+            await handleSetCurrentRfp(event.data.rfp_data.id, event.data.rfp_data);
             console.log('✅ Direct RFP update successful:', event.data.rfp_data.name);
           } catch (error) {
             console.error('❌ Direct RFP update failed:', error);
@@ -726,6 +726,58 @@ const Home: React.FC = () => {
           // Force a re-render of RFP indicator component
           // This could trigger a state update that forces re-render
           console.log('🔄 Forcing RFP indicator refresh');
+        }
+        return;
+      }
+
+      // NEW: Handle RFP_CREATED_SUCCESS messages from useMessageHandling
+      if (event.data?.type === 'RFP_CREATED_SUCCESS') {
+        console.log('🎯 HOME MESSAGE DEBUG: RFP_CREATED_SUCCESS received:', {
+          rfpId: event.data.rfpId,
+          rfpName: event.data.rfpName,
+          sessionId: event.data.sessionId,
+          timestamp: new Date().toISOString()
+        });
+        
+        if (event.data.rfpId) {
+          try {
+            await handleSetCurrentRfp(event.data.rfpId);
+            console.log('✅ HOME MESSAGE DEBUG: RFP context updated from RFP_CREATED_SUCCESS:', event.data.rfpId);
+            
+            // Also refresh artifacts to ensure new form artifacts are loaded
+            if (currentSessionId) {
+              await loadSessionArtifacts(currentSessionId);
+              console.log('✅ Artifacts refreshed after RFP creation');
+            }
+          } catch (error) {
+            console.error('❌ HOME MESSAGE DEBUG: Failed to update RFP context from RFP_CREATED_SUCCESS:', error);
+          }
+        }
+        return;
+      }
+
+      // NEW: Handle REFRESH_SESSION_CONTEXT messages from useMessageHandling
+      if (event.data?.type === 'REFRESH_SESSION_CONTEXT') {
+        console.log('🎯 HOME MESSAGE DEBUG: REFRESH_SESSION_CONTEXT received:', {
+          sessionId: event.data.sessionId,
+          timestamp: new Date().toISOString()
+        });
+        
+        if (event.data.sessionId && currentSessionId === event.data.sessionId) {
+          try {
+            // Reload session context to get updated RFP context
+            const sessionWithContext = await DatabaseService.getSessionWithContext(event.data.sessionId);
+            if (sessionWithContext?.current_rfp_id) {
+              await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+              console.log('✅ HOME MESSAGE DEBUG: Session context refreshed with RFP:', sessionWithContext.current_rfp_id);
+            }
+            
+            // Also refresh artifacts to ensure they're up to date
+            await loadSessionArtifacts(event.data.sessionId);
+            console.log('✅ Artifacts refreshed from session context');
+          } catch (error) {
+            console.error('❌ HOME MESSAGE DEBUG: Failed to refresh session context:', error);
+          }
         }
         return;
       }

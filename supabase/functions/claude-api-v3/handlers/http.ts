@@ -611,6 +611,65 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       tool_names: claudeResponse.toolCalls?.map((call: unknown) => (call as Record<string, unknown>).name)
     });
 
+    // AGENT CONTEXT TRANSFER: Check if we need to trigger continuation after agent switch
+    if (agentSwitchOccurred) {
+      console.log('🔄 Agent switch detected - checking for continuation requirement');
+      
+      // Find the switch_agent result that has trigger_continuation
+      const switchAgentResult = toolResults.find((result: unknown, index: number) => {
+        const toolCall = claudeResponse.toolCalls?.[index] as unknown as Record<string, unknown>;
+        const resultData = result as Record<string, unknown>;
+        return toolCall?.name === 'switch_agent' && resultData?.success === true && resultData?.trigger_continuation === true;
+      }) as Record<string, unknown>;
+      
+      if (switchAgentResult?.trigger_continuation && switchAgentResult?.context_message) {
+        const newAgentData = switchAgentResult.new_agent as Record<string, unknown>;
+        console.log('🤖 Triggering agent continuation with context:', {
+          new_agent_id: newAgentData?.id,
+          new_agent_name: newAgentData?.name,
+          has_context: !!switchAgentResult.context_message,
+          context_preview: (switchAgentResult.context_message as string)?.substring(0, 100)
+        });
+
+        try {
+          // Store the context message as a system message in the session
+          const contextMessage = switchAgentResult.context_message as string;
+          
+          // Store message in database for the new agent to pick up
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error: messageError } = await (supabase as any)
+            .from('messages')
+            .insert({
+              session_id: sessionId,
+              agent_id: newAgentData?.id as string,
+              message: contextMessage,
+              role: 'system',
+              is_system_message: true,
+              metadata: {
+                message_type: 'agent_context_transfer',
+                original_user_request: switchAgentResult.auto_process_context,
+                agent_switch_timestamp: new Date().toISOString()
+              }
+            });
+
+          if (messageError) {
+            console.error('❌ Failed to store agent context message:', messageError);
+          } else {
+            console.log('✅ Agent context message stored successfully');
+          }
+          
+          // Add a flag to response metadata to trigger client-side follow-up message
+          if (claudeResponse.textResponse) {
+            claudeResponse.textResponse += `\n\n*Connecting you to the ${newAgentData?.name} agent to process your request...*`;
+          }
+          
+        } catch (continuationError) {
+          console.error('❌ Agent continuation setup failed:', continuationError);
+          // Don't fail the whole request, just log the error
+        }
+      }
+    }
+
     // Prepare metadata in format expected by client
     const metadata: Record<string, unknown> = {
       model: 'claude-sonnet-4-20250514',
