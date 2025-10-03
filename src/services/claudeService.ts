@@ -332,6 +332,13 @@ export class ClaudeService {
         );
 
         if (!response.ok) {
+          // Check for Claude API service outage errors
+          if (response.status === 503) {
+            const errorText = await response.text().catch(() => 'Service unavailable');
+            if (errorText.includes('503') || errorText.includes('upstream connect error')) {
+              throw new Error('Claude API error: 503 upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: Connection refused');
+            }
+          }
           throw new Error(`Edge function failed: ${response.status} ${response.statusText}`);
         }
 
@@ -492,6 +499,14 @@ export class ClaudeService {
 
         if (error) {
           console.error('🚨 Edge function error:', error);
+          // Check for Claude API service outage patterns
+          const errorMessage = error.message || '';
+          if (errorMessage.includes('503') || 
+              errorMessage.includes('upstream connect error') ||
+              errorMessage.includes('remote connection failure') ||
+              errorMessage.includes('Connection refused')) {
+            throw new Error('Claude API error: 503 upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: Connection refused');
+          }
           throw new Error(`Edge function failed: ${error.message}`);
         }
 

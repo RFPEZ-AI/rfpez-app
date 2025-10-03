@@ -5,7 +5,7 @@ import { IonAlert, IonToast } from '@ionic/react';
 
 export interface APIError {
   message: string;
-  type: 'rate_limit' | 'network' | 'auth' | 'quota' | 'server' | 'overloaded' | 'unknown';
+  type: 'rate_limit' | 'network' | 'auth' | 'quota' | 'server' | 'overloaded' | 'service_down' | 'unknown';
   retryable: boolean;
   suggestion?: string;
 }
@@ -68,6 +68,13 @@ const APIErrorHandler: React.FC<APIErrorHandlerProps> = ({
           icon: '🚫',
           color: 'warning' as const,
           suggestion: error.suggestion || 'The API is currently experiencing high demand. Please wait a moment and try again.'
+        };
+      case 'service_down':
+        return {
+          header: 'AI Service Temporarily Down',
+          icon: '🔧',
+          color: 'medium' as const,
+          suggestion: error.suggestion || 'Our AI service is currently experiencing technical issues. Please try again in a few minutes.'
         };
       default:
         return {
@@ -153,6 +160,20 @@ export const categorizeError = (error: Error | unknown): APIError => {
       type: 'overloaded',
       retryable: true,
       suggestion: 'The Claude API is currently experiencing high demand. Please wait a moment and try again.'
+    };
+  }
+
+  // Detect Claude API service outages (503 errors, upstream connect errors)
+  if (messageLower.includes('503') || 
+      messageLower.includes('upstream connect error') ||
+      messageLower.includes('remote connection failure') ||
+      messageLower.includes('service unavailable') ||
+      (messageLower.includes('claude api error') && messageLower.includes('503'))) {
+    return {
+      message: 'AI service temporarily unavailable',
+      type: 'service_down',
+      retryable: true,
+      suggestion: 'Our AI service is temporarily down for maintenance. Please try again in a few minutes. Your messages are saved and will be processed once service is restored.'
     };
   }
 
