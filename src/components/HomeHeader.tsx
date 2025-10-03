@@ -191,6 +191,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                 size="small"
                 onClick={onToggleArtifactWindow}
                 title={artifactWindowOpen ? "Hide artifacts" : "Show artifacts"}
+                data-testid="artifact-window-toggle"
                 style={{
                   '--padding-start': '6px',
                   '--padding-end': '6px',

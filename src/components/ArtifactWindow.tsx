@@ -423,7 +423,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
                 }
               }}
             >
-              Submit Questionnaire
+              <span data-testid="form-submit-button">Submit Questionnaire</span>
             </IonButton>
           </div>
         </div>
@@ -1246,7 +1246,7 @@ const ArtifactWindow: React.FC<SingletonArtifactWindowProps> = ({
                 // Display the artifact
                 <div 
                   className="artifact-container"
-                  data-testid="artifact-container"
+                  data-testid={`artifact-item-${artifact.name?.replace(/\s+/g, '-').toLowerCase() || artifact.id}`}
                   data-artifact-id={artifact.id}
                   data-artifact-name={artifact.name}
                   style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>

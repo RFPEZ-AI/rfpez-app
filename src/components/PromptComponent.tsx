@@ -231,6 +231,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             value={message}
             placeholder={placeholder}
             aria-label="Message input"
+            data-testid="message-input"
             onIonInput={(e) => setMessage(e.detail.value || '')}
             onKeyDown={handleKeyDown}
             rows={1}
@@ -260,6 +261,7 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
             disabled={!message.trim() || isLoading}
             size="default"
             color="primary"
+            data-testid="submit-message-button"
             style={{
               '--border-radius': '12px',
               '--box-shadow': '0 2px 4px rgba(var(--ion-color-primary-rgb), 0.3)',
