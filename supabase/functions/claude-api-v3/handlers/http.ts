@@ -10,6 +10,39 @@ import { getToolDefinitions } from '../tools/definitions.ts';
 import { buildSystemPrompt, loadAgentContext, loadUserProfile } from '../utils/system-prompt.ts';
 import { ClaudeMessage } from '../types.ts';
 
+// Supabase client interface
+interface SupabaseClient {
+  from: (table: string) => {
+    select: (columns?: string) => SupabaseQuery;
+    insert: (data: Record<string, unknown>) => SupabaseQuery;
+    update: (data: Record<string, unknown>) => SupabaseQuery;
+    delete: () => SupabaseQuery;
+    eq: (column: string, value: unknown) => SupabaseQuery;
+    in: (column: string, values: unknown[]) => SupabaseQuery;
+    order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
+    limit: (count: number) => SupabaseQuery;
+    single: () => SupabaseQuery;
+  };
+  auth: {
+    getUser: () => Promise<{ data: { user: Record<string, unknown> } | null; error: unknown }>;
+  };
+}
+
+interface SupabaseQuery {
+  select: (columns?: string) => SupabaseQuery;
+  insert: (data: Record<string, unknown>) => SupabaseQuery;
+  update: (data: Record<string, unknown>) => SupabaseQuery;
+  delete: () => SupabaseQuery;
+  eq: (column: string, value: unknown) => SupabaseQuery;
+  in: (column: string, values: unknown[]) => SupabaseQuery;
+  order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
+  limit: (count: number) => SupabaseQuery;
+  single: () => SupabaseQuery;
+  textSearch: (column: string, query: string) => SupabaseQuery;
+  ilike: (column: string, pattern: string) => SupabaseQuery;
+  then: <T>(onfulfilled?: (value: { data: T; error: unknown }) => T | PromiseLike<T>) => Promise<T>;
+}
+
 // Interface for tool calls (matching Claude service)
 interface ClaudeToolCall {
   type: 'tool_use';
@@ -636,8 +669,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
           const contextMessage = switchAgentResult.context_message as string;
           
           // Store message in database for the new agent to pick up
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { error: messageError } = await (supabase as any)
+          const { error: messageError } = await (supabase as SupabaseClient)
             .from('messages')
             .insert({
               session_id: sessionId,
