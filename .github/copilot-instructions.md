@@ -490,12 +490,26 @@ export default Component;
 - Agent instructions combined with user messages for context
 - Current agent displayed in `AgentIndicator` component
 
+### Deployment Workflow
+**Complete local-to-remote deployment process:**
+1. **Pre-deployment Quality Checks**: Run linting (`npm run lint`), unit tests (`npm test`), and edge function tests
+2. **Clean Up**: Remove temporary files, debug artifacts, and development-only content
+3. **Database Deployment**: Push migrations (`supabase db push`), update agent instructions if modified
+4. **Edge Function Deployment**: Deploy functions (`supabase functions deploy claude-api-v3`, `supabase functions deploy supabase-mcp-server`)
+5. **Code Repository**: Commit all changes and push to origin (`git push origin master`)
+6. **Verification**: Test remote environment, verify all services operational
+7. **Documentation**: Update deployment history and verify success criteria
+
+**📖 See `DOCUMENTATION/DEPLOYMENT-GUIDE.md` for complete step-by-step instructions and troubleshooting.**
+
 ## Key Files for Understanding
 - `src/pages/Home.tsx` - Main application orchestration
 - `src/services/claudeService.ts` - Claude API integration patterns
 - `src/hooks/useMessageHandling.ts` - Message processing workflow
 - `database/agents-schema.sql` - Multi-agent database structure
 - `DOCUMENTATION/AGENTS.md` - Agent system documentation
+- `DOCUMENTATION/DEPLOYMENT-GUIDE.md` - Comprehensive deployment procedures from local to remote
+- `DOCUMENTATION/DEPLOYMENT-QUICK-REFERENCE.md` - Quick deployment commands and troubleshooting fixes
 - `supabase/functions/supabase-mcp-server/index.ts` - MCP protocol implementation
 - `supabase/functions/claude-api-v3/index.ts` - HTTP REST API for Claude integration (V3)
 

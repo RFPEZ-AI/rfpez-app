@@ -1,5 +1,7 @@
 # Quick Deployment Reference
 
+> **📖 For comprehensive deployment instructions including quality checks, database migrations, and edge functions, see [DEPLOYMENT-GUIDE.md](./DEPLOYMENT-GUIDE.md)**
+
 ## Common Commands
 
 ### Version Management
