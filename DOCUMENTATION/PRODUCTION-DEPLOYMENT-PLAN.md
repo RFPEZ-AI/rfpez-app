@@ -9,7 +9,7 @@ This document outlines the comprehensive production deployment strategy for RFPE
 - **Frontend**: React/TypeScript with Ionic React framework
 - **Hosting**: Azure Static Web Apps (`dev.rfpez.ai`)
 - **Backend**: Supabase instance (`jxlutaztoukwbbgtoulc.supabase.co`)
-- **Edge Functions**: `mcp-server` (MCP protocol) and `claude-api` (HTTP REST)
+- **Edge Functions**: `supabase-mcp-server` (MCP protocol) and `claude-api` (HTTP REST)
 - **API Integration**: Claude API with MCP (Model Context Protocol)
 - **Database**: PostgreSQL via Supabase with RLS policies
 
@@ -73,7 +73,7 @@ AZURE_STATIC_WEB_APPS_API_TOKEN=<swa-deployment-token>
 1. **Create Production Project**: New Supabase organization/project
 2. **Schema Migration**: Export current schema to SQL files
 3. **Data Migration**: Export essential seed data (agents, schemas)
-4. **Edge Functions**: Deploy both `mcp-server` and `claude-api`
+4. **Edge Functions**: Deploy both `supabase-mcp-server` and `claude-api`
 5. **RLS Policies**: Verify all Row Level Security policies
 6. **Environment Variables**: Update Supabase function environment variables
 
@@ -157,7 +157,7 @@ Value: <azure-static-web-app-domain>
 3. **Edge Functions Deployment**
    ```bash
    # Deploy to production Supabase
-   supabase functions deploy mcp-server --project-ref [prod-ref]
+   supabase functions deploy supabase-mcp-server --project-ref [prod-ref]
    supabase functions deploy claude-api --project-ref [prod-ref]
    ```
 

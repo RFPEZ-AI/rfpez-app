@@ -84,7 +84,7 @@ export class MCPClient {
   constructor(baseUrl?: string, debug = false) {
     // Use the Supabase edge function URL
     const supabaseUrl = process.env.REACT_APP_SUPABASE_URL;
-    this.baseUrl = baseUrl || `${supabaseUrl}/functions/v1/mcp-server`;
+    this.baseUrl = baseUrl || `${supabaseUrl}/functions/v1/supabase-mcp-server`;
     this.debugMode = debug;
     
     if (this.debugMode) {

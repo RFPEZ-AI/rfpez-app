@@ -10,7 +10,7 @@ Your RFPEZ app now has **full Claude API integration with MCP function calling c
 2. **`src/services/claudeAPIFunctions.ts`** - Proper TypeScript types for Anthropic SDK
 3. **`src/components/ClaudeTestComponent.tsx`** - Updated test interface with MCP features
 4. **`supabase/functions/claude-api/index.ts`** - Already deployed and active
-5. **`supabase/functions/mcp-server/index.ts`** - Already deployed and active
+5. **`supabase/functions/supabase-mcp-server/index.ts`** - Already deployed and active
 
 ### 🚀 **Key Features Implemented**
 
@@ -84,7 +84,7 @@ REACT_APP_SUPABASE_ANON_KEY=your_supabase_anon_key
 ```
 
 ### **Supabase Functions** (Already deployed):
-- ✅ `mcp-server` - For Claude Desktop integration
+- ✅ `supabase-mcp-server` - For Claude Desktop integration
 - ✅ `claude-api` - For Claude API function calling
 
 ## 📊 **Using in Your Application**

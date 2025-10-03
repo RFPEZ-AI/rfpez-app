@@ -106,7 +106,7 @@ Successfully migrated MCP (Model Context Protocol) testing functionality from th
    - Use `window.analyzeMCPLogs()` for analysis
 
 5. **Verify Network Activity**
-   - Check Network tab for calls to `/functions/v1/mcp-server`
+   - Check Network tab for calls to `/functions/v1/supabase-mcp-server`
    - Confirm MCP server communication
 
 ## Integration Status

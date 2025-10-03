@@ -15,7 +15,7 @@ window.mcpDebug = {
     console.log('REACT_APP_SUPABASE_URL:', supabaseUrl);
     console.log('REACT_APP_SUPABASE_ANON_KEY:', hasAnonKey);
     
-    const mcpUrl = `${supabaseUrl}/functions/v1/mcp-server`;
+    const mcpUrl = `${supabaseUrl}/functions/v1/supabase-mcp-server`;
     console.log('Computed MCP URL:', mcpUrl);
     
     return { supabaseUrl, mcpUrl };
@@ -49,7 +49,7 @@ window.mcpDebug = {
       return false;
     }
     
-    const mcpUrl = `${supabaseUrl}/functions/v1/mcp-server`;
+    const mcpUrl = `${supabaseUrl}/functions/v1/supabase-mcp-server`;
     console.log('Testing URL:', mcpUrl);
     
     const testRequest = {

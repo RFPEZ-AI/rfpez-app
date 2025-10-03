@@ -50,7 +50,7 @@ When you run the tests, look for these patterns:
 
 ### ✅ Success Patterns
 ```
-🔧 MCPClient initialized with URL: https://your-project.supabase.co/functions/v1/mcp-server
+🔧 MCPClient initialized with URL: https://your-project.supabase.co/functions/v1/supabase-mcp-server
 ✅ Access token available, making request to: [URL]
 📡 Response status: 200
 ✅ MCP Response: { result: { ... } }

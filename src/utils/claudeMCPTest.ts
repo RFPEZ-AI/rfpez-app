@@ -83,7 +83,7 @@ export const analyzeMCPLogs = (): {
   console.log('1. Look for: 🔗 Attempting MCP client for function: [function_name]');
   console.log('2. Look for: ✅ MCP client success for [function_name]');
   console.log('3. Look for: ❌ MCP client failed for [function_name], falling back to HTTP');
-  console.log('4. Check Network tab for calls to /functions/v1/mcp-server');
+  console.log('4. Check Network tab for calls to /functions/v1/supabase-mcp-server');
 
   return {
     mcpAttempts,

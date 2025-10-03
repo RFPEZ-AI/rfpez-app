@@ -46,7 +46,7 @@ const storeMessageIsolated = async (
       }
     };
     
-    const response = await fetch(`${supabaseUrl}/functions/v1/mcp-server`, {
+    const response = await fetch(`${supabaseUrl}/functions/v1/supabase-mcp-server`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

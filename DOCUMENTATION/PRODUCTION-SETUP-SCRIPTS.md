@@ -117,7 +117,7 @@ psql -f production-seed-data.sql "postgresql://postgres:[PASSWORD]@db.[PROD_REF]
 supabase link --project-ref [PROD_REF]
 
 # Deploy Edge Functions
-supabase functions deploy mcp-server
+supabase functions deploy supabase-mcp-server
 supabase functions deploy claude-api
 
 # Set environment variables for Edge Functions
@@ -146,7 +146,7 @@ curl -I https://rfpez.ai
 supabase db ping --project-ref [PROD_REF]
 
 # Test Edge Functions
-curl -X POST https://[PROD_REF].supabase.co/functions/v1/mcp-server \
+curl -X POST https://[PROD_REF].supabase.co/functions/v1/supabase-mcp-server \
   -H "Content-Type: application/json" \
   -H "Authorization: Bearer [ANON_KEY]" \
   -d '{"jsonrpc":"2.0","method":"tools/list","id":1}'
