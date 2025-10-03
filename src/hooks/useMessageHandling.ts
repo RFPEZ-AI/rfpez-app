@@ -1182,6 +1182,9 @@ export const useMessageHandling = () => {
           case 'server':
             errorMessage = `⚠️ The AI service is temporarily unavailable. Your message has been saved and you can try again in a few moments. ${categorizedError.suggestion || ''}`;
             break;
+          case 'service_down':
+            errorMessage = `🔧 Our AI service is temporarily down for maintenance. Please try again in a few minutes. Your message has been saved and will be processed once service is restored.`;
+            break;
           default:
             errorMessage = `❌ I'm having trouble connecting to the AI service right now. ${categorizedError.message || 'Please try again later.'} Your message has been saved.`;
         }

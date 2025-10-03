@@ -168,7 +168,7 @@ supabase functions list    # Verify function versions updated with recent timest
 # STEP 7: Test Remote Environment
 # Switch to remote configuration and verify functionality:
 ./scripts/supabase-remote.bat  # (Windows) or ./scripts/supabase-remote.sh (Linux/Mac)
-npm start  # Test against remote Supabase
+# Use VS Code Task: "Start Development Server" to test against remote Supabase
 # ✅ Verify core functionality works with remote endpoints
 ```
 
@@ -321,23 +321,37 @@ const consoleLogs = await mcp_browser_get_console_logs();
 
 ### Development Commands & Terminal Management
 
-# Testing patterns - use separate terminal
-npm test           # Jest tests with watch mode
+#### **⚡ CRITICAL: Use VS Code Tasks for Server Management**
+**ALWAYS use VS Code tasks instead of command line npm commands to avoid port conflicts and ensure proper terminal management.**
+
+#### **Primary VS Code Tasks (Ctrl+Shift+P → Tasks: Run Task)**
+- **"Start Development Server"** - Main React app (port 3100) - BACKGROUND TASK
+- **"Start API"** - API server (port 3001) - BACKGROUND TASK  
+- **"Run Tests (Watch Mode)"** - Auto-running Jest tests - BACKGROUND TASK
+- **"Test MCP Connection"** - Validate MCP integration
+- **"Setup MCP Environment"** - Configure MCP dependencies
+
+#### **❌ AVOID Command Line npm Commands for Servers**
+```bash
+# ❌ DON'T USE - Can cause port conflicts
+npm start          # Use "Start Development Server" task instead
+npm run start:api  # Use "Start API" task instead
+```
+
+#### **✅ Acceptable Command Line Usage**
+```bash
+# Testing patterns (OK for one-time commands)
+npm test           # For single test runs (use task for watch mode)
 npm run test:coverage  # Coverage reports
 
-# Supabase Edge Functions - use separate terminal
+# Supabase Edge Functions
 supabase functions deploy supabase-mcp-server    # Deploy MCP server
 supabase functions deploy claude-api-v3  # Deploy Claude API function (V3)
 npm run mcp:test   # Test MCP server connection
-
-# Available VS Code tasks
-# - "Run Tests (Watch Mode)" - Auto-running Jest tests
-# - "Test MCP Connection" - Validate MCP integration
-# - "Setup MCP Environment" - Configure MCP dependencies
 ```
 
-### Terminal Session Management Rules
-Use the vs code tasks for starting the dev server to ensure it runs in a protected terminal session.
+### Server Management Rules
+**ALWAYS use VS Code tasks for starting/stopping development and API servers to avoid port conflicts.**
 
 
 ### Database Operations
@@ -362,17 +376,14 @@ Use the vs code tasks for starting the dev server to ensure it runs in a protect
 - **Real-time Debugging**: Combine direct SQL queries with browser automation for comprehensive debugging
 
 ### Memory MCP Workflow Patterns
-- **Session State Tracking**: Use `mcp_memory_create_entities` to track terminal sessions, server processes, and workflow states
 - **Process Management**: Create entities for active processes (DevServer, TestRunner, etc.) with status observations
-- **Terminal Assignment**: Track which terminals are assigned to which processes to prevent conflicts
 - **Command Context**: Store command execution context and results for continuity
 - **Error Prevention**: Use memory to avoid repeating failed commands or interrupting critical processes
-- ** Temporary Files**: Use memory to track temporary files for cleanup before commits
-- ** Temporary Logging**: Use memory to track temporary logging/debug cleanup before commits
+- **Temporary Files**: Use memory to track temporary files for cleanup before commits
+- **Temporary Logging**: Use memory to track temporary logging/debug cleanup before commits
 
 **Memory Entity Types:**
 - `Process`: Active processes like dev server, test runners
-- `TerminalSession`: Terminal state and assigned processes
 - `Workflow`: Development workflows and their states
 - `Guidelines`: Rules and best practices for process management
 
@@ -382,7 +393,7 @@ Use the vs code tasks for starting the dev server to ensure it runs in a protect
 mcp_memory_create_entities([{
   name: "DevServer_Port3100", 
   entityType: "Process",
-  observations: ["Started at [timestamp]", "Terminal ID: [id]", "Status: Running"]
+  observations: ["Started at [timestamp]", "Status: Running"]
 }]);
 
 // Before running commands, check process status
@@ -460,20 +471,13 @@ export default Component;
 5. UI updates with artifact references and agent attribution
 
 ### Development Workflow with Memory Integration
-**Before Any Terminal Command:**
+**Before Starting Services:**
 1. Check memory for existing process states: `mcp_memory_search_nodes`
-2. Verify terminal assignments and active processes
-3. Choose appropriate terminal or create new session if needed
+2. Verify if servers are already running via VS Code tasks
 
 **When Starting Dev Server:**
 1. Check if server already running: `mcp_memory_search_nodes({ query: "DevServer status running" })`
-2. If starting new server, create memory entity with terminal ID and timestamp
-3. Mark terminal as PROTECTED for server use only
-
-**When Running Other Commands:**
-1. Search memory for server terminal ID to avoid using it
-2. Use separate terminal for all non-server commands
-3. Update memory with command results and process states
+2. Use VS Code task "Start Development Server" to start if needed
 
 **Error Recovery:**
 1. Use memory to track failed commands and their context
@@ -514,9 +518,10 @@ The project includes comprehensive browser automation through MCP (Model Context
 
 ### Prerequisites for Browser MCP Testing
 ```bash
-# Ensure the main application is restarted
-npx kill-port 3100 && npm start  # Starts app on http://localhost:3100
-Important: switch to a new terminal for the next commands to avoid killing the server
+# Ensure the main application is running via VS Code Tasks
+# Use: Ctrl+Shift+P → "Tasks: Run Task" → "Start Development Server"
+# This starts the React app on http://localhost:3100 via VS Code task
+# ⚠️ NEVER use "npm start" directly - always use the VS Code task to avoid port conflicts
 # For authentication tests, use test account:
 # Email: mskiba@esphere.com
 # Password: thisisatest
@@ -560,26 +565,28 @@ await mcp_browser_click({ index: elements[0].index });
 ## Memory MCP Best Practices
 
 ### Proactive Memory Usage
-1. **Always check memory before terminal commands**: Use `mcp_memory_search_nodes` to understand current process states
-2. **Track server lifecycle**: Create/update memory entities when starting/stopping dev server
-3. **Record terminal assignments**: Note which terminal IDs are used for which purposes
-4. **Document command context**: Store why certain commands were run and their outcomes
-5. **Maintain process awareness**: Keep track of background processes to prevent conflicts
+1. **Check process states**: Use `mcp_memory_search_nodes` to understand current server states
+2. **Track server lifecycle**: Create/update memory entities when starting/stopping servers via tasks
+3. **Document command context**: Store why certain commands were run and their outcomes
+4. **Maintain process awareness**: Keep track of background processes to prevent conflicts
 
 ### Memory Entity Naming Conventions
 - **Processes**: `DevServer_Port3100`, `TestRunner_Jest`, `EdgeFunction_Deploy`
-- **Terminals**: `Terminal_[ID]_[Purpose]` (e.g., `Terminal_1_DevServer`)
 - **Workflows**: `Workflow_[Name]` (e.g., `Workflow_Testing`, `Workflow_Deployment`)
-- **Guidelines**: `Rules_[Category]` (e.g., `Rules_TerminalManagement`)
+- **Guidelines**: `Rules_[Category]` (e.g., `Rules_ProcessManagement`)
 
-### IO  Port Usage
-- Dev server: Port 3100
-- subabase mcp: port 3000
-- api-server port 3001
+### IO Port Usage & VS Code Task Management
+- **Dev server: Port 3100** - Managed by VS Code task "Start Development Server"
+- **API server: Port 3001** - Managed by VS Code task "Start API"
+- **Supabase MCP: Port 3000** - MCP protocol server
+- **Supabase Local: Port 54321** - Local Supabase stack
 
+**⚡ Task Management Rules:**
+- Use VS Code tasks (Ctrl+Shift+P → Tasks: Run Task) for all server operations
+- Never use `npm start` or `npm run start:api` directly in command line
+- Restart servers using "Tasks: Terminate Task" then "Tasks: Run Task"
 
 ### Error Prevention Through Memory
-- Before starting dev server: Check if already running via memory search
-- Before running commands: Verify terminal is not used for critical processes
+- Before starting servers: Check if already running via memory search and task status
 - After command failures: Document the failure context for future reference
 - During troubleshooting: Use memory to avoid repeating failed approaches
