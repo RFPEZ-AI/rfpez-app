@@ -1047,6 +1047,26 @@ const Home: React.FC = () => {
     );
   };
 
+  // Helper function to create system messages instead of alert popups
+  const addSystemMessage = (content: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
+    const icons = {
+      info: 'ℹ️',
+      success: '✅',
+      warning: '⚠️',
+      error: '❌'
+    };
+    
+    const systemMessage: Message = {
+      id: `system-${type}-${Date.now()}`,
+      content: `${icons[type]} ${content}`,
+      isUser: false,
+      timestamp: new Date(),
+      agentName: 'System'
+    };
+    
+    setMessages((prev: Message[]) => [...prev, systemMessage]);
+  };
+
   const handleArtifactSelect = (artifactRef: ArtifactReference) => {
     console.log('Artifact selected:', artifactRef);
     console.log('Available artifacts:', artifacts.map(a => ({ id: a.id, name: a.name, type: a.type })));
@@ -1063,8 +1083,15 @@ const Home: React.FC = () => {
       console.warn('❌ Artifact not found in artifacts array:', artifactRef.artifactId);
       console.log('🔍 This suggests the artifact reference exists but the actual artifact data was not created/stored properly');
       
-      // Try to show a helpful message to the user
-      alert(`Artifact "${artifactRef.artifactName}" could not be loaded. Please try recreating it.`);
+      // Create a system message instead of showing an alert popup
+      const errorMessage: Message = {
+        id: `artifact-error-${artifactRef.artifactId}-${Date.now()}`,
+        content: `⚠️ Artifact "${artifactRef.artifactName}" could not be loaded. Please try recreating it.`,
+        isUser: false,
+        timestamp: new Date(),
+        agentName: 'System'
+      };
+      setMessages((prev: Message[]) => [...prev, errorMessage]);
     }
   };
 
@@ -1176,7 +1203,7 @@ const Home: React.FC = () => {
         console.log('ℹ️ No RFP context - form saved to artifact submissions only');
       }
         
-      alert('Form submitted successfully!');
+      addSystemMessage('Form submitted successfully!', 'success');
         
       // Send auto-prompt after successful submission
       const formName = artifact.name || 'Form';
@@ -1216,7 +1243,7 @@ const Home: React.FC = () => {
       
     } catch (error) {
       console.error('❌ Error submitting form:', error);
-      alert('An error occurred while submitting the questionnaire.');
+      addSystemMessage('An error occurred while submitting the questionnaire.', 'error');
     }
   };
 
@@ -1357,7 +1384,7 @@ const Home: React.FC = () => {
               }
             } catch (docxError) {
               console.error('❌ Error converting structured document to DOCX:', docxError);
-              alert('Error converting document to Word format. The document will be downloaded as a text file instead.');
+              addSystemMessage('Error converting document to Word format. The document will be downloaded as a text file instead.', 'warning');
               // Continue to fallback download with the extracted content
               const blob = new Blob([documentContent], { type: 'text/plain' });
               const url = URL.createObjectURL(blob);
@@ -1378,10 +1405,10 @@ const Home: React.FC = () => {
             console.log('Form data keys:', Object.keys(formData));
             console.log('Schema type:', typeof formData.schema);
             
-            alert(
+            addSystemMessage(
               'This form artifact does not contain a valid form schema. ' +
               'The artifact appears to contain metadata or raw form data instead of a structured form definition. ' +
-              'Please check that this is a properly formatted form artifact.'
+              'Please check that this is a properly formatted form artifact.', 'warning'
             );
             return;
           }
@@ -1389,7 +1416,7 @@ const Home: React.FC = () => {
           // If JSON parsing fails and it's a form, show error
           if (artifact.type === 'form') {
             console.warn('⚠️ Form artifact has invalid JSON content');
-            alert('This form artifact appears to be empty or contains invalid data.');
+            addSystemMessage('This form artifact appears to be empty or contains invalid data.', 'warning');
             return;
           }
           // If it's a document that's not JSON, check if it's markdown/text content
@@ -1411,7 +1438,7 @@ const Home: React.FC = () => {
               return;
             } catch (docxError) {
               console.error('❌ Error converting markdown to DOCX:', docxError);
-              alert('Error converting document to Word format. The document will be downloaded as a text file instead.');
+              addSystemMessage('Error converting document to Word format. The document will be downloaded as a text file instead.', 'warning');
               // Fall through to basic download
             }
           } else {
@@ -1443,12 +1470,12 @@ const Home: React.FC = () => {
         console.log('✅ Artifact content downloaded as text file');
       } else {
         console.warn('⚠️ No downloadable content found in artifact');
-        alert('This artifact does not have downloadable content.');
+        addSystemMessage('This artifact does not have downloadable content.', 'info');
       }
       
     } catch (error) {
       console.error('❌ Error downloading artifact:', error);
-      alert('An error occurred while downloading the artifact. Please try again.');
+      addSystemMessage('An error occurred while downloading the artifact. Please try again.', 'error');
     }
   };
 
