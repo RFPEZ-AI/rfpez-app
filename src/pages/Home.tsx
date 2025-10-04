@@ -1119,26 +1119,64 @@ const Home: React.FC = () => {
     setMessages((prev: Message[]) => [...prev, systemMessage]);
   };
 
-  const handleArtifactSelect = (artifactRef: ArtifactReference) => {
+  const handleArtifactSelect = async (artifactRef: ArtifactReference) => {
     console.log('Artifact selected:', artifactRef);
     console.log('Available artifacts:', artifacts.map(a => ({ id: a.id, name: a.name, type: a.type })));
     
-    // Find the artifact by ID and select it
-    const artifact = artifacts.find(a => a.id === artifactRef.artifactId);
-    if (artifact) {
-      selectArtifact(artifact.id);
-      artifactWindowState.selectArtifact(artifact.id);
-      artifactWindowState.openWindow();
-      artifactWindowState.expandWindow();
-      console.log('Selected artifact for display:', artifact.name);
-    } else {
-      console.warn('❌ Artifact not found in artifacts array:', artifactRef.artifactId);
-      console.log('🔍 This suggests the artifact reference exists but the actual artifact data was not created/stored properly');
+    // Function to attempt artifact selection with retry logic
+    const attemptArtifactSelection = async (retryCount = 0): Promise<boolean> => {
+      const artifact = artifacts.find(a => a.id === artifactRef.artifactId);
+      
+      if (artifact) {
+        selectArtifact(artifact.id);
+        artifactWindowState.selectArtifact(artifact.id);
+        artifactWindowState.openWindow();
+        artifactWindowState.expandWindow();
+        console.log('✅ Selected artifact for display:', artifact.name);
+        return true;
+      }
+      
+      // If artifact not found and we haven't exhausted retries, try again
+      if (retryCount < 3) {
+        console.log(`⏳ Artifact not immediately available, retrying in ${100 * (retryCount + 1)}ms... (attempt ${retryCount + 1}/3)`);
+        await new Promise(resolve => setTimeout(resolve, 100 * (retryCount + 1)));
+        return attemptArtifactSelection(retryCount + 1);
+      }
+      
+      return false;
+    };
+    
+    // Try to select the artifact with retry logic
+    const success = await attemptArtifactSelection();
+    
+    if (!success) {
+      console.warn('❌ Artifact not found after retries:', artifactRef.artifactId);
+      console.log('🔍 This suggests a sync issue between artifact creation and UI state updates');
+      
+      // Try to reload artifacts from database before showing error
+      if (currentSessionId) {
+        console.log('🔄 Attempting to reload session artifacts from database...');
+        try {
+          await loadSessionArtifacts(currentSessionId);
+          // Try one more time after reload
+          const artifactAfterReload = artifacts.find(a => a.id === artifactRef.artifactId);
+          if (artifactAfterReload) {
+            selectArtifact(artifactAfterReload.id);
+            artifactWindowState.selectArtifact(artifactAfterReload.id);
+            artifactWindowState.openWindow();
+            artifactWindowState.expandWindow();
+            console.log('✅ Found artifact after database reload:', artifactAfterReload.name);
+            return;
+          }
+        } catch (error) {
+          console.error('Failed to reload session artifacts:', error);
+        }
+      }
       
       // Create a system message instead of showing an alert popup
       const errorMessage: Message = {
         id: `artifact-error-${artifactRef.artifactId}-${Date.now()}`,
-        content: `⚠️ Artifact "${artifactRef.artifactName}" could not be loaded. Please try recreating it.`,
+        content: `⚠️ Artifact "${artifactRef.artifactName}" could not be loaded. Please try refreshing the page.`,
         isUser: false,
         timestamp: new Date(),
         agentName: 'System'

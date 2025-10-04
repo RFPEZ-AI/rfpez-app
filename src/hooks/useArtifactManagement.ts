@@ -151,7 +151,12 @@ export const useArtifactManagement = (
       isReferencedInSession: true
     };
     
-    setArtifacts(prev => [...prev, artifactWithMessage]);
+    // Add artifact to state and ensure immediate availability
+    setArtifacts(prev => {
+      const updated = [...prev, artifactWithMessage];
+      console.log('📝 Artifact with message added to state immediately:', artifactWithMessage.id, 'Total:', updated.length);
+      return updated;
+    });
     
     // Auto-select the newly created artifact
     setSelectedArtifactId(artifactWithMessage.id);
@@ -459,7 +464,12 @@ export const useArtifactManagement = (
       type: file.type.includes('pdf') ? 'pdf' : 'document',
       size: `${(file.size / 1024).toFixed(1)} KB`
     };
-    setArtifacts(prev => [...prev, newArtifact]);
+    // Add artifact to state and ensure immediate availability
+    setArtifacts(prev => {
+      const updated = [...prev, newArtifact];
+      console.log('📝 Attached file artifact added to state immediately:', newArtifact.id, 'Total:', updated.length);
+      return updated;
+    });
     
     // Auto-select and trigger auto-open for attached files
     setSelectedArtifactId(newArtifact.id);
@@ -574,8 +584,18 @@ export const useArtifactManagement = (
               isReferencedInSession: true
             };
             
-            setArtifacts(prev => [...prev, formArtifact]);
-            selectArtifact(formArtifact.id); // Auto-select new artifact
+            // Add artifact to state and ensure immediate availability
+            setArtifacts(prev => {
+              const updated = [...prev, formArtifact];
+              console.log('📝 Artifact added to state immediately:', formArtifact.id, 'Total:', updated.length);
+              return updated;
+            });
+            
+            // Auto-select new artifact and trigger callbacks
+            selectArtifact(formArtifact.id);
+            if (onArtifactAdded) {
+              onArtifactAdded(formArtifact.id);
+            }
             
             // Auto-create placeholder RFP for the form if no RFP context exists
             (async () => {
@@ -813,7 +833,13 @@ export const useArtifactManagement = (
               isReferencedInSession: true
             };
             
-            setArtifacts(prev => [...prev, textArtifact]);
+            // Add artifact to state and ensure immediate availability
+            setArtifacts(prev => {
+              const updated = [...prev, textArtifact];
+              console.log('📝 Text artifact added to state immediately:', textArtifact.id, 'Total:', updated.length);
+              return updated;
+            });
+            
             selectArtifact(textArtifact.id); // Auto-select new artifact
             
             // Notify parent that an artifact was added (triggers auto-open)
@@ -867,7 +893,13 @@ export const useArtifactManagement = (
               isReferencedInSession: true
             };
             
-            setArtifacts(prev => [...prev, requestArtifact]);
+            // Add artifact to state and ensure immediate availability
+            setArtifacts(prev => {
+              const updated = [...prev, requestArtifact];
+              console.log('📝 Request artifact added to state immediately:', requestArtifact.id, 'Total:', updated.length);
+              return updated;
+            });
+            
             selectArtifact(requestArtifact.id); // Auto-select new artifact
             
             // Notify parent that an artifact was added (triggers auto-open)
@@ -920,7 +952,13 @@ export const useArtifactManagement = (
               isReferencedInSession: true
             };
             
-            setArtifacts(prev => [...prev, templateArtifact]);
+            // Add artifact to state and ensure immediate availability
+            setArtifacts(prev => {
+              const updated = [...prev, templateArtifact];
+              console.log('📝 Template artifact added to state immediately:', templateArtifact.id, 'Total:', updated.length);
+              return updated;
+            });
+            
             selectArtifact(templateArtifact.id); // Auto-select new artifact
             
             // Notify parent that an artifact was added (triggers auto-open)
@@ -973,7 +1011,13 @@ export const useArtifactManagement = (
         isReferencedInSession: true
       };
       
-      setArtifacts(prev => [...prev, formArtifact]);
+      // Add artifact to state and ensure immediate availability
+      setArtifacts(prev => {
+        const updated = [...prev, formArtifact];
+        console.log('📝 Buyer questionnaire artifact added to state immediately:', formArtifact.id, 'Total:', updated.length);
+        return updated;
+      });
+      
       setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
       console.log('Added buyer questionnaire to artifacts:', formArtifact);
       

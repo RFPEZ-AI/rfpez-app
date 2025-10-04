@@ -962,14 +962,26 @@ export const useMessageHandling = () => {
           const currentMessage = prev.find(msg => msg.id === aiMessageId);
           const currentContent = currentMessage?.content || '';
           
-          // If streaming was used, use the streamed content; otherwise use Claude's final response
+          // CRITICAL FIX: Choose the longer content to avoid streaming truncation
           const wasStreaming = claudeResponse.metadata?.is_streaming;
+          const fullApiResponse = claudeResponse.content || '';
+          
           if (wasStreaming && currentContent) {
-            // Use the streamed content that was built up during streaming
-            finalContent = currentContent;
+            // Use the longer of streamed content vs API response to prevent truncation
+            finalContent = currentContent.length >= fullApiResponse.length 
+              ? currentContent 
+              : fullApiResponse;
+              
+            console.log('🔧 STREAMING FALLBACK DECISION:', {
+              streamedContentLength: currentContent.length,
+              apiResponseLength: fullApiResponse.length,
+              usingStreamed: currentContent.length >= fullApiResponse.length,
+              streamedPreview: currentContent.substring(0, 100) + '...',
+              apiPreview: fullApiResponse.substring(0, 100) + '...'
+            });
           } else {
             // Use Claude's final response (non-streaming case)
-            finalContent = claudeResponse.content || '';
+            finalContent = fullApiResponse;
           }
           
           console.log('🔧 FINAL CONTENT ASSEMBLY:');
