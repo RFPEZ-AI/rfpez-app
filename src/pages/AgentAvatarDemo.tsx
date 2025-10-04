@@ -74,6 +74,14 @@ const AgentAvatarDemo: React.FC = () => {
       isActive: false,
       isPremium: false,
       isFree: false
+    },
+    {
+      name: 'Solutions',
+      avatarUrl: '/assets/avatars/solutions-agent.svg',
+      isDefault: false,
+      isActive: false,
+      isPremium: false,
+      isFree: false
     }
   ];
 
