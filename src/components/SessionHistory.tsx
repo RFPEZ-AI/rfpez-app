@@ -136,12 +136,17 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
             size="small"
             onClick={onNewSession}
             title="Create new session"
+            data-testid="new-session-button"
             style={{ 
-              '--padding-start': '4px', 
-              '--padding-end': '4px',
+              '--padding-start': '8px', 
+              '--padding-end': '8px',
               order: 2,
-              minWidth: '32px',
-              height: '32px'
+              minWidth: '36px',
+              height: '36px',
+              '--color': 'var(--ion-color-primary)',
+              '--background-hover': 'var(--ion-color-primary-tint)',
+              border: '1px solid var(--ion-color-primary-tint)',
+              borderRadius: '6px'
             }}
           >
             <IonIcon icon={create} />
@@ -152,12 +157,17 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
             size="small"
             onClick={onNewSession}
             title="Create new session"
+            data-testid="new-session-button"
             style={{ 
-              '--padding-start': '4px', 
-              '--padding-end': '4px',
+              '--padding-start': '6px', 
+              '--padding-end': '6px',
               order: 2,
-              minWidth: '24px',
-              height: '24px'
+              minWidth: '28px',
+              height: '28px',
+              '--color': 'var(--ion-color-primary)',
+              '--background-hover': 'var(--ion-color-primary-tint)',
+              border: '1px solid var(--ion-color-primary-tint)',
+              borderRadius: '6px'
             }}
           >
             <IonIcon icon={create} />

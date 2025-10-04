@@ -639,24 +639,25 @@ export const useMessageHandling = () => {
             return;
           }
           
+          // CRITICAL FIX: Flush buffer immediately when toolProcessing starts, not just when complete
+          if (toolProcessing && streamingBuffer.length > 0) {
+            console.log('🔧 IMMEDIATE BUFFER FLUSH - Tool processing detected, flushing buffer:', streamingBuffer.length, 'chars');
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { ...msg, content: msg.content + streamingBuffer }
+                  : msg
+              )
+            );
+            streamingBuffer = '';
+          }
+
           if (isComplete) {
             if (toolProcessing) {
               console.log('🔧 Message segment complete - tools processing for message:', aiMessageId, {
                 streamingBuffer: streamingBuffer.length,
                 currentMessageId: aiMessageId
               });
-              
-              // Final update with any remaining buffer before tool processing
-              if (streamingBuffer.length > 0) {
-                setMessages(prev => 
-                  prev.map(msg => 
-                    msg.id === aiMessageId 
-                      ? { ...msg, content: msg.content + streamingBuffer }
-                      : msg
-                  )
-                );
-                streamingBuffer = '';
-              }
               
               // Create a tool processing indicator message
               const toolProcessingMessage: Message = {
@@ -679,9 +680,9 @@ export const useMessageHandling = () => {
               streamingCompleted = false;
               console.log('🔧 Set isWaitingForToolCompletion = true');
               
-              // UI-LEVEL TIMEOUT: Force cleanup after 30 seconds regardless of API state
+              // UI-LEVEL TIMEOUT: Force cleanup after 45 seconds to allow for recursive continuation
               uiTimeoutId = setTimeout(() => {
-                console.log('⏰ UI TIMEOUT TRIGGERED - forcing tool processing cleanup after 30 seconds');
+                console.log('⏰ UI TIMEOUT TRIGGERED - forcing tool processing cleanup after 45 seconds');
                 console.log('🔧 Timeout cleanup for processing message:', toolProcessingMessageId);
                 
                 if (toolProcessingMessageId && isWaitingForToolCompletion) {
@@ -692,7 +693,7 @@ export const useMessageHandling = () => {
                   const timeoutMessageId = uuidv4();
                   const timeoutMessage: Message = {
                     id: timeoutMessageId,
-                    content: 'Tool processing exceeded time limit. Please try again.',
+                    content: 'Tool processing exceeded time limit. If artifacts were created, they should still be available. Please check the artifact panel or try again.',
                     isUser: false,
                     timestamp: new Date(),
                     agentName: agentForResponse?.agent_name || 'AI Assistant'
@@ -763,8 +764,9 @@ export const useMessageHandling = () => {
           }
           
           // If we get new content after tool processing started, create a new message
+          // Also handle recursive continuation content
           if (isWaitingForToolCompletion && chunk.trim()) {
-            console.log('📝 Creating new message for content after tool processing:', {
+            console.log('📝 Creating new message for content after tool processing (may be recursive continuation):', {
               chunk: chunk.substring(0, 50) + '...',
               chunkLength: chunk.length,
               isWaitingForToolCompletion,
@@ -912,10 +914,7 @@ export const useMessageHandling = () => {
         // to avoid overriding streamed content with final response
         let finalContent = claudeResponse.content || '';
         
-        // Generate artifact references for the AI message (outside callback for database save)
-        const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
-        
-        // Update the message in state with final content and artifact references, preserving streamed content
+        // Update the message in state with final content first (without artifact references)
         setMessages(prev => {
           const currentMessage = prev.find(msg => msg.id === aiMessageId);
           const currentContent = currentMessage?.content || '';
@@ -946,11 +945,6 @@ export const useMessageHandling = () => {
             agentName: agentForResponse?.agent_name || 'AI Assistant'
           };
           
-          // Add artifact references if any
-          if (artifactRefs.length > 0) {
-            finalAiMessage.artifactRefs = artifactRefs;
-          }
-          
           return prev.map(msg => 
             msg.id === aiMessageId 
               ? finalAiMessage
@@ -958,9 +952,29 @@ export const useMessageHandling = () => {
           );
         });
 
+        // Generate artifact references (still needed for database save, but UI update will be delayed)
+        const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
+        
         // Process Claude response metadata for artifacts with message ID
         console.log('🔍 useMessageHandling: About to call addClaudeArtifacts with metadata:', claudeResponse.metadata);
+        
+        // CRITICAL FIX: Process artifacts FIRST, then add references to UI after a delay
+        // This ensures artifacts are available when references are clicked, preventing "could not be loaded" errors
         addClaudeArtifacts(claudeResponse.metadata, aiMessageId);
+        
+        // Add artifact references to the UI after a short delay to ensure artifacts are processed
+        if (artifactRefs.length > 0) {
+          setTimeout(() => {
+            console.log('🔗 Adding artifact references to UI after artifact processing:', artifactRefs);
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { ...msg, artifactRefs }
+                  : msg
+              )
+            );
+          }, 300); // Delay to ensure artifact processing completes
+        }
 
         setIsLoading(false);
         

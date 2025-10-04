@@ -733,16 +733,16 @@ const Home: React.FC = () => {
       // NEW: Handle RFP_CREATED_SUCCESS messages from useMessageHandling
       if (event.data?.type === 'RFP_CREATED_SUCCESS') {
         console.log('🎯 HOME MESSAGE DEBUG: RFP_CREATED_SUCCESS received:', {
-          rfpId: event.data.rfpId,
-          rfpName: event.data.rfpName,
+          rfpId: event.data.rfp_id,
+          rfpName: event.data.rfp_name,
           sessionId: event.data.sessionId,
           timestamp: new Date().toISOString()
         });
         
-        if (event.data.rfpId) {
+        if (event.data.rfp_id) {
           try {
-            await handleSetCurrentRfp(event.data.rfpId);
-            console.log('✅ HOME MESSAGE DEBUG: RFP context updated from RFP_CREATED_SUCCESS:', event.data.rfpId);
+            await handleSetCurrentRfp(event.data.rfp_id);
+            console.log('✅ HOME MESSAGE DEBUG: RFP context updated from RFP_CREATED_SUCCESS:', event.data.rfp_id);
             
             // Also refresh artifacts to ensure new form artifacts are loaded
             if (currentSessionId) {
