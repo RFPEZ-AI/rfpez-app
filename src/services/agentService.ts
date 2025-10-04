@@ -61,10 +61,10 @@ export class AgentService {
 
     let availableAgents = data || [];
 
-    // If user is not authenticated, they can only see the default agent
+    // If user is not authenticated, they can see default agents AND free agents
     if (!isAuthenticated) {
-      availableAgents = availableAgents.filter(agent => agent.is_default);
-      console.log('Non-authenticated user - showing only default agent:', availableAgents);
+      availableAgents = availableAgents.filter(agent => agent.is_default || agent.is_free);
+      console.log('Non-authenticated user - showing default and free agents:', availableAgents);
       return availableAgents;
     }
 

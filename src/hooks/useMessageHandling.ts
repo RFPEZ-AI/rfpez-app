@@ -34,6 +34,7 @@ interface EnhancedFunctionResult {
 
 export const useMessageHandling = () => {
   console.log('🚨🚨🚨 MESSAGE HANDLING HOOK LOADED 🚨🚨🚨');
+  console.log('🔄 AGENT TRANSITION DEBUG: Message handling hook initialized');
   const abortControllerRef = useRef<AbortController | null>(null);
   const isProcessingRef = useRef<boolean>(false); // Add processing guard
   
@@ -144,6 +145,23 @@ export const useMessageHandling = () => {
           
           // Handle different types of function results
           if (result && result.success) {
+            // 🔄 AGENT SWITCH DETECTION
+            if (funcObj.function === 'switch_agent') {
+              console.log('🔄 AGENT SWITCH DETECTED in function results:', {
+                function_name: funcObj.function,
+                result: result,
+                trigger_continuation: (result as any)?.trigger_continuation,
+                new_agent_name: (result as any)?.new_agent?.name,
+                context_message: (result as any)?.context_message
+              });
+              
+              // If this was an agent switch with continuation, the edge function should handle the continuation
+              // We just need to update the UI state
+              if ((result as any)?.success) {
+                console.log('🔄 Agent switch successful, UI should update automatically via edge function continuation');
+              }
+            }
+            
             if (funcObj.function === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
               // Form artifacts - use artifact_name from result
               const functionArgs = funcObj.arguments as Record<string, unknown>;
@@ -825,15 +843,40 @@ export const useMessageHandling = () => {
           streamingBuffer += chunk;
           const now = Date.now();
           
+          console.log('🔧 STREAMING BUFFER UPDATE:', {
+            chunkLength: chunk.length,
+            chunkPreview: chunk.substring(0, 30),
+            bufferLength: streamingBuffer.length,
+            bufferPreview: streamingBuffer.substring(0, 50) + '...',
+            messageId: aiMessageId,
+            willUpdate: now - lastUpdateTime >= updateInterval || streamingBuffer.length > 150
+          });
+          
           // Update UI periodically or when buffer gets large
           if (now - lastUpdateTime >= updateInterval || streamingBuffer.length > 150) {
-            setMessages(prev => 
-              prev.map(msg => 
+            console.log('🔧 UPDATING UI MESSAGE with buffer:', {
+              messageId: aiMessageId,
+              bufferContent: streamingBuffer,
+              bufferLength: streamingBuffer.length
+            });
+            
+            setMessages(prev => {
+              const updated = prev.map(msg => 
                 msg.id === aiMessageId 
                   ? { ...msg, content: msg.content + streamingBuffer }
                   : msg
-              )
-            );
+              );
+              
+              // Find the updated message to log its content
+              const updatedMessage = updated.find(msg => msg.id === aiMessageId);
+              console.log('🔧 UI MESSAGE UPDATED:', {
+                messageId: aiMessageId,
+                newContentLength: updatedMessage?.content.length,
+                newContentPreview: updatedMessage?.content.substring(0, 100) + '...'
+              });
+              
+              return updated;
+            });
             streamingBuffer = '';
             lastUpdateTime = now;
           }

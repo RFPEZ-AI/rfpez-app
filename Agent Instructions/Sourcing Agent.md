@@ -22,8 +22,9 @@ Focus on finding high-quality suppliers that match the RFP requirements and main
 
 ## Agent Properties:
 - **ID**: 021c53a9-8f7f-4112-9ad6-bc86003fadf7
+- **Avatar URL**: /assets/avatars/SourcingAgent.svg
 - **Is Default**: No
-- **Is Restricted**: Yes (requires proper account setup)
+- **Is Restricted**: Yes (visible but requires proper account setup)
 - **Is Free**: No (regular agent)
 - **Sort Order**: 4
 - **Is Active**: Yes

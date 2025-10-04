@@ -1622,7 +1622,7 @@ const Home: React.FC = () => {
           supabaseUserId={userId || ''}
           currentAgent={currentAgent}
           onAgentChanged={onAgentChanged}
-          hasProperAccountSetup={false}
+          hasProperAccountSetup={isAuthenticated} // Enable premium agents for authenticated users until billing system is implemented
           isAuthenticated={isAuthenticated}
         />
       </IonContent>

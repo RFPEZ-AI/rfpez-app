@@ -75,10 +75,11 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
     try {
       setLoading(true);
       
-      // Always load all active agents regardless of authentication status
-      // We'll handle visibility/interaction in the UI
-      const allAgents = await AgentService.getActiveAgents();
-      setAgents(allAgents);
+      // Load agents based on user authentication and account setup status
+      console.log('🔍 Loading agents with params:', { hasProperAccountSetup, isAuthenticated });
+      const availableAgents = await AgentService.getAvailableAgents(hasProperAccountSetup, isAuthenticated);
+      console.log('🔍 Available agents received:', availableAgents.map(a => ({ name: a.name, is_default: a.is_default, is_free: a.is_free })));
+      setAgents(availableAgents);
     } catch (error) {
       console.error('Error loading agents:', error);
       setToastMessage('Failed to load agents');
@@ -98,8 +99,8 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
     let accessMessage = '';
 
     if (!isAuthenticated) {
-      // Non-authenticated users can only access the default agent
-      canAccess = agent.is_default;
+      // Non-authenticated users can access default agents AND free agents
+      canAccess = agent.is_default || agent.is_free;
       accessMessage = 'Please sign in to access more agents and features.';
     } else {
       // Authenticated users can access:
@@ -233,8 +234,8 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                     // Determine if user can access this agent
                     let canAccess = false;
                     if (!isAuthenticated) {
-                      // Non-authenticated users can only access the default agent
-                      canAccess = agent.is_default;
+                      // Non-authenticated users can access default agents AND free agents
+                      canAccess = agent.is_default || agent.is_free;
                     } else {
                       // Authenticated users can access:
                       // 1. Default agents, 2. Free agents, 3. Non-restricted non-free agents
@@ -243,6 +244,8 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                                 (!agent.is_restricted && !agent.is_free) ||
                                 (agent.is_restricted && hasProperAccountSetup);
                     }
+                    
+                    // Access control logic correctly implemented above
                     
                     return (
                       <IonCol size="12" sizeMd="6" sizeLg="4" key={agent.id}>

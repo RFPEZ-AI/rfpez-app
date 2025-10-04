@@ -399,7 +399,12 @@ export class ClaudeService {
                     if ((eventData.type === 'text' && eventData.content) || (eventData.type === 'content_delta' && eventData.delta)) {
                       const content = eventData.content || eventData.delta;
                       fullContent += content;
-                      console.log('📝 CALLING onChunk with content:', content.substring(0, 50) + '...');
+                      console.log('📝 CALLING onChunk with content:', {
+                        contentLength: content.length,
+                        contentPreview: content.substring(0, 50),
+                        fullContentLength: fullContent.length,
+                        fullContentPreview: fullContent.substring(0, 100) + '...'
+                      });
                       onChunk(content, false);
                     } else if (eventData.type === 'tool_invocation') {
                       if (eventData.toolEvent?.type === 'tool_start') {
@@ -419,6 +424,26 @@ export class ClaudeService {
                       }
                     } else if (eventData.type === 'completion' || eventData.type === 'complete') {
                       console.log('✅ Stream completion detected:', eventData.type);
+                      
+                      // 🔧 CRITICAL FIX: Use full_content from completion event if available
+                      // This prevents content clipping issues where streaming chunks might be lost
+                      if (eventData.full_content && eventData.full_content.length > fullContent.length) {
+                        console.log('🔧 COMPLETION CONTENT SYNC:', {
+                          streamedContentLength: fullContent.length,
+                          completionContentLength: eventData.full_content.length,
+                          contentDifference: eventData.full_content.length - fullContent.length,
+                          action: 'using_completion_content'
+                        });
+                        
+                        // Call onChunk with the missing content to update UI
+                        const missingContent = eventData.full_content.substring(fullContent.length);
+                        if (missingContent) {
+                          console.log('📝 Adding missing content from completion event:', missingContent.length, 'chars');
+                          onChunk(missingContent, false);
+                        }
+                        
+                        fullContent = eventData.full_content;
+                      }
                       
                       // 🔧 CAPTURE COMPLETION METADATA for agent switching detection
                       if (eventData.metadata) {
