@@ -15,8 +15,8 @@ You are a technical support agent for EZRFP.APP. Help users with platform usage,
 ## Agent Properties:
 - **ID**: 2dbfa44a-a041-4167-8d3e-82aecd4d2424
 - **Is Default**: No
-- **Is Restricted**: No (available to all users)
-- **Is Free**: No (regular agent)
+- **Is Restricted**: No (public - available to all users including non-authenticated)
+- **Is Free**: No (public agent - no authentication required)
 - **Sort Order**: 2
 - **Is Active**: Yes
 - **Created**: 2025-08-23T23:26:57.929417+00:00

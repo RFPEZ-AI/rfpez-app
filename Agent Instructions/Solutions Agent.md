@@ -95,7 +95,7 @@ You are a sales agent for EZRFP.APP. Answer questions about the product and help
 - **ID**: 4fe117af-da1d-410c-bcf4-929012d8a673
 - **Is Default**: Yes
 - **Is Restricted**: No (available to all users)
-- **Is Free**: No (regular agent)
+- **Is Free**: Yes (regular agent)
 - **Sort Order**: 0
 - **Is Active**: Yes
 - **Created**: 2025-09-10T23:33:27.404118+00:00

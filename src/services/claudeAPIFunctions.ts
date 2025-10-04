@@ -1556,13 +1556,16 @@ export class ClaudeAPIFunctionHandler {
         new_agent: {
           id: agent.id,
           name: agent.name,
+          role: agent.role, // Add role for edge function
           instructions: agent.initial_prompt,
           initial_prompt: agent.initial_prompt
         },
         switch_reason: reason,
         message: `Successfully switched to ${agent.name} agent (anonymous session). The ${agent.name} will now respond.`,
         user_type: 'anonymous',
-        stop_processing: false // Allow the new agent to respond immediately
+        stop_processing: false, // Allow the new agent to respond immediately
+        trigger_continuation: true, // 🔥 ENABLE AUTOMATIC AGENT RESPONSE
+        context_message: `The user has been switched to you from another agent. Context: ${reason || 'User requested assistance'}. Please review the conversation context and respond appropriately based on your role as ${agent.name}.`
       };
     }
     
@@ -1585,13 +1588,16 @@ export class ClaudeAPIFunctionHandler {
         new_agent: {
           id: agent.id,
           name: agent.name,
+          role: agent.role, // Add role for edge function
           instructions: agent.initial_prompt,
           initial_prompt: agent.initial_prompt
         },
         switch_reason: reason,
         message: `Successfully switched to ${agent.name} agent (temporary session). The ${agent.name} will now respond.`,
         user_type: 'authenticated-no-profile',
-        stop_processing: false // Allow the new agent to respond immediately
+        stop_processing: false, // Allow the new agent to respond immediately
+        trigger_continuation: true, // 🔥 ENABLE AUTOMATIC AGENT RESPONSE  
+        context_message: `The user has been switched to you from another agent. Context: ${reason || 'User requested assistance'}. Please review the conversation context and respond appropriately based on your role as ${agent.name}.`
       };
     }
     
@@ -1747,13 +1753,16 @@ export class ClaudeAPIFunctionHandler {
       new_agent: newActiveAgent ? {
         id: newActiveAgent.agent_id,
         name: newActiveAgent.agent_name,
+        role: agent.role, // Add role for edge function
         instructions: newActiveAgent.agent_instructions,
         initial_prompt: newActiveAgent.agent_initial_prompt
       } : null,
       switch_reason: reason,
       message: `Successfully switched to ${agent.name} agent. The ${agent.name} will now respond.`,
       user_type: 'authenticated',
-      stop_processing: false // Allow the new agent to respond immediately
+      stop_processing: false, // Allow the new agent to respond immediately
+      trigger_continuation: true, // 🔥 ENABLE AUTOMATIC AGENT RESPONSE
+      context_message: `The user has been switched to you from another agent. Context: ${reason || 'User requested RFP assistance'}. Please review the conversation context and respond appropriately based on your role as ${agent.name}.`
     };
     
     console.log('🔄 Agent switch complete, returning result:', {

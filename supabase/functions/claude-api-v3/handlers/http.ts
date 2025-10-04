@@ -388,8 +388,7 @@ function handleStreamingResponse(
           toolsUsedCount: toolsUsed.length,
           executedToolResultsCount: executedToolResults.length,
           executedToolResults: executedToolResults,
-          agentSwitchOccurred: agentSwitchOccurred,
-          pendingToolCallsCount: pendingToolCalls.length
+          agentSwitchOccurred: agentSwitchOccurred
         });
 
         // Send completion event with metadata including agent switch detection
@@ -409,7 +408,7 @@ function handleStreamingResponse(
         console.log('✅ Streaming completed successfully');
         console.log('📊 Streaming summary:', {
           textLength: fullContent.length,
-          toolCallCount: pendingToolCalls.length
+          toolCallCount: toolsUsed.length
         });
         controller.close();
         
