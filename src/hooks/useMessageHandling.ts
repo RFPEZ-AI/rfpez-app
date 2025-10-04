@@ -963,57 +963,38 @@ export const useMessageHandling = () => {
         
         // CRITICAL FIX: Get the current message content that was built up during streaming
         // to avoid overriding streamed content with final response
-        let finalContent = claudeResponse.content || '';
+        // let finalContent = claudeResponse.content || ''; // Unused when final content refresh is disabled
         
-        // Update the message in state with final content first (without artifact references)
-        setMessages(prev => {
-          const currentMessage = prev.find(msg => msg.id === aiMessageId);
-          const currentContent = currentMessage?.content || '';
-          
-          // CRITICAL FIX: Choose the longer content to avoid streaming truncation
-          const wasStreaming = claudeResponse.metadata?.is_streaming;
-          const fullApiResponse = claudeResponse.content || '';
-          
-          if (wasStreaming && currentContent) {
-            // Use the longer of streamed content vs API response to prevent truncation
-            finalContent = currentContent.length >= fullApiResponse.length 
-              ? currentContent 
-              : fullApiResponse;
-              
-            console.log('🔧 STREAMING FALLBACK DECISION:', {
-              streamedContentLength: currentContent.length,
-              apiResponseLength: fullApiResponse.length,
-              usingStreamed: currentContent.length >= fullApiResponse.length,
-              streamedPreview: currentContent.substring(0, 100) + '...',
-              apiPreview: fullApiResponse.substring(0, 100) + '...'
-            });
-          } else {
-            // Use Claude's final response (non-streaming case)
-            finalContent = fullApiResponse;
-          }
-          
-          console.log('🔧 FINAL CONTENT ASSEMBLY:');
-          console.log('- Was streaming:', wasStreaming);
-          console.log('- Current streamed content length:', currentContent.length);
-          console.log('- Claude response content length:', (claudeResponse.content || '').length);
-          console.log('- Final content length:', finalContent.length);
-          console.log('- Final content preview:', finalContent.substring(0, 100) + '...');
-          
-          // Create the final message with preserved streaming content
-          const finalAiMessage: Message = {
-            id: aiMessageId,
-            content: finalContent,
-            isUser: false,
-            timestamp: new Date(),
-            agentName: agentForResponse?.agent_name || 'AI Assistant'
-          };
-          
-          return prev.map(msg => 
-            msg.id === aiMessageId 
-              ? finalAiMessage
-              : msg
-          );
-        });
+        // 🚨 STREAMING DEBUG: DISABLE FINAL CONTENT REFRESH TO OBSERVE PARTIAL RESPONSES
+        console.log('🚨 DEBUG MODE: Skipping final content refresh to observe streaming behavior');
+        console.log('🔧 FINAL CONTENT ASSEMBLY (DEBUG DISABLED):');
+        console.log('- Was streaming:', claudeResponse.metadata?.is_streaming);
+        console.log('- Claude response content length:', (claudeResponse.content || '').length);
+        console.log('- Preserving streamed content as-is for debugging');
+        
+        // Get final content for artifacts but don't update UI
+        // const currentMessage = messages.find(msg => msg.id === aiMessageId);
+        // const currentContent = currentMessage?.content || '';
+        // const wasStreaming = claudeResponse.metadata?.is_streaming;
+        // const fullApiResponse = claudeResponse.content || '';
+        
+        // Final content logic commented out as it's not used when message update is disabled for debug mode
+        // if (wasStreaming && currentContent) {
+        //   finalContent = currentContent.length >= fullApiResponse.length 
+        //     ? currentContent 
+        //     : fullApiResponse;
+        // } else {
+        //   finalContent = fullApiResponse;
+        // }
+        
+        // 🚨 DISABLED: Final message update to preserve streaming state
+        // setMessages(prev => {
+        //   return prev.map(msg => 
+        //     msg.id === aiMessageId 
+        //       ? { ...msg, content: finalContent }
+        //       : msg
+        //   );
+        // });
 
         // Generate artifact references (still needed for database save, but UI update will be delayed)
         const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
@@ -1025,19 +1006,23 @@ export const useMessageHandling = () => {
         // This ensures artifacts are available when references are clicked, preventing "could not be loaded" errors
         addClaudeArtifacts(claudeResponse.metadata, aiMessageId);
         
-        // Add artifact references to the UI after a short delay to ensure artifacts are processed
-        if (artifactRefs.length > 0) {
-          setTimeout(() => {
-            console.log('🔗 Adding artifact references to UI after artifact processing:', artifactRefs);
-            setMessages(prev => 
-              prev.map(msg => 
-                msg.id === aiMessageId 
-                  ? { ...msg, artifactRefs }
-                  : msg
-              )
-            );
-          }, 300); // Delay to ensure artifact processing completes
-        }
+        // 🚨 STREAMING DEBUG: DISABLE ARTIFACT REFERENCE TIMEOUT TO OBSERVE STREAMING
+        console.log('🚨 DEBUG MODE: Skipping artifact reference timeout to preserve streaming state');
+        console.log('🔗 Artifact references found (not being added):', artifactRefs);
+        
+        // 🚨 DISABLED: Artifact reference timeout
+        // if (artifactRefs.length > 0) {
+        //   setTimeout(() => {
+        //     console.log('🔗 Adding artifact references to UI after artifact processing:', artifactRefs);
+        //     setMessages(prev => 
+        //       prev.map(msg => 
+        //         msg.id === aiMessageId 
+        //           ? { ...msg, artifactRefs }
+        //           : msg
+        //       )
+        //     );
+        //   }, 300); // Delay to ensure artifact processing completes
+        // }
 
         setIsLoading(false);
         

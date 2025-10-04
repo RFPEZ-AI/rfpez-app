@@ -156,12 +156,14 @@ describe('AgentService', () => {
       } as any);
     });
 
-    it('should return only default agent for non-authenticated users', async () => {
+    it('should return default and free agents for non-authenticated users', async () => {
       const result = await AgentService.getAvailableAgents(false, false);
 
-      expect(result).toHaveLength(1);
-      expect(result[0].is_default).toBe(true);
-      expect(result[0].name).toBe('Solutions');
+      expect(result).toHaveLength(2);
+      expect(result.some(agent => agent.is_default)).toBe(true);
+      expect(result.some(agent => agent.is_free)).toBe(true);
+      expect(result.find(agent => agent.name === 'Solutions')).toBeDefined();
+      expect(result.find(agent => agent.name === 'RFP Design')).toBeDefined();
     });
 
     it('should return default and free agents for authenticated users without billing', async () => {
@@ -272,9 +274,10 @@ describe('AgentService', () => {
     it('should handle guest user access correctly', async () => {
       const result = await AgentService.getAvailableAgents(false, false);
       
-      // Guest users should only see default agent
-      expect(result).toHaveLength(1);
-      expect(result[0].is_default).toBe(true);
+      // Guest users should see default and free agents
+      expect(result).toHaveLength(2);
+      expect(result.some(agent => agent.is_default)).toBe(true);
+      expect(result.some(agent => agent.is_free)).toBe(true);
     });
 
     it('should handle authenticated user without billing correctly', async () => {

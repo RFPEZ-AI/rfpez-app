@@ -369,12 +369,12 @@ export class ClaudeService {
             while (true) {
               const { done, value } = await reader.read();
               if (done) {
-                console.log('🚨 SSE STREAM DONE');
+
                 break;
               }
 
               const chunk = decoder.decode(value, { stream: true });
-              console.log('🚨 RAW CHUNK RECEIVED:', chunk.substring(0, 200) + '...');
+
               buffer += chunk; // Add to buffer
               const lines = buffer.split('\n');
               
@@ -382,29 +382,16 @@ export class ClaudeService {
               buffer = lines.pop() || '';
 
               for (const line of lines) {
-                console.log('🚨 PROCESSING SSE LINE:', line.substring(0, 100) + '...');
                 if (line.startsWith('data: ')) {
-                  console.log('🚨 FOUND DATA LINE, parsing...');
                   try {
                     const eventData = JSON.parse(line.slice(6));
                     
-                    console.log('🔍 SSE EVENT DEBUG:', {
-                      eventType: eventData.type,
-                      hasContent: !!(eventData.content || eventData.delta),
-                      contentLength: (eventData.content || eventData.delta)?.length || 0,
-                      contentPreview: (eventData.content || eventData.delta)?.substring(0, 50) || '[no content]',
-                      rawLine: line.substring(0, 100) + '...'
-                    });
+
                     
                     if ((eventData.type === 'text' && eventData.content) || (eventData.type === 'content_delta' && eventData.delta)) {
                       const content = eventData.content || eventData.delta;
                       fullContent += content;
-                      console.log('📝 CALLING onChunk with content:', {
-                        contentLength: content.length,
-                        contentPreview: content.substring(0, 50),
-                        fullContentLength: fullContent.length,
-                        fullContentPreview: fullContent.substring(0, 100) + '...'
-                      });
+
                       onChunk(content, false);
                     } else if (eventData.type === 'tool_invocation') {
                       if (eventData.toolEvent?.type === 'tool_start') {
@@ -425,37 +412,35 @@ export class ClaudeService {
                     } else if (eventData.type === 'completion' || eventData.type === 'complete') {
                       console.log('✅ Stream completion detected:', eventData.type);
                       
-                      // 🔧 CRITICAL FIX: Use full_content from completion event if available
-                      // This prevents content clipping issues where streaming chunks might be lost
-                      if (eventData.full_content && eventData.full_content.length > fullContent.length) {
-                        console.log('🔧 COMPLETION CONTENT SYNC:', {
-                          streamedContentLength: fullContent.length,
-                          completionContentLength: eventData.full_content.length,
-                          contentDifference: eventData.full_content.length - fullContent.length,
-                          action: 'using_completion_content'
-                        });
-                        
-                        // Call onChunk with the missing content to update UI
-                        const missingContent = eventData.full_content.substring(fullContent.length);
-                        if (missingContent) {
-                          console.log('📝 Adding missing content from completion event:', missingContent.length, 'chars');
-                          onChunk(missingContent, false);
-                        }
-                        
-                        fullContent = eventData.full_content;
-                      }
-                      
                       // 🔧 CAPTURE COMPLETION METADATA for agent switching detection
                       if (eventData.metadata) {
                         streamingCompletionMetadata = eventData.metadata;
-                        console.log('📋 Captured streaming completion metadata:', {
+                        console.log('� Captured streaming completion metadata:', {
                           hasAgentSwitch: !!eventData.metadata.agent_switch_occurred,
                           functionsCallled: eventData.metadata.functions_called,
                           functionResultsCount: eventData.metadata.function_results?.length || 0
                         });
                       }
                       
+                      // Process any final content from completion event if present
+                      if (eventData.content || eventData.full_content) {
+                        // If we have full_content and it's longer than what we've streamed, use the missing part
+                        if (eventData.full_content && eventData.full_content.length > fullContent.length) {
+                          const missingContent = eventData.full_content.substring(fullContent.length);
+                          console.log('📝 Adding missing content from completion:', missingContent.length, 'chars');
+                          fullContent = eventData.full_content; // Update to complete content
+                          onChunk(missingContent, false);
+                        } else if (eventData.content) {
+                        fullContent += eventData.content;
+                        console.log('� Adding final completion content:', eventData.content.length, 'chars');
+                          onChunk(eventData.content, false);
+                        }
+                      }
+                      
+                      // Only call completion after processing any final content
+                      console.log('🏁 Calling final completion with total content:', fullContent.length, 'chars');
                       onChunk('', true); // Indicate completion
+                      
                       if (eventData.metadata?.toolsUsed) {
                         toolsUsed = [...new Set([...toolsUsed, ...eventData.metadata.toolsUsed])];
                       }
