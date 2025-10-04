@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonActionSheet } from '@ionic/react';
 import { create, chatbubbleOutline, chevronForward, chevronDown, trash } from 'ionicons/icons';
 import { useIsMobile } from '../utils/useMediaQuery';
@@ -33,9 +33,10 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   onToggleExpanded
 }) => {
   const isMobile = useIsMobile();
-  const [internalExpanded, setInternalExpanded] = useState(true);
+  const [internalExpanded, setInternalExpanded] = useState(!isMobile); // Start expanded on desktop, collapsed on mobile
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedSessionForAction, setSelectedSessionForAction] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Determine actual expanded state based on internal state
   // forceCollapsed now only triggers auto-collapse via useEffect, but manual expansion is always allowed
@@ -49,19 +50,41 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
     }
   }, [forceCollapsed]);
 
-  // Initialize expanded state based on mobile detection
+  // Respond to mobile state changes - but don't force collapse unless forceCollapsed is true
   useEffect(() => {
-    console.log('🔄 SessionHistory: Initializing expanded state', { isMobile, forceCollapsed });
-    // Only auto-expand if not force collapsed
-    if (!forceCollapsed) {
-      setInternalExpanded(true);
+    console.log('🔄 SessionHistory: Mobile state changed', { isMobile, forceCollapsed, currentlyExpanded: internalExpanded });
+    // Only auto-collapse on mobile when switching to mobile view, but don't auto-expand
+    if (isMobile && internalExpanded && !forceCollapsed) {
+      console.log('🔄 SessionHistory: Auto-collapsing due to mobile view');
+      setInternalExpanded(false);
     }
-  }, [isMobile]); // Only depend on isMobile, not forceCollapsed
+  }, [isMobile]); // Only depend on isMobile
 
   // Notify parent when expansion state changes
   useEffect(() => {
     onToggleExpanded?.(isExpanded);
   }, [isExpanded, onToggleExpanded]);
+
+  // Click-outside detection for auto-collapse
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
+        // Only auto-collapse if expanded and not on mobile (mobile has different UX patterns)
+        if (isExpanded && !isMobile) {
+          console.log('🔄 SessionHistory: Auto-collapsing due to click outside');
+          setInternalExpanded(false);
+        }
+      }
+    };
+
+    // Only add listener when expanded to avoid unnecessary event handling
+    if (isExpanded) {
+      document.addEventListener('mousedown', handleClickOutside);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+      };
+    }
+  }, [isExpanded, isMobile]);
 
   const toggleExpanded = () => {
     // Allow toggle always, but force collapse may override it
@@ -83,19 +106,21 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   };
 
   return (
-    <div style={{ 
-      height: '100%', 
-      display: 'flex', 
-      flexDirection: 'column',
-      borderRight: '1px solid var(--ion-color-light-shade)',
-      width: isExpanded ? '300px' : '60px',
-      minWidth: isExpanded ? '300px' : '60px',
-      transition: 'width 0.3s ease, min-width 0.3s ease',
-      backgroundColor: 'var(--ion-background-color)',
-      position: 'relative',
-      zIndex: 1
-      // No margin needed - parent container handles positioning
-    }}>
+    <div 
+      ref={containerRef}
+      style={{ 
+        height: '100%', 
+        display: 'flex', 
+        flexDirection: 'column',
+        borderRight: '1px solid var(--ion-color-light-shade)',
+        width: isExpanded ? '300px' : '60px',
+        minWidth: isExpanded ? '300px' : '60px',
+        transition: 'width 0.3s ease, min-width 0.3s ease',
+        backgroundColor: 'var(--ion-background-color)',
+        position: 'relative',
+        zIndex: 1
+        // No margin needed - parent container handles positioning
+      }}>
       {/* Header with collapse/expand and new session controls */}
       <div style={{ 
         padding: isExpanded ? '8px 12px' : '4px', 
@@ -132,10 +157,10 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
         {/* New Session Button - always visible but different styles */}
         {isExpanded ? (
           <IonButton 
-            fill="clear" 
+            fill="outline" 
             size="small"
             onClick={onNewSession}
-            title="Create new session"
+            title="Create new session (fresh start)"
             data-testid="new-session-button"
             style={{ 
               '--padding-start': '8px', 
@@ -143,34 +168,38 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
               order: 2,
               minWidth: '36px',
               height: '36px',
-              '--color': 'var(--ion-color-primary)',
-              '--background-hover': 'var(--ion-color-primary-tint)',
-              border: '1px solid var(--ion-color-primary-tint)',
-              borderRadius: '6px'
+              '--color': 'var(--ion-color-success)',
+              '--border-color': 'var(--ion-color-success)',
+              '--background-hover': 'var(--ion-color-success-tint)',
+              fontWeight: '600',
+              borderRadius: '8px',
+              boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            <IonIcon icon={create} />
+            <IonIcon icon={create} style={{ fontSize: '18px' }} />
           </IonButton>
         ) : (
           <IonButton 
-            fill="clear" 
+            fill="solid" 
             size="small"
             onClick={onNewSession}
-            title="Create new session"
+            title="New Session (Click to start fresh)"
             data-testid="new-session-button"
             style={{ 
               '--padding-start': '6px', 
               '--padding-end': '6px',
               order: 2,
-              minWidth: '28px',
-              height: '28px',
-              '--color': 'var(--ion-color-primary)',
-              '--background-hover': 'var(--ion-color-primary-tint)',
-              border: '1px solid var(--ion-color-primary-tint)',
-              borderRadius: '6px'
+              minWidth: '30px',
+              height: '30px',
+              '--background': 'var(--ion-color-success)',
+              '--color': 'white',
+              '--background-hover': 'var(--ion-color-success-shade)',
+              borderRadius: '8px',
+              boxShadow: '0 2px 6px rgba(76, 175, 80, 0.3)',
+              transition: 'all 0.2s ease'
             }}
           >
-            <IonIcon icon={create} />
+            <IonIcon icon={create} style={{ fontSize: '16px' }} />
           </IonButton>
         )}
       </div>
