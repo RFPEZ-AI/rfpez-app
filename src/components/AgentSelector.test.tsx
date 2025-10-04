@@ -346,14 +346,14 @@ describe('AgentSelector', () => {
 
       await waitFor(() => {
         // The component wraps initial_prompt text in quotes and small elements, so use flexible text matching
-        expect(screen.getByText((content, node) => 
+        expect(screen.getByText((content) => 
           content.includes('How can I help you?')
         )).toBeInTheDocument();
-        expect(screen.getByText((content, node) => 
+        expect(screen.getByText((content) => 
           content.includes('How can I assist you?')
         )).toBeInTheDocument();
         // RFP Design agent should NOT be visible since it's not free and hasProperAccountSetup is false
-        expect(screen.queryByText((content, node) => 
+        expect(screen.queryByText((content) => 
           content.includes('I can help you design RFPs')
         )).not.toBeInTheDocument();
       });

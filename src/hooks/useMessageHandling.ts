@@ -147,17 +147,25 @@ export const useMessageHandling = () => {
           if (result && result.success) {
             // 🔄 AGENT SWITCH DETECTION
             if (funcObj.function === 'switch_agent') {
+              // Type-safe access to agent switch result properties
+              const agentSwitchResult = result as {
+                trigger_continuation?: boolean;
+                new_agent?: { name: string };
+                context_message?: string;
+                success?: boolean;
+              };
+              
               console.log('🔄 AGENT SWITCH DETECTED in function results:', {
                 function_name: funcObj.function,
                 result: result,
-                trigger_continuation: (result as any)?.trigger_continuation,
-                new_agent_name: (result as any)?.new_agent?.name,
-                context_message: (result as any)?.context_message
+                trigger_continuation: agentSwitchResult.trigger_continuation,
+                new_agent_name: agentSwitchResult.new_agent?.name,
+                context_message: agentSwitchResult.context_message
               });
               
               // If this was an agent switch with continuation, the edge function should handle the continuation
               // We just need to update the UI state
-              if ((result as any)?.success) {
+              if (agentSwitchResult.success) {
                 console.log('🔄 Agent switch successful, UI should update automatically via edge function continuation');
               }
             }
