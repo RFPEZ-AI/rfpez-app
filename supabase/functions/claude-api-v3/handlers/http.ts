@@ -8,7 +8,7 @@ import { getAuthenticatedSupabaseClient, getUserId, validateAuthHeader } from '.
 import { ClaudeAPIService, ToolExecutionService } from '../services/claude.ts';
 import { getToolDefinitions } from '../tools/definitions.ts';
 import { buildSystemPrompt, loadAgentContext, loadUserProfile } from '../utils/system-prompt.ts';
-import { ClaudeMessage } from '../types.ts';
+import { ClaudeMessage, ClaudeToolDefinition } from '../types.ts';
 
 // Supabase client interface
 interface SupabaseClient {
@@ -67,18 +67,18 @@ function isToolExecutionResult(obj: unknown): obj is { function_name: string; re
 // Recursive streaming helper to handle unlimited tool call chains
 async function streamWithRecursiveTools(
   messages: ClaudeMessage[],
-  tools: any[],
+  tools: ClaudeToolDefinition[],
   systemPrompt: string,
-  claudeService: any,
-  toolService: any,
+  claudeService: ClaudeAPIService,
+  toolService: ToolExecutionService,
   controller: ReadableStreamDefaultController<Uint8Array>,
   sessionId?: string,
   recursionDepth: number = 0
-): Promise<{ fullContent: string; toolsUsed: string[]; executedToolResults: any[] }> {
+): Promise<{ fullContent: string; toolsUsed: string[]; executedToolResults: unknown[] }> {
   const MAX_RECURSION_DEPTH = 5;
   let fullContent = '';
   const toolsUsed: string[] = [];
-  const executedToolResults: any[] = [];
+  const executedToolResults: unknown[] = [];
   
   if (recursionDepth >= MAX_RECURSION_DEPTH) {
     console.warn(`🔄 Max recursion depth (${MAX_RECURSION_DEPTH}) reached, stopping recursive calls`);
@@ -90,34 +90,35 @@ async function streamWithRecursiveTools(
   const pendingToolCalls: unknown[] = [];
   
   // Stream from Claude API
-  const response = await claudeService.streamMessage(messages, tools, (chunk: any) => {
+  const response = await claudeService.streamMessage(messages, tools, (chunk: unknown) => {
     try {
-      if (chunk.type === 'text' && chunk.content) {
-        fullContent += chunk.content;
+      const chunkData = chunk as Record<string, unknown>;
+      if (chunkData.type === 'text' && chunkData.content) {
+        fullContent += chunkData.content as string;
         
         const textEvent = {
           type: 'content_delta',
-          delta: chunk.content,
+          delta: chunkData.content,
           full_content: fullContent
         };
         const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
         controller.enqueue(new TextEncoder().encode(sseData));
         
-      } else if (chunk.type === 'tool_use' && chunk.name) {
-        console.log(`🔧 Tool use detected at depth ${recursionDepth}:`, chunk.name);
-        if (!toolsUsed.includes(chunk.name)) {
-          toolsUsed.push(chunk.name);
+      } else if (chunkData.type === 'tool_use' && chunkData.name) {
+        console.log(`🔧 Tool use detected at depth ${recursionDepth}:`, chunkData.name);
+        if (!toolsUsed.includes(chunkData.name as string)) {
+          toolsUsed.push(chunkData.name as string);
         }
         
-        pendingToolCalls.push(chunk);
+        pendingToolCalls.push(chunkData);
         
         // Send tool invocation start event
         const toolEvent = {
           type: 'tool_invocation',
           toolEvent: {
             type: 'tool_start',
-            toolName: chunk.name,
-            parameters: chunk.input,
+            toolName: chunkData.name,
+            parameters: chunkData.input,
             timestamp: new Date().toISOString()
           }
         };
@@ -180,24 +181,25 @@ async function streamWithRecursiveTools(
     }
     
     // 🔄 CHECK FOR AGENT SWITCHING WITH CONTINUATION
-    const agentSwitchResult = executedToolResults.find(result => 
-      result.function_name === 'switch_agent' && 
-      result.result?.success === true && 
-      result.result?.trigger_continuation === true
-    );
+    const agentSwitchResult = executedToolResults.find(result => {
+      const resultData = result as Record<string, unknown>;
+      return resultData.function_name === 'switch_agent' && 
+             (resultData.result as Record<string, unknown>)?.success === true && 
+             (resultData.result as Record<string, unknown>)?.trigger_continuation === true;
+    }) as Record<string, unknown> | undefined;
     
     if (agentSwitchResult && recursionDepth < MAX_RECURSION_DEPTH - 1) {
       console.log('🚀 AGENT SWITCH WITH CONTINUATION DETECTED');
       
       try {
-        const switchResult = agentSwitchResult.result;
-        const newAgentData = switchResult.new_agent;
+        const switchResult = agentSwitchResult.result as Record<string, unknown>;
+        const newAgentData = switchResult.new_agent as Record<string, unknown>;
         const contextMessage = switchResult.context_message;
         
         console.log('🤖 Triggering new agent automatic response:', {
           agent_name: newAgentData?.name,
           agent_role: newAgentData?.role,
-          context_preview: contextMessage?.substring(0, 100)
+          context_preview: (contextMessage as string)?.substring(0, 100)
         });
         
         // Get new agent context and tools - need to import necessary functions
@@ -207,17 +209,19 @@ async function streamWithRecursiveTools(
         
         const newAgentContext = await loadAgentContext(
           undefined, // supabase client will be handled internally
-          newAgentData?.id as string,
-          sessionId
+          sessionId,
+          newAgentData?.id as string
         );
         
+        if (!newAgentContext) {
+          throw new Error('Failed to load new agent context');
+        }
+        
         // Build system prompt for new agent that SKIPS welcome and focuses on context processing
-        const baseSystemPrompt = await buildSystemPrompt(
-          newAgentContext.agent,
-          newAgentContext.profile,
-          newAgentContext.session,
-          newAgentContext.preferences
-        );
+        const baseSystemPrompt = buildSystemPrompt({
+          agent: newAgentContext,
+          sessionId: sessionId
+        });
         
         // Override system prompt to focus on context processing, not welcome
         const contextProcessingPrompt = baseSystemPrompt + 
@@ -232,7 +236,7 @@ async function streamWithRecursiveTools(
         const continuationMessages = [
           {
             role: 'user' as const,
-            content: contextMessage
+            content: (contextMessage as string) || 'Continue with the previous context.'
           }
         ];
         
@@ -273,16 +277,20 @@ async function streamWithRecursiveTools(
       ...messages,
       {
         role: 'assistant' as const,
-        content: response.toolCalls.map((tc: any) => ({
-          type: 'tool_use',
-          id: tc.id,
-          name: tc.name,
-          input: tc.input
+        content: response.toolCalls.map((tc: unknown) => ({
+          type: 'tool_use' as const,
+          id: (tc as Record<string, unknown>).id as string,
+          name: (tc as Record<string, unknown>).name as string,
+          input: (tc as Record<string, unknown>).input as Record<string, unknown>
         }))
       },
       {
         role: 'user' as const,
-        content: toolResults
+        content: toolResults.map((result: unknown, index: number) => ({
+          type: 'tool_result' as const,
+          tool_use_id: response.toolCalls[index]?.id || `tool_${index}`,
+          content: typeof result === 'string' ? result : JSON.stringify(result)
+        }))
       }
     ];
     
@@ -689,16 +697,18 @@ export async function handlePostRequest(request: Request): Promise<Response> {
             // Get new agent context and tools
             const newAgentContext = await loadAgentContext(
               supabase as SupabaseClient,
-              newAgentData?.id as string,
-              sessionId
+              sessionId,
+              newAgentData?.id as string
             );
             
-            const newSystemPrompt = await buildSystemPrompt(
-              newAgentContext.agent,
-              newAgentContext.profile,
-              newAgentContext.session,
-              newAgentContext.preferences
-            );
+            if (!newAgentContext) {
+              throw new Error('Failed to load new agent context');
+            }
+            
+            const newSystemPrompt = buildSystemPrompt({
+              agent: newAgentContext,
+              sessionId: sessionId
+            });
             
             const newTools = getToolDefinitions(newAgentData?.role as string);
             
@@ -709,35 +719,23 @@ export async function handlePostRequest(request: Request): Promise<Response> {
               system_prompt_length: newSystemPrompt.length
             });
             
-            // **RECURSIVE CALL** - New agent processes the context automatically
-            const continuationResult = await streamWithRecursiveTools(
-              continuationMessages,
-              newTools,
-              newSystemPrompt,
-              claudeService,
-              toolService,
-              controller,
-              sessionId,
-              recursionDepth + 1
-            );
+            // **NON-STREAMING AGENT CONTINUATION** - Get response from new agent
+            const continuationResponse = await claudeService.sendMessage(continuationMessages as ClaudeMessage[], newTools);
             
-            // Append continuation result to main response
-            fullContent += '\n\n---\n\n';
-            fullContent += continuationResult.fullContent;
-            toolsUsed.push(...continuationResult.toolsUsed.filter(tool => !toolsUsed.includes(tool)));
-            executedToolResults.push(...continuationResult.executedToolResults);
+            // Update the main response with continuation
+            if (continuationResponse.textResponse) {
+              claudeResponse.textResponse = continuationResponse.textResponse;
+            }
             
             console.log('✅ Agent continuation completed successfully', {
-              continuation_content_length: continuationResult.fullContent.length,
-              total_tools_used: toolsUsed.length
+              continuation_content_length: continuationResponse.textResponse?.length || 0,
+              has_tool_calls: continuationResponse.toolCalls?.length > 0
             });
             
           } catch (continuationError) {
             console.error('❌ Automatic agent continuation failed:', continuationError);
             // Fallback to original behavior - just notify about the switch
-            if (fullContent) {
-              fullContent += `\n\n*Connected to ${newAgentData?.name} agent. Please continue your conversation.*`;
-            }
+            claudeResponse.textResponse = `*Connected to ${newAgentData?.name} agent. Please continue your conversation.*`;
           }
           
         } catch (continuationError) {

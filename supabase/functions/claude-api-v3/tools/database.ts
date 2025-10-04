@@ -83,6 +83,20 @@ interface MessageData {
   artifacts?: Record<string, unknown>[];
 }
 
+interface DatabaseMessageResult {
+  id: string;
+  role: string;
+  message: string;
+  created_at: string;
+  agent_id?: string;
+  is_system_message?: boolean;
+  metadata?: Record<string, unknown>;
+  agents?: {
+    name: string;
+    role: string;
+  };
+}
+
 interface SessionData {
   userId: string;
   title?: string;
@@ -906,12 +920,12 @@ export async function fetchConversationHistory(supabase: SupabaseClient, session
 
   if (error) {
     console.error('❌ Failed to fetch conversation history:', error);
-    throw new Error(`Failed to fetch conversation history: ${error.message}`);
+    throw new Error(`Failed to fetch conversation history: ${(error as Error).message || 'Unknown error'}`);
   }
 
-  console.log(`📚 Retrieved ${messages?.length || 0} messages from conversation history`);
+  console.log(`📚 Retrieved ${(messages as DatabaseMessageResult[])?.length || 0} messages from conversation history`);
   
-  return (messages || []).map(msg => ({
+  return ((messages as DatabaseMessageResult[]) || []).map((msg: DatabaseMessageResult) => ({
     id: msg.id,
     role: msg.role as 'user' | 'assistant' | 'system',
     message: msg.message,
@@ -919,8 +933,8 @@ export async function fetchConversationHistory(supabase: SupabaseClient, session
     agent_id: msg.agent_id,
     is_system_message: msg.is_system_message,
     metadata: msg.metadata,
-    agent_name: (msg.agents as any)?.name,
-    agent_role: (msg.agents as any)?.role
+    agent_name: msg.agents?.name,
+    agent_role: msg.agents?.role
   })) as ConversationMessage[];
 }
 
