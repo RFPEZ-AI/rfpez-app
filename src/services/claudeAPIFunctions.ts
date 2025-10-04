@@ -1560,9 +1560,9 @@ export class ClaudeAPIFunctionHandler {
           initial_prompt: agent.initial_prompt
         },
         switch_reason: reason,
-        message: `Successfully switched to ${agent.name} agent (anonymous session). The ${agent.name} will respond in the next message.`,
+        message: `Successfully switched to ${agent.name} agent (anonymous session). The ${agent.name} will now respond.`,
         user_type: 'anonymous',
-        stop_processing: true // Signal to stop generating additional content
+        stop_processing: false // Allow the new agent to respond immediately
       };
     }
     
@@ -1589,9 +1589,9 @@ export class ClaudeAPIFunctionHandler {
           initial_prompt: agent.initial_prompt
         },
         switch_reason: reason,
-        message: `Successfully switched to ${agent.name} agent (temporary session). The ${agent.name} will respond in the next message.`,
+        message: `Successfully switched to ${agent.name} agent (temporary session). The ${agent.name} will now respond.`,
         user_type: 'authenticated-no-profile',
-        stop_processing: true // Signal to stop generating additional content
+        stop_processing: false // Allow the new agent to respond immediately
       };
     }
     
@@ -1751,9 +1751,9 @@ export class ClaudeAPIFunctionHandler {
         initial_prompt: newActiveAgent.agent_initial_prompt
       } : null,
       switch_reason: reason,
-      message: `Successfully switched to ${agent.name} agent. The ${agent.name} will respond in the next message.`,
+      message: `Successfully switched to ${agent.name} agent. The ${agent.name} will now respond.`,
       user_type: 'authenticated',
-      stop_processing: true // Signal to stop generating additional content
+      stop_processing: false // Allow the new agent to respond immediately
     };
     
     console.log('🔄 Agent switch complete, returning result:', {

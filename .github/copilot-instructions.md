@@ -541,6 +541,145 @@ The project includes comprehensive browser automation through MCP (Model Context
 # Password: thisisatest
 ```
 
+### ⚡ MCP Browser Testing Speed Tips & Best Practices
+
+#### **Quick Test Setup Workflow**
+```javascript
+// ESSENTIAL: Always activate tools first in this order
+await activate_mcp_browser_navigation_tools();    // Navigate, tabs
+await activate_mcp_browser_interaction_tools();   // Click, fill, keys
+await activate_mcp_browser_script_tools();        // Get elements, evaluate
+await activate_mcp_browser_visual_tools();        // Screenshot, scroll
+
+// SPEED TIP: Navigate and screenshot in one go
+await mcp_browser_navigate({ url: 'http://localhost:3100' });
+await mcp_browser_screenshot({ name: 'initial-state' });
+```
+
+#### **Authentication Testing Pattern**
+```javascript
+// FAST LOGIN SEQUENCE - Use this exact pattern
+const loginSequence = async () => {
+  // 1. Get elements (always fresh)
+  const elements = await mcp_browser_get_clickable_elements();
+  
+  // 2. Click Login button (usually index 2)
+  await mcp_browser_click({ index: 2 });
+  
+  // 3. Fill credentials (email: index 3, password: index 5)
+  await mcp_browser_form_input_fill({ index: 3, value: 'mskiba@esphere.com' });
+  await mcp_browser_form_input_fill({ index: 5, value: 'thisisatest' });
+  
+  // 4. Submit (Sign In button: index 6)
+  await mcp_browser_click({ index: 6 });
+  
+  // 5. Verify success (look for username in top right)
+  await mcp_browser_screenshot({ name: 'logged-in' });
+};
+```
+
+#### **Browser Session Reset Prevention**
+```javascript
+// CRITICAL: Browser can reset unexpectedly
+// Always check login state before running tests
+const verifyAuthentication = async () => {
+  const elements = await mcp_browser_get_clickable_elements();
+  const hasLoginButton = elements.some(el => el.text?.includes('Login'));
+  
+  if (hasLoginButton) {
+    console.log('⚠️ Session reset detected - need to login again');
+    await loginSequence();
+  }
+  return !hasLoginButton;
+};
+```
+
+#### **Message Testing Optimization**
+```javascript
+// FAST MESSAGE SENDING - Always use this pattern
+const sendTestMessage = async (message) => {
+  // 1. Get current elements
+  const elements = await mcp_browser_get_clickable_elements();
+  
+  // 2. Find textarea (usually last input element)
+  const textareaIndex = elements.findIndex(el => el.tag === 'textarea');
+  
+  // 3. Click and fill
+  await mcp_browser_click({ index: textareaIndex });
+  await mcp_browser_form_input_fill({ index: textareaIndex, value: message });
+  
+  // 4. Submit with Enter key (faster than finding button)
+  await mcp_browser_press_key({ key: 'Enter' });
+  
+  // 5. Take screenshot for verification
+  await mcp_browser_screenshot({ name: 'message-sent' });
+};
+```
+
+#### **Element Finding Speed Tips**
+```javascript
+// DON'T: Call get_clickable_elements multiple times
+// ❌ Slow approach
+const elements1 = await mcp_browser_get_clickable_elements();
+await mcp_browser_click({ index: 2 });
+const elements2 = await mcp_browser_get_clickable_elements(); // Unnecessary
+
+// ✅ Fast approach - reuse elements until interaction changes page
+const elements = await mcp_browser_get_clickable_elements();
+await mcp_browser_click({ index: 2 });
+await mcp_browser_form_input_fill({ index: 3, value: 'test' });
+// Only refresh elements after major page changes
+```
+
+#### **Common Index Patterns (for speed)**
+```javascript
+// These indices are typically consistent:
+const COMMON_INDICES = {
+  LOGIN_BUTTON: 2,           // Main login button
+  EMAIL_FIELD: 3,            // Email input in login modal
+  PASSWORD_FIELD: 5,         // Password input in login modal  
+  SIGNIN_BUTTON: 6,          // Sign in submit button
+  MAIN_TEXTAREA: 11,         // Main chat textarea (when logged in)
+  AGENT_SELECTOR: 1,         // Agent chip in header
+  ARTIFACT_TOGGLE: 13        // Artifact panel toggle
+};
+
+// Use with caution - verify with screenshot if failing
+await mcp_browser_click({ index: COMMON_INDICES.LOGIN_BUTTON });
+```
+
+#### **Error Recovery Patterns**
+```javascript
+// Handle common browser issues
+const robustClick = async (index, retries = 2) => {
+  for (let i = 0; i < retries; i++) {
+    try {
+      await mcp_browser_click({ index });
+      return true;
+    } catch (error) {
+      if (i === retries - 1) throw error;
+      
+      // Refresh elements and try again
+      await mcp_browser_get_clickable_elements();
+      await new Promise(resolve => setTimeout(resolve, 500));
+    }
+  }
+};
+```
+
+#### **Testing Session Checklist**
+```javascript
+// Before starting any test session:
+// 1. ✅ Dev server running (VS Code task)
+// 2. ✅ Activate all MCP browser tools
+// 3. ✅ Navigate to localhost:3100
+// 4. ✅ Take initial screenshot  
+// 5. ✅ Check authentication state
+// 6. ✅ Login if needed
+// 7. ✅ Verify successful login (username visible)
+// 8. ✅ Ready for testing!
+```
+
 ### Available MCP Browser Tools
 - **Navigation**: `mcp_browser_navigate`, `mcp_browser_go_back`, `mcp_browser_go_forward`
 - **Interaction**: `mcp_browser_click`, `mcp_browser_hover`, `mcp_browser_form_input_fill`, `mcp_browser_press_key`

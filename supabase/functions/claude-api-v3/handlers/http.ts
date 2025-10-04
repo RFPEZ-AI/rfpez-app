@@ -64,6 +64,249 @@ function isToolExecutionResult(obj: unknown): obj is { function_name: string; re
          'function_name' in obj &&
          typeof (obj as Record<string, unknown>).function_name === 'string';
 }
+// Recursive streaming helper to handle unlimited tool call chains
+async function streamWithRecursiveTools(
+  messages: ClaudeMessage[],
+  tools: any[],
+  systemPrompt: string,
+  claudeService: any,
+  toolService: any,
+  controller: ReadableStreamDefaultController<Uint8Array>,
+  sessionId?: string,
+  recursionDepth: number = 0
+): Promise<{ fullContent: string; toolsUsed: string[]; executedToolResults: any[] }> {
+  const MAX_RECURSION_DEPTH = 5;
+  let fullContent = '';
+  const toolsUsed: string[] = [];
+  const executedToolResults: any[] = [];
+  
+  if (recursionDepth >= MAX_RECURSION_DEPTH) {
+    console.warn(`🔄 Max recursion depth (${MAX_RECURSION_DEPTH}) reached, stopping recursive calls`);
+    return { fullContent, toolsUsed, executedToolResults };
+  }
+  
+  console.log(`🔄 Recursive streaming depth ${recursionDepth}`);
+  
+  const pendingToolCalls: unknown[] = [];
+  
+  // Stream from Claude API
+  const response = await claudeService.streamMessage(messages, tools, (chunk: any) => {
+    try {
+      if (chunk.type === 'text' && chunk.content) {
+        fullContent += chunk.content;
+        
+        const textEvent = {
+          type: 'content_delta',
+          delta: chunk.content,
+          full_content: fullContent
+        };
+        const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
+        controller.enqueue(new TextEncoder().encode(sseData));
+        
+      } else if (chunk.type === 'tool_use' && chunk.name) {
+        console.log(`🔧 Tool use detected at depth ${recursionDepth}:`, chunk.name);
+        if (!toolsUsed.includes(chunk.name)) {
+          toolsUsed.push(chunk.name);
+        }
+        
+        pendingToolCalls.push(chunk);
+        
+        // Send tool invocation start event
+        const toolEvent = {
+          type: 'tool_invocation',
+          toolEvent: {
+            type: 'tool_start',
+            toolName: chunk.name,
+            parameters: chunk.input,
+            timestamp: new Date().toISOString()
+          }
+        };
+        const sseData = `data: ${JSON.stringify(toolEvent)}\n\n`;
+        controller.enqueue(new TextEncoder().encode(sseData));
+      }
+    } catch (error) {
+      console.error('Error in recursive chunk handler:', error);
+    }
+  }, systemPrompt);
+  
+  // If there are tool calls, execute them and recurse
+  if (pendingToolCalls.length > 0) {
+    console.log(`🔧 Executing ${pendingToolCalls.length} tools at depth ${recursionDepth}`);
+    
+    const toolResults = [];
+    for (const toolCall of pendingToolCalls) {
+      if (!isClaudeToolCall(toolCall)) continue;
+      
+      try {
+        const result = await toolService.executeTool(toolCall, sessionId);
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolCall.id,
+          content: JSON.stringify(result)
+        });
+        
+        executedToolResults.push({
+          function_name: toolCall.name,
+          result: result
+        });
+        
+        // Send tool completion event
+        const toolCompleteEvent = {
+          type: 'tool_invocation',
+          toolEvent: {
+            type: 'tool_complete',
+            toolName: toolCall.name,
+            result: result,
+            timestamp: new Date().toISOString()
+          }
+        };
+        const completeSseData = `data: ${JSON.stringify(toolCompleteEvent)}\n\n`;
+        controller.enqueue(new TextEncoder().encode(completeSseData));
+        
+      } catch (error) {
+        console.error(`Tool execution error for ${toolCall.name}:`, error);
+        const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
+        const errorResult = { success: false, error: errorMessage };
+        toolResults.push({
+          type: 'tool_result',
+          tool_use_id: toolCall.id,
+          content: JSON.stringify(errorResult)
+        });
+        executedToolResults.push({
+          function_name: toolCall.name,
+          result: errorResult
+        });
+      }
+    }
+    
+    // 🔄 CHECK FOR AGENT SWITCHING WITH CONTINUATION
+    const agentSwitchResult = executedToolResults.find(result => 
+      result.function_name === 'switch_agent' && 
+      result.result?.success === true && 
+      result.result?.trigger_continuation === true
+    );
+    
+    if (agentSwitchResult && recursionDepth < MAX_RECURSION_DEPTH - 1) {
+      console.log('🚀 AGENT SWITCH WITH CONTINUATION DETECTED');
+      
+      try {
+        const switchResult = agentSwitchResult.result;
+        const newAgentData = switchResult.new_agent;
+        const contextMessage = switchResult.context_message;
+        
+        console.log('🤖 Triggering new agent automatic response:', {
+          agent_name: newAgentData?.name,
+          agent_role: newAgentData?.role,
+          context_preview: contextMessage?.substring(0, 100)
+        });
+        
+        // Get new agent context and tools - need to import necessary functions
+        const { loadAgentContext } = await import('../utils/system-prompt.ts');
+        const { buildSystemPrompt } = await import('../utils/system-prompt.ts');
+        const { getToolDefinitions } = await import('../tools/definitions.ts');
+        
+        const newAgentContext = await loadAgentContext(
+          undefined, // supabase client will be handled internally
+          newAgentData?.id as string,
+          sessionId
+        );
+        
+        // Build system prompt for new agent that SKIPS welcome and focuses on context processing
+        const baseSystemPrompt = await buildSystemPrompt(
+          newAgentContext.agent,
+          newAgentContext.profile,
+          newAgentContext.session,
+          newAgentContext.preferences
+        );
+        
+        // Override system prompt to focus on context processing, not welcome
+        const contextProcessingPrompt = baseSystemPrompt + 
+          `\n\n🤖 CONTEXT HANDOFF MODE: You are receiving a handoff from another agent. ` +
+          `DO NOT provide a welcome message or introduction. ` +
+          `Instead, IMMEDIATELY process the context and take appropriate actions based on your role. ` +
+          `The user has already been greeted by the previous agent.`;
+        
+        const newTools = getToolDefinitions(newAgentData?.role as string);
+        
+        // Create continuation messages with context
+        const continuationMessages = [
+          {
+            role: 'user' as const,
+            content: contextMessage
+          }
+        ];
+        
+        // **RECURSIVE CALL FOR NEW AGENT** - Process context without welcome
+        const continuationResult = await streamWithRecursiveTools(
+          continuationMessages,
+          newTools,
+          contextProcessingPrompt,
+          claudeService,
+          toolService,
+          controller,
+          sessionId,
+          recursionDepth + 1
+        );
+        
+        // Merge continuation results
+        fullContent += '\n\n' + continuationResult.fullContent;
+        toolsUsed.push(...continuationResult.toolsUsed.filter(tool => !toolsUsed.includes(tool)));
+        executedToolResults.push(...continuationResult.executedToolResults);
+        
+        console.log('✅ Agent continuation completed', {
+          new_agent: newAgentData?.name,
+          continuation_content_length: continuationResult.fullContent.length,
+          tools_used: continuationResult.toolsUsed
+        });
+        
+        // Return early - no need for standard recursion since we handled the agent switch
+        return { fullContent, toolsUsed, executedToolResults };
+        
+      } catch (continuationError) {
+        console.error('❌ Agent continuation failed:', continuationError);
+        // Fall through to standard recursion behavior
+      }
+    }
+    
+    // Build messages with tool results
+    const messagesWithToolResults = [
+      ...messages,
+      {
+        role: 'assistant' as const,
+        content: response.toolCalls.map((tc: any) => ({
+          type: 'tool_use',
+          id: tc.id,
+          name: tc.name,
+          input: tc.input
+        }))
+      },
+      {
+        role: 'user' as const,
+        content: toolResults
+      }
+    ];
+    
+    // Recurse to handle potential additional tool calls
+    const recursiveResult = await streamWithRecursiveTools(
+      messagesWithToolResults,
+      tools,
+      systemPrompt,
+      claudeService,
+      toolService,
+      controller,
+      sessionId,
+      recursionDepth + 1
+    );
+    
+    // Combine results
+    fullContent += recursiveResult.fullContent;
+    toolsUsed.push(...recursiveResult.toolsUsed.filter(tool => !toolsUsed.includes(tool)));
+    executedToolResults.push(...recursiveResult.executedToolResults);
+  }
+  
+  return { fullContent, toolsUsed, executedToolResults };
+}
+
 // Handle streaming response with proper SSE format and tool execution
 function handleStreamingResponse(
   messages: unknown[], 
@@ -115,277 +358,25 @@ function handleStreamingResponse(
         
         console.log('🌊 Starting streaming response...');
         
-        let fullContent = '';
-        const toolsUsed: string[] = [];
-        const pendingToolCalls: unknown[] = [];
-        const executedToolResults: unknown[] = []; // Track actual tool execution results
+        // Use recursive streaming to handle unlimited tool call chains
+        const result = await streamWithRecursiveTools(
+          messages as ClaudeMessage[],
+          tools,
+          systemPrompt,
+          claudeService,
+          toolService,
+          controller,
+          sessionId
+        );
+        
+        const { fullContent, toolsUsed, executedToolResults } = result;
 
-        // First, get response from Claude (might include tool calls)
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const response = await claudeService.streamMessage(messages as ClaudeMessage[], tools, (chunk) => {
-          try {
-            console.log('🎯 HTTP HANDLER onChunk called with:', chunk.type, JSON.stringify(chunk, null, 2));
-            
-            // Handle text content
-            if (chunk.type === 'text' && chunk.content) {
-              fullContent += chunk.content;
-              
-              // Send content_delta event in expected format for client
-              const textEvent = {
-                type: 'content_delta',
-                delta: chunk.content,
-                full_content: fullContent
-              };
-              const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
-              console.log('📤 Sending to client:', JSON.stringify(textEvent));
-              controller.enqueue(new TextEncoder().encode(sseData));
-              
-            } else if (chunk.type === 'tool_use' && chunk.name) {
-              console.log('🔧 HTTP Handler - Tool use detected:', chunk.name);
-              console.log('� HTTP Handler - Tool chunk input:', JSON.stringify(chunk.input, null, 2));
-              console.log('🔧 HTTP Handler - Full chunk:', JSON.stringify(chunk, null, 2));
-              if (!toolsUsed.includes(chunk.name)) {
-                toolsUsed.push(chunk.name);
-              }
-              
-              // Store tool call for execution
-              pendingToolCalls.push(chunk);
-              
-              // Send tool invocation start event
-              const toolEvent = {
-                type: 'tool_invocation',
-                toolEvent: {
-                  type: 'tool_start',
-                  toolName: chunk.name,
-                  parameters: chunk.input,
-                  timestamp: new Date().toISOString()
-                }
-              };
-              const sseData = `data: ${JSON.stringify(toolEvent)}\n\n`;
-              controller.enqueue(new TextEncoder().encode(sseData));
-            }
-          } catch (error) {
-            console.error('Error encoding chunk:', error);
-          }
-        }, systemPrompt);
-
-        // 🔍 DEBUG: Check what tool calls we got from the response
-        console.log('🔍 DEBUG response.toolCalls:', JSON.stringify(response.toolCalls, null, 2));
-        console.log('🔍 DEBUG pendingToolCalls:', JSON.stringify(pendingToolCalls, null, 2));
-
-        // If there are tool calls, execute them and get final response from Claude
-        if (pendingToolCalls.length > 0) {
-          console.log(`🔧 Executing ${pendingToolCalls.length} tool calls...`);
-          
-          // Execute all tool calls
-          const toolResults = [];
-          for (const toolCall of pendingToolCalls) {
-            if (!isClaudeToolCall(toolCall)) {
-              console.error('Invalid tool call format:', toolCall);
-              continue;
-            }
-            
-            try {
-              const result = await toolService.executeTool(toolCall, sessionId);
-              toolResults.push({
-                type: 'tool_result',
-                tool_use_id: toolCall.id,
-                content: JSON.stringify(result)
-              });
-              
-              // Store tool execution result for metadata
-              executedToolResults.push({
-                function_name: toolCall.name,
-                result: result
-              });
-              
-              // Send tool completion event
-              const toolCompleteEvent = {
-                type: 'tool_invocation',
-                toolEvent: {
-                  type: 'tool_complete',
-                  toolName: toolCall.name,
-                  result: result,
-                  timestamp: new Date().toISOString()
-                }
-              };
-              const completeSseData = `data: ${JSON.stringify(toolCompleteEvent)}\n\n`;
-              controller.enqueue(new TextEncoder().encode(completeSseData));
-              
-            } catch (error) {
-              console.error(`Tool execution error for ${toolCall.name}:`, error);
-              const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
-              const errorResult = { success: false, error: errorMessage };
-              toolResults.push({
-                type: 'tool_result',
-                tool_use_id: toolCall.id,
-                content: JSON.stringify(errorResult)
-              });
-              
-              // Store failed tool execution result for metadata
-              executedToolResults.push({
-                function_name: toolCall.name,
-                result: errorResult
-              });
-            }
-          }
-
-          // Create new message with tool results and get final response
-          const messagesWithToolResults = [
-            ...messages,
-            {
-              role: 'assistant',
-              content: response.toolCalls.map(tc => ({
-                type: 'tool_use',
-                id: tc.id,
-                name: tc.name,
-                input: tc.input
-              }))
-            },
-            {
-              role: 'user',
-              content: toolResults
-            }
-          ];
-
-          console.log('🔄 Getting final response from Claude with tool results...');
-          
-          // Reset for potential additional tool calls
-          const additionalToolCalls: unknown[] = [];
-          
-          // Get final response from Claude
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          await claudeService.streamMessage(messagesWithToolResults as ClaudeMessage[], tools, (chunk) => {
-            try {
-              if (chunk.type === 'text' && chunk.content) {
-                fullContent += chunk.content;
-                
-                const textEvent = {
-                  type: 'content_delta',
-                  delta: chunk.content,
-                  full_content: fullContent
-                };
-                const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
-                console.log('📤 Final response to client:', JSON.stringify(textEvent));
-                controller.enqueue(new TextEncoder().encode(sseData));
-                
-              } else if (chunk.type === 'tool_use' && chunk.name) {
-                console.log('🔧 Additional tool use detected:', chunk.name);
-                if (!toolsUsed.includes(chunk.name)) {
-                  toolsUsed.push(chunk.name);
-                }
-                
-                // Store additional tool call for execution
-                additionalToolCalls.push(chunk);
-                
-                // Send tool invocation start event
-                const toolEvent = {
-                  type: 'tool_invocation',
-                  toolEvent: {
-                    type: 'tool_start',
-                    toolName: chunk.name,
-                    parameters: chunk.input,
-                    timestamp: new Date().toISOString()
-                  }
-                };
-                const sseData = `data: ${JSON.stringify(toolEvent)}\n\n`;
-                controller.enqueue(new TextEncoder().encode(sseData));
-              }
-            } catch (error) {
-              console.error('Error encoding final chunk:', error);
-            }
-          }, systemPrompt);
-          
-          // Handle additional tool calls if any
-          if (additionalToolCalls.length > 0) {
-            console.log(`🔧 Executing ${additionalToolCalls.length} additional tool calls...`);
-            
-            // Execute additional tool calls
-            const additionalToolResults = [];
-            for (const toolCall of additionalToolCalls) {
-              if (!isClaudeToolCall(toolCall)) {
-                console.error('Invalid additional tool call format:', toolCall);
-                continue;
-              }
-              
-              try {
-                const result = await toolService.executeTool(toolCall, sessionId);
-                additionalToolResults.push({
-                  type: 'tool_result',
-                  tool_use_id: toolCall.id,
-                  content: JSON.stringify(result)
-                });
-                
-                // Store additional tool execution result for metadata
-                executedToolResults.push({
-                  function_name: toolCall.name,
-                  result: result
-                });
-                
-                // Send tool completion event
-                const toolCompleteEvent = {
-                  type: 'tool_invocation',
-                  toolEvent: {
-                    type: 'tool_complete',
-                    toolName: toolCall.name,
-                    result: result,
-                    timestamp: new Date().toISOString()
-                  }
-                };
-                const completeSseData = `data: ${JSON.stringify(toolCompleteEvent)}\n\n`;
-                controller.enqueue(new TextEncoder().encode(completeSseData));
-                
-              } catch (error) {
-                console.error(`Additional tool execution error for ${toolCall.name}:`, error);
-                const errorMessage = error instanceof Error ? error.message : 'Tool execution failed';
-                additionalToolResults.push({
-                  type: 'tool_result',
-                  tool_use_id: toolCall.id,
-                  content: JSON.stringify({ success: false, error: errorMessage })
-                });
-              }
-            }
-            
-            // Get final response with additional tool results
-            const finalMessages = [
-              ...messagesWithToolResults,
-              {
-                role: 'assistant',
-                content: additionalToolCalls.map(tc => ({
-                  type: 'tool_use',
-                  id: isClaudeToolCall(tc) ? tc.id : String((tc as Record<string, unknown>).id || ''),
-                  name: isClaudeToolCall(tc) ? tc.name : String((tc as Record<string, unknown>).name || ''),
-                  input: isClaudeToolCall(tc) ? tc.input : (tc as Record<string, unknown>).input || {}
-                }))
-              },
-              {
-                role: 'user',
-                content: additionalToolResults
-              }
-            ];
-            
-            console.log('🔄 Getting final response after additional tools...');
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            await claudeService.streamMessage(finalMessages as ClaudeMessage[], tools, (chunk) => {
-              try {
-                if (chunk.type === 'text' && chunk.content) {
-                  fullContent += chunk.content;
-                  
-                  const textEvent = {
-                    type: 'content_delta',
-                    delta: chunk.content,
-                    full_content: fullContent
-                  };
-                  const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
-                  console.log('📤 Final response to client:', JSON.stringify(textEvent));
-                  controller.enqueue(new TextEncoder().encode(sseData));
-                }
-              } catch (error) {
-                console.error('Error encoding additional final chunk:', error);
-              }
-            }, systemPrompt);
-          }
-        }
+        console.log('� Recursive streaming completed:', {
+          fullContentLength: fullContent.length,
+          toolsUsedCount: toolsUsed.length,
+          executedToolResultsCount: executedToolResults.length,
+          toolsUsed: toolsUsed
+        });
         
         // Detect if an agent switch occurred during streaming
         const agentSwitchOccurred = executedToolResults.some((result: unknown) => {
@@ -655,44 +646,99 @@ export async function handlePostRequest(request: Request): Promise<Response> {
         return toolCall?.name === 'switch_agent' && resultData?.success === true && resultData?.trigger_continuation === true;
       }) as Record<string, unknown>;
       
-      if (switchAgentResult?.trigger_continuation && switchAgentResult?.context_message) {
+      if (switchAgentResult?.trigger_continuation) {
         const newAgentData = switchAgentResult.new_agent as Record<string, unknown>;
-        console.log('🤖 Triggering agent continuation with context:', {
+        console.log('🤖 Triggering agent continuation with conversation history:', {
           new_agent_id: newAgentData?.id,
           new_agent_name: newAgentData?.name,
-          has_context: !!switchAgentResult.context_message,
-          context_preview: (switchAgentResult.context_message as string)?.substring(0, 100)
+          session_id: sessionId
         });
 
         try {
-          // Store the context message as a system message in the session
-          const contextMessage = switchAgentResult.context_message as string;
+          // Fetch full conversation history for the new agent
+          const { fetchConversationHistory } = await import('../tools/database.ts');
+          const conversationHistory = await fetchConversationHistory(supabase as SupabaseClient, sessionId);
           
-          // Store message in database for the new agent to pick up
-          const { error: messageError } = await (supabase as SupabaseClient)
-            .from('messages')
-            .insert({
-              session_id: sessionId,
-              agent_id: newAgentData?.id as string,
-              message: contextMessage,
-              role: 'system',
-              is_system_message: true,
-              metadata: {
-                message_type: 'agent_context_transfer',
-                original_user_request: switchAgentResult.auto_process_context,
-                agent_switch_timestamp: new Date().toISOString()
-              }
+          console.log('📚 Retrieved conversation history:', {
+            message_count: conversationHistory.length,
+            first_message_preview: conversationHistory[0]?.message?.substring(0, 100),
+            last_message_preview: conversationHistory[conversationHistory.length - 1]?.message?.substring(0, 100)
+          });
+          
+          // **TRIGGER AUTOMATIC CONTINUATION** - Make new agent respond immediately
+          try {
+            console.log('🚀 TRIGGERING AUTOMATIC AGENT CONTINUATION WITH CONVERSATION HISTORY');
+            
+            // Build continuation messages from conversation history instead of passed context
+            const continuationMessages = conversationHistory.map(msg => ({
+              role: msg.role as 'user' | 'assistant' | 'system',
+              content: msg.message
+            }));
+            
+            // Add current assistant response to conversation
+            continuationMessages.push({
+              role: 'assistant' as const,
+              content: claudeResponse.textResponse || ''
             });
-
-          if (messageError) {
-            console.error('❌ Failed to store agent context message:', messageError);
-          } else {
-            console.log('✅ Agent context message stored successfully');
-          }
-          
-          // Add a flag to response metadata to trigger client-side follow-up message
-          if (claudeResponse.textResponse) {
-            claudeResponse.textResponse += `\n\n*Connecting you to the ${newAgentData?.name} agent to process your request...*`;
+            
+            // Add system message prompting new agent to continue
+            continuationMessages.push({
+              role: 'system' as const,
+              content: `You are now the active agent for this conversation. Please review the conversation history above and continue assisting the user based on your role as ${newAgentData?.name}. Respond naturally and appropriately to the user's needs based on the full context.`
+            });
+            
+            // Get new agent context and tools
+            const newAgentContext = await loadAgentContext(
+              supabase as SupabaseClient,
+              newAgentData?.id as string,
+              sessionId
+            );
+            
+            const newSystemPrompt = await buildSystemPrompt(
+              newAgentContext.agent,
+              newAgentContext.profile,
+              newAgentContext.session,
+              newAgentContext.preferences
+            );
+            
+            const newTools = getToolDefinitions(newAgentData?.role as string);
+            
+            console.log('🤖 Triggering new agent response:', {
+              agent_name: newAgentData?.name,
+              agent_role: newAgentData?.role,
+              tools_count: newTools.length,
+              system_prompt_length: newSystemPrompt.length
+            });
+            
+            // **RECURSIVE CALL** - New agent processes the context automatically
+            const continuationResult = await streamWithRecursiveTools(
+              continuationMessages,
+              newTools,
+              newSystemPrompt,
+              claudeService,
+              toolService,
+              controller,
+              sessionId,
+              recursionDepth + 1
+            );
+            
+            // Append continuation result to main response
+            fullContent += '\n\n---\n\n';
+            fullContent += continuationResult.fullContent;
+            toolsUsed.push(...continuationResult.toolsUsed.filter(tool => !toolsUsed.includes(tool)));
+            executedToolResults.push(...continuationResult.executedToolResults);
+            
+            console.log('✅ Agent continuation completed successfully', {
+              continuation_content_length: continuationResult.fullContent.length,
+              total_tools_used: toolsUsed.length
+            });
+            
+          } catch (continuationError) {
+            console.error('❌ Automatic agent continuation failed:', continuationError);
+            // Fallback to original behavior - just notify about the switch
+            if (fullContent) {
+              fullContent += `\n\n*Connected to ${newAgentData?.name} agent. Please continue your conversation.*`;
+            }
           }
           
         } catch (continuationError) {

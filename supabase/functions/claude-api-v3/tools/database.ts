@@ -15,6 +15,16 @@ interface Agent {
   initial_prompt?: string;
 }
 
+interface ConversationMessage {
+  id: string;
+  role: 'user' | 'assistant' | 'system';
+  message: string;
+  created_at: string;
+  agent_id?: string;
+  is_system_message?: boolean;
+  metadata?: Record<string, unknown>;
+}
+
 interface SupabaseClient {
   from: (table: string) => {
     select: (columns?: string) => SupabaseQuery;
@@ -657,6 +667,10 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
     }
   }
   
+  // Check if user is anonymous
+  const ANONYMOUS_USER_ID = '00000000-0000-0000-0000-000000000001';
+  const isAnonymousUser = userId === ANONYMOUS_USER_ID;
+  
   console.log('🔄 AGENT SWITCH REQUEST:', {
     session_id,
     agent_id: agent_id || 'not provided',
@@ -664,6 +678,7 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
     targetAgent: targetAgent || 'not determined',
     reason: reason || 'not provided',
     userId,
+    isAnonymousUser,
     userMessage: userMessage ? userMessage.substring(0, 100) + '...' : 'not provided'
   });
   
@@ -681,6 +696,7 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
     targetAgent,
     reason,
     userId,
+    isAnonymousUser,
     userMessage: userMessage ? userMessage.substring(0, 50) + '...' : 'not provided',
     timestamp: new Date().toISOString()
   });
@@ -737,6 +753,33 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
   if (agentError || !agent) {
     console.error('❌ Agent not found:', agentError);
     throw new Error(`Agent not found with identifier: ${targetAgent}`);
+  }
+
+  // 🔐 AUTHENTICATION & AUTHORIZATION CHECK
+  // Validate agent access for anonymous users
+  if (isAnonymousUser) {
+    const agentObj = agent as unknown as Agent;
+    const agentIsRestricted = agentObj.is_restricted;
+    const agentIsFree = agentObj.is_free;
+    
+    console.log('🔐 Anonymous user agent access validation:', {
+      agentName: agentObj.name,
+      is_restricted: agentIsRestricted,
+      is_free: agentIsFree,
+      canAccess: !agentIsRestricted || agentIsFree
+    });
+    
+    // Anonymous users can only access agents that are:
+    // 1. NOT restricted (is_restricted = false), OR
+    // 2. Free agents (is_free = true, even if restricted)
+    if (agentIsRestricted && !agentIsFree) {
+      console.log('🚫 ACCESS DENIED: Anonymous user trying to access restricted agent:', agentObj.name);
+      throw new Error(`Access denied: The ${agentObj.name} agent requires an account to use. Please sign up or log in to access specialized agents and advanced features. Anonymous users can use the Solutions agent and other free agents.`);
+    }
+    
+    console.log('✅ Access granted: Anonymous user can access agent:', agentObj.name);
+  } else {
+    console.log('✅ Authenticated user - full agent access granted');
   }
 
   // CHECK IF WE'RE ALREADY ON THE REQUESTED AGENT - PREVENT REDUNDANT SWITCHES
@@ -818,29 +861,9 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
 
   console.log('✅ Agent switch completed successfully');
 
-  // Create ACTIONABLE context message for the new agent to auto-process the original request
-  let contextMessage = '';
-  let autoProcessMessage = '';
-  
-  if (data.user_input) {
-    contextMessage = `User context from previous agent: "${data.user_input}". Please continue assisting with this request.`;
-    
-    // Generate specific instructions based on the new agent's role and the user request
-    const userRequest = data.user_input.toLowerCase();
-    const newAgentRole = (agent as unknown as Agent).role;
-    const newAgentName = (agent as unknown as Agent).name;
-    
-    if (newAgentRole === 'design' && (userRequest.includes('rfp') || userRequest.includes('questionnaire') || userRequest.includes('form') || userRequest.includes('procurement') || userRequest.includes('source') || userRequest.includes('buy'))) {
-      // RFP Design agent should auto-create RFP and forms
-      autoProcessMessage = `\n\n🤖 AUTO-PROCESSING: Based on the user's request "${data.user_input}", I will now create the RFP and generate the necessary forms. Please execute the appropriate create_and_set_rfp and create_form_artifact functions to fulfill this request.`;
-    } else if (newAgentRole === 'sales' && (userRequest.includes('help') || userRequest.includes('what') || userRequest.includes('how'))) {
-      // Solutions agent should provide information
-      autoProcessMessage = `\n\n🤖 AUTO-PROCESSING: I'll help answer the user's question: "${data.user_input}". Let me provide comprehensive information about our platform and services.`;
-    } else {
-      // Generic auto-processing message
-      autoProcessMessage = `\n\n🤖 AUTO-PROCESSING: I'll now assist with the user's request: "${data.user_input}". Let me take the appropriate actions based on my role as ${newAgentName}.`;
-    }
-  }
+  console.log('✅ Agent switch completed - new agent will read conversation history');
+
+  // No longer pass context directly - new agent will read session messages
 
   return {
     success: true,
@@ -854,13 +877,51 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
       initial_prompt: (agent as unknown as Agent).initial_prompt
     },
     switch_reason: reason,
-    user_context: data.user_input,
-    context_message: contextMessage + autoProcessMessage,
-    message: `Successfully switched to ${(agent as unknown as Agent).name} agent.  The ${(agent as unknown as Agent).name} will respond in the next message.`,
-    stop_processing: false, // Allow streaming to continue
-    auto_process_context: data.user_input, // Include the original request for auto-processing
-    trigger_continuation: true // Flag to trigger continuation with new agent
+    message: `Successfully switched to ${(agent as unknown as Agent).name} agent. The ${(agent as unknown as Agent).name} will now read the conversation history and respond accordingly.`,
+    trigger_continuation: true // Flag to trigger continuation with new agent reading full conversation
   };
+}
+
+// Fetch conversation history for agent switching context
+export async function fetchConversationHistory(supabase: SupabaseClient, sessionId: string): Promise<ConversationMessage[]> {
+  console.log('📚 Fetching conversation history for session:', sessionId);
+  
+  const { data: messages, error } = await supabase
+    .from('messages')
+    .select(`
+      id,
+      role,
+      message,
+      created_at,
+      agent_id,
+      is_system_message,
+      metadata,
+      agents!inner (
+        name,
+        role
+      )
+    `)
+    .eq('session_id', sessionId)
+    .order('created_at', { ascending: true });
+
+  if (error) {
+    console.error('❌ Failed to fetch conversation history:', error);
+    throw new Error(`Failed to fetch conversation history: ${error.message}`);
+  }
+
+  console.log(`📚 Retrieved ${messages?.length || 0} messages from conversation history`);
+  
+  return (messages || []).map(msg => ({
+    id: msg.id,
+    role: msg.role as 'user' | 'assistant' | 'system',
+    message: msg.message,
+    created_at: msg.created_at,
+    agent_id: msg.agent_id,
+    is_system_message: msg.is_system_message,
+    metadata: msg.metadata,
+    agent_name: (msg.agents as any)?.name,
+    agent_role: (msg.agents as any)?.role
+  })) as ConversationMessage[];
 }
 
 // Recommend agent for a topic

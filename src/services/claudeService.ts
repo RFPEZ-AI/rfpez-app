@@ -1462,6 +1462,85 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
         }
       }
 
+      // Check if we need recursive continuation after tool processing
+      const needsContinuation = functionsExecuted.length > 0 && 
+                              (!finalContent || finalContent.trim().length < 50) &&
+                              !agentSwitchOccurred && 
+                              stream && onChunk; // Only continue if streaming with callback
+      
+      if (needsContinuation) {
+        console.log('🔄 Detected need for recursive continuation after tool processing');
+        
+        // Build updated conversation history with tool results
+        const updatedMessages: MessageParam[] = [
+          ...conversationHistory,
+          {
+            role: 'user',
+            content: userMessage
+          },
+          {
+            role: 'assistant',
+            content: finalContent || 'I have processed your request and executed the necessary functions.'
+          }
+        ];
+        
+        // Add tool results as system messages to provide context
+        if (allFunctionResults.length > 0) {
+          const toolSummary = allFunctionResults.map(result => 
+            `${result.function}: ${typeof result.result === 'object' ? JSON.stringify(result.result) : result.result}`
+          ).join('; ');
+          
+          updatedMessages.push({
+            role: 'user',
+            content: `Based on the tool results (${toolSummary}), please continue your response with any additional information or next steps.`
+          });
+        }
+        
+        try {
+          console.log('🔄 Starting recursive continuation call');
+          const continuationResponse = await this.generateResponse(
+            '', // Empty user message since we're continuing with updated history
+            agent,
+            updatedMessages,
+            sessionId,
+            userProfile,
+            currentRfp,
+            currentArtifact,
+            abortSignal,
+            stream,
+            onChunk
+          );
+          
+          // Combine responses
+          const combinedContent = (finalContent + ' ' + continuationResponse.content).trim();
+          const combinedFunctions = [...functionsExecuted, ...(continuationResponse.metadata.functions_called || [])];
+          const combinedResults = [...allFunctionResults, ...(continuationResponse.metadata.function_results || [])];
+          
+          console.log('🔄 Recursive continuation completed, combined response length:', combinedContent.length);
+          
+          return {
+            content: combinedContent,
+            metadata: {
+              model: response.model,
+              tokens_used: (response.usage?.input_tokens + response.usage?.output_tokens || 0) + 
+                          (continuationResponse.metadata.tokens_used || 0),
+              response_time: responseTime,
+              temperature: 0.7,
+              functions_called: combinedFunctions,
+              function_results: combinedResults,
+              agent_switch_occurred: agentSwitchOccurred,
+              agent_switch_result: agentSwitchResult,
+              is_streaming: stream,
+              stream_complete: true,
+              recursive_continuation: true
+            }
+          };
+        } catch (continuationError) {
+          console.error('🔄 Recursive continuation failed:', continuationError);
+          // Fall back to original response
+        }
+      }
+
       return {
         content: finalContent,
         metadata: {
