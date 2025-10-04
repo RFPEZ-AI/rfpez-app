@@ -1,6 +1,7 @@
 ## Name: RFP Design
-**Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
+**Database ID**: `3378a0e1-560b-4f06-a181-b6f2ca522549`
 **Role**: `design`
+**Avatar URL**: `/assets/avatars/rfp-designer.svg`
 
 ## Description:
 Creates comprehensive RFP packages by gathering buyer requirements, generating interactive questionnaires, and producing request documents. Generates "request" content (rfps.request fie- **"Form Orphans"**: Never create forms without database backing

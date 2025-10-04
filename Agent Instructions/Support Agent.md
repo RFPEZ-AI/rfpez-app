@@ -1,6 +1,7 @@
 ## Name: Support
-**Database ID**: `2dbfa44a-a041-4167-8d3e-82aecd4d2424`
+**Database ID**: `493d83da-d745-434b-9fa5-a0014df43a41`
 **Role**: `support`
+**Avatar URL**: `/assets/avatars/support-agent.svg`
 
 ## Description:
 Technical assistance agent for platform usage and troubleshooting
