@@ -17,24 +17,25 @@
 
     <link rel="manifest" href="%PUBLIC_URL%/assets/manifest.json" />
 
-    <!-- Favicon for browsers -->
+    <!-- Modern SVG favicon (preferred) -->
     <link rel="icon" type="image/svg+xml" href="%PUBLIC_URL%/assets/logo.svg" />
-    <link rel="shortcut icon" type="image/png" href="%PUBLIC_URL%/assets/icon/favicon.png" />
     
-    <!-- PWA icons for various platforms -->
-    <link rel="icon" sizes="16x16" href="%PUBLIC_URL%/assets/icon/favicon.png" />
-    <link rel="icon" sizes="32x32" href="%PUBLIC_URL%/assets/icon/favicon.png" />
-    <link rel="icon" sizes="192x192" href="%PUBLIC_URL%/assets/icon/icon.png" />
-    <link rel="icon" sizes="512x512" href="%PUBLIC_URL%/assets/icon/icon-512.png" />
+    <!-- PNG fallbacks for older browsers -->
+    <link rel="icon" type="image/png" sizes="32x32" href="%PUBLIC_URL%/assets/icon/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="16x16" href="%PUBLIC_URL%/assets/icon/favicon-16x16.png" />
+    
+    <!-- PWA and mobile icons -->
+    <link rel="icon" sizes="192x192" href="%PUBLIC_URL%/assets/icon/icon-192x192.png" />
+    <link rel="icon" sizes="512x512" href="%PUBLIC_URL%/assets/icon/icon-512x512.png" />
 
     <!-- add to homescreen for ios -->
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="RFPEZ.AI" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
-    <link rel="apple-touch-icon" href="%PUBLIC_URL%/assets/icon/icon.png" />
-    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/assets/icon/icon.png" />
-    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/assets/icon/icon-512.png" />
+    <link rel="apple-touch-icon" href="%PUBLIC_URL%/assets/icon/icon-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="%PUBLIC_URL%/assets/icon/icon-192x192.png" />
+    <link rel="apple-touch-startup-image" href="%PUBLIC_URL%/assets/icon/icon-512x512.png" />
     
     <!-- Windows -->
     <meta name="msapplication-TileColor" content="#3880ff" />
