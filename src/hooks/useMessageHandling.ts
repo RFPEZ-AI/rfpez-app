@@ -568,6 +568,7 @@ export const useMessageHandling = () => {
 
         // Create streaming callback with proper UTF-8 handling and buffering
         let streamingBuffer = '';
+        let accumulatedContent = ''; // STREAMING FIX: Track total accumulated content
         let lastUpdateTime = 0;
         const updateInterval = 50; // Update UI every 50ms to reduce re-render frequency
         let streamingCompleted = false;
@@ -790,10 +791,13 @@ export const useMessageHandling = () => {
                   messageId: aiMessageId
                 });
                 
+                // STREAMING FIX: Add final buffer to accumulated content
+                accumulatedContent += streamingBuffer;
+                
                 setMessages(prev => 
                   prev.map(msg => 
                     msg.id === aiMessageId 
-                      ? { ...msg, content: msg.content + streamingBuffer }
+                      ? { ...msg, content: accumulatedContent } // Use accumulated content
                       : msg
                   )
                 );
@@ -810,7 +814,9 @@ export const useMessageHandling = () => {
           
           // If we get new content after tool processing started, create a new message
           // Also handle recursive continuation content
-          if (isWaitingForToolCompletion && chunk.trim()) {
+          // STREAMING ACCUMULATION FIX: Only create continuation if we have a tool processing message
+          // This prevents message ID switching during normal streaming of text content
+          if (isWaitingForToolCompletion && chunk.trim() && toolProcessingMessageId) {
             console.log('📝 Creating new message for content after tool processing (may be recursive continuation):', {
               chunk: chunk.substring(0, 50) + '...',
               chunkLength: chunk.length,
@@ -828,10 +834,13 @@ export const useMessageHandling = () => {
                 currentMessageId: aiMessageId
               });
               
+              // STREAMING FIX: Add buffer to accumulated content before transitioning
+              accumulatedContent += streamingBuffer;
+              
               setMessages(prev => 
                 prev.map(msg => 
                   msg.id === aiMessageId 
-                    ? { ...msg, content: msg.content + streamingBuffer }
+                    ? { ...msg, content: accumulatedContent } // Use accumulated content
                     : msg
                 )
               );
@@ -878,12 +887,21 @@ export const useMessageHandling = () => {
             aiMessageId = continuationMessageId;
             isWaitingForToolCompletion = false;
             streamingBuffer = '';
+            accumulatedContent = chunk; // STREAMING FIX: Reset accumulator with the continuation content
             lastUpdateTime = Date.now();
             
             console.log('🔄 Switched to continuation message ID:', aiMessageId);
             return;
           }
           
+          // DEBUG: Log conditions that might trigger continuation logic
+          console.log('🔍 CONTINUATION CHECK:', {
+            isWaitingForToolCompletion,
+            hasChunk: !!chunk?.trim(),
+            toolProcessingMessageId,
+            willTriggerContinuation: isWaitingForToolCompletion && chunk.trim() && toolProcessingMessageId
+          });
+
           // STREAMING BUFFER FIX: Filter out tool metadata from text chunks
           // Only add to buffer if chunk contains actual text content (not tool metadata)
           // CRITICAL FIX: Preserve whitespace characters (spaces, newlines) - they are valid text!
@@ -929,10 +947,13 @@ export const useMessageHandling = () => {
               bufferLength: streamingBuffer.length
             });
             
+            // STREAMING FIX: Add buffer to accumulated content before updating UI
+            accumulatedContent += streamingBuffer;
+            
             setMessages(prev => {
               const updated = prev.map(msg => 
                 msg.id === aiMessageId 
-                  ? { ...msg, content: msg.content + streamingBuffer }
+                  ? { ...msg, content: accumulatedContent } // Use accumulated content instead of msg.content + buffer
                   : msg
               );
               
@@ -940,6 +961,7 @@ export const useMessageHandling = () => {
               const updatedMessage = updated.find(msg => msg.id === aiMessageId);
               console.log('🔧 UI MESSAGE UPDATED:', {
                 messageId: aiMessageId,
+                accumulatedLength: accumulatedContent.length,
                 newContentLength: updatedMessage?.content.length,
                 newContentPreview: updatedMessage?.content.substring(0, 100) + '...'
               });

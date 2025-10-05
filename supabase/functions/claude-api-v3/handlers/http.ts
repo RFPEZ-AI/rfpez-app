@@ -94,14 +94,22 @@ async function streamWithRecursiveTools(
       if (chunkData.type === 'text' && chunkData.content) {
         const textContent = chunkData.content as string;
         
-        // STREAMING BUFFER FIX: Ensure only clean text content is sent to client
-        // Filter out any tool metadata that might have leaked into text content
-        // CRITICAL FIX: Clean metadata while preserving all necessary whitespace
-        const cleanTextContent = textContent
-          .replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, '') // Remove UUIDs completely
-          .replace(/\{"id":"[^"]+","type":"[^"]+"\}/g, '') // Remove JSON objects completely
-          .replace(/\btool_use_id\b[^,}\]]+[,}\]]/g, '') // Remove tool_use_id references completely
-          .replace(/[ \t]{2,}/g, ' '); // Only normalize multiple horizontal spaces (preserve single spaces and all newlines)
+        // MINIMAL TEXT CLEANING: Only remove obvious tool metadata, preserve all actual content
+        let cleanTextContent = textContent;
+        
+        // Only clean if text contains clear tool metadata markers (very conservative)
+        if (textContent.includes('"tool_use_id"') || textContent.includes('"type":"tool_use"')) {
+          cleanTextContent = textContent
+            .replace(/\{"tool_use_id":"[^"]+"[^}]*\}/g, '') // Remove complete tool_use_id objects only
+            .replace(/\{"id":"[^"]+","type":"tool_use"[^}]*\}/g, '') // Remove tool_use JSON objects only
+            .trim();
+        }
+        
+        console.log('🧹 Text cleaning:', {
+          original_length: textContent.length,
+          cleaned_length: cleanTextContent.length,
+          had_tool_metadata: textContent !== cleanTextContent
+        });
         
 
         
@@ -266,8 +274,19 @@ async function streamWithRecursiveTools(
           recursionDepth + 1
         );
         
-        // Merge continuation results
-        fullContent += '\n\n' + continuationResult.fullContent;
+        // Merge continuation results with proper transition handling
+        // AGENT SWITCH TRANSITION FIX: If original content ends abruptly, add transition text
+        let transitionContent = '';
+        if (fullContent.length > 0 && !fullContent.endsWith('.') && !fullContent.endsWith('!') && !fullContent.endsWith('?')) {
+          // Original content was truncated mid-sentence, provide smooth transition
+          transitionContent = '...\n\n*Connecting you with our RFP Design specialist for detailed technical assistance...*\n\n';
+          console.log('🔄 Adding transition text for truncated agent switch');
+        } else if (fullContent.length > 0) {
+          // Original content was complete, add normal separator
+          transitionContent = '\n\n';
+        }
+        
+        fullContent += transitionContent + continuationResult.fullContent;
         toolsUsed.push(...continuationResult.toolsUsed.filter(tool => !toolsUsed.includes(tool)));
         executedToolResults.push(...continuationResult.executedToolResults);
         
