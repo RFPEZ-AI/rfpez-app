@@ -928,8 +928,8 @@ const Home: React.FC = () => {
       // 🔥 CRITICAL FIX: Actually create a new session in the database
       if (isAuthenticated && userId && createNewSession) {
         console.log('🔥 Creating actual new session in database...');
-        // For new sessions, we don't want to inherit the current RFP, so pass null for both agent (will use default) and RFP ID
-        const newSessionId = await createNewSession(currentAgent, undefined);
+        // For new sessions, always use the default Solutions agent and no RFP ID
+        const newSessionId = await createNewSession(null, undefined);
         
         if (newSessionId) {
           console.log('✅ New session created successfully:', newSessionId);
@@ -956,22 +956,11 @@ const Home: React.FC = () => {
             await loadUserSessions();
           }
           
-          // Use the currently selected agent, or default if none selected
-          if (currentAgent) {
-            const initialMessage: Message = {
-              id: 'initial-prompt',
-              content: currentAgent.agent_initial_prompt,
-              isUser: false,
-              timestamp: new Date(),
-              agentName: currentAgent.agent_name
-            };
+          // Always load the default agent for new sessions since we passed null to createNewSession
+          const initialMessage = await loadDefaultAgentWithPrompt();
+          if (initialMessage) {
             setMessages([initialMessage]);
-            console.log('New session started with current agent:', currentAgent.agent_name);
-          } else {
-            const initialMessage = await loadDefaultAgentWithPrompt();
-            if (initialMessage) {
-              setMessages([initialMessage]);
-            }
+            console.log('New session started with default agent:', initialMessage.agentName);
           }
           
           console.log('🎉 New session created successfully with clean state');

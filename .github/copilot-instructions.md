@@ -855,39 +855,82 @@ await mcp_browser_click({ index: elements[0].index });
 ### UI Test Automation Identifiers
 Key UI elements are decorated with `data-testid` attributes for reliable MCP browser testing:
 
-**Core Navigation & Actions:**
-- `data-testid="new-rfp-button"` - New RFP creation button in RFP menu
-- `data-testid="message-input"` - Main message input textarea
+**Navigation & Menu Access:**
+- `data-testid="new-session-button"` - New session creation button in sidebar (✅ CRITICAL)
+- `data-testid="main-menu-button"` - Main developer/admin menu trigger button (developer role+)
+- `data-testid="rfp-menu-button"` - RFP management menu trigger button (all authenticated users)
+- `data-testid="agents-menu-button"` - Agent management menu trigger button (all authenticated users)
+
+**Core Messaging & Actions:**
+- `data-testid="message-input"` - Main message input textarea (✅ CRITICAL)
 - `data-testid="submit-message-button"` - Message submit button (or use ENTER key)
 - `data-testid="agent-selector"` - Agent indicator/selector (click to switch agents)
 - `data-testid="select-agent-button"` - Explicit agent selection button (when no agent selected)
 
 **RFP & Context Management:**
+- `data-testid="new-rfp-button"` - New RFP creation button in RFP menu
 - `data-testid="rfp-context-footer"` - Footer container showing current RFP context
 - `data-testid="current-rfp-display"` - Specific text showing "Current RFP: [name]"
 - `data-testid="set-current-rfp-{id}"` - Buttons to set specific RFP as current
-- `data-testid="artifact-window-toggle"` - Button to show/hide artifact panel
 
 **Artifact & Form Interaction:**
+- `data-testid="artifact-window-toggle"` - Button to show/hide artifact panel
 - `data-testid="artifact-window"` - Main artifact panel container
 - `data-testid="artifact-item-{name}"` - Individual artifact items (name slugified)
 - `data-testid="form-submit-button"` - Form submission button in artifacts
 - `data-testid="artifact-toggle"` - Artifact panel expand/collapse button
 
-**Usage in MCP Browser Tests:**
+**Preferred MCP Browser Testing Approach:**
 ```javascript
-// Navigate and interact with key elements
-await mcp_browser_click({ selector: '[data-testid="new-rfp-button"]' });
+// 🎯 RECOMMENDED: Use selector-based targeting instead of index-based
+// ✅ Reliable approach - works across UI changes
+await mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
 await mcp_browser_form_input_fill({ selector: '[data-testid="message-input"]', value: 'test message' });
 await mcp_browser_press_key({ key: 'Enter' }); // Submit message
 await mcp_browser_click({ selector: '[data-testid="agent-selector"]' }); // Switch agent
-await mcp_browser_click({ selector: '[data-testid="artifact-item-led-lighting-requirements-assessment"]' });
-await mcp_browser_click({ selector: '[data-testid="form-submit-button"]' });
+
+// ❌ Avoid index-based targeting when possible (brittle)
+await mcp_browser_click({ index: 2 });  // Index can change with UI updates
+
+// 🔍 Fallback: Use index when selector not available (with screenshot verification)
+const elements = await mcp_browser_get_clickable_elements();
+await mcp_browser_screenshot({ name: 'before-click' }); // Debug screenshot
+await mcp_browser_click({ index: elements.findIndex(el => el.text?.includes('Target Text')) });
+```
+
+**Complete Testing Workflow Example:**
+```javascript
+// Standard test session setup with new identifiers
+await activate_mcp_browser_navigation_tools();
+await activate_mcp_browser_interaction_tools();
+await activate_mcp_browser_visual_tools();
+
+// Navigate and start session
+await mcp_browser_navigate({ url: 'http://localhost:3100' });
+await mcp_browser_screenshot({ name: 'homepage' });
+
+// Create new session (much more reliable now!)
+await mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
+
+// Send message using selector instead of guessing index
+await mcp_browser_form_input_fill({ 
+  selector: '[data-testid="message-input"]', 
+  value: 'Create a new RFP for LED lighting procurement' 
+});
+await mcp_browser_press_key({ key: 'Enter' });
 
 // Verify state changes
 const footer = await mcp_browser_get_text({ selector: '[data-testid="current-rfp-display"]' });
 // Should show "Current RFP: [name]" immediately after creation
 ```
+
+**🎯 Key MCP Browser Testing Improvements:**
+- **Reliable Element Location**: All critical navigation elements now have consistent `data-testid` attributes
+- **Fixed Missing UI Elements**: Added missing trigger buttons for RFP and Agents menus (were previously inaccessible)
+- **Comprehensive Coverage**: Core user workflows (session creation, messaging, agent switching, menu access) all have proper test identifiers
+- **Consistent Naming**: Uses kebab-case naming convention (`element-name-action`)
+- **Selector-First Approach**: Prefer `data-testid` selectors over brittle index-based targeting
+- **Test identifiers follow kebab-case naming**: `data-testid="element-name-action"`
 
 ## Testing Notes
 - Console warnings for Ionic/Stencil components are expected

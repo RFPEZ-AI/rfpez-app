@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon } from '@ionic/react';
-import { documentTextOutline } from 'ionicons/icons';
+import { documentTextOutline, personCircle } from 'ionicons/icons';
 import type { User } from '@supabase/supabase-js';
 import { RFP } from '../types/rfp';
 import { Agent, SessionActiveAgent, UserProfile } from '../types/database';
@@ -119,6 +119,15 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
           })()}
           
           {/* RFP Menu - Available to all authenticated users for creating and editing RFPs */}
+          <IonButton 
+            fill="clear" 
+            onClick={() => setShowRFPMenu(true)}
+            data-testid="rfp-menu-button"
+          >
+            <IonIcon icon={documentTextOutline} slot="start" /> 
+            RFP
+          </IonButton>
+          
           <GenericMenu
             items={rfps}
             getLabel={r => r.name || `RFP #${r.id}`}
@@ -133,6 +142,16 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             setShowPopover={setShowRFPMenu}
             title="RFP"
           />
+          
+          {/* Agents Menu - Available to authenticated users for agent management */}
+          <IonButton 
+            fill="clear" 
+            onClick={() => setShowAgentsMenu(true)}
+            data-testid="agents-menu-button"
+          >
+            <IonIcon icon={personCircle} slot="start" /> 
+            Agents
+          </IonButton>
           
           <AgentsMenu
             agents={agents}
@@ -172,6 +191,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
               onSwitchAgent={onSwitchAgent}
               compact={true}
               showSwitchButton={true}
+              data-testid="agent-selector"
             />
           </div>
         </div>
