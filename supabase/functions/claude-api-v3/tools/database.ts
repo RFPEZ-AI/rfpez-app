@@ -382,6 +382,86 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
   };
 }
 
+// Create a document artifact and store in the database
+export async function createDocumentArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: {
+  name: string;
+  description?: string;
+  content: string;
+  content_type?: string;
+  artifactRole: string;
+  tags?: string[];
+}) {
+  const { name, description, content, content_type = 'markdown', artifactRole, tags = [] } = data;
+  
+  // Map artifact role to valid database value
+  const mappedRole = mapArtifactRole(artifactRole);
+  if (!mappedRole) {
+    throw new Error(`Invalid artifact role: ${artifactRole}`);
+  }
+  
+  // Generate a unique ID for the artifact (artifacts table uses text ID)
+  const artifactId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  
+  console.log('Creating document artifact:', { artifactId, name, description, artifactRole, mappedRole, sessionId, userId });
+  
+  // Validate content_type
+  const validContentTypes = ['markdown', 'plain', 'html'];
+  if (!validContentTypes.includes(content_type)) {
+    throw new Error(`Content type must be one of: ${validContentTypes.join(', ')}`);
+  }
+  
+  const { data: artifact, error } = await supabase
+    .from('artifacts')
+    .insert({
+      id: artifactId, // Provide the required ID field
+      session_id: sessionId,
+      user_id: userId,
+      name: name,
+      description: description,
+      artifact_role: mappedRole,
+      schema: {
+        type: 'text',
+        content_type,
+        tags: tags || []
+      },
+      ui_schema: null,
+      default_values: {
+        content,
+        content_type,
+        tags: tags || []
+      },
+      submit_action: null,
+      type: 'document', // Set the type as 'document'
+      status: 'active', // Required by constraint
+      processing_status: 'completed', // Required by constraint
+      file_size: content.length,
+      mime_type: content_type === 'html' ? 'text/html' : content_type === 'plain' ? 'text/plain' : 'text/markdown',
+      processed_content: content,
+      metadata: {
+        type: 'text',
+        content_type,
+        description: description || null,
+        tags: tags || [],
+        user_id: userId
+      },
+      created_at: new Date().toISOString()
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error creating document artifact:', error);
+    throw error;
+  }
+
+  return {
+    success: true,
+    artifact_id: (artifact as unknown as { id: string }).id,
+    artifact_name: name, // Include the name in the response
+    message: `Created ${mappedRole} document artifact: ${name}`
+  };
+}
+
 // Get conversation history for a session
 export async function getConversationHistory(supabase: SupabaseClient, sessionId: string, limit = 50) {
   const { data: messages, error } = await supabase

@@ -70,6 +70,52 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
     }
   },
   {
+    name: 'create_document_artifact',
+    description: 'Create a document artifact (text document, RFP document, etc.) and store it in the database',
+    input_schema: {
+      type: 'object',
+      properties: {
+        name: {
+          type: 'string',
+          description: 'Name/title of the document artifact'
+        },
+        description: {
+          type: 'string',
+          description: 'Description of the document artifact'
+        },
+        content: {
+          type: 'string',
+          description: 'The text content of the document (markdown, plain text, etc.)'
+        },
+        content_type: {
+          type: 'string',
+          description: 'Content type of the document',
+          enum: ['markdown', 'plain', 'html'],
+          default: 'markdown'
+        },
+        artifactRole: {
+          type: 'string',
+          description: 'Role/type of the document artifact',
+          enum: [
+            'request_document',
+            'rfp_document',
+            'proposal_document',
+            'specification_document',
+            'contract_document',
+            'report_document',
+            'template',
+            'other_document'
+          ]
+        },
+        tags: {
+          type: 'array',
+          description: 'Optional tags for categorizing the document'
+        }
+      },
+      required: ['name', 'content', 'artifactRole']
+    }
+  },
+  {
     name: 'get_conversation_history',
     description: 'Retrieve conversation history for the current session',
     input_schema: {
@@ -254,15 +300,15 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
 // Define role-based tool restrictions
 const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: string[] }> = {
   'sales': {
-    // Solutions agent (sales role) can now create forms but should NOT create RFPs directly - must switch to RFP Design for RFP creation
+    // Solutions agent (sales role) can now create forms and documents but should NOT create RFPs directly - must switch to RFP Design for RFP creation
     blocked: ['create_and_set_rfp']
   },
   'design': {
     // RFP Design has access to all RFP creation tools - REMOVED switch_agent to prevent self-switching loops
-    allowed: ['create_and_set_rfp', 'create_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'create_session', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
+    allowed: ['create_and_set_rfp', 'create_form_artifact', 'create_document_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'create_session', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
   },
   'support': {
-    // Support agents don't need RFP creation tools
+    // Support agents don't need RFP creation tools but can create documents
     blocked: ['create_and_set_rfp', 'create_form_artifact']
   }
 };

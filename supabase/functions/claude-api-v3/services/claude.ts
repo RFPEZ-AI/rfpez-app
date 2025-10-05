@@ -311,6 +311,12 @@ export class ToolExecutionService {
           return await createFormArtifact(this.supabase, sessionId!, this.userId, input);
         }
 
+        case 'create_document_artifact': {
+          const { createDocumentArtifact } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await createDocumentArtifact(this.supabase, sessionId!, this.userId, input);
+        }
+
         case 'get_conversation_history': {
           const { getConversationHistory } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
