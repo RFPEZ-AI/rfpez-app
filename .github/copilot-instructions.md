@@ -6,6 +6,84 @@ RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend
 ## Current goal
 The current goal is to get the product demo ready following the instructions in DEMO-INSTRUCTIONS.md
 
+## Quick Reference
+
+### Essential Commands
+```bash
+# Environment Status Check
+echo "Current Supabase Config:" && grep -E "REACT_APP_SUPABASE_URL|REACT_APP_SUPABASE_ANON_KEY" .env.local
+# Local: 127.0.0.1:54321 | Remote: jxlutaztoukwbbgtoulc.supabase.co
+
+# Server Management (Use VS Code Tasks ONLY)
+# Ctrl+Shift+P → "Tasks: Run Task" → Select:
+# - "Start Development Server" (React app - port 3100)
+# - "Start API" (API server - port 3001) 
+# - "Start Edge Runtime" (Edge functions)
+
+# Local Supabase Stack
+supabase start                    # Start all local services
+supabase status                   # Check service status
+supabase stop                     # Stop all services
+
+# Edge Function Development
+supabase functions serve claude-api-v3 --debug    # Local testing with logs
+supabase functions deploy claude-api-v3           # Deploy to remote
+supabase functions list                           # Check versions
+
+# Database Operations
+supabase migration new feature_name         # Create new migration
+supabase db reset                          # Apply all migrations locally
+supabase db push                           # Deploy schema to remote
+supabase migration list                    # Check sync status
+
+# Testing Commands
+npm test -- --watchAll=false              # Single test run
+# Use VS Code Task: "Run Tests (Watch Mode)" for continuous testing
+# Use VS Code Task: "Run Tests with Coverage" for coverage reports
+```
+
+### Environment Verification
+```bash
+# Check Current Environment
+echo "🔍 Environment Check:"
+echo "Supabase URL: $(grep REACT_APP_SUPABASE_URL .env.local | cut -d'=' -f2)"
+echo "Local Supabase Status:" && supabase status --output env 2>/dev/null || echo "❌ Local Supabase not running"
+echo "React Dev Server:" && curl -s http://localhost:3100 >/dev/null && echo "✅ Running" || echo "❌ Not running"
+echo "API Server:" && curl -s http://localhost:3001/health >/dev/null && echo "✅ Running" || echo "❌ Not running"
+
+# Switch Environments
+./scripts/supabase-local.bat     # Switch to LOCAL (Windows)
+./scripts/supabase-remote.bat    # Switch to REMOTE (Windows)
+./scripts/supabase-local.sh      # Switch to LOCAL (Linux/Mac)
+./scripts/supabase-remote.sh     # Switch to REMOTE (Linux/Mac)
+```
+
+### Port Usage Reference
+- **3100**: React Development Server (VS Code Task)
+- **3001**: API Server (VS Code Task)
+- **3000**: Supabase MCP Server
+- **54321**: Local Supabase API
+- **54322**: Local PostgreSQL Database  
+- **54323**: Local Supabase Studio
+
+### Troubleshooting Quick Fixes
+```bash
+# Port Conflicts
+netstat -ano | findstr :3100              # Check what's using port 3100 (Windows)
+lsof -ti:3100 | xargs kill -9             # Kill process on port 3100 (Linux/Mac)
+
+# Edge Runtime Issues
+docker restart supabase_edge_runtime_rfpez-app-local
+# Or use VS Code Task: "Restart Edge Runtime"
+
+# VS Code Task Issues
+# Ctrl+Shift+P → "Tasks: Terminate Task" → Select task to stop
+# Then restart with "Tasks: Run Task"
+
+# Agent UUID Lookup (for instruction updates)
+SELECT id, name FROM agents WHERE name IN ('Solutions', 'RFP Design', 'Support');
+```
+
 ## Architecture Patterns
 
 ### Service Layer Pattern
@@ -26,7 +104,7 @@ The current goal is to get the product demo ready following the instructions in 
 - Agent switching via `session_agents` junction table tracking active agent per session
 - All messages linked to agent_id for conversation attribution
 - Three access tiers: public, free (authenticated), premium (billing required)
-- Default agents: Solutions (sales), RFP Design (free), Technical Support, RFP Assistant
+- Default agents: Solutions (sales), RFP Design (free), Support, RFP Assistant
 - Agent switching via Claude function calls now properly updates UI in real-time
 
 ## Critical Workflows
@@ -45,7 +123,7 @@ supabase start
 # Or manually edit .env.local to use local URLs
 
 # 3. Start React Development Server
-use task "Start Dev Server" in VS Code tasks (Ctrl+Shift+B)
+use VS Code task "Start Development Server" (Ctrl+Shift+P → Tasks: Run Task)
 ```
 
 #### **Edge Function Development Workflow**
@@ -181,17 +259,37 @@ supabase functions list    # Verify function versions updated with recent timest
 ```bash
 # When agent instructions are updated in Agent Instructions/*.md files:
 
-# 1. Read local agent instruction files
-# 2. Update remote database directly via SQL:
-UPDATE agents 
-SET instructions = 'FULL_AGENT_INSTRUCTIONS_HERE'
-WHERE id = 'agent-uuid-here';
+# 1. Get Agent UUIDs (run this query first):
+SELECT id, name FROM agents WHERE name IN ('Solutions', 'RFP Design', 'Support');
+# Copy the UUID for the agent you're updating
 
-# 3. Verify updates with:
-SELECT name, LEFT(instructions, 100) as preview, updated_at 
+# 2. Read local agent instruction files
+# Note: Handle single quotes by doubling them ('') in SQL strings
+# Or use $$ delimiter for complex text
+
+# 3. Update remote database with proper SQL escaping:
+UPDATE agents 
+SET instructions = $$FULL_AGENT_INSTRUCTIONS_HERE$$,
+    updated_at = NOW()
+WHERE id = 'paste-uuid-from-step-1-here';
+
+# 4. Verify updates with:
+SELECT name, 
+       LENGTH(instructions) as instruction_length,
+       LEFT(instructions, 100) as preview, 
+       updated_at 
 FROM agents 
-WHERE name IN ('Solutions', 'RFP Design', 'Agent Name');
+WHERE name IN ('Solutions', 'RFP Design', 'Support')
+ORDER BY updated_at DESC;
+
+# 5. Test agent functionality after update
+# Switch to updated agent in app and verify behavior
 ```
+
+**💡 SQL String Handling Tips:**
+- Use `$$content$$` delimiters for multi-line text with quotes
+- Escape single quotes by doubling them: `'Don''t do this'`
+- Always verify character encoding for special characters
 
 **🚨 Critical Deployment Rules:**
 - **Always test locally first** - Never deploy untested code to remote
@@ -200,6 +298,12 @@ WHERE name IN ('Solutions', 'RFP Design', 'Agent Name');
 - **Agent instructions** - Must be updated via direct SQL, not migrations
 - **Validate after deployment** - Always verify functionality in remote environment
 - **Rollback plan** - Keep note of previous function versions for emergency rollback
+
+**🎯 Edge Function Versioning Strategy:**
+- **claude-api-v3**: Primary endpoint for all new development and production use
+- **claude-api-v2**: Legacy endpoint - kept for compatibility, avoid for new features
+- **supabase-mcp-server**: MCP protocol server - deploy after claude-api-v3
+- **Version Migration**: Always test V3 functionality before deprecating V2 usage
 
 **📊 Deployment Success Verification:**
 ```bash
@@ -210,7 +314,7 @@ supabase migration list  # Local and Remote columns should match
 supabase functions list  # Check updated timestamps and version numbers
 
 # Agent Instructions: Updated timestamps
-SELECT name, updated_at FROM agents WHERE name IN ('Solutions', 'RFP Design');
+SELECT name, updated_at FROM agents WHERE name IN ('Solutions', 'RFP Design', 'Support');
 
 # Application: Remote functionality verified
 # Test core workflows against remote endpoints
@@ -224,6 +328,30 @@ Successfully deployed local changes to remote:
 - ✅ **Verification**: All migrations synchronized, function versions incremented, agent timestamps updated
 
 This demonstrates the complete local-to-remote workflow ensuring all development work is properly deployed to production.
+
+**🚀 Complete Deployment Workflow Summary:**
+```bash
+# Pre-Deployment Checklist
+✅ All local tests passing (npm test -- --watchAll=false)
+✅ Edge functions working locally (supabase functions serve --debug)
+✅ Local database migrations applied (supabase db reset)
+✅ Environment switched to local for testing
+
+# Deployment Steps (in order)
+1. supabase migration list                    # Check pending migrations
+2. supabase db push                          # Deploy database changes
+3. supabase functions deploy claude-api-v3   # Deploy primary API
+4. supabase functions deploy supabase-mcp-server  # Deploy MCP server
+5. Update agent instructions via SQL (if needed)
+6. supabase migration list                   # Verify sync
+7. Switch to remote environment and test
+
+# Post-Deployment Verification
+✅ All migrations synchronized (Local = Remote)
+✅ Function versions incremented with recent timestamps
+✅ Agent instructions updated if modified
+✅ Core functionality tested against remote endpoints
+```
 
 ### Debugging and Logging Patterns
 
@@ -374,11 +502,22 @@ npm run mcp:test   # Test MCP server connection
 - **Testing**: MCPTestComponent for browser-based MCP debugging
 
 #### **MCP Tool Usage Guidelines**
-- **Preferred**: Use `mcp_supabase-offi_execute_sql` for direct SQL queries and database operations
-- **Avoid**: supabase-local MCP tools - they have limitations and timing constraints (1-minute log window)
-- **Database Operations**: Always use direct SQL execution instead of supabase-local MCP wrappers
-- **Log Access**: Use browser MCP tools to access Supabase Dashboard when CLI logs are insufficient
-- **Real-time Debugging**: Combine direct SQL queries with browser automation for comprehensive debugging
+
+**For Database Operations (in order of preference):**
+1. **Primary**: `mcp_supabase-offi_execute_sql` - Direct SQL execution with full query capability
+2. **Alternative**: Native Supabase CLI commands when MCP tools unavailable
+3. **Avoid**: supabase-local MCP tools - limited functionality and 1-minute log window constraint
+
+**For Logging and Monitoring:**
+- **Local Development**: `supabase functions serve --debug` for real-time edge function logs
+- **Local Container Logs**: `docker logs -f supabase_edge_runtime_rfpez-app-local` for edge runtime logs
+- **Remote Debugging**: Browser MCP tools to access Supabase Dashboard logs
+- **Historical Logs**: Direct dashboard access (MCP tools limited to last 1 minute)
+
+**For Testing and Validation:**
+- **Database State**: Direct SQL queries via `mcp_supabase-offi_execute_sql`
+- **API Testing**: Browser MCP tools for end-to-end workflow validation
+- **Performance**: Combine direct SQL analysis with browser automation
 
 ### Memory MCP Workflow Patterns
 - **Process Management**: Create entities for active processes (DevServer, TestRunner, etc.) with status observations
