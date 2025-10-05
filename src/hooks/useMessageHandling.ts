@@ -123,30 +123,14 @@ export const useMessageHandling = () => {
   const generateArtifactReferences = (metadata: Record<string, unknown>): ArtifactReference[] => {
     const refs: ArtifactReference[] = [];
     
-    // DEBUG: Log all metadata to understand the structure
-    console.log('🐛 DEBUG: generateArtifactReferences called with metadata:', JSON.stringify(metadata, null, 2));
+
     
     // Handle function results that contain forms/templates
-    console.log('🔍 DEBUG: Checking for function_results...', {
-      hasFunctionResults: !!metadata.function_results,
-      isArray: Array.isArray(metadata.function_results),
-      type: typeof metadata.function_results,
-      value: metadata.function_results
-    });
-    
     if (metadata.function_results && Array.isArray(metadata.function_results)) {
-      console.log('🔍 DEBUG: function_results found, length:', metadata.function_results.length);
       metadata.function_results.forEach((funcResult: Record<string, unknown>) => {
-        console.log('🔍 DEBUG: Processing function result:', funcResult);
         if (typeof funcResult === 'object' && funcResult !== null) {
           const funcObj = funcResult as Record<string, unknown>;
           const result = funcObj.result as Record<string, unknown>;
-          
-          console.log('🔍 DEBUG: Function object:', {
-            functionName: funcObj.function_name, // Fixed: use function_name not function
-            hasResult: !!result,
-            resultSuccess: result?.success
-          });
           
           // Handle different types of function results
           if (result && result.success) {
@@ -189,14 +173,6 @@ export const useMessageHandling = () => {
               });
             } else if (funcObj.function_name === 'create_document_artifact' || funcObj.function_name === 'generate_proposal_artifact') {
               // Document artifacts - check for success first, then artifact_id
-              console.log('🔍 DEBUG: Processing document artifact function:', {
-                function: funcObj.function_name,
-                hasResult: !!result,
-                resultSuccess: result?.success,
-                hasArtifactId: !!(result?.artifact_id),
-                result_keys: result ? Object.keys(result) : [],
-                fullResult: result
-              });
               
               if (result && (result.success || result.artifact_id)) {
                 const artifactRef = {
@@ -207,16 +183,7 @@ export const useMessageHandling = () => {
                   displayText: result.artifact_name as string || result.title as string || 'Generated Document'
                 };
                 
-                console.log('🔍 DEBUG: Adding artifact ref to array:', artifactRef);
                 refs.push(artifactRef);
-                console.log('🔍 DEBUG: Current refs array length:', refs.length);
-              } else {
-                console.log('❌ DEBUG: Document artifact creation failed or missing data:', {
-                  hasResult: !!result,
-                  resultSuccess: result?.success,
-                  hasArtifactId: !!(result?.artifact_id),
-                  result
-                });
               }
             } else if (funcObj.function_name === 'create_and_set_rfp') {
               // RFP creation - trigger UI refresh
@@ -1104,9 +1071,7 @@ export const useMessageHandling = () => {
         // });
 
         // Generate artifact references (still needed for database save, but UI update will be delayed)
-        console.log('🔍 METADATA DEBUG: Full Claude response metadata:', JSON.stringify(claudeResponse.metadata, null, 2));
         const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
-        console.log('🔍 ARTIFACT REFS DEBUG: Generated references:', artifactRefs);
         
         // Process Claude response metadata for artifacts with message ID
         console.log('🔍 useMessageHandling: About to call addClaudeArtifacts with metadata:', claudeResponse.metadata);
