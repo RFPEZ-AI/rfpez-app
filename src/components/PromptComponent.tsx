@@ -199,8 +199,8 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         border: '3px solid var(--ion-color-light-shade)',
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
       }}>
-        {/* File attachment button */}
-        {onAttachFile && (
+        {/* File attachment button - HIDDEN: Not yet supported, will be enabled later */}
+        {false && onAttachFile && (
           <div>
             <input
               type="file"
