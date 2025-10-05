@@ -9,7 +9,7 @@ The current goal is to get the product demo ready following the instructions in 
 ## Architecture Patterns
 
 ### Service Layer Pattern
-- **ClaudeService** (`src/services/claudeService.ts`): Claude API integration with function calling and MCP support
+- **ClaudeService** (`src/services/claudeService.ts`): Claude API integration with function calling and MCP support primarily via `claude-api-v3` Edge Function
 - **DatabaseService** (`src/services/database.ts`): Supabase operations with RLS policies
 - **AgentService** (`src/services/agentService.ts`): Multi-agent system management
 - Services use static methods and error handling with APIRetryHandler
@@ -19,6 +19,7 @@ The current goal is to get the product demo ready following the instructions in 
 - **Components**: `src/components/` - Reusable UI components with Ionic React
 - **Hooks**: `src/hooks/` - Custom hooks for state management (useHomeState, useSessionState, useAgentManagement)
 - **Types**: `src/types/` - TypeScript interfaces for database, home, RFP entities
+- **Refactoring**: If the component becomes complex, common logic extracted to hooks and services for maintainability.
 
 ### Multi-Agent System
 - Agents stored in `public.agents` table with instructions, prompts, and access control
@@ -51,16 +52,20 @@ use task "Start Dev Server" in VS Code tasks (Ctrl+Shift+B)
 ```bash
 # LOCAL-FIRST Edge Function Development:
 
-# 1. Develop & Test Functions Locally
+# 1. Ensure Edge Runtime is Running (if not already started)
+# Use VS Code Task: "Start Edge Runtime" if functions aren't responding
+# Or manually: docker start supabase_edge_runtime_rfpez-app-local
+
+# 2. Develop & Test Functions Locally
 supabase functions serve claude-api-v3  # Serves locally on port 54321
 # Test against local function endpoint: http://127.0.0.1:54321/functions/v1/claude-api-v3
 
-# 2. Local Function Testing
+# 3. Local Function Testing
 curl -X POST http://127.0.0.1:54321/functions/v1/claude-api-v3 \
   -H "Content-Type: application/json" \
   -d '{"test": "data"}'
 
-# 3. Only Deploy to Remote After Local Testing
+# 4. Only Deploy to Remote After Local Testing
 supabase functions deploy claude-api-v3  # Deploy to production
 
 # ❌ NEVER: Deploy directly to remote without local testing
@@ -492,7 +497,7 @@ export default Component;
 
 ### Deployment Workflow
 **Complete local-to-remote deployment process:**
-1. **Pre-deployment Quality Checks**: Run linting (`npm run lint`), unit tests (`npm test`), and edge function tests
+1. **Pre-deployment Quality Checks**: Run linting (`npm run lint`), unit tests (`npm test -- --watchAll=false`), and edge function tests.  Note use --watchAll=false to avoid hanging process
 2. **Clean Up**: Remove temporary files, debug artifacts, and development-only content
 3. **Database Deployment**: Push migrations (`supabase db push`), update agent instructions if modified
 4. **Edge Function Deployment**: Deploy functions (`supabase functions deploy claude-api-v3`, `supabase functions deploy supabase-mcp-server`)
