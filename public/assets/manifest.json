@@ -2,69 +2,70 @@
   "short_name": "RFPEZ.AI",
   "name": "RFPEZ.AI - AI-Powered RFP Assistant",
   "description": "AI-powered assistant for Request for Proposal (RFP) management and analysis",
+  "version": "2.0.0",
   "icons": [
     {
-      "src": "/assets/icon/favicon-16x16.png",
+      "src": "/assets/icon/favicon-16x16.png?v=2.0.0",
       "sizes": "16x16",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/favicon-32x32.png",
+      "src": "/assets/icon/favicon-32x32.png?v=2.0.0",
       "sizes": "32x32",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-48x48.png",
+      "src": "/assets/icon/icon-48x48.png?v=2.0.0",
       "sizes": "48x48",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-72x72.png",
+      "src": "/assets/icon/icon-72x72.png?v=2.0.0",
       "sizes": "72x72",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-96x96.png",
+      "src": "/assets/icon/icon-96x96.png?v=2.0.0",
       "sizes": "96x96",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-144x144.png",
+      "src": "/assets/icon/icon-144x144.png?v=2.0.0",
       "sizes": "144x144",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon.png",
+      "src": "/assets/icon/icon.png?v=2.0.0",
       "sizes": "180x180",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-192x192.png",
+      "src": "/assets/icon/icon-192x192.png?v=2.0.0",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-192x192-maskable.png",
+      "src": "/assets/icon/icon-192x192-maskable.png?v=2.0.0",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
     },
     {
-      "src": "/assets/icon/icon-512.png",
+      "src": "/assets/icon/icon-512.png?v=2.0.0",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-512x512-maskable.png",
+      "src": "/assets/icon/icon-512x512-maskable.png?v=2.0.0",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -78,8 +79,15 @@
   "scope": "/",
   "lang": "en",
   "dir": "ltr",
-  "categories": ["business", "productivity"],
-  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "categories": [
+    "business",
+    "productivity"
+  ],
+  "display_override": [
+    "window-controls-overlay",
+    "standalone",
+    "minimal-ui"
+  ],
   "shortcuts": [
     {
       "name": "New RFP",
@@ -88,7 +96,7 @@
       "url": "/",
       "icons": [
         {
-          "src": "/assets/icon/icon-96x96.png",
+          "src": "/assets/icon/icon-96x96.png?v=2.0.0",
           "sizes": "96x96",
           "type": "image/png"
         }
