@@ -19,14 +19,17 @@ import ArtifactTextRenderer from './artifacts/ArtifactTextRenderer';
 import ArtifactBidRenderer from './artifacts/ArtifactBidRenderer';
 import ArtifactDefaultRenderer from './artifacts/ArtifactDefaultRenderer';
 import ArtifactModal from './artifacts/ArtifactModal';
+import ArtifactDropdown from './ArtifactDropdown';
 
 const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({ 
   artifact,
+  artifacts = [],
   onDownload, 
   onFormSubmit,
   isCollapsed: externalCollapsed,
   onToggleCollapse: externalToggleCollapse,
-  currentRfpId
+  currentRfpId,
+  onArtifactSelect
 }) => {
   // State management
   const [isPortrait, setIsPortrait] = useState<boolean>(window.innerHeight > window.innerWidth);
@@ -233,43 +236,14 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
           onMouseDown={isPortrait && !collapsed ? handleDragStart : undefined}
           onTouchStart={isPortrait && !collapsed ? handleDragStart : undefined}
         >
-          {!collapsed && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                <IonIcon 
-                  icon={getTypeIcon(artifact.type)} 
-                  style={{ marginRight: '8px', fontSize: '16px', color: '#666' }} 
-                />
-                <span style={{ 
-                  fontSize: '14px', 
-                  fontWeight: '500',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  whiteSpace: 'nowrap'
-                }}>
-                  {artifact.name}
-                </span>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                <IonButton
-                  fill="clear"
-                  size="small"
-                  onClick={() => setIsFullScreen(true)}
-                  data-testid="fullscreen-button"
-                >
-                  <IonIcon icon={expandOutline} style={{ fontSize: '16px' }} />
-                </IonButton>
-              </div>
-            </>
-          )}
-          
           <IonButton
             fill="clear"
             size="small"
             onClick={toggleCollapse}
             data-testid="artifact-toggle"
             style={{ 
-              marginLeft: collapsed ? '0' : '8px',
+              marginRight: collapsed ? '0' : '8px',
+              flexShrink: 0,
               transform: collapsed 
                 ? (isPortrait ? 'rotate(180deg)' : 'rotate(-90deg)') 
                 : (isPortrait ? 'rotate(0deg)' : 'rotate(90deg)')
@@ -280,6 +254,47 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
               style={{ fontSize: '16px' }} 
             />
           </IonButton>
+          
+          {!collapsed && (
+            <>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <IonButton
+                  fill="clear"
+                  size="small"
+                  onClick={() => setIsFullScreen(true)}
+                  data-testid="fullscreen-button"
+                  style={{ flexShrink: 0, backgroundColor: '#e0f7fa', border: '1px solid #00bcd4' }}
+                >
+                  <IonIcon icon={expandOutline} style={{ fontSize: '16px', color: '#00796b' }} />
+                </IonButton>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+                <ArtifactDropdown
+                  artifacts={artifacts.map(a => ({
+                    id: a.id,
+                    name: a.name,
+                    type: a.type,
+                    description: a.size || '', // Use size as description fallback
+                    created_at: new Date().toISOString() // Fallback for missing created_at
+                  }))}
+                  selectedArtifact={artifact ? {
+                    id: artifact.id,
+                    name: artifact.name,
+                    type: artifact.type,
+                    description: artifact.size || '',
+                    created_at: new Date().toISOString()
+                  } : null}
+                  onSelectArtifact={(dropdownArtifact) => {
+                    const fullArtifact = artifacts.find(a => a.id === dropdownArtifact.id);
+                    if (fullArtifact && onArtifactSelect) {
+                      onArtifactSelect(fullArtifact);
+                    }
+                  }}
+                  loading={false}
+                />
+              </div>
+            </>
+          )}
         </div>
 
         {/* Content */}

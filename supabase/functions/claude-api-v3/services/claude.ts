@@ -411,6 +411,33 @@ export class ToolExecutionService {
           return toolResult;
         }
 
+        case 'list_artifacts': {
+          const { listArtifacts } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await listArtifacts(this.supabase, {
+            ...input,
+            userId: this.userId
+          });
+        }
+
+        case 'get_current_artifact_id': {
+          const { getCurrentArtifactId } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await getCurrentArtifactId(this.supabase, {
+            ...input,
+            sessionId: sessionId || ''
+          });
+        }
+
+        case 'select_active_artifact': {
+          const { selectActiveArtifact } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await selectActiveArtifact(this.supabase, {
+            ...input,
+            sessionId: sessionId || ''
+          });
+        }
+
         default:
           console.log(`Unknown tool: ${name}`);
           return {

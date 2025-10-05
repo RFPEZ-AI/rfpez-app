@@ -23,12 +23,13 @@ export interface ArtifactReference {
 // Singleton artifact window props
 export interface SingletonArtifactWindowProps {
   artifact: Artifact | null; // Single artifact to display
+  artifacts?: Artifact[]; // All available artifacts for dropdown
   onDownload?: (artifact: Artifact) => void;
   onFormSubmit?: (artifact: Artifact, formData: Record<string, unknown>) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   currentRfpId?: number | null;
-  onArtifactSelect?: (artifact: Artifact) => void; // New function to handle artifact selection
+  onArtifactSelect?: (artifact: Artifact) => void; // Function to handle artifact selection
 }
 
 export interface Session {
