@@ -532,43 +532,6 @@ export const claudeApiFunctions: Tool[] = [
     }
   },
   {
-    "name": "create_text_artifact",
-    "description": "Create a text artifact that can be displayed in the artifact window",
-    "input_schema": {
-      "type": "object",
-      "properties": {
-        "session_id": {
-          "type": "string",
-          "description": "Session ID to associate the artifact with"
-        },
-        "title": {
-          "type": "string",
-          "description": "Title for the text artifact"
-        },
-        "content": {
-          "type": "string",
-          "description": "The text content to display"
-        },
-        "content_type": {
-          "type": "string",
-          "enum": ["markdown", "plain", "html"],
-          "description": "Type of text content (default: markdown)",
-          "default": "markdown"
-        },
-        "description": {
-          "type": "string",
-          "description": "Brief description of the text artifact"
-        },
-        "tags": {
-          "type": "array",
-          "items": { "type": "string" },
-          "description": "Tags for categorizing the artifact"
-        }
-      },
-      "required": ["session_id", "title", "content"]
-    }
-  },
-  {
     "name": "generate_request_artifact",
     "description": "Generate a request for proposal (RFP) text artifact from RFP data and questionnaire responses",
     "input_schema": {
@@ -1141,8 +1104,6 @@ export class ClaudeAPIFunctionHandler {
       // Artifact functions
       case 'create_form_artifact':
         return await this.createFormArtifact(parameters, userId);
-      case 'create_text_artifact':
-        return await this.createTextArtifact(parameters, userId);
       case 'generate_request_artifact':
         return await this.generateRequestArtifact(parameters, userId);
       case 'update_form_artifact':

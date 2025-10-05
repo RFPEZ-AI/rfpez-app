@@ -9,7 +9,7 @@ export function getAuthenticatedSupabaseClient(request: Request) {
   }
   
   // Return a mock client that has the auth methods but doesn't make real calls
-  return Promise.resolve({
+  return {
     auth: {
       getUser: () => Promise.resolve({
         data: { user: { id: 'mock-user-id' } },
@@ -22,7 +22,7 @@ export function getAuthenticatedSupabaseClient(request: Request) {
       update: () => ({ data: {}, error: null }),
       delete: () => ({ data: null, error: null })
     })
-  });
+  };
 }
 
 // Mock getUserId that doesn't make HTTP calls

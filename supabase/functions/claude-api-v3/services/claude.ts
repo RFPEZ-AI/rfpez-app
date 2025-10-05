@@ -312,9 +312,16 @@ export class ToolExecutionService {
         }
 
         case 'create_document_artifact': {
+          console.log('🚀 EXECUTING CREATE_DOCUMENT_ARTIFACT TOOL!', {
+            sessionId,
+            userId: this.userId,
+            input: JSON.stringify(input, null, 2)
+          });
           const { createDocumentArtifact } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
-          return await createDocumentArtifact(this.supabase, sessionId!, this.userId, input);
+          const result = await createDocumentArtifact(this.supabase, sessionId!, this.userId, input);
+          console.log('🎯 CREATE_DOCUMENT_ARTIFACT RESULT:', JSON.stringify(result, null, 2));
+          return result;
         }
 
         case 'get_conversation_history': {

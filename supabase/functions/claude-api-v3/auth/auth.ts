@@ -40,6 +40,13 @@ export function getAuthenticatedSupabaseClient(request: Request) {
   
   // Check if this is the anonymous key - use service role for anonymous users
   const anonymousKey = config.supabaseAnonKey;
+  console.log('🔐 Auth token analysis:', {
+    tokenLength: token.length,
+    anonymousKeyLength: anonymousKey?.length,
+    isAnonymous: token === anonymousKey,
+    tokenPreview: token.substring(0, 20) + '...'
+  });
+  
   if (token === anonymousKey) {
     console.log('🔓 Anonymous token detected, using service role client');
     // Create service role client for anonymous users
@@ -47,8 +54,10 @@ export function getAuthenticatedSupabaseClient(request: Request) {
     return supabase;
   }
   
-  // Create client with user token for RLS
-  const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  console.log('👤 User token detected, creating RLS-enabled client with JWT context');
+  // CRITICAL: Use anon key with user's JWT token to establish proper RLS context
+  // This allows auth.uid() to return the correct user ID from the JWT payload
+  const supabase = createClient(supabaseUrl, config.supabaseAnonKey, {
     global: {
       headers: {
         Authorization: `Bearer ${token}`
@@ -56,6 +65,7 @@ export function getAuthenticatedSupabaseClient(request: Request) {
     }
   });
   
+  console.log('✅ Created Supabase client with user JWT for RLS context');
   return supabase;
 }
 

@@ -127,16 +127,23 @@ export const useMessageHandling = () => {
     console.log('🐛 DEBUG: generateArtifactReferences called with metadata:', JSON.stringify(metadata, null, 2));
     
     // Handle function results that contain forms/templates
+    console.log('🔍 DEBUG: Checking for function_results...', {
+      hasFunctionResults: !!metadata.function_results,
+      isArray: Array.isArray(metadata.function_results),
+      type: typeof metadata.function_results,
+      value: metadata.function_results
+    });
+    
     if (metadata.function_results && Array.isArray(metadata.function_results)) {
-      console.log('� DEBUG: function_results found, length:', metadata.function_results.length);
-            metadata.function_results.forEach((funcResult: Record<string, unknown>) => {
+      console.log('🔍 DEBUG: function_results found, length:', metadata.function_results.length);
+      metadata.function_results.forEach((funcResult: Record<string, unknown>) => {
         console.log('🔍 DEBUG: Processing function result:', funcResult);
         if (typeof funcResult === 'object' && funcResult !== null) {
           const funcObj = funcResult as Record<string, unknown>;
           const result = funcObj.result as Record<string, unknown>;
           
           console.log('🔍 DEBUG: Function object:', {
-            functionName: funcObj.function,
+            functionName: funcObj.function_name, // Fixed: use function_name not function
             hasResult: !!result,
             resultSuccess: result?.success
           });
@@ -144,7 +151,7 @@ export const useMessageHandling = () => {
           // Handle different types of function results
           if (result && result.success) {
             // 🔄 AGENT SWITCH DETECTION
-            if (funcObj.function === 'switch_agent') {
+            if (funcObj.function_name === 'switch_agent') {
               // Type-safe access to agent switch result properties
               const agentSwitchResult = result as {
                 trigger_continuation?: boolean;
@@ -168,7 +175,7 @@ export const useMessageHandling = () => {
               }
             }
             
-            if (funcObj.function === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
+            if (funcObj.function_name === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
               // Form artifacts - use artifact_name from result
               const functionArgs = funcObj.arguments as Record<string, unknown>;
               const artifactName = (result.artifact_name as string) || (functionArgs?.name as string) || (result.template_name as string) || (result.title as string) || 'Generated Template';
@@ -180,16 +187,38 @@ export const useMessageHandling = () => {
                 isCreated: true,
                 displayText: artifactName
               });
-            } else if ((funcObj.function === 'create_text_artifact' || funcObj.function === 'generate_proposal_artifact') && result.artifact_id) {
-              // Document artifacts
-              refs.push({
-                artifactId: result.artifact_id as string,
-                artifactName: result.title as string || 'Generated Document',
-                artifactType: 'document',
-                isCreated: true,
-                displayText: result.title as string
+            } else if (funcObj.function_name === 'create_document_artifact' || funcObj.function_name === 'generate_proposal_artifact') {
+              // Document artifacts - check for success first, then artifact_id
+              console.log('🔍 DEBUG: Processing document artifact function:', {
+                function: funcObj.function_name,
+                hasResult: !!result,
+                resultSuccess: result?.success,
+                hasArtifactId: !!(result?.artifact_id),
+                result_keys: result ? Object.keys(result) : [],
+                fullResult: result
               });
-            } else if (funcObj.function === 'create_and_set_rfp') {
+              
+              if (result && (result.success || result.artifact_id)) {
+                const artifactRef = {
+                  artifactId: result.artifact_id as string || `doc-${Date.now()}`,
+                  artifactName: result.artifact_name as string || result.title as string || 'Generated Document',
+                  artifactType: 'document' as const,
+                  isCreated: true,
+                  displayText: result.artifact_name as string || result.title as string || 'Generated Document'
+                };
+                
+                console.log('🔍 DEBUG: Adding artifact ref to array:', artifactRef);
+                refs.push(artifactRef);
+                console.log('🔍 DEBUG: Current refs array length:', refs.length);
+              } else {
+                console.log('❌ DEBUG: Document artifact creation failed or missing data:', {
+                  hasResult: !!result,
+                  resultSuccess: result?.success,
+                  hasArtifactId: !!(result?.artifact_id),
+                  result
+                });
+              }
+            } else if (funcObj.function_name === 'create_and_set_rfp') {
               // RFP creation - trigger UI refresh
               console.log('🎯 create_and_set_rfp detected - checking result format:', {
                 hasCurrentRfpId: !!result.current_rfp_id,
@@ -368,6 +397,7 @@ export const useMessageHandling = () => {
     addClaudeArtifacts: (metadata: Record<string, unknown>, messageId?: string) => void,
     loadSessionAgent: (sessionId: string) => Promise<void>,
     handleAgentChanged: (agent: SessionActiveAgent) => Message | null,
+    loadSessionArtifacts: (sessionId: string) => Promise<any[] | undefined>,
     currentArtifact?: {
       id: string;
       name: string;
@@ -1074,7 +1104,9 @@ export const useMessageHandling = () => {
         // });
 
         // Generate artifact references (still needed for database save, but UI update will be delayed)
+        console.log('🔍 METADATA DEBUG: Full Claude response metadata:', JSON.stringify(claudeResponse.metadata, null, 2));
         const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
+        console.log('🔍 ARTIFACT REFS DEBUG: Generated references:', artifactRefs);
         
         // Process Claude response metadata for artifacts with message ID
         console.log('🔍 useMessageHandling: About to call addClaudeArtifacts with metadata:', claudeResponse.metadata);
@@ -1083,19 +1115,38 @@ export const useMessageHandling = () => {
         // This ensures artifacts are available when references are clicked, preventing "could not be loaded" errors
         addClaudeArtifacts(claudeResponse.metadata, aiMessageId);
         
-        // DISABLED: Artifact reference timeout
-        // if (artifactRefs.length > 0) {
-        //   setTimeout(() => {
-        //     console.log('🔗 Adding artifact references to UI after artifact processing:', artifactRefs);
-        //     setMessages(prev => 
-        //       prev.map(msg => 
-        //         msg.id === aiMessageId 
-        //           ? { ...msg, artifactRefs }
-        //           : msg
-        //       )
-        //     );
-        //   }, 300); // Delay to ensure artifact processing completes
-        // }
+        // CRITICAL FIX: Refresh artifacts from database after Claude creates new ones
+        // This ensures the artifact panel shows all newly created documents
+        const hasArtifactCreation = claudeResponse.metadata?.function_results || 
+                                  claudeResponse.metadata?.buyer_questionnaire ||
+                                  claudeResponse.metadata?.create_document_artifact;
+        
+        if (currentSessionId && hasArtifactCreation) {
+          console.log('🔄 Refreshing artifacts from database after Claude response (includes document artifacts)');
+          // Small delay to ensure database operations complete
+          setTimeout(async () => {
+            try {
+              await loadSessionArtifacts(currentSessionId);
+              console.log('✅ Artifacts refreshed from database');
+            } catch (error) {
+              console.error('❌ Failed to refresh artifacts:', error);
+            }
+          }, 500);
+        }
+        
+        // RE-ENABLED: Artifact reference timeout to show document cards in messages
+        if (artifactRefs.length > 0) {
+          setTimeout(() => {
+            console.log('🔗 Adding artifact references to UI after artifact processing:', artifactRefs);
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { ...msg, artifactRefs }
+                  : msg
+              )
+            );
+          }, 300); // Delay to ensure artifact processing completes
+        }
 
         setIsLoading(false);
         
@@ -1178,6 +1229,7 @@ export const useMessageHandling = () => {
         if (isAuthenticated && userId && activeSessionId) {
           try {
             console.log('Saving AI response to session:', activeSessionId);
+            console.log('🔍 DEBUG: artifactRefs being passed to database:', artifactRefs);
             const savedAiMessage = await DatabaseService.addMessage(
               activeSessionId, 
               userId, 
@@ -1191,6 +1243,30 @@ export const useMessageHandling = () => {
             );
             console.log('AI message saved:', savedAiMessage);
             await loadUserSessions();
+            
+            // 🔄 ARTIFACT REFRESH: Check if any tools were executed and refresh artifacts
+            if (claudeResponse.metadata && claudeResponse.metadata.function_results && Array.isArray(claudeResponse.metadata.function_results)) {
+              console.log('🔍 DEBUG: Checking for artifact creation in function results:', claudeResponse.metadata.function_results.map((fr: any) => fr.function));
+              
+              const hasArtifactCreation = claudeResponse.metadata.function_results.some((fr: any) => 
+                fr.function === 'create_form_artifact' || 
+                fr.function === 'create_document_artifact' ||
+                fr.function === 'generate_proposal_artifact'
+              );
+              
+              console.log('🔍 DEBUG: hasArtifactCreation:', hasArtifactCreation, 'artifactRefs length:', artifactRefs.length);
+              
+              if (hasArtifactCreation) {
+                console.log('🔄 Artifact creation detected, refreshing artifacts for session:', activeSessionId);
+                
+                // Trigger artifact refresh via postMessage to Home component
+                window.postMessage({ 
+                  type: 'ARTIFACT_REFRESH_NEEDED',
+                  sessionId: activeSessionId,
+                  timestamp: new Date().toISOString()
+                }, '*');
+              }
+            }
           } catch (error) {
             console.error('Failed to save AI message:', error);
           }
@@ -1237,6 +1313,18 @@ export const useMessageHandling = () => {
                 );
                 console.log('AI message saved after streaming cleanup:', savedAiMessage);
                 await loadUserSessions();
+                
+                // 🔄 ARTIFACT REFRESH: Check if any tools were executed and refresh artifacts
+                if (lastAiMessage.artifactRefs && lastAiMessage.artifactRefs.length > 0) {
+                  console.log('🔄 Artifact references found in cleanup, refreshing artifacts for session:', activeSessionId);
+                  
+                  // Trigger artifact refresh via postMessage to Home component
+                  window.postMessage({ 
+                    type: 'ARTIFACT_REFRESH_NEEDED',
+                    sessionId: activeSessionId,
+                    timestamp: new Date().toISOString()
+                  }, '*');
+                }
               } else {
                 console.warn('No AI message content found to save after streaming cleanup');
               }
@@ -1395,7 +1483,8 @@ export const useMessageHandling = () => {
     currentRfp: RFP | null,
     addClaudeArtifacts: (metadata: Record<string, unknown>, messageId?: string) => void,
     loadSessionAgent: (sessionId: string) => Promise<void>,
-    handleAgentChanged: (agent: SessionActiveAgent) => Message | null
+    handleAgentChanged: (agent: SessionActiveAgent) => Message | null,
+    loadSessionArtifacts: (sessionId: string) => Promise<any[] | undefined>
   ) => {
     
     // Use smart auto-prompt manager to decide if we should send
@@ -1433,6 +1522,7 @@ export const useMessageHandling = () => {
       addClaudeArtifacts,
       loadSessionAgent,
       handleAgentChanged,
+      loadSessionArtifacts, // Add the required parameter
       null // currentArtifact - not available in auto-prompt context
     );
   };
