@@ -18,7 +18,12 @@ const MainMenu: React.FC<MainMenuProps> = ({ onSelect }) => {
 
   return (
     <>
-      <IonButton id="main-menu-trigger" fill="clear" onClick={() => setShowPopover(true)}>
+      <IonButton 
+        id="main-menu-trigger" 
+        data-testid="main-menu-button"
+        fill="clear" 
+        onClick={() => setShowPopover(true)}
+      >
         <IonIcon icon={menuIcon} slot="icon-only" />
       </IonButton>
       <IonPopover 
