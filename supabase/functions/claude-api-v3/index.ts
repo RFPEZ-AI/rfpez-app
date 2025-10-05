@@ -1,6 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Claude API v3 Edge Function - Modular Architecture
 // Refactored from 1542-line monolithic structure to maintainable modules
+// Version: 2025-10-05 - Streaming truncation fix deployed
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleOptionsRequest, handlePostRequest } from './handlers/http.ts';
