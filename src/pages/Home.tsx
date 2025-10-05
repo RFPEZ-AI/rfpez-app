@@ -904,7 +904,7 @@ const Home: React.FC = () => {
       // Reset artifact window state completely for new session
       artifactWindowState.resetForNewSession();
       artifactWindowState.saveLastSession(null);
-      setForceSessionHistoryCollapsed(true); // Keep session history collapsed for clean new session experience
+      // Don't force-collapse session history - let user access session management naturally
       
       // 🔥 CRITICAL FIX: Actually create a new session in the database
       if (isAuthenticated && userId && createNewSession) {

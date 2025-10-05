@@ -208,15 +208,15 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
               order: 2,
               minWidth: '30px',
               height: '30px',
-              '--background': 'var(--ion-color-success)',
-              '--color': 'white',
-              '--background-hover': 'var(--ion-color-success-shade)',
+              backgroundColor: '#4CAF50', // Direct CSS instead of CSS custom property
+              color: 'white',
               borderRadius: '8px',
               boxShadow: '0 2px 6px rgba(76, 175, 80, 0.3)',
-              transition: 'all 0.2s ease'
+              transition: 'all 0.2s ease',
+              border: 'none'
             }}
           >
-            <IonIcon icon={add} style={{ fontSize: '16px' }} />
+            <IonIcon icon={add} style={{ fontSize: '16px', color: 'white' }} />
           </IonButton>
         )}
       </div>

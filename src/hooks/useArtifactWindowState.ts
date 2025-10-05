@@ -16,10 +16,10 @@ interface ArtifactWindowState {
 export const useArtifactWindowState = () => {
   const isMobile = useIsMobile();
   
-  // Default state: open on both desktop and mobile for better UX
+  // Default state: start closed and collapsed, expand only when artifacts are added or user clicks expand
   const getDefaultState = (): ArtifactWindowState => ({
-    isOpen: true, // Open by default on both desktop and mobile
-    isCollapsed: isMobile, // Start collapsed on mobile, expanded on desktop
+    isOpen: false, // Start closed by default - will open when artifacts are added
+    isCollapsed: true, // Start collapsed by default - expand only when artifacts added or user clicks expand
     selectedArtifactId: null
   });
 
@@ -160,7 +160,7 @@ export const useArtifactWindowState = () => {
     }
   }, []);
 
-  // Restore artifact for session
+  // Restore artifact for session - only open window but keep collapsed unless previously expanded
   const restoreSessionArtifact = useCallback((sessionId: string) => {
     const lastArtifactId = getSessionArtifact(sessionId);
     if (lastArtifactId) {
@@ -168,7 +168,7 @@ export const useArtifactWindowState = () => {
         ...prev,
         selectedArtifactId: lastArtifactId,
         isOpen: true, // Open window if we have an artifact to show
-        isCollapsed: false // Expand to show the artifact
+        isCollapsed: true // Start collapsed - let user expand manually if needed
       }));
       return lastArtifactId;
     }
