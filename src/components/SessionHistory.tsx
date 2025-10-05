@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { IonButton, IonIcon, IonItem, IonLabel, IonList, IonActionSheet } from '@ionic/react';
-import { create, chatbubbleOutline, chevronForward, chevronDown, trash } from 'ionicons/icons';
+import { add, chatbubbleOutline, chevronForward, chevronDown, trash, timeOutline } from 'ionicons/icons';
 import { useIsMobile } from '../utils/useMediaQuery';
 
 interface Session {
@@ -33,7 +33,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   onToggleExpanded
 }) => {
   const isMobile = useIsMobile();
-  const [internalExpanded, setInternalExpanded] = useState(!isMobile); // Start expanded on desktop, collapsed on mobile
+  const [internalExpanded, setInternalExpanded] = useState(false); // Start collapsed by default until expansion button is pressed
   const [showActionSheet, setShowActionSheet] = useState(false);
   const [selectedSessionForAction, setSelectedSessionForAction] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -50,11 +50,11 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
     }
   }, [forceCollapsed]);
 
-  // Respond to mobile state changes - but don't force collapse unless forceCollapsed is true
+  // Respond to mobile state changes - collapse when switching to mobile if expanded
   useEffect(() => {
     console.log('🔄 SessionHistory: Mobile state changed', { isMobile, forceCollapsed, currentlyExpanded: internalExpanded });
-    // Only auto-collapse on mobile when switching to mobile view, but don't auto-expand
-    if (isMobile && internalExpanded && !forceCollapsed) {
+    // Auto-collapse when switching to mobile view if currently expanded
+    if (isMobile && internalExpanded) {
       console.log('🔄 SessionHistory: Auto-collapsing due to mobile view');
       setInternalExpanded(false);
     }
@@ -127,7 +127,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
         borderBottom: '1px solid var(--ion-color-light-shade)',
         display: 'flex',
         alignItems: 'center',
-        justifyContent: isExpanded ? 'space-between' : 'center',
+        justifyContent: isExpanded ? 'space-between' : 'flex-start',
         gap: '4px',
         flexDirection: 'row',
         minHeight: isExpanded ? '40px' : '32px',
@@ -137,6 +137,23 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
         backgroundColor: 'var(--ion-background-color)',
         zIndex: 2
       }}>
+        {/* History Icon - only visible when collapsed */}
+        {!isExpanded && (
+          <IonIcon 
+            icon={timeOutline} 
+            style={{ 
+              fontSize: '16px',
+              width: '16px',
+              height: '16px',
+              minWidth: '16px',
+              color: 'var(--ion-color-medium)',
+              order: 0,
+              marginRight: '4px',
+              flexShrink: 0
+            }} 
+          />
+        )}
+        
         {/* Collapse/Expand Button */}
         <IonButton 
           fill="clear" 
@@ -176,7 +193,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
               boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
             }}
           >
-            <IonIcon icon={create} style={{ fontSize: '18px' }} />
+            <IonIcon icon={add} style={{ fontSize: '18px' }} />
           </IonButton>
         ) : (
           <IonButton 
@@ -199,7 +216,7 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
               transition: 'all 0.2s ease'
             }}
           >
-            <IonIcon icon={create} style={{ fontSize: '16px' }} />
+            <IonIcon icon={add} style={{ fontSize: '16px' }} />
           </IonButton>
         )}
       </div>
