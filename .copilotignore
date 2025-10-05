@@ -1,0 +1,22 @@
+# Copilot Ignore File
+
+# Exclude test automation folder from Copilot context to reduce request size
+../rfpez-test-automation/
+**/rfpez-test-automation/**
+
+# Exclude large test report files
+**/*test-report*.json
+**/led-bulb-test-*.json
+**/nail-*-test-*.json
+
+# Exclude node_modules to reduce context
+**/node_modules/**
+
+# Exclude build artifacts
+**/build/**
+**/dist/**
+**/coverage/**
+
+# Exclude log files
+**/*.log
+**/logs/**

@@ -972,6 +972,181 @@ export class DatabaseService {
       return false;
     }
   }
+
+  // Artifact management methods (complementing Claude tools)
+  
+  /**
+   * List artifacts with optional scope filtering
+   * @param sessionId Optional session ID to filter artifacts
+   * @param allArtifacts If true, returns all user artifacts regardless of session
+   * @param artifactType Optional artifact type filter
+   * @param limit Maximum number of artifacts to return
+   */
+  static async listArtifacts({
+    sessionId,
+    allArtifacts = false,
+    artifactType,
+    limit = 50,
+  }: {
+    sessionId?: string;
+    allArtifacts?: boolean;
+    artifactType?: string;
+    limit?: number;
+  }): Promise<Artifact[]> {
+    try {
+      let query = supabase
+        .from('artifacts')
+        .select('id, name, type, description, artifact_role, created_at, updated_at, status, session_id')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .limit(limit);
+
+      if (!allArtifacts && sessionId) {
+        // Session-scoped artifacts
+        query = query.eq('session_id', sessionId);
+      } else if (!allArtifacts) {
+        // No session specified and not all artifacts - return empty
+        return [];
+      }
+      // For all artifacts, we return all active artifacts (user filtering handled by RLS)
+
+      if (artifactType) {
+        query = query.eq('type', artifactType);
+      }
+
+      const { data: artifacts, error } = await query;
+
+      if (error) {
+        console.error('❌ Error listing artifacts:', error);
+        throw error;
+      }
+
+      return artifacts || [];
+    } catch (error) {
+      console.error('❌ Exception listing artifacts:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get the current artifact ID for a session
+   * @param sessionId Session ID to get current artifact for
+   */
+  static async getCurrentArtifactId(sessionId?: string): Promise<string | null> {
+    try {
+      if (!sessionId) {
+        return null;
+      }
+
+      // Try to get current artifact from session context
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('sessions')
+        .select('context')
+        .eq('id', sessionId)
+        .single();
+
+      if (sessionError) {
+        console.warn('⚠️ Could not retrieve session context:', sessionError);
+      }
+
+      let currentArtifactId = null;
+      if (sessionData?.context && typeof sessionData.context === 'object') {
+        const context = sessionData.context as Record<string, unknown>;
+        currentArtifactId = context.current_artifact_id as string || null;
+      }
+
+      // If no current artifact in context, get the most recent artifact for the session
+      if (!currentArtifactId) {
+        const { data: artifacts, error: artifactsError } = await supabase
+          .from('artifacts')
+          .select('id')
+          .eq('session_id', sessionId)
+          .eq('status', 'active')
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (!artifactsError && artifacts && artifacts.length > 0) {
+          currentArtifactId = artifacts[0].id;
+        }
+      }
+
+      return currentArtifactId;
+    } catch (error) {
+      console.error('❌ Exception getting current artifact ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Select an artifact to be displayed in the artifact window
+   * @param artifactId ID of the artifact to select
+   * @param sessionId Optional session ID to update context
+   */
+  static async selectActiveArtifact(artifactId: string, sessionId?: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    try {
+      // Verify the artifact exists and get its details
+      const { data: artifact, error: artifactError } = await supabase
+        .from('artifacts')
+        .select('id, name, type, session_id, status')
+        .eq('id', artifactId)
+        .single();
+
+      if (artifactError || !artifact) {
+        return {
+          success: false,
+          error: 'Artifact not found'
+        };
+      }
+
+      if (artifact.status !== 'active') {
+        return {
+          success: false,
+          error: 'Artifact is not active'
+        };
+      }
+
+      // If sessionId is provided, update the session context
+      if (sessionId) {
+        // Get current session context
+        const { data: sessionData, error: sessionError } = await supabase
+          .from('sessions')
+          .select('context')
+          .eq('id', sessionId)
+          .single();
+
+        let context = {};
+        if (!sessionError && sessionData?.context) {
+          context = sessionData.context as Record<string, unknown>;
+        }
+
+        // Update context with current artifact
+        const updatedContext = {
+          ...context,
+          current_artifact_id: artifactId
+        };
+
+        const { error: updateError } = await supabase
+          .from('sessions')
+          .update({ context: updatedContext })
+          .eq('id', sessionId);
+
+        if (updateError) {
+          console.warn('⚠️ Failed to update session context:', updateError);
+        }
+      }
+
+      return {
+        success: true,
+        message: `Active artifact set to: ${artifact.name}`
+      };
+    } catch (error) {
+      console.error('❌ Exception selecting active artifact:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
 }
 
 export default DatabaseService;

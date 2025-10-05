@@ -42,5 +42,9 @@ deno.lock
 /temp
 temp/
 
+# Test automation context (exclude from Copilot)
+../rfpez-test-automation/
+**/rfpez-test-automation/
+
 .fake
 nul

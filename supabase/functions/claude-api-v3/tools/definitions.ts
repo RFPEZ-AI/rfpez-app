@@ -294,6 +294,64 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       },
       required: ['topic']
     }
+  },
+  {
+    name: 'list_artifacts',
+    description: 'List artifacts with optional scope filtering. Use all_artifacts=true to get all artifacts for the account, or leave false (default) to get only session artifacts.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'Session ID to get artifacts for (optional, uses current session if not provided)'
+        },
+        all_artifacts: {
+          type: 'boolean',
+          description: 'If true, lists all artifacts for the account. If false (default), lists only artifacts for the specified session.',
+          default: false
+        },
+        artifact_type: {
+          type: 'string',
+          description: 'Optional filter by artifact type (form, document, text, etc.)'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of artifacts to return',
+          default: 50
+        }
+      }
+    }
+  },
+  {
+    name: 'get_current_artifact_id',
+    description: 'Get the ID of the currently selected artifact in the artifact window',
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'Session ID to get current artifact for (optional, uses current session if not provided)'
+        }
+      }
+    }
+  },
+  {
+    name: 'select_active_artifact',
+    description: 'Select an artifact to be displayed in the artifact window. This will change what artifact is currently shown to the user.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        artifact_id: {
+          type: 'string',
+          description: 'The ID of the artifact to select and display'
+        },
+        session_id: {
+          type: 'string',
+          description: 'Session ID to set the artifact for (optional, uses current session if not provided)'
+        }
+      },
+      required: ['artifact_id']
+    }
   }
 ];
 

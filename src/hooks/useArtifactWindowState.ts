@@ -32,7 +32,7 @@ export type UseArtifactWindowStateReturn = ArtifactWindowState & ArtifactWindowA
 
 export const useArtifactWindowState = (): UseArtifactWindowStateReturn => {
   const [state, setState] = useState<ArtifactWindowState>({
-    isOpen: true,
+    isOpen: false, // Start closed by default
     isCollapsed: false,
     selectedArtifactId: null
   });
@@ -109,7 +109,7 @@ export const useArtifactWindowState = (): UseArtifactWindowStateReturn => {
 
   const resetForNewSession = useCallback(() => {
     setState({
-      isOpen: true,
+      isOpen: false, // Start closed for new sessions
       isCollapsed: false,
       selectedArtifactId: null
     });

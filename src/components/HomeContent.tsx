@@ -79,7 +79,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
 }) => {
   const isMobile = useIsMobile();
   // Use selected artifact based on window state if available, otherwise fall back to most recent
-  const displayedArtifact = selectedArtifact || (artifacts.length > 0 ? artifacts[artifacts.length - 1] : null);
+  const displayedArtifact = selectedArtifact || null;
 
   return (
     <div style={{ 
@@ -161,11 +161,23 @@ const HomeContent: React.FC<HomeContentProps> = ({
         }}>
           <ArtifactWindow
             artifact={displayedArtifact}
+            artifacts={artifacts}
             onDownload={onDownloadArtifact}
             onFormSubmit={onFormSubmit}
             currentRfpId={currentRfpId}
             isCollapsed={artifactWindowCollapsed}
             onToggleCollapse={onToggleArtifactCollapse}
+            onArtifactSelect={(artifact) => {
+              if (onArtifactSelect) {
+                // Convert Artifact to ArtifactReference
+                const artifactRef: ArtifactReference = {
+                  artifactId: artifact.id,
+                  artifactName: artifact.name,
+                  artifactType: artifact.type
+                };
+                onArtifactSelect(artifactRef);
+              }
+            }}
           />
         </div>
       </div>
