@@ -391,6 +391,12 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
   artifactRole: string;
   tags?: string[];
 }) {
+  console.log('🔥 CREATEDOCUMENTARTIFACT FUNCTION CALLED!', {
+    sessionId,
+    userId,
+    data: JSON.stringify(data, null, 2)
+  });
+  
   const { name, description, content, content_type = 'markdown', artifactRole, tags = [] } = data;
   
   // Map artifact role to valid database value
@@ -410,47 +416,60 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
     throw new Error(`Content type must be one of: ${validContentTypes.join(', ')}`);
   }
   
+  const insertData = {
+    id: artifactId, // Provide the required ID field
+    session_id: sessionId,
+    user_id: userId,
+    name: name,
+    description: description,
+    artifact_role: mappedRole,
+    schema: {
+      type: 'text',
+      content_type,
+      tags: tags || []
+    },
+    ui_schema: null,
+    default_values: {
+      content,
+      content_type,
+      tags: tags || []
+    },
+    submit_action: null,
+    type: 'document', // Set the type as 'document'
+    status: 'active', // Required by constraint
+    processing_status: 'completed', // Required by constraint
+    file_size: content.length,
+    mime_type: content_type === 'html' ? 'text/html' : content_type === 'plain' ? 'text/plain' : 'text/markdown',
+    processed_content: content,
+    metadata: {
+      type: 'text',
+      content_type,
+      description: description || null,
+      tags: tags || [],
+      user_id: userId
+    },
+    created_at: new Date().toISOString()
+  };
+  
+  console.log('🗄️ Document artifact insert data:', JSON.stringify(insertData, null, 2));
+  
   const { data: artifact, error } = await supabase
     .from('artifacts')
-    .insert({
-      id: artifactId, // Provide the required ID field
-      session_id: sessionId,
-      user_id: userId,
-      name: name,
-      description: description,
-      artifact_role: mappedRole,
-      schema: {
-        type: 'text',
-        content_type,
-        tags: tags || []
-      },
-      ui_schema: null,
-      default_values: {
-        content,
-        content_type,
-        tags: tags || []
-      },
-      submit_action: null,
-      type: 'document', // Set the type as 'document'
-      status: 'active', // Required by constraint
-      processing_status: 'completed', // Required by constraint
-      file_size: content.length,
-      mime_type: content_type === 'html' ? 'text/html' : content_type === 'plain' ? 'text/plain' : 'text/markdown',
-      processed_content: content,
-      metadata: {
-        type: 'text',
-        content_type,
-        description: description || null,
-        tags: tags || [],
-        user_id: userId
-      },
-      created_at: new Date().toISOString()
-    })
+    .insert(insertData)
     .select()
     .single();
 
+  console.log('🗄️ Document artifact insert result:', { 
+    success: !error,
+    error: error ? JSON.stringify(error, null, 2) : null,
+    artifact: artifact ? { 
+      id: (artifact as unknown as { id: string }).id, 
+      name: (artifact as unknown as { name: string }).name 
+    } : null
+  });
+
   if (error) {
-    console.error('Error creating document artifact:', error);
+    console.error('❌ Error creating document artifact:', JSON.stringify(error, null, 2));
     throw error;
   }
 

@@ -781,6 +781,25 @@ const Home: React.FC = () => {
         }
         return;
       }
+
+      // NEW: Handle ARTIFACT_REFRESH_NEEDED messages from useMessageHandling
+      if (event.data?.type === 'ARTIFACT_REFRESH_NEEDED') {
+        console.log('🎯 HOME MESSAGE DEBUG: ARTIFACT_REFRESH_NEEDED received:', {
+          sessionId: event.data.sessionId,
+          timestamp: event.data.timestamp
+        });
+        
+        if (event.data.sessionId && currentSessionId === event.data.sessionId) {
+          try {
+            console.log('🔄 Refreshing artifacts after tool execution for session:', event.data.sessionId);
+            await loadSessionArtifacts(event.data.sessionId);
+            console.log('✅ Artifacts refreshed successfully after tool execution');
+          } catch (error) {
+            console.error('❌ HOME MESSAGE DEBUG: Failed to refresh artifacts after tool execution:', error);
+          }
+        }
+        return;
+      }
       
       // ORIGINAL: Handle legacy RFP refresh messages
       if (event.data?.type === 'REFRESH_CURRENT_RFP') {
@@ -1095,6 +1114,7 @@ const Home: React.FC = () => {
         });
         return null; // Return null immediately to satisfy the sync interface
       },
+      loadSessionArtifacts,
       selectedArtifact // Add current artifact context
     );
   };
@@ -1328,7 +1348,8 @@ const Home: React.FC = () => {
             console.error('Failed to handle agent change:', error);
           });
           return null; // Return null immediately to satisfy the sync interface
-        }
+        },
+        loadSessionArtifacts
       );
       
     } catch (error) {

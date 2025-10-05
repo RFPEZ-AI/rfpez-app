@@ -798,35 +798,35 @@ export const useArtifactManagement = (
           }
         }
         
-        // Handle create_text_artifact results
-        if (functionResult.function === 'create_text_artifact' && functionResult.result) {
+        // Handle create_document_artifact results
+        if (functionResult.function === 'create_document_artifact' && functionResult.result) {
           const result = functionResult.result;
           
-          if (result.success && result.content) {
-            console.log('Text artifact detected from function result:', result);
+          if (result.success && result.artifact_id) {
+            console.log('Document artifact detected from function result:', result);
             
-            const artifactId = result.artifact_id || `text-${Date.now()}-${index}`;
+            const artifactId = result.artifact_id;
             
             // Check if this artifact already exists or has been processed
             if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
-              console.log('⚠️ Skipping duplicate text artifact:', artifactId);
+              console.log('⚠️ Skipping duplicate document artifact:', artifactId);
               return;
             }
             
             processedArtifactIds.add(artifactId);
-            console.log('📝 Processing new text artifact:', artifactId);
+            console.log('📝 Processing new document artifact:', artifactId);
             
-            const textArtifact: Artifact = {
+            const documentArtifact: Artifact = {
               id: artifactId,
-              name: result.title || 'Generated Text',
-              type: 'document', // Use 'document' type for text artifacts
-              size: `${(result.content as string)?.length || 0} characters`,
+              name: (result as any).artifact_name || 'Generated Document',
+              type: 'document',
+              size: `${(result as any).content?.length || 0} characters`,
               content: JSON.stringify({
-                title: result.title,
-                description: result.description,
-                content: result.content,
-                content_type: result.content_type || 'markdown',
-                tags: result.tags || []
+                name: (result as any).artifact_name,
+                description: (result as any).description || null,
+                content: (result as any).content || '',
+                content_type: (result as any).content_type || 'markdown',
+                tags: (result as any).tags || []
               }),
               sessionId: currentSessionId,
               messageId,
@@ -835,17 +835,17 @@ export const useArtifactManagement = (
             
             // Add artifact to state and ensure immediate availability
             setArtifacts(prev => {
-              const updated = [...prev, textArtifact];
-              console.log('📝 Text artifact added to state immediately:', textArtifact.id, 'Total:', updated.length);
+              const updated = [...prev, documentArtifact];
+              console.log('📝 Document artifact added to state immediately:', documentArtifact.id, 'Total:', updated.length);
               return updated;
             });
             
-            selectArtifact(textArtifact.id); // Auto-select new artifact
+            selectArtifact(documentArtifact.id); // Auto-select new artifact
             
             // Notify parent that an artifact was added (triggers auto-open)
-            onArtifactAdded?.(textArtifact.id);
+            onArtifactAdded?.(documentArtifact.id);
             
-            console.log('✅ Added text artifact from function result:', textArtifact);
+            console.log('✅ Added document artifact from function result:', documentArtifact);
             
             // Create artifact reference for the message
             const artifactRef: ArtifactReference = {
