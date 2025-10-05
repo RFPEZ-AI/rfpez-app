@@ -34,6 +34,10 @@ test-automation/led-bulb-test-report-1757738266071.json
 # Supabase edge function coverage
 supabase/functions/claude-api-v3/coverage/
 
+# Deno lock files (generated automatically, can cause integrity issues)
+**/deno.lock
+deno.lock
+
 # Temporary files
 /temp
 temp/
