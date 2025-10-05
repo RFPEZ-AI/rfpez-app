@@ -85,8 +85,6 @@ async function streamWithRecursiveTools(
     return { fullContent, toolsUsed, executedToolResults };
   }
   
-  console.log(`🔄 Recursive streaming depth ${recursionDepth}`);
-  
   const pendingToolCalls: unknown[] = [];
   
   // Stream from Claude API
@@ -94,15 +92,31 @@ async function streamWithRecursiveTools(
     try {
       const chunkData = chunk as Record<string, unknown>;
       if (chunkData.type === 'text' && chunkData.content) {
-        fullContent += chunkData.content as string;
+        const textContent = chunkData.content as string;
         
-        const textEvent = {
-          type: 'content_delta',
-          delta: chunkData.content,
-          full_content: fullContent
-        };
-        const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
-        controller.enqueue(new TextEncoder().encode(sseData));
+        // STREAMING BUFFER FIX: Ensure only clean text content is sent to client
+        // Filter out any tool metadata that might have leaked into text content
+        // CRITICAL FIX: Clean metadata while preserving all necessary whitespace
+        const cleanTextContent = textContent
+          .replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, '') // Remove UUIDs completely
+          .replace(/\{"id":"[^"]+","type":"[^"]+"\}/g, '') // Remove JSON objects completely
+          .replace(/\btool_use_id\b[^,}\]]+[,}\]]/g, '') // Remove tool_use_id references completely
+          .replace(/[ \t]{2,}/g, ' '); // Only normalize multiple horizontal spaces (preserve single spaces and all newlines)
+        
+
+        
+        // Only add to fullContent and stream if we have actual text content
+        if (cleanTextContent) {
+          fullContent += cleanTextContent;
+          
+          const textEvent = {
+            type: 'content_delta',
+            delta: cleanTextContent,
+            full_content: fullContent
+          };
+          const sseData = `data: ${JSON.stringify(textEvent)}\n\n`;
+          controller.enqueue(new TextEncoder().encode(sseData));
+        }
         
       } else if (chunkData.type === 'tool_use' && chunkData.name) {
         console.log(`🔧 Tool use detected at depth ${recursionDepth}:`, chunkData.name);
@@ -364,8 +378,6 @@ function handleStreamingResponse(
         
         const tools = getToolDefinitions(agentContext?.role);
         
-        console.log('🌊 Starting streaming response...');
-        
         // Use recursive streaming to handle unlimited tool call chains
         const result = await streamWithRecursiveTools(
           messages as ClaudeMessage[],
@@ -391,14 +403,6 @@ function handleStreamingResponse(
           return isToolExecutionResult(result) && result.function_name === 'switch_agent' && result.result?.success === true;
         });
 
-        // DEBUG: Log completion event details
-        console.log('🏁 COMPLETION EVENT DEBUG:', {
-          toolsUsedCount: toolsUsed.length,
-          executedToolResultsCount: executedToolResults.length,
-          executedToolResults: executedToolResults,
-          agentSwitchOccurred: agentSwitchOccurred
-        });
-
         // Send completion event with metadata including agent switch detection
         const completeEvent = {
           type: 'complete',
@@ -412,12 +416,6 @@ function handleStreamingResponse(
           }
         };
         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
-        
-        console.log('✅ Streaming completed successfully');
-        console.log('📊 Streaming summary:', {
-          textLength: fullContent.length,
-          toolCallCount: toolsUsed.length
-        });
         controller.close();
         
       } catch (error) {

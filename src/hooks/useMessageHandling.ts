@@ -33,8 +33,6 @@ interface EnhancedFunctionResult {
 }
 
 export const useMessageHandling = () => {
-  console.log('🚨🚨🚨 MESSAGE HANDLING HOOK LOADED 🚨🚨🚨');
-  console.log('🔄 AGENT TRANSITION DEBUG: Message handling hook initialized');
   const abortControllerRef = useRef<AbortController | null>(null);
   const isProcessingRef = useRef<boolean>(false); // Add processing guard
   
@@ -437,7 +435,6 @@ export const useMessageHandling = () => {
     
     // Verify our controller is still valid before starting the request
     if (!thisRequestController || thisRequestController.signal.aborted) {
-      console.log('🚨 AbortController invalid or already aborted before request start');
       return;
     }
     
@@ -580,9 +577,7 @@ export const useMessageHandling = () => {
         let uiTimeoutId: NodeJS.Timeout | null = null;
         
         const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean) => {
-          console.log('🚨 STREAMING CHUNK HANDLER CALLED - This should appear if streaming works!');
-          
-          console.log('📡 STREAMING CHUNK RECEIVED:', {
+          console.log(' STREAMING CHUNK RECEIVED:', {
             chunkLength: chunk.length,
             chunkPreview: chunk.length > 0 ? chunk.substring(0, 50) + '...' : '[empty]',
             isComplete,
@@ -752,6 +747,24 @@ export const useMessageHandling = () => {
               if (isWaitingForToolCompletion) {
                 console.log('🔧 Tool completion detected - cleaning up tool processing state');
                 
+                // STREAMING COMPLETION FIX: Flush any remaining buffer before cleanup
+                if (streamingBuffer.length > 0) {
+                  console.log('🔧 FLUSHING BUFFER during tool completion cleanup:', {
+                    bufferLength: streamingBuffer.length,
+                    bufferContent: streamingBuffer.substring(0, 100) + '...',
+                    messageId: aiMessageId
+                  });
+                  
+                  setMessages(prev => 
+                    prev.map(msg => 
+                      msg.id === aiMessageId 
+                        ? { ...msg, content: msg.content + streamingBuffer }
+                        : msg
+                    )
+                  );
+                  streamingBuffer = '';
+                }
+                
                 // Remove tool processing message if it exists
                 if (toolProcessingMessageId) {
                   setMessages(prev => prev.filter(msg => msg.id !== toolProcessingMessageId));
@@ -771,6 +784,12 @@ export const useMessageHandling = () => {
               
               // Final update with any remaining buffer
               if (streamingBuffer.length > 0) {
+                console.log('🔧 FINAL BUFFER FLUSH on completion:', {
+                  bufferLength: streamingBuffer.length,
+                  bufferContent: streamingBuffer.substring(0, 100) + '...',
+                  messageId: aiMessageId
+                });
+                
                 setMessages(prev => 
                   prev.map(msg => 
                     msg.id === aiMessageId 
@@ -797,8 +816,26 @@ export const useMessageHandling = () => {
               chunkLength: chunk.length,
               isWaitingForToolCompletion,
               toolProcessingMessageId,
-              currentAiMessageId: aiMessageId
+              currentAiMessageId: aiMessageId,
+              currentStreamingBuffer: streamingBuffer.length
             });
+            
+            // STREAMING CONTINUATION FIX: Flush any remaining buffer to the current message before transitioning
+            if (streamingBuffer.length > 0) {
+              console.log('🔧 FLUSHING REMAINING BUFFER before continuation:', {
+                bufferLength: streamingBuffer.length,
+                bufferContent: streamingBuffer.substring(0, 100) + '...',
+                currentMessageId: aiMessageId
+              });
+              
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === aiMessageId 
+                    ? { ...msg, content: msg.content + streamingBuffer }
+                    : msg
+                )
+              );
+            }
             
             // Remove tool processing message
             if (toolProcessingMessageId) {
@@ -847,8 +884,31 @@ export const useMessageHandling = () => {
             return;
           }
           
-          // Handle partial UTF-8 chunks properly - accumulate in buffer
-          streamingBuffer += chunk;
+          // STREAMING BUFFER FIX: Filter out tool metadata from text chunks
+          // Only add to buffer if chunk contains actual text content (not tool metadata)
+          // CRITICAL FIX: Preserve whitespace characters (spaces, newlines) - they are valid text!
+          const isValidTextChunk = chunk && 
+            typeof chunk === 'string' && 
+            !chunk.match(/^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i) && // Not a UUID
+            !chunk.includes('"id":"') && // Not JSON tool data
+            !chunk.includes('"type":"') && // Not JSON event data
+            !chunk.includes('tool_use_id') && // Not tool result data
+            chunk.length > 0; // Allow whitespace characters - they are part of text formatting!
+          
+          if (isValidTextChunk) {
+            streamingBuffer += chunk;
+          } else if (chunk && chunk.trim()) {
+            console.log('🔧 FILTERING OUT NON-TEXT CHUNK:', {
+              chunkLength: chunk.length,
+              chunkPreview: chunk.substring(0, 50) + '...',
+              reason: chunk.match(/^[a-f0-9-]{36}$/i) ? 'UUID detected' : 
+                     chunk.includes('"id":"') ? 'JSON tool data' :
+                     chunk.includes('"type":"') ? 'JSON event data' :
+                     chunk.includes('tool_use_id') ? 'Tool result data' : 'Unknown metadata',
+              messageId: aiMessageId
+            });
+          }
+          
           const now = Date.now();
           
           console.log('🔧 STREAMING BUFFER UPDATE:', {
@@ -857,6 +917,7 @@ export const useMessageHandling = () => {
             bufferLength: streamingBuffer.length,
             bufferPreview: streamingBuffer.substring(0, 50) + '...',
             messageId: aiMessageId,
+            isValidTextChunk,
             willUpdate: now - lastUpdateTime >= updateInterval || streamingBuffer.length > 150
           });
           
@@ -966,12 +1027,6 @@ export const useMessageHandling = () => {
         // let finalContent = claudeResponse.content || ''; // Unused when final content refresh is disabled
         
         // 🚨 STREAMING DEBUG: DISABLE FINAL CONTENT REFRESH TO OBSERVE PARTIAL RESPONSES
-        console.log('🚨 DEBUG MODE: Skipping final content refresh to observe streaming behavior');
-        console.log('🔧 FINAL CONTENT ASSEMBLY (DEBUG DISABLED):');
-        console.log('- Was streaming:', claudeResponse.metadata?.is_streaming);
-        console.log('- Claude response content length:', (claudeResponse.content || '').length);
-        console.log('- Preserving streamed content as-is for debugging');
-        
         // Get final content for artifacts but don't update UI
         // const currentMessage = messages.find(msg => msg.id === aiMessageId);
         // const currentContent = currentMessage?.content || '';
@@ -1006,11 +1061,7 @@ export const useMessageHandling = () => {
         // This ensures artifacts are available when references are clicked, preventing "could not be loaded" errors
         addClaudeArtifacts(claudeResponse.metadata, aiMessageId);
         
-        // 🚨 STREAMING DEBUG: DISABLE ARTIFACT REFERENCE TIMEOUT TO OBSERVE STREAMING
-        console.log('🚨 DEBUG MODE: Skipping artifact reference timeout to preserve streaming state');
-        console.log('🔗 Artifact references found (not being added):', artifactRefs);
-        
-        // 🚨 DISABLED: Artifact reference timeout
+        // DISABLED: Artifact reference timeout
         // if (artifactRefs.length > 0) {
         //   setTimeout(() => {
         //     console.log('🔗 Adding artifact references to UI after artifact processing:', artifactRefs);
