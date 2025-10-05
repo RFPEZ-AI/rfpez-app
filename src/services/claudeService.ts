@@ -268,6 +268,19 @@ export class ClaudeService {
   ): Promise<ClaudeResponse> {
     // Use centralized Supabase client to avoid multiple instance warnings
     
+    // DEBUG: Check environment and auth status for anonymous key investigation
+    const session = await supabase.auth.getSession();
+    const anonKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+    console.log('🔍 Auth & Environment Debug:', {
+      hasSession: !!session?.data?.session,
+      hasAccessToken: !!session?.data?.session?.access_token,
+      hasAnonKey: !!anonKey,
+      anonKeyLength: anonKey?.length || 0,
+      anonKeyPreview: anonKey ? anonKey.substring(0, 20) + '...' : 'undefined',
+      userId: session?.data?.session?.user?.id || 'anonymous',
+      streaming: stream
+    });
+    
     // Detect previous login evidence for anonymous users
     const loginEvidence = this.detectPreviousLoginEvidence();
     
@@ -318,18 +331,41 @@ export class ClaudeService {
       if (stream && onChunk) {
         // Use direct fetch for streaming responses
         const session = await supabase.auth.getSession();
+        const authToken = session.data.session?.access_token || process.env.REACT_APP_SUPABASE_ANON_KEY;
+        
+        console.log('🔍 Streaming Auth Debug:', {
+          hasAccessToken: !!session.data.session?.access_token,
+          usingAnonKey: !session.data.session?.access_token,
+          authTokenLength: authToken?.length || 0,
+          authTokenPreview: authToken ? authToken.substring(0, 20) + '...' : 'undefined'
+        });
+        
+        // Validate auth token before making request
+        if (!authToken) {
+          throw new Error('No authentication token available (neither access token nor anonymous key)');
+        }
+        
+        console.log('🚀 Making streaming request to:', `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/claude-api-v3`);
+        
         const response = await fetch(
           `${process.env.REACT_APP_SUPABASE_URL}/functions/v1/claude-api-v3`,
           {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${session.data.session?.access_token || process.env.REACT_APP_SUPABASE_ANON_KEY}`
+              'Authorization': `Bearer ${authToken}`
             },
             body: JSON.stringify(payload),
             signal: abortSignal
           }
         );
+        
+        console.log('📡 Response received:', {
+          status: response.status,
+          statusText: response.statusText,
+          ok: response.ok,
+          headers: Object.fromEntries(response.headers.entries())
+        });
 
         if (!response.ok) {
           // Check for Claude API service outage errors
@@ -356,26 +392,55 @@ export class ClaudeService {
 
         if (reader) {
           try {
+            console.log('🌊 Starting streaming reader loop');
+            let chunkCount = 0;
             // eslint-disable-next-line no-constant-condition
             while (true) {
               const { done, value } = await reader.read();
+              chunkCount++;
+              
+              console.log('🔍 Reader iteration:', {
+                chunkCount,
+                done,
+                valueLength: value?.length || 0,
+                bufferLength: buffer.length,
+                fullContentLength: fullContent.length
+              });
+              
               if (done) {
-
+                console.log('✅ Stream reader completed - done=true');
                 break;
               }
 
               const chunk = decoder.decode(value, { stream: true });
+              console.log('📥 Decoded chunk:', {
+                chunkLength: chunk.length,
+                chunkPreview: chunk.substring(0, 100) + (chunk.length > 100 ? '...' : ''),
+                bufferLengthBefore: buffer.length
+              });
 
               buffer += chunk; // Add to buffer
               const lines = buffer.split('\n');
               
               // Keep the last line in buffer (might be incomplete)
               buffer = lines.pop() || '';
+              
+              console.log('📋 Processing lines:', {
+                totalLines: lines.length,
+                bufferLengthAfter: buffer.length,
+                linePreviews: lines.slice(0, 3).map(line => line.substring(0, 50) + (line.length > 50 ? '...' : ''))
+              });
 
               for (const line of lines) {
                 if (line.startsWith('data: ')) {
                   try {
-                    const eventData = JSON.parse(line.slice(6));
+                    const jsonStr = line.slice(6);
+                    console.log('🔍 Parsing JSON line:', {
+                      lineLength: line.length,
+                      jsonLength: jsonStr.length,
+                      jsonPreview: jsonStr.substring(0, 100) + (jsonStr.length > 100 ? '...' : '')
+                    });
+                    const eventData = JSON.parse(jsonStr);
                     
 
                     
@@ -383,6 +448,13 @@ export class ClaudeService {
                       const content = eventData.content || eventData.delta;
                       fullContent += content;
 
+                      console.log('📤 Calling onChunk with content:', {
+                        contentLength: content.length,
+                        contentPreview: content.substring(0, 50) + (content.length > 50 ? '...' : ''),
+                        fullContentLength: fullContent.length,
+                        eventType: eventData.type
+                      });
+                      
                       onChunk(content, false);
                     } else if (eventData.type === 'tool_invocation') {
                       if (eventData.toolEvent?.type === 'tool_start') {
@@ -430,6 +502,12 @@ export class ClaudeService {
                       
                       // Only call completion after processing any final content
                       console.log('🏁 Calling final completion with total content:', fullContent.length, 'chars');
+                      console.log('🎯 STREAMING FINAL SUMMARY:', {
+                        totalContentLength: fullContent.length,
+                        totalChunksProcessed: chunkCount,
+                        toolsUsedCount: toolsUsed.length,
+                        toolsUsed: toolsUsed
+                      });
                       onChunk('', true); // Indicate completion
                       
                       if (eventData.metadata?.toolsUsed) {

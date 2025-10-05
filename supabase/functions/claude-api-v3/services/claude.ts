@@ -108,7 +108,7 @@ export class ClaudeAPIService {
 
     const requestBody = {
       model: 'claude-sonnet-4-20250514',
-      max_tokens: 4000,
+      max_tokens: 8000,  // Increased from 4000 to prevent truncation
       temperature: 0.3,
       messages: formattedMessages,
       tools: tools,
@@ -184,14 +184,17 @@ export class ClaudeAPIService {
                 
                 if (parsed.delta?.type === 'text_delta') {
                   const textChunk = parsed.delta.text;
-                  fullTextResponse += textChunk;
-                  
-                  // Send text chunk to client
-                  onChunk({ 
-                    type: 'text', 
-                    content: textChunk,
-                    delta: { text: textChunk } 
-                  });
+                  if (textChunk && textChunk.trim()) { // Only process non-empty chunks
+                    fullTextResponse += textChunk;
+                    console.log('💬 Text chunk received:', textChunk.length, 'characters');
+                    
+                    // Send text chunk to client
+                    onChunk({ 
+                      type: 'text', 
+                      content: textChunk,
+                      delta: { text: textChunk } 
+                    });
+                  }
                 } else if (parsed.delta?.type === 'input_json_delta' && activeToolCall.id) {
                   // Accumulate input parameters for the active tool call
                   const partialJson = parsed.delta.partial_json || '';
@@ -255,7 +258,9 @@ export class ClaudeAPIService {
                 console.log('🛑 Message stopped:', parsed.delta.stop_reason);
               }
             } catch (parseError) {
-              console.error('Error parsing streaming data:', parseError, 'Data:', eventData);
+              console.error('Error parsing streaming data:', parseError, 'Data:', eventData.substring(0, 200));
+              // Don't break the stream for parse errors, continue processing
+              continue;
             }
           }
         }
