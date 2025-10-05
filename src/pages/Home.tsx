@@ -16,8 +16,46 @@ import { useSessionState } from '../hooks/useSessionState';
 import { useAgentManagement } from '../hooks/useAgentManagement';
 import { useRFPManagement } from '../hooks/useRFPManagement';
 import { useArtifactManagement } from '../hooks/useArtifactManagement';
-import { useArtifactWindowState } from '../hooks/useArtifactWindowState';
 import { useMessageHandling } from '../hooks/useMessageHandling';
+
+// Temporary stub for useArtifactWindowState
+const useArtifactWindowState = () => ({
+  saveLastSession: (sessionId: string | null) => {
+    if (sessionId) localStorage.setItem('rfpez_last_session', sessionId);
+    else localStorage.removeItem('rfpez_last_session');
+  },
+  getLastSession: (): string | null => localStorage.getItem('rfpez_last_session'),
+  selectArtifact: (artifactId: string | null) => 
+    artifactId && localStorage.setItem('rfpez_selected_artifact', artifactId),
+  saveSessionArtifact: (sessionId: string | null, artifactId: string | null) => 
+    sessionId && artifactId && localStorage.setItem(`rfpez_session_artifact_${sessionId}`, artifactId),
+  restoreSessionArtifact: (sessionId: string): string | null => 
+    localStorage.getItem(`rfpez_session_artifact_${sessionId}`),
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  autoOpenForArtifact: (artifactId: string | null) => {
+    // Stub implementation - no operation needed
+  },
+  isOpen: true,
+  isCollapsed: false,
+  openWindow: () => {
+    // Stub implementation - no operation needed
+  },
+  expandWindow: () => {
+    // Stub implementation - no operation needed
+  },
+  closeWindow: () => {
+    // Stub implementation - no operation needed
+  },
+  toggleWindow: () => {
+    // Stub implementation - no operation needed
+  },
+  toggleCollapse: () => {
+    // Stub implementation - no operation needed
+  },
+  resetForNewSession: () => {
+    // Stub implementation - no operation needed
+  }
+});
 
 // Import clickable element decorator for development testing
 import '../utils/clickableElementDecorator';
