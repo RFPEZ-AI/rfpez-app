@@ -52,7 +52,7 @@
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-192x192.png",
+      "src": "/assets/icon/icon-192x192-maskable.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "maskable"
@@ -64,7 +64,7 @@
       "purpose": "any"
     },
     {
-      "src": "/assets/icon/icon-512.png",
+      "src": "/assets/icon/icon-512x512-maskable.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
@@ -77,5 +77,22 @@
   "background_color": "#F7EBD0",
   "scope": "/",
   "lang": "en",
-  "dir": "ltr"
+  "dir": "ltr",
+  "categories": ["business", "productivity"],
+  "display_override": ["window-controls-overlay", "standalone", "minimal-ui"],
+  "shortcuts": [
+    {
+      "name": "New RFP",
+      "short_name": "New RFP",
+      "description": "Create a new RFP",
+      "url": "/",
+      "icons": [
+        {
+          "src": "/assets/icon/icon-96x96.png",
+          "sizes": "96x96",
+          "type": "image/png"
+        }
+      ]
+    }
+  ]
 }
