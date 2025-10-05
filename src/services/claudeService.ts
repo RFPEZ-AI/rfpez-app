@@ -342,13 +342,6 @@ export class ClaudeService {
           throw new Error(`Edge function failed: ${response.status} ${response.statusText}`);
         }
 
-        console.log('🚨 FETCH RESPONSE RECEIVED:', {
-          status: response.status,
-          statusText: response.statusText,
-          headers: response.headers,
-          hasBody: !!response.body
-        });
-
         // Handle streaming response
         const reader = response.body?.getReader();
         const decoder = new TextDecoder();
@@ -361,8 +354,6 @@ export class ClaudeService {
         let buffer = ''; // Buffer for incomplete lines
         let streamingCompletionMetadata: any = null; // Store completion metadata from Edge Function
 
-        console.log('🚨 STARTING SSE READER LOOP - reader exists:', !!reader);
-        
         if (reader) {
           try {
             // eslint-disable-next-line no-constant-condition
@@ -1203,8 +1194,27 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
                       contentLength: toolResponseText.length,
                       willStream: !!onChunk
                     });
-                    // Stream the tool response content
-                    onChunk?.(toolResponseText, false);
+                    
+                    // STREAMING BUFFER FIX: Clean tool response text to ensure no metadata contamination
+                    // CRITICAL FIX: Clean metadata while preserving all necessary whitespace
+                    const cleanToolResponseText = toolResponseText
+                      .replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, '') // Remove UUIDs completely
+                      .replace(/\{"id":"[^"]+","type":"[^"]+"\}/g, '') // Remove JSON objects completely
+                      .replace(/\btool_use_id\b[^,}\]]+[,}\]]/g, '') // Remove tool_use_id references completely
+                      .replace(/[ \t]{2,}/g, ' ') // Only normalize multiple horizontal spaces (preserve single spaces and all newlines)
+                      .trim();
+                    
+                    if (cleanToolResponseText && cleanToolResponseText !== toolResponseText) {
+                      console.log('🔧 CLEANED TOOL RESPONSE TEXT:', {
+                        originalLength: toolResponseText.length,
+                        cleanedLength: cleanToolResponseText.length,
+                        originalPreview: toolResponseText.substring(0, 100) + '...',
+                        cleanedPreview: cleanToolResponseText.substring(0, 100) + '...'
+                      });
+                    }
+                    
+                    // Stream the cleaned tool response content
+                    onChunk?.(cleanToolResponseText || toolResponseText, false);
                   } else {
                     console.log('⚠️ NO TOOL RESPONSE TEXT TO STREAM - but still triggering continuation for UI cleanup');
                     // CRITICAL FIX: Even with empty response, trigger continuation to remove processing message
@@ -1371,7 +1381,23 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       // Always extract text from the final response object
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const finalTextBlocks = response.content.filter((block: any) => block.type === 'text') as any[];
-      const responseTextContent = finalTextBlocks.map(block => block.text).join('');
+      const rawResponseTextContent = finalTextBlocks.map(block => block.text).join('');
+      
+      // STREAMING BUFFER FIX: Clean response text content to prevent tool metadata contamination
+      const responseTextContent = rawResponseTextContent
+        .replace(/[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}/gi, '') // Remove UUIDs
+        .replace(/\{"id":"[^"]+","type":"[^"]+"\}/g, '') // Remove JSON objects
+        .replace(/\btool_use_id\b[^,}\]]+[,}\]]/g, '') // Remove tool_use_id references
+        .trim();
+      
+      if (responseTextContent !== rawResponseTextContent) {
+        console.log('🔧 CLEANED RESPONSE TEXT CONTENT:', {
+          originalLength: rawResponseTextContent.length,
+          cleanedLength: responseTextContent.length,
+          originalPreview: rawResponseTextContent.substring(0, 100) + '...',
+          cleanedPreview: responseTextContent.substring(0, 100) + '...'
+        });
+      }
       
       console.log('🔧 FINAL CONTENT ASSEMBLY DEBUG:', {
         streamingMode: stream && onChunk,
