@@ -470,7 +470,7 @@ const DebugPage: React.FC = () => {
           <IonCardContent>
             <p>
               When MCP browser tests execute backend operations successfully but UI shows stale data 
-              (e.g., "Current RFP is None"), use this manual refresh to sync the UI state.
+              (e.g., &quot;Current RFP is None&quot;), use this manual refresh to sync the UI state.
             </p>
             
             <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
@@ -513,7 +513,7 @@ const DebugPage: React.FC = () => {
             }}>
               <p style={{ margin: '0 0 8px 0' }}><strong>When to use:</strong></p>
               <ul style={{ margin: '0', paddingLeft: '16px' }}>
-                <li>MCP browser test shows "RFP created successfully" but UI shows "Current RFP is None"</li>
+                <li>MCP browser test shows &quot;RFP created successfully&quot; but UI shows &quot;Current RFP is None&quot;</li>
                 <li>Artifacts created via MCP tools but not visible in artifact panel</li>
                 <li>Session state appears out of sync with database state</li>
               </ul>
