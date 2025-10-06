@@ -3,14 +3,10 @@
 import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { 
-  documentTextOutline, 
   chevronBackOutline, 
   chevronForwardOutline, 
   expandOutline, 
-  clipboardOutline, 
-  imageOutline, 
-  chevronUpOutline, 
-  reorderTwoOutline 
+  chevronUpOutline 
 } from 'ionicons/icons';
 import { SingletonArtifactWindowProps } from '../types/home';
 import { useArtifactTypeDetection } from '../hooks/useArtifactTypeDetection';
@@ -97,23 +93,6 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
       setPortraitHeight(60);
     }
   }, [collapsed]);
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'document':
-      case 'text':
-      case 'pdf':
-        return documentTextOutline;
-      case 'form':
-        return clipboardOutline;
-      case 'image':
-        return imageOutline;
-      case 'bid_view':
-        return reorderTwoOutline;
-      default:
-        return documentTextOutline;
-    }
-  };
 
   const renderArtifactContent = () => {
     if (!artifact) return null;
