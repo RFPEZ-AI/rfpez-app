@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import { Message, ArtifactReference } from '../types/home';
+import { Message, ArtifactReference, Artifact } from '../types/home';
 import { RFP } from '../types/rfp';
 import { SessionActiveAgent, UserProfile } from '../types/database';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
@@ -364,7 +364,7 @@ export const useMessageHandling = () => {
     addClaudeArtifacts: (metadata: Record<string, unknown>, messageId?: string) => void,
     loadSessionAgent: (sessionId: string) => Promise<void>,
     handleAgentChanged: (agent: SessionActiveAgent) => Message | null,
-    loadSessionArtifacts: (sessionId: string) => Promise<any[] | undefined>,
+    loadSessionArtifacts: (sessionId: string) => Promise<Artifact[] | undefined>,
     currentArtifact?: {
       id: string;
       name: string;
@@ -1233,12 +1233,12 @@ export const useMessageHandling = () => {
             
             // 🔄 ARTIFACT REFRESH: Check if any tools were executed and refresh artifacts
             if (claudeResponse.metadata && claudeResponse.metadata.function_results && Array.isArray(claudeResponse.metadata.function_results)) {
-              console.log('🔍 DEBUG: Checking for artifact creation in function results:', claudeResponse.metadata.function_results.map((fr: any) => fr.function));
+              console.log('🔍 DEBUG: Checking for artifact creation in function results:', claudeResponse.metadata.function_results.map((fr: EnhancedFunctionResult) => fr.function || 'unknown'));
               
-              const hasArtifactCreation = claudeResponse.metadata.function_results.some((fr: any) => 
-                fr.function === 'create_form_artifact' || 
+              const hasArtifactCreation = claudeResponse.metadata.function_results.some((fr: EnhancedFunctionResult) => 
+                (fr.function === 'create_form_artifact' || 
                 fr.function === 'create_document_artifact' ||
-                fr.function === 'generate_proposal_artifact'
+                fr.function === 'generate_proposal_artifact')
               );
               
               console.log('🔍 DEBUG: hasArtifactCreation:', hasArtifactCreation, 'artifactRefs length:', artifactRefs.length);
@@ -1471,7 +1471,7 @@ export const useMessageHandling = () => {
     addClaudeArtifacts: (metadata: Record<string, unknown>, messageId?: string) => void,
     loadSessionAgent: (sessionId: string) => Promise<void>,
     handleAgentChanged: (agent: SessionActiveAgent) => Message | null,
-    loadSessionArtifacts: (sessionId: string) => Promise<any[] | undefined>
+    loadSessionArtifacts: (sessionId: string) => Promise<Artifact[] | undefined>
   ) => {
     
     // Use smart auto-prompt manager to decide if we should send
