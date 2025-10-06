@@ -631,9 +631,29 @@ export async function createSession(supabase: SupabaseClient, data: SessionData)
     }
   }
 
+  // IMPORTANT: Set this new session as the user's current session
+  // This ensures that when the user refreshes, they stay in the new session
+  const sessionId = (session as unknown as { id: string }).id;
+  console.log('🔧 Setting new session as current for user:', userId, 'Session:', sessionId);
+  
+  const { error: profileUpdateError } = await supabase
+    .from('user_profiles')
+    .update({ 
+      current_session_id: sessionId,
+      updated_at: new Date().toISOString()
+    })
+    .eq('supabase_user_id', userId);
+
+  if (profileUpdateError) {
+    console.error('⚠️ Warning: Failed to set current session in user profile:', profileUpdateError);
+    // Don't throw here, session creation succeeded, this is just a convenience feature
+  } else {
+    console.log('✅ Successfully set new session as current session for user');
+  }
+
   const result = {
     success: true,
-    session_id: (session as unknown as { id: string }).id,
+    session_id: sessionId,
     message: 'Session created successfully'
   };
   
