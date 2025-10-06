@@ -161,23 +161,6 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
     }
   },
   {
-    name: 'create_session',
-    description: 'Create a new conversation session',
-    input_schema: {
-      type: 'object',
-      properties: {
-        title: {
-          type: 'string',
-          description: 'Session title'
-        },
-        agentId: {
-          type: 'string',
-          description: 'Agent ID to associate with the session'
-        }
-      }
-    }
-  },
-  {
     name: 'search_messages',
     description: 'Search messages across all user conversations',
     input_schema: {
@@ -352,6 +335,46 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       },
       required: ['artifact_id']
     }
+  },
+  {
+    name: 'update_form_data',
+    description: 'Update the form data (default_values) for an existing form artifact. This populates the form with sample or real data while keeping the schema intact. Use this to fill forms with test data or update existing form values.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        artifact_id: {
+          type: 'string',
+          description: 'ID of the form artifact to update with new data'
+        },
+        session_id: {
+          type: 'string',
+          description: 'Current session ID for context'
+        },
+        form_data: {
+          type: 'object',
+          description: 'Complete form data object with field names matching the form schema. This will replace the current default_values completely.'
+        }
+      },
+      required: ['artifact_id', 'session_id', 'form_data']
+    }
+  },
+  {
+    name: 'update_form_artifact',
+    description: 'Update an existing form artifact with new data or schema. CRITICAL: When updating default_values, you MUST use the exact field names from the existing form schema.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        artifact_id: {
+          type: 'string',
+          description: 'ID of the artifact to update'
+        },
+        updates: {
+          type: 'object',
+          description: 'Updates to apply to the artifact. For default_values, field names must EXACTLY match the schema properties. This is a nested object containing form updates.'
+        }
+      },
+      required: ['artifact_id', 'updates']
+    }
   }
 ];
 
@@ -363,7 +386,7 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
   },
   'design': {
     // RFP Design has access to all RFP creation tools - REMOVED switch_agent to prevent self-switching loops
-    allowed: ['create_and_set_rfp', 'create_form_artifact', 'create_document_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'create_session', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
+    allowed: ['create_and_set_rfp', 'create_form_artifact', 'create_document_artifact', 'update_form_data', 'update_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
   },
   'support': {
     // Support agents don't need RFP creation tools but can create documents
