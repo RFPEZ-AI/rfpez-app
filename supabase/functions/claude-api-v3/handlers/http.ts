@@ -356,7 +356,8 @@ function handleStreamingResponse(
   sessionId?: string, 
   agentId?: string,
   userMessage?: string,
-  agent?: { role?: string }
+  agent?: { role?: string },
+  newSessionData?: { success: boolean; session_id: string; message: string } | null
 ): Promise<Response> {
   // Create readable stream for SSE
   const stream = new ReadableStream({
@@ -423,7 +424,7 @@ function handleStreamingResponse(
         });
 
         // Send completion event with metadata including agent switch detection
-        const completeEvent = {
+        const completeEvent: Record<string, unknown> = {
           type: 'complete',
           full_content: fullContent,
           token_count: fullContent.length, // Approximate token count
@@ -434,6 +435,15 @@ function handleStreamingResponse(
             function_results: executedToolResults
           }
         };
+        
+        // Add session creation info if a new session was auto-created
+        if (newSessionData) {
+          completeEvent.session_created = true;
+          completeEvent.new_session = {
+            id: newSessionData.session_id,
+            message: newSessionData.message
+          };
+        }
         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
         controller.close();
         
@@ -580,10 +590,39 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       hasClientCallback: !!clientCallback 
     });
 
+    // Auto-create session if none provided (for first message)
+    let actualSessionId = sessionId;
+    let newSessionData: { success: boolean; session_id: string; message: string } | null = null;
+    
+    if (!sessionId) {
+      console.log('🆕 No session ID provided - creating new session automatically');
+      
+      // Import createSession function
+      const { createSession } = await import('../tools/database.ts');
+      
+      try {
+        const sessionResult = await createSession(supabase as unknown as SupabaseClient, {
+          userId: userId,
+          title: userMessage?.substring(0, 50) || 'New Conversation',
+          agentId: effectiveAgentId
+        });
+        
+        if (sessionResult.success) {
+          actualSessionId = sessionResult.session_id;
+          newSessionData = sessionResult; // Store the full result
+          console.log('✅ Auto-created session:', actualSessionId);
+        } else {
+          console.error('❌ Failed to auto-create session');
+        }
+      } catch (error) {
+        console.error('❌ Error auto-creating session:', error);
+      }
+    }
+
     // If streaming is requested, handle it separately
     if (stream) {
       console.log('🌊 Streaming requested - using streaming handler');
-      return handleStreamingResponse(processedMessages, supabase, userId, sessionId, effectiveAgentId, userMessage, agent);
+      return handleStreamingResponse(processedMessages, supabase, userId, actualSessionId, effectiveAgentId, userMessage, agent, newSessionData);
     }
 
     // Initialize services
@@ -810,9 +849,18 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       toolCalls: claudeResponse.toolCalls,
       toolResults: toolResults,
       usage: claudeResponse.usage,
-      sessionId: sessionId,
+      sessionId: actualSessionId, // Use actualSessionId which contains the auto-created session ID if needed
       agentId: effectiveAgentId
     };
+
+    // Add session creation info if a new session was auto-created
+    if (newSessionData) {
+      responseData.sessionCreated = true;
+      responseData.newSession = {
+        id: newSessionData.session_id,
+        message: newSessionData.message
+      };
+    }
 
     // Handle client callback if provided
     if (clientCallback) {

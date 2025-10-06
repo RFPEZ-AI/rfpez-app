@@ -340,15 +340,6 @@ export class ToolExecutionService {
           });
         }
 
-        case 'create_session': {
-          const { createSession } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
-          return await createSession(this.supabase, {
-            ...input,
-            userId: this.userId
-          });
-        }
-
         case 'search_messages': {
           const { searchMessages } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
@@ -436,6 +427,18 @@ export class ToolExecutionService {
             ...input,
             sessionId: sessionId || ''
           });
+        }
+
+        case 'update_form_data': {
+          const { updateFormData } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await updateFormData(this.supabase, sessionId!, this.userId, input);
+        }
+
+        case 'update_form_artifact': {
+          const { updateFormArtifact } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await updateFormArtifact(this.supabase, sessionId!, this.userId, input);
         }
 
         default:

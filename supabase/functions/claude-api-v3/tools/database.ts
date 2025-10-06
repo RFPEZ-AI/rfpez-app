@@ -555,20 +555,63 @@ export async function storeMessage(supabase: SupabaseClient, data: MessageData) 
 export async function createSession(supabase: SupabaseClient, data: SessionData) {
   const { userId, title, agentId } = data;
   
-  console.log('Creating session:', { userId, title, agentId });
+  console.log('🔧 CREATE_SESSION DEBUG START:', { 
+    userId, 
+    title, 
+    agentId,
+    userIdType: typeof userId,
+    userIdLength: userId?.length,
+    timestamp: new Date().toISOString()
+  });
+  
+  // First get the user profile to get the internal ID (userId here is supabaseUserId)
+  const { data: userProfile, error: profileError } = await supabase
+    .from('user_profiles')
+    .select('id, email, supabase_user_id')
+    .eq('supabase_user_id', userId)
+    .single();
+
+  console.log('🔧 User profile lookup result:', { 
+    userProfile, 
+    profileError: profileError ? JSON.stringify(profileError) : null
+  });
+
+  if (profileError || !userProfile) {
+    console.error('❌ User profile not found for Supabase user ID:', userId);
+    console.error('❌ Available user profiles check...');
+    
+    // Debug: Show available user profiles
+    const { data: allProfiles } = await supabase
+      .from('user_profiles')
+      .select('id, email, supabase_user_id')
+      .limit(5);
+    
+    console.error('❌ Available user profiles:', allProfiles);
+    throw new Error(`User profile not found for user ID: ${userId}. Profile error: ${JSON.stringify(profileError)}`);
+  }
+  
+  const sessionData = {
+    user_id: (userProfile as unknown as { id: string }).id, // Use the user_profiles.id (internal UUID)
+    title: title || 'New Conversation',
+    created_at: new Date().toISOString()
+  };
+  
+  console.log('🔧 Attempting to insert session:', sessionData);
   
   const { data: session, error } = await supabase
     .from('sessions')
-    .insert({
-      user_id: userId,
-      title: title || 'New Conversation',
-      created_at: new Date().toISOString()
-    })
+    .insert(sessionData)
     .select()
     .single();
 
+  console.log('🔧 Session creation result:', { 
+    session, 
+    error: error ? JSON.stringify(error) : null,
+    success: !error
+  });
+
   if (error) {
-    console.error('Error creating session:', error);
+    console.error('❌ Error creating session:', JSON.stringify(error));
     throw error;
   }
 
@@ -588,11 +631,14 @@ export async function createSession(supabase: SupabaseClient, data: SessionData)
     }
   }
 
-  return {
+  const result = {
     success: true,
     session_id: (session as unknown as { id: string }).id,
     message: 'Session created successfully'
   };
+  
+  console.log('✅ CREATE_SESSION SUCCESS:', result);
+  return result;
 }
 
 // Search messages across conversations
@@ -976,6 +1022,40 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
 
   console.log('✅ Agent switch completed - new agent will read conversation history');
 
+  // Get current RFP context for UI updates
+  let currentRfp = null;
+  try {
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('sessions')
+      .select('current_rfp_id')
+      .eq('id', session_id)
+      .single();
+
+    const sessionRecord = sessionData as unknown as { current_rfp_id?: string } | null;
+    
+    if (!sessionError && sessionRecord?.current_rfp_id) {
+      // Get RFP details
+      const { data: rfpData, error: rfpError } = await supabase
+        .from('rfps')
+        .select('id, name, status')
+        .eq('id', sessionRecord.current_rfp_id)
+        .single();
+
+      const rfpRecord = rfpData as unknown as { id: string; name: string; status: string } | null;
+
+      if (!rfpError && rfpRecord) {
+        currentRfp = {
+          id: rfpRecord.id,
+          title: rfpRecord.name,
+          status: rfpRecord.status
+        };
+        console.log('📋 Current RFP context for UI update:', currentRfp);
+      }
+    }
+  } catch (rfpError) {
+    console.warn('⚠️ Could not retrieve RFP context for UI update:', rfpError);
+  }
+
   // No longer pass context directly - new agent will read session messages
 
   return {
@@ -989,6 +1069,7 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
       instructions: (agent as unknown as Agent).instructions,
       initial_prompt: (agent as unknown as Agent).initial_prompt
     },
+    current_rfp: currentRfp, // Include RFP context for UI updates
     switch_reason: reason,
     message: `Successfully switched to ${(agent as unknown as Agent).name} agent. The ${(agent as unknown as Agent).name} will now read the conversation history and respond accordingly.`,
     trigger_continuation: true // Flag to trigger continuation with new agent reading full conversation
@@ -1309,6 +1390,173 @@ export async function selectActiveArtifact(supabase: SupabaseClient, data: {
     };
   } catch (error) {
     console.error('❌ Exception selecting active artifact:', error);
+    throw error;
+  }
+}
+
+// Update form data for an existing form artifact
+export async function updateFormData(supabase: SupabaseClient, _sessionId: string, _userId: string, data: {
+  artifact_id: string;
+  session_id: string;
+  form_data: Record<string, unknown>;
+}) {
+  console.log('🔄 Starting updateFormData with params:', JSON.stringify(data, null, 2));
+  
+  const { artifact_id, form_data, session_id } = data;
+  
+  console.log('🔄 Updating form data:', { artifact_id, userId: _userId, session_id });
+  console.log('🔍 Form data to set:', form_data);
+  
+  if (!artifact_id) {
+    throw new Error('Artifact ID is required for updating form data');
+  }
+  
+  if (!form_data || typeof form_data !== 'object') {
+    throw new Error('Form data must be a valid object');
+  }
+  
+  if (!session_id) {
+    throw new Error('Session ID is required for updating form data');
+  }
+  
+  try {
+    // First verify the artifact exists and is a form
+    // @ts-ignore - Supabase client type compatibility
+    const { data: existingArtifact, error: fetchError } = await supabase
+      .from('artifacts')
+      .select('id, name, type, artifact_role, schema')
+      .eq('id', artifact_id)
+      .eq('type', 'form')
+      .single();
+    
+    if (fetchError) {
+      console.error('❌ Error fetching artifact:', fetchError);
+      throw new Error(`Artifact not found: ${artifact_id}`);
+    }
+    
+    if (!existingArtifact) {
+      throw new Error(`Form artifact not found: ${artifact_id}`);
+    }
+    
+    console.log('✅ Found existing form artifact:', (existingArtifact as unknown as { name: string }).name);
+    
+    // Update the default_values field with the new form data
+    // @ts-ignore - Supabase client type compatibility
+    const { error: updateError } = await supabase
+      .from('artifacts')
+      .update({
+        default_values: form_data,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', artifact_id)
+      .select()
+      .single();
+    
+    if (updateError) {
+      console.error('❌ Error updating form data:', updateError);
+      throw updateError;
+    }
+    
+    console.log('✅ Form data updated successfully:', { artifact_id, name: (existingArtifact as unknown as { name: string }).name });
+    
+    return {
+      success: true,
+      artifact_id,
+      name: (existingArtifact as unknown as { name: string }).name,
+      form_data,
+      session_id,
+      updated_at: new Date().toISOString(),
+      message: `Form data for "${(existingArtifact as unknown as { name: string }).name}" updated successfully with sample values`
+    };
+  } catch (error) {
+    console.error('❌ Error updating form data:', error);
+    throw error;
+  }
+}
+
+// Update form artifact with new data or schema
+export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: string, _userId: string, data: {
+  artifact_id: string;
+  updates: {
+    title?: string;
+    description?: string;
+    form_schema?: Record<string, unknown>;
+    ui_schema?: Record<string, unknown>;
+    default_values?: Record<string, unknown>;
+    submit_action?: Record<string, unknown>;
+  };
+}) {
+  const { artifact_id, updates } = data;
+  
+  console.log('✏️ Updating form artifact:', { artifact_id, userId: _userId });
+  
+  if (!artifact_id) {
+    throw new Error('Artifact ID is required for updating');
+  }
+  
+  if (!updates || typeof updates !== 'object') {
+    throw new Error('Updates object is required');
+  }
+  
+  try {
+    // Get the existing artifact to validate schema compatibility
+    // @ts-ignore - Supabase client type compatibility
+    const { data: existingArtifact, error: checkError } = await supabase
+      .from('artifacts')
+      .select('*')
+      .eq('id', artifact_id)
+      .single();
+    
+    if (!existingArtifact || checkError) {
+      throw new Error(`Artifact not found: ${artifact_id}`);
+    }
+    
+    // Update the artifact in database
+    // @ts-ignore - Supabase client type compatibility
+    const { data: updatedArtifact, error: updateError } = await supabase
+      .from('artifacts')
+      .update({
+        name: updates.title || (existingArtifact as unknown as { name: string }).name,
+        description: updates.description || (existingArtifact as unknown as { description: string }).description,
+        schema: updates.form_schema || (existingArtifact as unknown as { schema: Record<string, unknown> }).schema,
+        ui_schema: updates.ui_schema || (existingArtifact as unknown as { ui_schema: Record<string, unknown> }).ui_schema,
+        default_values: updates.default_values || (existingArtifact as unknown as { default_values: Record<string, unknown> }).default_values,
+        submit_action: updates.submit_action || (existingArtifact as unknown as { submit_action: Record<string, unknown> }).submit_action,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', artifact_id)
+      .select()
+      .single();
+    
+    if (updateError) {
+      console.error('❌ Failed to update artifact in database:', updateError);
+      throw new Error(`Failed to update artifact: ${String(updateError)}`);
+    }
+    
+    console.log('✅ Form artifact updated successfully:', { artifact_id });
+    
+    // Return the updated artifact content so frontend can refresh the form
+    const artifactContent = {
+      schema: (updatedArtifact as unknown as { schema: Record<string, unknown> }).schema,
+      uiSchema: (updatedArtifact as unknown as { ui_schema: Record<string, unknown> }).ui_schema || {},
+      formData: (updatedArtifact as unknown as { default_values: Record<string, unknown> }).default_values || {},
+      submitAction: (updatedArtifact as unknown as { submit_action: Record<string, unknown> }).submit_action || { type: 'save_session' }
+    };
+    
+    return {
+      success: true,
+      artifact_id,
+      updated: true,
+      updated_fields: Object.keys(updates),
+      updated_at: new Date().toISOString(),
+      title: (updatedArtifact as unknown as { name: string }).name,
+      description: (updatedArtifact as unknown as { description: string }).description,
+      type: 'form',
+      content: JSON.stringify(artifactContent),
+      message: `Artifact "${artifact_id}" updated successfully`
+    };
+  } catch (error) {
+    console.error('❌ Error updating form artifact:', error);
     throw error;
   }
 }
