@@ -248,12 +248,6 @@ supabase functions deploy supabase-mcp-server       # MCP protocol server
 supabase migration list    # Confirm all migrations now show in Remote column
 supabase functions list    # Verify function versions updated with recent timestamps
 
-# STEP 7: Test Remote Environment
-# Switch to remote configuration and verify functionality:
-./scripts/supabase-remote.bat  # (Windows) or ./scripts/supabase-remote.sh (Linux/Mac)
-# Use VS Code Task: "Start Development Server" to test against remote Supabase
-# ✅ Verify core functionality works with remote endpoints
-```
 
 **🎯 Agent Instructions Deployment Pattern:**
 ```bash
