@@ -5,7 +5,7 @@ import { useHomeState } from '../useHomeState';
 
 describe('useHomeState', () => {
   it('should initialize with correct default values', () => {
-    const { result } = renderHook(() => useHomeState());
+    const { result } = renderHook(() => useHomeState('test-user', false));
 
     expect(result.current.isLoading).toBe(false);
     expect(result.current.selectedSessionId).toBeUndefined();
@@ -13,7 +13,7 @@ describe('useHomeState', () => {
   });
 
   it('should update isLoading state', () => {
-    const { result } = renderHook(() => useHomeState());
+    const { result } = renderHook(() => useHomeState('test-user', false));
 
     act(() => {
       result.current.setIsLoading(true);
@@ -29,7 +29,7 @@ describe('useHomeState', () => {
   });
 
   it('should update selectedSessionId state', () => {
-    const { result } = renderHook(() => useHomeState());
+    const { result } = renderHook(() => useHomeState('test-user', false));
     const testSessionId = 'test-session-123';
 
     act(() => {
@@ -40,7 +40,7 @@ describe('useHomeState', () => {
   });
 
   it('should update currentSessionId state', () => {
-    const { result } = renderHook(() => useHomeState());
+    const { result } = renderHook(() => useHomeState('test-user', false));
     const testSessionId = 'current-session-456';
 
     act(() => {

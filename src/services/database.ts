@@ -65,6 +65,51 @@ export class DatabaseService {
       console.error('Error creating session:', error);
       return null;
     }
+
+    // CRITICAL FIX: Store the initial welcome message from the default agent
+    // This ensures the welcome message persists when the user refreshes
+    console.log('🌟 DatabaseService: Adding initial welcome message to session:', data.id);
+    
+    try {
+      // Get the default agent's initial prompt
+      const { data: defaultAgent, error: agentError } = await supabase
+        .from('agents')
+        .select('name, initial_prompt')
+        .eq('is_default', true)
+        .single();
+      
+      if (!agentError && defaultAgent?.initial_prompt) {
+        console.log('🤖 DatabaseService: Found default agent:', defaultAgent.name);
+        
+        // Store the initial welcome message as a system message
+        const { error: messageError } = await supabase
+          .from('messages')
+          .insert({
+            session_id: data.id,
+            user_id: userProfile.id, // Use internal user_profiles.id
+            content: defaultAgent.initial_prompt,
+            role: 'system',
+            message_order: 1,
+            metadata: {
+              agent_name: defaultAgent.name,
+              message_type: 'initial_welcome',
+              auto_generated: true
+            }
+          });
+        
+        if (messageError) {
+          console.error('⚠️ DatabaseService: Failed to store initial welcome message:', messageError);
+        } else {
+          console.log('✅ DatabaseService: Initial welcome message stored successfully');
+        }
+      } else {
+        console.warn('⚠️ DatabaseService: Could not find default agent or initial prompt:', agentError);
+      }
+    } catch (welcomeError) {
+      console.error('⚠️ DatabaseService: Error adding welcome message:', welcomeError);
+      // Don't fail session creation if welcome message fails
+    }
+
     return data;
   }
 
