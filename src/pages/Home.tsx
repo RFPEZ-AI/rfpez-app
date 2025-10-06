@@ -370,11 +370,12 @@ const Home: React.FC = () => {
       return;
     }
     
-    // Always load default agent and show initial prompt, regardless of authentication
-    if (!supabaseLoading) {
-      console.log('Loading default agent for all users...');
+    // Only load default agent if no current session exists and no messages
+    // This prevents overriding active agent selections during routine auth state changes
+    if (!supabaseLoading && !currentSessionId && messages.length === 0) {
+      console.log('Loading default agent for initial app startup...');
       loadDefaultAgentWithPrompt().then(initialMessage => {
-        if (initialMessage && messages.length === 0) {
+        if (initialMessage) {
           setMessages([initialMessage]);
         }
       });
