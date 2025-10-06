@@ -1,5 +1,5 @@
 ## Name: Support
-**Database ID**: `493d83da-d745-434b-9fa5-a0014df43a41`
+**Database ID**: `f47ac10b-58cc-4372-a567-0e02b2c3d479`
 **Role**: `support`
 **Avatar URL**: `/assets/avatars/support-agent.svg`
 

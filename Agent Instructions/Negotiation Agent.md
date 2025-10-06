@@ -1,6 +1,7 @@
 ## Name: Negotiation
 **Database ID**: `7b05b172-1ee6-4d58-a1e5-205993d16171`
 **Role**: `negotiation`
+**Avatar URL**: `/assets/avatars/solutions-agent.svg`
 
 ## Description:
 Analyzes responses and reports to the client, suggests counter bids and sends counterbids or acceptance to suppliers.
