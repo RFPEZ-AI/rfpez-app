@@ -116,8 +116,10 @@ const Home: React.FC = () => {
     selectedSessionId,
     setSelectedSessionId,
     currentSessionId,
-    setCurrentSessionId
-  } = useHomeState();
+    setCurrentSessionId,
+    needsSessionRestore,
+    setNeedsSessionRestore
+  } = useHomeState(user?.id, !!session);
 
   // CRITICAL FIX: Use ref to keep session ID synchronized and avoid stale closures
   const currentSessionIdRef = useRef<string | undefined>(currentSessionId);
@@ -450,6 +452,26 @@ const Home: React.FC = () => {
       restoreSession();
     }
   }, [sessions, isAuthenticated, currentSessionId, isCreatingNewSession, handleSelectSession]);
+
+  // CRITICAL FIX: Handle session restoration from useHomeState
+  // This ensures that when useHomeState restores a session ID from the database,
+  // we actually load the full session content (messages, agent, artifacts)
+  useEffect(() => {
+    if (needsSessionRestore && sessions.length > 0) {
+      console.log('🔄 Processing session restoration from useHomeState:', needsSessionRestore);
+      const sessionToRestore = sessions.find(s => s.id === needsSessionRestore);
+      if (sessionToRestore) {
+        console.log('✅ Found session to restore, calling handleSelectSession:', needsSessionRestore);
+        handleSelectSession(needsSessionRestore);
+        // Clear the restoration flag
+        setNeedsSessionRestore(null);
+      } else {
+        console.warn('⚠️ Session to restore not found in sessions list:', needsSessionRestore);
+        // Clear the flag anyway to prevent infinite loops
+        setNeedsSessionRestore(null);
+      }
+    }
+  }, [needsSessionRestore, sessions, handleSelectSession]);
 
   // Safety timeout to clear the new session creation flag
   useEffect(() => {

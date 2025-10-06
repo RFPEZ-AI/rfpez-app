@@ -426,11 +426,54 @@ async function executeStoreMessage(params: any, userId: string) {
 async function executeCreateSession(params: any, userId: string) {
   const { title, description } = params
   
+  // ANTI-DUPLICATION: Check if there's a recent empty session we can reuse
+  // This prevents accumulation of "Chat Session" entries
+  if (title === 'Chat Session' || !title || title.trim() === '') {
+    const { data: recentEmptySession } = await supabase
+      .from('sessions')
+      .select('id, title, created_at')
+      .eq('user_id', userId)
+      .or(`title.eq.Chat Session,title.is.null`)
+      .eq('is_archived', false)
+      .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+    
+    if (recentEmptySession) {
+      console.log('🔄 MCP: Reusing recent empty session:', recentEmptySession.id);
+      
+      // Set this existing session as current and return it
+      const { error: updateError } = await supabase
+        .from('user_profiles')
+        .update({ 
+          current_session_id: recentEmptySession.id,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', userId);
+      
+      if (updateError) {
+        console.error('⚠️ MCP: Failed to set existing session as current:', updateError);
+      } else {
+        console.log('✅ MCP: Existing session set as current');
+      }
+      
+      return {
+        session_id: recentEmptySession.id,
+        title: recentEmptySession.title || 'Chat Session',
+        description: description || null,
+        created_at: recentEmptySession.created_at,
+        reused: true
+      };
+    }
+  }
+  
+  // Create new session only if no suitable existing session found
   const { data: session, error } = await supabase
     .from('sessions')
     .insert({
-      user_id: userId,
-      title,
+      user_id: userId, // userId is the internal user_profiles.id
+      title: title || 'Chat Session',
       description
     })
     .select()
@@ -442,21 +485,82 @@ async function executeCreateSession(params: any, userId: string) {
   
   // IMPORTANT: Set this new session as the user's current session
   // This ensures that when the user refreshes, they stay in the new session
-  console.log('🔧 MCP: Setting new session as current for user:', userId, 'Session:', session.id);
+  console.log('🔧 MCP: Setting new session as current - userId (internal):', userId, 'Session:', session.id);
   
-  const { error: profileUpdateError } = await supabase
+  // SIMPLIFIED: Direct table update with service role key (bypasses RLS)
+  const { error: updateError } = await supabase
     .from('user_profiles')
     .update({ 
       current_session_id: session.id,
       updated_at: new Date().toISOString()
     })
-    .eq('supabase_user_id', userId);
-
-  if (profileUpdateError) {
-    console.error('⚠️ MCP Warning: Failed to set current session in user profile:', profileUpdateError);
-    // Don't throw here, session creation succeeded, this is just a convenience feature
+    .eq('id', userId);
+  
+  if (updateError) {
+    console.error('⚠️ MCP: Failed to set current session:', JSON.stringify(updateError));
+    throw new Error(`Failed to set current session: ${updateError.message}`);
   } else {
-    console.log('✅ MCP: Successfully set new session as current session for user');
+    console.log('✅ MCP: Session set as current successfully');
+  }
+  
+  // CRITICAL FIX: Store the initial welcome message from the default agent
+  // This ensures the welcome message persists when the user refreshes
+  // BUT only if this is a new session (not reused) and has no messages yet
+  if (!session.reused) {
+    console.log('🌟 MCP: Adding initial welcome message to new session:', session.id);
+    
+    try {
+      // Check if session already has messages (in case of race conditions)
+      const { data: existingMessages } = await supabase
+        .from('messages')
+        .select('id')
+        .eq('session_id', session.id)
+        .limit(1);
+      
+      if (!existingMessages || existingMessages.length === 0) {
+        // Get the default agent's initial prompt
+        const { data: defaultAgent, error: agentError } = await supabase
+          .from('agents')
+          .select('name, initial_prompt')
+          .eq('is_default', true)
+          .single();
+        
+        if (!agentError && defaultAgent?.initial_prompt) {
+          console.log('🤖 MCP: Found default agent:', defaultAgent.name);
+          
+          // Store the initial welcome message as a system message
+          const { error: messageError } = await supabase
+            .from('messages')
+            .insert({
+              session_id: session.id,
+              user_id: userId,
+              content: defaultAgent.initial_prompt,
+              role: 'system',
+              message_order: 1,
+              metadata: {
+                agent_name: defaultAgent.name,
+                message_type: 'initial_welcome',
+                auto_generated: true
+              }
+            });
+          
+          if (messageError) {
+            console.error('⚠️ MCP: Failed to store initial welcome message:', messageError);
+          } else {
+            console.log('✅ MCP: Initial welcome message stored successfully');
+          }
+        } else {
+          console.warn('⚠️ MCP: Could not find default agent or initial prompt:', agentError);
+        }
+      } else {
+        console.log('🔄 MCP: Session already has messages, skipping welcome message');
+      }
+    } catch (welcomeError) {
+      console.error('⚠️ MCP: Error adding welcome message:', welcomeError);
+      // Don't fail session creation if welcome message fails
+    }
+  } else {
+    console.log('🔄 MCP: Reused session, skipping welcome message addition');
   }
   
   return {

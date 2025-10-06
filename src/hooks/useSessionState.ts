@@ -82,6 +82,16 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
       );
       console.log('Session created:', session);
       if (session) {
+        // CRITICAL FIX: Immediately set this new session as the user's current session
+        // This ensures that when the user refreshes or sends their first message,
+        // they stay in this session instead of creating another one
+        try {
+          await DatabaseService.setUserCurrentSession(session.id);
+          console.log('✅ New session set as current in user profile:', session.id);
+        } catch (error) {
+          console.warn('⚠️ Failed to set new session as current:', error);
+        }
+        
         await loadUserSessions();
         return session.id;
       }

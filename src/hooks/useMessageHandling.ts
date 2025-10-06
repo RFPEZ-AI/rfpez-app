@@ -444,9 +444,31 @@ export const useMessageHandling = () => {
       if (isAuthenticated && userId) {
         console.log('Authenticated user sending message, currentSessionId:', activeSessionId);
         
-        // Create session if none exists
+        // CRITICAL FIX: Validate existing session and ensure current_session_id is set
+        if (activeSessionId) {
+          console.log('🔍 Validating existing session ID:', activeSessionId);
+          
+          // Verify the session exists and belongs to the user
+          try {
+            const sessionMessages = await DatabaseService.getSessionMessages(activeSessionId);
+            console.log('✅ Session validation successful - found', sessionMessages.length, 'existing messages');
+            
+            // Ensure this session is set as the user's current session for persistence
+            await DatabaseService.setUserCurrentSession(activeSessionId);
+            console.log('✅ Confirmed session as current in user profile:', activeSessionId);
+            
+            // Update tool invocation session tracking to use the existing session
+            loadToolInvocationsForSession(activeSessionId);
+          } catch (sessionError) {
+            console.warn('⚠️ Session validation failed for ID:', activeSessionId, sessionError);
+            // Clear invalid session ID and create a new one
+            activeSessionId = undefined;
+          }
+        }
+        
+        // Create session if none exists or validation failed
         if (!activeSessionId) {
-          console.log('No current session, creating new one with RFP context:', currentRfp?.id);
+          console.log('No current session or validation failed, creating new one with RFP context:', currentRfp?.id);
           const newSessionId = await createNewSession(currentAgent, currentRfp?.id);
           if (newSessionId) {
             activeSessionId = newSessionId; // Use immediately for this request
