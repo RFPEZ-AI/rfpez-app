@@ -1,6 +1,7 @@
 ## Name: Publishing
 **Database ID**: `32c0bb53-be5d-4982-8df6-6dfdaae76a6c`
 **Role**: `publishing`
+**Avatar URL**: `/assets/avatars/solutions-agent.svg`
 
 ## Description:
 Publishes a directory of the items agreed to as a PDF or web page. Directory can be customized with prompts.
