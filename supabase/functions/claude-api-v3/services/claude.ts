@@ -306,9 +306,19 @@ export class ToolExecutionService {
     try {
       switch (name) {
         case 'create_form_artifact': {
+          // Validate session_id for form artifact creation
+          if (!sessionId || sessionId.trim() === '') {
+            console.error('❌ CREATE_FORM_ARTIFACT ERROR: session_id is required and cannot be empty');
+            return {
+              success: false,
+              error: 'Session ID is required for form artifact creation',
+              message: 'Cannot create form artifacts without a valid session. Please start a new session.'
+            };
+          }
+          
           const { createFormArtifact } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
-          return await createFormArtifact(this.supabase, sessionId!, this.userId, input);
+          return await createFormArtifact(this.supabase, sessionId, this.userId, input);
         }
 
         case 'create_document_artifact': {
@@ -317,26 +327,58 @@ export class ToolExecutionService {
             userId: this.userId,
             input: JSON.stringify(input, null, 2)
           });
+          
+          // Validate session_id for document artifact creation
+          if (!sessionId || sessionId.trim() === '') {
+            console.error('❌ CREATE_DOCUMENT_ARTIFACT ERROR: session_id is required and cannot be empty');
+            return {
+              success: false,
+              error: 'Session ID is required for document artifact creation',
+              message: 'Cannot create document artifacts without a valid session. Please start a new session.'
+            };
+          }
+          
           const { createDocumentArtifact } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
-          const result = await createDocumentArtifact(this.supabase, sessionId!, this.userId, input);
+          const result = await createDocumentArtifact(this.supabase, sessionId, this.userId, input);
           console.log('🎯 CREATE_DOCUMENT_ARTIFACT RESULT:', JSON.stringify(result, null, 2));
           return result;
         }
 
         case 'get_conversation_history': {
+          // Use sessionId from input or parameter, but validate it's not empty
+          const targetSessionId = (input.sessionId as string) || sessionId;
+          if (!targetSessionId || (typeof targetSessionId === 'string' && targetSessionId.trim() === '')) {
+            console.error('❌ GET_CONVERSATION_HISTORY ERROR: session_id is required and cannot be empty');
+            return {
+              success: false,
+              error: 'Session ID is required for conversation history',
+              message: 'Cannot retrieve conversation history without a valid session. Please start a new session.'
+            };
+          }
+          
           const { getConversationHistory } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
-          return await getConversationHistory(this.supabase, input.sessionId || sessionId!);
+          return await getConversationHistory(this.supabase, targetSessionId);
         }
 
         case 'store_message': {
+          // Validate session_id for store_message
+          if (!sessionId || sessionId.trim() === '') {
+            console.error('❌ STORE_MESSAGE ERROR: session_id is required and cannot be empty');
+            return {
+              success: false,
+              error: 'Session ID is required for storing messages',
+              message: 'Cannot store messages without a valid session. Please start a new session.'
+            };
+          }
+          
           const { storeMessage } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
           return await storeMessage(this.supabase, {
             ...input,
             userId: this.userId,
-            sessionId: sessionId || ''
+            sessionId: sessionId
           });
         }
 
@@ -378,11 +420,22 @@ export class ToolExecutionService {
             session_id: sessionId,
             user_message: this.userMessage?.substring(0, 100)
           });
+          
+          // Validate session_id - must be valid UUID, not empty string
+          if (!sessionId || sessionId.trim() === '') {
+            console.error('❌ SWITCH_AGENT ERROR: session_id is required and cannot be empty');
+            return {
+              success: false,
+              error: 'Session ID is required for agent switching',
+              message: 'Cannot switch agents without a valid session. Please start a new session.'
+            };
+          }
+          
           const { switchAgent } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
           return await switchAgent(this.supabase, this.userId, {
             ...input,
-            session_id: sessionId || ''
+            session_id: sessionId
           }, this.userMessage);
         }
 
@@ -393,10 +446,20 @@ export class ToolExecutionService {
         }
 
         case 'create_and_set_rfp': {
+          // Validate session_id for RFP creation
+          if (!sessionId || sessionId.trim() === '') {
+            console.error('❌ CREATE_AND_SET_RFP ERROR: session_id is required and cannot be empty');
+            return {
+              success: false,
+              error: 'Session ID is required for RFP creation',
+              message: 'Cannot create RFP without a valid session. Please start a new session.'
+            };
+          }
+          
           const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
           // @ts-ignore - RFP function type compatibility
           const toolResult = await createAndSetRfpWithClient(this.supabase, input, { 
-            sessionId: sessionId || ''
+            sessionId: sessionId
           });
           console.log('🎯 create_and_set_rfp tool result:', JSON.stringify(toolResult, null, 2));
           return toolResult;

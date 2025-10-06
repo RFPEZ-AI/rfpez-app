@@ -135,7 +135,7 @@ export const useMessageHandling = () => {
           // Handle different types of function results
           if (result && result.success) {
             // 🔄 AGENT SWITCH DETECTION
-            if (funcObj.function_name === 'switch_agent') {
+            if (funcObj.function === 'switch_agent') {
               // Type-safe access to agent switch result properties
               const agentSwitchResult = result as {
                 trigger_continuation?: boolean;
@@ -159,7 +159,7 @@ export const useMessageHandling = () => {
               }
             }
             
-            if (funcObj.function_name === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
+            if (funcObj.function === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
               // Form artifacts - use artifact_name from result
               const functionArgs = funcObj.arguments as Record<string, unknown>;
               const artifactName = (result.artifact_name as string) || (functionArgs?.name as string) || (result.template_name as string) || (result.title as string) || 'Generated Template';
@@ -171,7 +171,7 @@ export const useMessageHandling = () => {
                 isCreated: true,
                 displayText: artifactName
               });
-            } else if (funcObj.function_name === 'create_document_artifact' || funcObj.function_name === 'generate_proposal_artifact') {
+            } else if (funcObj.function === 'create_document_artifact' || funcObj.function === 'generate_proposal_artifact') {
               // Document artifacts - check for success first, then artifact_id
               
               if (result && (result.success || result.artifact_id)) {
@@ -185,7 +185,7 @@ export const useMessageHandling = () => {
                 
                 refs.push(artifactRef);
               }
-            } else if (funcObj.function_name === 'create_and_set_rfp') {
+            } else if (funcObj.function === 'create_and_set_rfp') {
               // RFP creation - trigger UI refresh
               console.log('🎯 create_and_set_rfp detected - checking result format:', {
                 hasCurrentRfpId: !!result.current_rfp_id,

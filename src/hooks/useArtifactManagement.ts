@@ -588,14 +588,17 @@ export const useArtifactManagement = (
             setArtifacts(prev => {
               const updated = [...prev, formArtifact];
               console.log('📝 Artifact added to state immediately:', formArtifact.id, 'Total:', updated.length);
+              
+              // Defer selection and callback to next tick to ensure state is updated
+              setTimeout(() => {
+                selectArtifact(formArtifact.id);
+                if (onArtifactAdded) {
+                  onArtifactAdded(formArtifact.id);
+                }
+              }, 0);
+              
               return updated;
             });
-            
-            // Auto-select new artifact and trigger callbacks
-            selectArtifact(formArtifact.id);
-            if (onArtifactAdded) {
-              onArtifactAdded(formArtifact.id);
-            }
             
             // Auto-create placeholder RFP for the form if no RFP context exists
             (async () => {
@@ -837,13 +840,15 @@ export const useArtifactManagement = (
             setArtifacts(prev => {
               const updated = [...prev, documentArtifact];
               console.log('📝 Document artifact added to state immediately:', documentArtifact.id, 'Total:', updated.length);
+              
+              // Defer selection and callback to next tick to ensure state is updated
+              setTimeout(() => {
+                selectArtifact(documentArtifact.id);
+                onArtifactAdded?.(documentArtifact.id);
+              }, 0);
+              
               return updated;
             });
-            
-            selectArtifact(documentArtifact.id); // Auto-select new artifact
-            
-            // Notify parent that an artifact was added (triggers auto-open)
-            onArtifactAdded?.(documentArtifact.id);
             
             console.log('✅ Added document artifact from function result:', documentArtifact);
             
@@ -897,13 +902,15 @@ export const useArtifactManagement = (
             setArtifacts(prev => {
               const updated = [...prev, requestArtifact];
               console.log('📝 Request artifact added to state immediately:', requestArtifact.id, 'Total:', updated.length);
+              
+              // Defer selection and callback to next tick to ensure state is updated
+              setTimeout(() => {
+                selectArtifact(requestArtifact.id);
+                onArtifactAdded?.(requestArtifact.id);
+              }, 0);
+              
               return updated;
             });
-            
-            selectArtifact(requestArtifact.id); // Auto-select new artifact
-            
-            // Notify parent that an artifact was added (triggers auto-open)
-            onArtifactAdded?.(requestArtifact.id);
             
             console.log('✅ Added request artifact from function result:', requestArtifact);
             
@@ -956,13 +963,15 @@ export const useArtifactManagement = (
             setArtifacts(prev => {
               const updated = [...prev, templateArtifact];
               console.log('📝 Template artifact added to state immediately:', templateArtifact.id, 'Total:', updated.length);
+              
+              // Defer selection and callback to next tick to ensure state is updated
+              setTimeout(() => {
+                selectArtifact(templateArtifact.id);
+                onArtifactAdded?.(templateArtifact.id);
+              }, 0);
+              
               return updated;
             });
-            
-            selectArtifact(templateArtifact.id); // Auto-select new artifact
-            
-            // Notify parent that an artifact was added (triggers auto-open)
-            onArtifactAdded?.(templateArtifact.id);
             
             console.log('✅ Added template artifact from function result:', templateArtifact);
             
@@ -1015,10 +1024,14 @@ export const useArtifactManagement = (
       setArtifacts(prev => {
         const updated = [...prev, formArtifact];
         console.log('📝 Buyer questionnaire artifact added to state immediately:', formArtifact.id, 'Total:', updated.length);
+        
+        // Defer selection to next tick to ensure state is updated
+        setTimeout(() => {
+          setSelectedArtifactId(formArtifact.id);
+        }, 0);
+        
         return updated;
       });
-      
-      setSelectedArtifactId(formArtifact.id); // Auto-select new artifact
       console.log('Added buyer questionnaire to artifacts:', formArtifact);
       
       // Create artifact reference for the message

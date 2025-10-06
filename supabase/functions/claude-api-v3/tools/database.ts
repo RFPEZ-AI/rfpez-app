@@ -154,9 +154,9 @@ function transformToJsonSchema(customForm: Record<string, unknown>): {
     (customForm.sections as Record<string, unknown>[]).forEach((section: Record<string, unknown>) => {
       if (section.fields && Array.isArray(section.fields)) {
         (section.fields as Record<string, unknown>[]).forEach((field: Record<string, unknown>) => {
-          const fieldId = field.id as string;
+          const fieldId = (field.id || field.name) as string;
           if (!fieldId || typeof fieldId !== 'string') {
-            console.warn('Skipping field with invalid or missing id:', field);
+            console.warn('Skipping field with invalid or missing id/name:', field);
             return;
           }
 
@@ -374,11 +374,74 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
     throw error;
   }
 
+  // ARTIFACT-RFP LINKING: Auto-link form artifacts to current RFP when session has one
+  try {
+    // Get the current RFP for this session
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('current_rfp_id')
+      .eq('id', sessionId)
+      .single() as { data: { current_rfp_id?: number } | null };
+    
+    if (session?.current_rfp_id) {
+      console.log('🔗 Claude API V3: Auto-linking form artifact to current RFP:', {
+        artifactId: (artifact as unknown as { id: string }).id,
+        rfpId: session.current_rfp_id,
+        artifactRole: mappedRole
+      });
+      
+      // Map artifact role to valid rfp_artifacts role values
+      let rfpRole = 'supplier'; // Default
+      if (mappedRole?.includes('buyer') || mappedRole?.includes('questionnaire')) {
+        rfpRole = 'buyer';
+      } else if (mappedRole?.includes('supplier') || mappedRole?.includes('bid')) {
+        rfpRole = 'supplier';
+      } else if (mappedRole?.includes('evaluator')) {
+        rfpRole = 'evaluator';
+      }
+      
+      // Insert into rfp_artifacts junction table
+      const { error: linkError } = await supabase
+        .from('rfp_artifacts')
+        .insert({
+          rfp_id: session.current_rfp_id,
+          artifact_id: (artifact as unknown as { id: string }).id,
+          role: rfpRole
+        });
+      
+      if (linkError) {
+        console.error('⚠️ Claude API V3: Failed to link artifact to RFP:', linkError);
+        // Don't fail the main artifact creation, just log the linking error
+      } else {
+        console.log('✅ Claude API V3: Successfully linked artifact to RFP');
+      }
+    } else {
+      console.log('📝 Claude API V3: No current RFP for session, skipping artifact linking');
+    }
+  } catch (linkingError) {
+    console.error('⚠️ Claude API V3: Error during artifact linking:', linkingError);
+    // Don't fail the main artifact creation
+  }
+
   return {
     success: true,
     artifact_id: (artifact as unknown as { id: string }).id,
     artifact_name: name, // Include the name in the response
-    message: `Created ${mappedRole} artifact: ${name}`
+    message: `Created ${mappedRole} artifact: ${name}`,
+    clientCallbacks: [
+      {
+        type: 'ui_refresh',
+        target: 'artifact_panel',
+        payload: {
+          artifact_id: (artifact as unknown as { id: string }).id,
+          artifact_name: name,
+          artifact_type: 'form',
+          artifact_role: mappedRole,
+          message: `Form artifact "${name}" has been created successfully`
+        },
+        priority: 'medium'
+      }
+    ]
   };
 }
 
@@ -1489,11 +1552,11 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
   }
   
   try {
-    // First verify the artifact exists and is a form
+    // First verify the artifact exists and is a form and check user permissions
     // @ts-ignore - Supabase client type compatibility
     const { data: existingArtifact, error: fetchError } = await supabase
       .from('artifacts')
-      .select('id, name, type, artifact_role, schema')
+      .select('id, name, type, artifact_role, schema, user_id')
       .eq('id', artifact_id)
       .eq('type', 'form')
       .single();
@@ -1507,26 +1570,50 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
       throw new Error(`Form artifact not found: ${artifact_id}`);
     }
     
-    console.log('✅ Found existing form artifact:', (existingArtifact as unknown as { name: string }).name);
+    console.log('✅ Found existing form artifact:', {
+      name: (existingArtifact as unknown as { name: string }).name,
+      user_id: (existingArtifact as unknown as { user_id: string }).user_id,
+      current_user: _userId
+    });
+    
+    // Get current auth context for debugging
+    // @ts-ignore - Supabase client type compatibility
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    console.log('🔐 Auth context:', { 
+      authError, 
+      user_id: user?.id,
+      artifact_user_id: (existingArtifact as unknown as { user_id: string }).user_id,
+      match: user?.id === (existingArtifact as unknown as { user_id: string }).user_id
+    });
     
     // Update the default_values field with the new form data
     // @ts-ignore - Supabase client type compatibility
-    const { error: updateError } = await supabase
+    const { data: updatedData, error: updateError } = await supabase
       .from('artifacts')
       .update({
         default_values: form_data,
         updated_at: new Date().toISOString()
       })
       .eq('id', artifact_id)
-      .select()
+      .select('id, name, default_values, updated_at')
       .single();
     
     if (updateError) {
       console.error('❌ Error updating form data:', updateError);
+      console.error('❌ Update error details:', JSON.stringify(updateError, null, 2));
       throw updateError;
     }
     
-    console.log('✅ Form data updated successfully:', { artifact_id, name: (existingArtifact as unknown as { name: string }).name });
+    if (!updatedData) {
+      console.error('❌ No data returned from update - possible RLS policy block');
+      throw new Error('Update succeeded but no data returned - check RLS policies');
+    }
+    
+    console.log('✅ Form data updated successfully:', { 
+      artifact_id, 
+      name: (existingArtifact as unknown as { name: string }).name,
+      default_values_length: Object.keys((updatedData as unknown as { default_values: Record<string, unknown> }).default_values || {}).length
+    });
     
     return {
       success: true,

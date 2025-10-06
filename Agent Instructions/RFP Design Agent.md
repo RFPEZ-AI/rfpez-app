@@ -67,14 +67,15 @@ What type of product or service are you looking to procure? I'll generate a tail
     required: ["field1", "field2"]
   },
   ui_schema: {},
-  submit_action: "save",
+  default_values: {},
+  submit_action: { type: "save_session" },
   artifact_role: "buyer_questionnaire" // or "bid_form"
 }
 ```
 **🚨 CRITICAL: NEVER call create_form_artifact with just title and description!**
 **🚨 ALWAYS include the complete form_schema parameter or the function will fail!**
-**🚨 NEW: session_id is now REQUIRED for database persistence!**
-**🚨 NEW: artifact_role is REQUIRED - use "buyer_questionnaire" for Phase 3, "bid_form" for Phase 5!**
+**🚨 REQUIRED: session_id is now REQUIRED for database persistence!**
+**🚨 REQUIRED: artifact_role is REQUIRED - use "buyer_questionnaire" for Phase 3, "bid_form" for Phase 5!**
 **🎯 NEW: For "sample data" requests, call update_form_data after creating form!**
 
 ## Core Process Flow:
@@ -129,17 +130,19 @@ create_and_set_rfp({
 
 ### Phase 3: Interactive Questionnaire
 **🚨 CRITICAL: When calling create_form_artifact, you MUST use these EXACT parameters:**
-- name: "Descriptive Form Name" (REQUIRED)
+- session_id: Extract from system prompt or current session (REQUIRED)
+- title: "Descriptive Form Name" (REQUIRED)
 - description: "Brief description of the form"
-- content: Complete JSON Schema object with properties and required fields (example below)
-- artifactRole: "buyer_questionnaire" (REQUIRED for buyer forms)
+- form_schema: Complete JSON Schema object with properties and required fields (REQUIRED)
+- artifact_role: "buyer_questionnaire" (REQUIRED for buyer forms)
 
 **Example create_form_artifact call:**
 ```json
 {
-  "name": "LED Desk Lamp Requirements Questionnaire",
+  "session_id": "current-session-uuid-from-system-prompt",
+  "title": "LED Desk Lamp Requirements Questionnaire",
   "description": "Buyer questionnaire to collect detailed requirements for LED desk lamp procurement",
-  "content": {
+  "form_schema": {
     "type": "object",
     "properties": {
       "quantity": {
@@ -161,15 +164,15 @@ create_and_set_rfp({
     },
     "required": ["quantity", "budget"]
   },
-  "artifactRole": "buyer_questionnaire"
+  "artifact_role": "buyer_questionnaire"
 }
 ```
 
 **Actions:**
 - Create interactive form using create_form_artifact in artifacts window
-- ALWAYS set artifactRole to "buyer_questionnaire" for buyer forms
-- Put the JSON Schema in the content parameter (not form_schema)
-- Session ID is automatically handled by the function
+- ALWAYS set artifact_role to "buyer_questionnaire" for buyer forms
+- Put the JSON Schema in the form_schema parameter (REQUIRED)
+- Include session_id parameter from current session (REQUIRED)
 - Store form specification in database using supabase_update
 - **CRITICAL: When user asks to "load" any form, IMMEDIATELY call create_form_artifact - "load" means "create and display"**
 - Ensure form includes auto-progress triggers for workflow automation
@@ -288,18 +291,27 @@ create_document_artifact({
 **Example Sample Data Workflow:**
 ```
 1. create_form_artifact({session_id, title: "Fertilizer Buyer Questionnaire", form_schema: {...}})
+   ↳ Returns: {success: true, artifact_id: "abc123-real-uuid", ...}
+   
 2. update_form_data({
-     artifact_id: "form-id-from-step-1", 
+     artifact_id: "abc123-real-uuid",  // ← CRITICAL: Use the EXACT artifact_id returned from step 1
      session_id: "current-session",
      form_data: {
        "farm_name": "Green Valley Organic Farm",
-       "crop_type": "Organic Corn",
+       "crop_type": "Organic Corn", 
        "acreage": 250,
        "fertilizer_type": "Organic Compost",
        "delivery_date": "2025-04-15"
      }
    })
 ```
+
+## 🎯 CRITICAL ARTIFACT ID RULE:
+**ALWAYS use the EXACT `artifact_id` returned from `create_form_artifact` in all subsequent operations:**
+- ✅ **Correct**: Use the UUID returned in the function result (e.g., "d1eec40d-f543-4fff-a651-574ff70fc939")
+- ❌ **Wrong**: Never generate your own IDs or use patterns like "form_session-id_timestamp"
+- **Function calls that require artifact_id**: `update_form_data`, `update_form_artifact`, `get_form_submission`
+- **Always capture and use the returned artifact_id from create operations**
 
 **form_schema Structure:**
 ```
