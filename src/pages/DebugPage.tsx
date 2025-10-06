@@ -459,6 +459,69 @@ const DebugPage: React.FC = () => {
           </IonCardContent>
         </IonCard>
 
+        {/* Manual UI Refresh for MCP Browser Tests */}
+        <IonCard>
+          <IonCardHeader>
+            <IonCardTitle>
+              <IonIcon icon={refresh} style={{ marginRight: '8px', verticalAlign: 'middle' }} />
+              Manual UI Refresh (MCP Browser Tests)
+            </IonCardTitle>
+          </IonCardHeader>
+          <IonCardContent>
+            <p>
+              When MCP browser tests execute backend operations successfully but UI shows stale data 
+              (e.g., "Current RFP is None"), use this manual refresh to sync the UI state.
+            </p>
+            
+            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginBottom: '12px' }}>
+              <IonButton 
+                onClick={() => {
+                  // Trigger manual UI refresh by posting message
+                  window.postMessage({ 
+                    type: 'EDGE_FUNCTION_CALLBACK',
+                    callbackType: 'ui_refresh',
+                    timestamp: Date.now(),
+                    source: 'manual_debug_refresh'
+                  }, '*');
+                  console.log('🔄 Manual UI refresh triggered via window message');
+                }}
+                color="primary"
+                size="small"
+              >
+                <IonIcon icon={refresh} slot="start" />
+                Trigger UI Refresh
+              </IonButton>
+              
+              <IonButton 
+                onClick={() => {
+                  // Reload the entire page
+                  window.location.reload();
+                }}
+                fill="outline"
+                color="warning"
+                size="small"
+              >
+                Full Page Reload
+              </IonButton>
+            </div>
+
+            <div style={{ 
+              padding: '12px', 
+              backgroundColor: 'var(--ion-color-light)', 
+              borderRadius: '8px',
+              fontSize: '13px'
+            }}>
+              <p style={{ margin: '0 0 8px 0' }}><strong>When to use:</strong></p>
+              <ul style={{ margin: '0', paddingLeft: '16px' }}>
+                <li>MCP browser test shows "RFP created successfully" but UI shows "Current RFP is None"</li>
+                <li>Artifacts created via MCP tools but not visible in artifact panel</li>
+                <li>Session state appears out of sync with database state</li>
+              </ul>
+              <p style={{ margin: '8px 0 0 0' }}><strong>Note:</strong> This mimics the clientCallbacks mechanism from Claude API v3</p>
+            </div>
+          </IonCardContent>
+        </IonCard>
+
         {/* Claude API Availability Test */}
         <ClaudeAPITestComponent />
 

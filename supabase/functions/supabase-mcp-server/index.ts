@@ -304,14 +304,10 @@ async function getUserFromAuth(authHeader: string): Promise<string | null> {
       return null
     }
     
-    // Get the user profile ID from the auth user ID
-    const { data: profile } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('supabase_user_id', user.id)
-      .single()
-    
-    return profile?.id || null
+    // CONSISTENT: Always use Supabase auth user ID
+    // This eliminates confusion between internal user_profiles.id and auth user ID
+    console.log('🔧 MCP: Using Supabase auth user ID:', user.id)
+    return user.id
   } catch (error) {
     console.error('Error getting user:', error)
     return null
@@ -353,6 +349,17 @@ async function executeGetConversationHistory(params: any, userId: string) {
 async function executeGetRecentSessions(params: any, userId: string) {
   const { limit = 10 } = params
   
+  // Get user_profiles.id from supabase auth user ID
+  const { data: userProfile } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('supabase_user_id', userId)
+    .single()
+  
+  if (!userProfile) {
+    throw new Error('User profile not found')
+  }
+  
   const { data: sessions, error } = await supabase
     .from('sessions')
     .select(`
@@ -363,7 +370,7 @@ async function executeGetRecentSessions(params: any, userId: string) {
       updated_at,
       session_metadata
     `)
-    .eq('user_id', userId)
+    .eq('user_id', userProfile.id)
     .eq('is_archived', false)
     .order('updated_at', { ascending: false })
     .limit(limit)
@@ -381,6 +388,17 @@ async function executeGetRecentSessions(params: any, userId: string) {
 async function executeStoreMessage(params: any, userId: string) {
   const { session_id, content, role, metadata = {} } = params
   
+  // Get user_profiles.id from supabase auth user ID
+  const { data: userProfile } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('supabase_user_id', userId)
+    .single()
+  
+  if (!userProfile) {
+    throw new Error('User profile not found')
+  }
+  
   // Get the current highest message order for this session
   const { data: lastMessage } = await supabase
     .from('messages')
@@ -396,7 +414,7 @@ async function executeStoreMessage(params: any, userId: string) {
     .from('messages')
     .insert({
       session_id,
-      user_id: userId,
+      user_id: userProfile.id,
       content,
       role,
       message_order: nextOrder,
@@ -426,13 +444,26 @@ async function executeStoreMessage(params: any, userId: string) {
 async function executeCreateSession(params: any, userId: string) {
   const { title, description } = params
   
+  // Get user_profiles.id from supabase auth user ID
+  const { data: userProfile } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('supabase_user_id', userId)
+    .single()
+  
+  if (!userProfile) {
+    throw new Error('User profile not found')
+  }
+  
+  const internalUserId = userProfile.id
+  
   // ANTI-DUPLICATION: Check if there's a recent empty session we can reuse
   // This prevents accumulation of "Chat Session" entries
   if (title === 'Chat Session' || !title || title.trim() === '') {
     const { data: recentEmptySession } = await supabase
       .from('sessions')
       .select('id, title, created_at')
-      .eq('user_id', userId)
+      .eq('user_id', internalUserId)
       .or(`title.eq.Chat Session,title.is.null`)
       .eq('is_archived', false)
       .gte('created_at', new Date(Date.now() - 5 * 60 * 1000).toISOString()) // Last 5 minutes
@@ -450,7 +481,7 @@ async function executeCreateSession(params: any, userId: string) {
           current_session_id: recentEmptySession.id,
           updated_at: new Date().toISOString()
         })
-        .eq('id', userId);
+        .eq('supabase_user_id', userId);
       
       if (updateError) {
         console.error('⚠️ MCP: Failed to set existing session as current:', updateError);
@@ -472,7 +503,7 @@ async function executeCreateSession(params: any, userId: string) {
   const { data: session, error } = await supabase
     .from('sessions')
     .insert({
-      user_id: userId, // userId is the internal user_profiles.id
+      user_id: internalUserId, // Use internal user_profiles.id for session ownership
       title: title || 'Chat Session',
       description
     })
@@ -485,7 +516,7 @@ async function executeCreateSession(params: any, userId: string) {
   
   // IMPORTANT: Set this new session as the user's current session
   // This ensures that when the user refreshes, they stay in the new session
-  console.log('🔧 MCP: Setting new session as current - userId (internal):', userId, 'Session:', session.id);
+  console.log('🔧 MCP: Setting new session as current - authUserId:', userId, 'internalUserId:', internalUserId, 'Session:', session.id);
   
   // SIMPLIFIED: Direct table update with service role key (bypasses RLS)
   const { error: updateError } = await supabase
@@ -494,7 +525,7 @@ async function executeCreateSession(params: any, userId: string) {
       current_session_id: session.id,
       updated_at: new Date().toISOString()
     })
-    .eq('id', userId);
+    .eq('supabase_user_id', userId);
   
   if (updateError) {
     console.error('⚠️ MCP: Failed to set current session:', JSON.stringify(updateError));
@@ -533,7 +564,7 @@ async function executeCreateSession(params: any, userId: string) {
             .from('messages')
             .insert({
               session_id: session.id,
-              user_id: userId,
+              user_id: internalUserId,
               content: defaultAgent.initial_prompt,
               role: 'system',
               message_order: 1,
@@ -574,6 +605,17 @@ async function executeCreateSession(params: any, userId: string) {
 async function executeSearchMessages(params: any, userId: string) {
   const { query, limit = 20 } = params
   
+  // Get user_profiles.id from supabase auth user ID
+  const { data: userProfile } = await supabase
+    .from('user_profiles')
+    .select('id')
+    .eq('supabase_user_id', userId)
+    .single()
+  
+  if (!userProfile) {
+    throw new Error('User profile not found')
+  }
+  
   // Use text search across messages for sessions owned by this user
   const { data: messages, error } = await supabase
     .from('messages')
@@ -586,7 +628,7 @@ async function executeSearchMessages(params: any, userId: string) {
       sessions!inner(title, description)
     `)
     .textSearch('content', query)
-    .eq('sessions.user_id', userId)
+    .eq('sessions.user_id', userProfile.id)
     .order('created_at', { ascending: false })
     .limit(limit)
   
@@ -668,9 +710,21 @@ async function executeSupabaseInsert(params: any, userId: string) {
   
   console.log('📝 Supabase insert:', { table, data, returning, userId })
   
-  // For certain tables, automatically add user_id if not present
-  if (['rfps', 'sessions', 'messages'].includes(table) && data && !data.user_id) {
-    data.user_id = userId
+  // Get user profile for user_id injection and RFP context
+  let userProfile = null
+  if (['rfps', 'sessions', 'messages', 'artifacts'].includes(table) && data && !data.user_id) {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('id, current_rfp_id')
+      .eq('supabase_user_id', userId)
+      .single()
+    
+    if (!profile) {
+      throw new Error('User profile not found')
+    }
+    
+    userProfile = profile
+    data.user_id = profile.id
   }
   
   // Special handling for rfps table
@@ -740,6 +794,51 @@ async function executeSupabaseInsert(params: any, userId: string) {
   
   if (error) {
     throw new Error(`Failed to insert into ${table}: ${error.message}`)
+  }
+  
+  // ARTIFACT-RFP LINKING: Auto-link artifacts to current RFP when appropriate
+  if (table === 'artifacts' && result && result.length > 0 && userProfile?.current_rfp_id) {
+    const insertedArtifact = result[0]
+    console.log('🔗 MCP: Auto-linking artifact to current RFP:', {
+      artifactId: insertedArtifact.id,
+      rfpId: userProfile.current_rfp_id,
+      artifactType: insertedArtifact.type
+    })
+    
+    try {
+      // Determine role based on type and name (mapped to allowed values)
+      let role = 'supplier' // Default for forms
+      if (insertedArtifact.type === 'form') {
+        if (insertedArtifact.name?.toLowerCase().includes('bid') || 
+            insertedArtifact.name?.toLowerCase().includes('supplier')) {
+          role = 'supplier'
+        } else if (insertedArtifact.name?.toLowerCase().includes('buyer') ||
+                   insertedArtifact.name?.toLowerCase().includes('questionnaire')) {
+          role = 'buyer'
+        } else {
+          role = 'supplier' // Default for forms
+        }
+      }
+      
+      // Insert into rfp_artifacts junction table
+      const { error: linkError } = await supabase
+        .from('rfp_artifacts')
+        .insert({
+          rfp_id: userProfile.current_rfp_id,
+          artifact_id: insertedArtifact.id,
+          role: role
+        })
+      
+      if (linkError) {
+        console.error('⚠️ MCP: Failed to link artifact to RFP:', linkError)
+        // Don't fail the main insert, just log the linking error
+      } else {
+        console.log('✅ MCP: Successfully linked artifact to RFP with role:', role)
+      }
+    } catch (linkingError) {
+      console.error('⚠️ MCP: Error during artifact linking:', linkingError)
+      // Don't fail the main insert
+    }
   }
   
   return {

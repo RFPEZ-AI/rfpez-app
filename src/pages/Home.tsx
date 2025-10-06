@@ -516,6 +516,68 @@ const Home: React.FC = () => {
     }
   }, [session, supabaseLoading]);
 
+  // 🚀 MCP UI REFRESH FIX: Add periodic polling for state synchronization
+  // This ensures UI updates even when MCP browser tests bypass normal callback flow
+  useEffect(() => {
+    let pollInterval: NodeJS.Timeout | null = null;
+    
+    const pollForStateChanges = async () => {
+      // Only poll when we have an active session but no current RFP
+      if (currentSessionId && !currentRfpId && session) {
+        try {
+          console.log('🔄 MCP UI REFRESH: Polling for state changes - session:', currentSessionId);
+          
+          // Check if session has RFP context that we're missing
+          const sessionWithContext = await DatabaseService.getSessionWithContext(currentSessionId);
+          if (sessionWithContext?.current_rfp_id && sessionWithContext.current_rfp_id !== currentRfpId) {
+            console.log('🔄 MCP UI REFRESH: Found missing RFP context, updating UI:', sessionWithContext.current_rfp_id);
+            await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+          }
+          
+          // Check for new artifacts if current RFP exists but artifact list is empty
+          if (currentRfpId && artifacts.length === 0) {
+            console.log('🔄 MCP UI REFRESH: Checking for missing artifacts for RFP:', currentRfpId);
+            // Import dynamically to avoid circular dependencies
+            const { DatabaseService: ArtifactDB } = await import('../services/database');
+            const sessionArtifacts = await ArtifactDB.getSessionArtifacts(currentSessionId);
+            if (sessionArtifacts && sessionArtifacts.length > 0) {
+              console.log('🔄 MCP UI REFRESH: Found missing artifacts, refreshing:', sessionArtifacts.length);
+              // Convert database artifacts to home artifacts format
+              const convertedArtifacts = sessionArtifacts.map(dbArtifact => ({
+                id: dbArtifact.id,
+                name: dbArtifact.name,
+                type: dbArtifact.type as 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other',
+                size: dbArtifact.file_size ? `${Math.round(dbArtifact.file_size / 1024)} KB` : 'Unknown size',
+                content: dbArtifact.processed_content,
+                sessionId: dbArtifact.session_id,
+                messageId: dbArtifact.message_id,
+                rfpId: currentRfpId
+              }));
+              setArtifacts(convertedArtifacts);
+            }
+          }
+          
+        } catch (error) {
+          console.warn('🔄 MCP UI REFRESH: Error during state polling:', error);
+        }
+      }
+    };
+    
+    // Start polling every 3 seconds when session is active
+    if (currentSessionId && session) {
+      pollInterval = setInterval(pollForStateChanges, 3000);
+      console.log('🔄 MCP UI REFRESH: Started state polling for session:', currentSessionId);
+    }
+    
+    // Cleanup on unmount or session change
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+        console.log('🔄 MCP UI REFRESH: Stopped state polling');
+      }
+    };
+  }, [currentSessionId, currentRfpId, session, artifacts.length]);
+
   // Listen for RFP refresh messages from Claude functions and enhanced client updates
   useEffect(() => {
     const handleRfpRefreshMessage = async (event: MessageEvent) => {
@@ -898,6 +960,27 @@ const Home: React.FC = () => {
         } else {
           console.log('🎯 DEBUG: No current session to refresh RFP context for');
         }
+      }
+      
+      // 🚀 MCP UI REFRESH FIX: Trigger immediate poll after any RFP-related message
+      // This helps with MCP browser tests where operations complete but UI isn't updated
+      if (event.data?.type === 'REFRESH_CURRENT_RFP' || 
+          event.data?.type === 'RFP_CREATED_SUCCESS' || 
+          event.data?.type === 'EDGE_FUNCTION_CALLBACK') {
+        console.log('🔄 MCP UI REFRESH: Triggering immediate state poll after message event');
+        setTimeout(async () => {
+          if (currentSessionId && session) {
+            try {
+              const sessionWithContext = await DatabaseService.getSessionWithContext(currentSessionId);
+              if (sessionWithContext?.current_rfp_id && sessionWithContext.current_rfp_id !== currentRfpId) {
+                console.log('🔄 MCP UI REFRESH: Immediate poll found missing RFP context:', sessionWithContext.current_rfp_id);
+                await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+              }
+            } catch (error) {
+              console.warn('🔄 MCP UI REFRESH: Error during immediate poll:', error);
+            }
+          }
+        }, 500); // Quick poll after a short delay
       }
     };
 

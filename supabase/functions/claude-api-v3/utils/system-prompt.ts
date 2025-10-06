@@ -40,6 +40,13 @@ export interface SystemPromptContext {
     loginCount?: number;
     lastLoginTime?: string;
   };
+  agentFallback?: {
+    occurred: boolean;
+    reason: string;
+    originalAgent?: string;
+    fallbackAgent?: string;
+    timestamp?: string;
+  };
 }
 
 /**
@@ -50,6 +57,18 @@ export interface SystemPromptContext {
 export function buildSystemPrompt(context: SystemPromptContext, userMessage?: string): string {
   // Start with agent instructions, fallback to initial_prompt, then default
   let systemPrompt = context.agent?.instructions || context.agent?.initial_prompt || 'You are a helpful AI assistant.';
+  
+  // Check for agent fallback information (attached to agent object or in context)
+  const fallbackInfo = context.agentFallback || (context.agent as any)?._fallbackInfo;
+  if (fallbackInfo?.occurred) {
+    systemPrompt += `\n\n🔔 AGENT FALLBACK NOTICE:\n`;
+    systemPrompt += `- There was an issue loading the intended agent for this session\n`;
+    systemPrompt += `- Reason: ${fallbackInfo.reason}\n`;
+    systemPrompt += `- You are now operating as: ${fallbackInfo.fallbackAgent || context.agent?.name || 'Default Agent'}\n`;
+    systemPrompt += `- Please acknowledge this fallback to the user and explain that you're the ${fallbackInfo.fallbackAgent || context.agent?.name} agent\n`;
+    systemPrompt += `- If the user expected a different agent, they can manually switch using the agent selector\n`;
+    systemPrompt += `- Time: ${fallbackInfo.timestamp}\n`;
+  }
   
   // 🤖 AUTO-PROCESSING: Detect agent switch context and add auto-processing instructions
   if (userMessage && context.agent) {
@@ -168,7 +187,177 @@ export function buildSystemPrompt(context: SystemPromptContext, userMessage?: st
 }
 
 /**
- * Load agent context from database
+ * Error types for agent loading operations
+ */
+enum AgentLoadError {
+  NOT_FOUND = 'NOT_FOUND',
+  DATABASE_ERROR = 'DATABASE_ERROR',
+  NETWORK_ERROR = 'NETWORK_ERROR',
+  PERMISSION_ERROR = 'PERMISSION_ERROR',
+  UNKNOWN_ERROR = 'UNKNOWN_ERROR'
+}
+
+/**
+ * Sleep utility for retry delays
+ */
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+/**
+ * Categorize database errors for better handling
+ */
+function categorizeError(error: any): AgentLoadError {
+  if (!error) return AgentLoadError.UNKNOWN_ERROR;
+  
+  const errorCode = error.code || error.error_code || '';
+  const errorMessage = (error.message || '').toLowerCase();
+  
+  // Supabase/PostgreSQL error codes
+  if (errorCode === 'PGRST116' || errorMessage.includes('no rows returned')) {
+    return AgentLoadError.NOT_FOUND;
+  }
+  
+  if (errorCode.startsWith('08') || errorMessage.includes('connection') || errorMessage.includes('timeout')) {
+    return AgentLoadError.NETWORK_ERROR;
+  }
+  
+  if (errorCode.startsWith('42') || errorMessage.includes('permission') || errorMessage.includes('unauthorized')) {
+    return AgentLoadError.PERMISSION_ERROR;
+  }
+  
+  if (errorCode.startsWith('53') || errorMessage.includes('resource') || errorMessage.includes('lock')) {
+    return AgentLoadError.DATABASE_ERROR;
+  }
+  
+  return AgentLoadError.DATABASE_ERROR;
+}
+
+/**
+ * Load agent with retry logic for transient errors
+ */
+async function loadAgentWithRetry(
+  _supabase: any,
+  queryFn: () => Promise<{ data: any; error: any }>,
+  maxRetries = 3,
+  baseDelayMs = 100
+): Promise<{ data: any; error: any; finalError?: AgentLoadError }> {
+  let lastError: any = null;
+  
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const result = await queryFn();
+      
+      if (!result.error) {
+        if (attempt > 1) {
+          console.log(`✅ Agent query succeeded on attempt ${attempt}/${maxRetries}`);
+        }
+        return result;
+      }
+      
+      lastError = result.error;
+      const errorType = categorizeError(result.error);
+      
+      // Don't retry NOT_FOUND or PERMISSION errors
+      if (errorType === AgentLoadError.NOT_FOUND || errorType === AgentLoadError.PERMISSION_ERROR) {
+        console.log(`⏹️ Non-retryable error (${errorType}), stopping after attempt ${attempt}`);
+        return { ...result, finalError: errorType };
+      }
+      
+      // Retry for transient errors
+      if (attempt < maxRetries && (errorType === AgentLoadError.NETWORK_ERROR || errorType === AgentLoadError.DATABASE_ERROR)) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt - 1); // Exponential backoff
+        console.log(`⏳ Retrying agent query in ${delayMs}ms (attempt ${attempt}/${maxRetries}) due to ${errorType}`);
+        await sleep(delayMs);
+        continue;
+      }
+      
+      return { ...result, finalError: errorType };
+    } catch (exception) {
+      lastError = exception;
+      const errorType = categorizeError(exception);
+      
+      if (attempt < maxRetries && errorType !== AgentLoadError.PERMISSION_ERROR) {
+        const delayMs = baseDelayMs * Math.pow(2, attempt - 1);
+        console.log(`⏳ Retrying after exception in ${delayMs}ms (attempt ${attempt}/${maxRetries})`);
+        await sleep(delayMs);
+        continue;
+      }
+      
+      return { data: null, error: lastError, finalError: errorType };
+    }
+  }
+  
+  return { data: null, error: lastError, finalError: categorizeError(lastError) };
+}
+
+/**
+ * Load default Solutions agent with detailed logging
+ */
+async function loadDefaultAgent(supabase: any, reason: string, originalError?: any): Promise<{ agent: Agent | null; fallbackInfo?: any }> {
+  console.log(`🔄 AGENT FALLBACK TRIGGERED - Reason: ${reason}`);
+  console.log('📊 Fallback context:', {
+    originalError: originalError?.message || 'Unknown',
+    errorCode: originalError?.code || 'N/A',
+    timestamp: new Date().toISOString(),
+    fallbackAgent: 'Solutions'
+  });
+  
+  const fallbackInfo = {
+    occurred: true,
+    reason: reason,
+    originalAgent: 'Unknown',
+    fallbackAgent: 'Solutions',
+    timestamp: new Date().toISOString()
+  };
+  
+  try {
+    const { data: defaultAgent, error: defaultError } = await (supabase as any)
+      .from('agents')
+      .select('id, name, instructions, initial_prompt, role')
+      .eq('name', 'Solutions')
+      .eq('is_active', true)
+      .single();
+    
+    if (defaultError) {
+      console.error('🚨 CRITICAL - Default agent fallback also failed:', defaultError);
+      return { agent: null, fallbackInfo };
+    }
+    
+    if (defaultAgent) {
+      console.log('✅ Successfully loaded default Solutions agent as fallback');
+      console.log('📋 Default agent details:', {
+        id: defaultAgent.id,
+        name: defaultAgent.name,
+        role: defaultAgent.role,
+        hasInstructions: !!defaultAgent.instructions,
+        instructionsLength: defaultAgent.instructions?.length || 0
+      });
+      
+      fallbackInfo.fallbackAgent = defaultAgent.name;
+    }
+    
+    return { agent: defaultAgent, fallbackInfo };
+  } catch (error) {
+    console.error('🚨 CRITICAL - Exception during default agent fallback:', error);
+    return { agent: null, fallbackInfo };
+  }
+}
+
+/**
+ * Enhanced result type for loadAgentContext that includes fallback information
+ */
+export interface AgentContextResult {
+  agent: Agent | null;
+  fallbackInfo?: {
+    occurred: boolean;
+    reason: string;
+    originalAgent?: string;
+    fallbackAgent: string;
+    timestamp: string;
+  };
+}
+
+/**
+ * Load agent context from database with enhanced error handling and retry logic
  */
 export async function loadAgentContext(supabase: unknown, sessionId?: string, agentId?: string): Promise<Agent | null> {
   console.log('🔧 loadAgentContext - ENTRY POINT:', { sessionId, agentId });
@@ -176,11 +365,12 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
     sessionIdType: typeof sessionId, 
     agentIdType: typeof agentId,
     sessionIdValue: sessionId,
-    agentIdValue: agentId
+    agentIdValue: agentId,
+    timestamp: new Date().toISOString()
   });
   
   if (!sessionId && !agentId) {
-    console.log('❌ loadAgentContext - No session ID or agent ID provided, using default agent');
+    console.log('❌ loadAgentContext - No session ID or agent ID provided, returning null (no fallback)');
     return null;
   }
 
@@ -188,68 +378,113 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
     let agent = null;
 
     if (agentId) {
-      // Load specific agent by ID
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('agents')
-        .select('id, name, instructions, initial_prompt, role')
-        .eq('id', agentId)
-        .eq('is_active', true)
-        .single();
-
-      if (error) {
-        console.error('Error loading agent by ID:', error);
-        return null;
-      }
-      agent = data;
-    } else if (sessionId) {
-      // Load active agent for session
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { data, error } = await (supabase as any)
-        .from('session_agents')
-        .select(`
-          agents!inner (
-            id,
-            name,
-            instructions,
-            initial_prompt,
-            role
-          )
-        `)
-        .eq('session_id', sessionId)
-        .eq('is_active', true)
-        .order('started_at', { ascending: false })
-        .limit(1)
-        .single();
-
-      if (error) {
-        console.error('Error loading session agent:', error);
-        // Try to get default agent
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: defaultAgent } = await (supabase as any)
+      console.log('🎯 Loading specific agent by ID:', agentId);
+      
+      const result = await loadAgentWithRetry(
+        supabase,
+        () => (supabase as any)
           .from('agents')
           .select('id, name, instructions, initial_prompt, role')
-          .eq('name', 'Solutions')
+          .eq('id', agentId)
           .eq('is_active', true)
-          .single();
+          .single()
+      );
+
+      if (result.error) {
+        console.error('❌ Error loading agent by ID:', {
+          agentId,
+          error: result.error,
+          errorType: result.finalError,
+          timestamp: new Date().toISOString()
+        });
         
-        return defaultAgent || null;
+        // For direct agent ID lookups, don't fallback to default - return null
+        return null;
       }
-      agent = data?.agents;
+      agent = result.data;
+      
+    } else if (sessionId) {
+      console.log('🎯 Loading active agent for session:', sessionId);
+      
+      const result = await loadAgentWithRetry(
+        supabase,
+        () => (supabase as any)
+          .from('session_agents')
+          .select(`
+            agents!inner (
+              id,
+              name,
+              instructions,
+              initial_prompt,
+              role
+            )
+          `)
+          .eq('session_id', sessionId)
+          .eq('is_active', true)
+          .order('started_at', { ascending: false })
+          .limit(1)
+          .single()
+      );
+
+      if (result.error) {
+        console.error('❌ Error loading session agent:', {
+          sessionId,
+          error: result.error,
+          errorType: result.finalError,
+          timestamp: new Date().toISOString()
+        });
+        
+        // Only fallback for session-based lookups  
+        const fallbackResult = await loadDefaultAgent(
+          supabase, 
+          `Session agent lookup failed: ${result.finalError}`, 
+          result.error
+        );
+        
+        // Store fallback info in a way that the system prompt can access it
+        if (fallbackResult.fallbackInfo && fallbackResult.agent) {
+          (fallbackResult.agent as any)._fallbackInfo = fallbackResult.fallbackInfo;
+        }
+        
+        return fallbackResult.agent;
+      }
+      agent = result.data?.agents;
     }
 
     if (agent) {
-      console.log('✅ Loaded agent context:', {
+      console.log('✅ Successfully loaded agent context:', {
         id: agent.id,
         name: agent.name,
         role: agent.role,
-        instructionsLength: agent.instructions?.length || 0
+        instructionsLength: agent.instructions?.length || 0,
+        loadedVia: agentId ? 'agentId' : 'sessionId',
+        timestamp: new Date().toISOString()
       });
+    } else {
+      console.log('⚠️ No agent found but no error occurred');
     }
 
     return agent;
   } catch (error) {
-    console.error('Unexpected error loading agent context:', error);
+    console.error('🚨 Unexpected error in loadAgentContext:', {
+      error,
+      sessionId,
+      agentId,
+      timestamp: new Date().toISOString()
+    });
+    
+    // For unexpected errors in session context, try fallback
+    if (sessionId && !agentId) {
+      const fallbackResult = await loadDefaultAgent(supabase, 'Unexpected exception during session agent lookup', error);
+      
+      // Store fallback info in a way that the system prompt can access it
+      if (fallbackResult.fallbackInfo && fallbackResult.agent) {
+        (fallbackResult.agent as any)._fallbackInfo = fallbackResult.fallbackInfo;
+      }
+      
+      return fallbackResult.agent;
+    }
+    
     return null;
   }
 }
