@@ -118,49 +118,73 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             return shouldShowMenu ? <MainMenu onSelect={onMainMenuSelect} /> : null;
           })()}
           
-          {/* RFP Menu - Available to all authenticated users for creating and editing RFPs */}
-          <IonButton 
-            fill="clear" 
-            onClick={() => setShowRFPMenu(true)}
-            data-testid="rfp-menu-button"
-          >
-            <IonIcon icon={documentTextOutline} slot="start" /> 
-            RFP
-          </IonButton>
+          {/* RFP Menu - Only available to administrators */}
+          {(() => {
+            const shouldShowRFPMenu = userProfile?.role && RoleService.isAdministrator(userProfile.role);
+            console.log('RFP Menu visibility check:', {
+              userRole: userProfile?.role,
+              shouldShow: shouldShowRFPMenu,
+              isAdministrator: userProfile?.role ? RoleService.isAdministrator(userProfile.role) : false
+            });
+            return shouldShowRFPMenu ? (
+              <>
+                <IonButton 
+                  fill="clear" 
+                  onClick={() => setShowRFPMenu(true)}
+                  data-testid="rfp-menu-button"
+                >
+                  <IonIcon icon={documentTextOutline} slot="start" /> 
+                  RFP
+                </IonButton>
+                
+                <GenericMenu
+                  items={rfps}
+                  getLabel={r => r.name || `RFP #${r.id}`}
+                  onNew={onNewRFP}
+                  onEdit={onEditRFP}
+                  onDelete={onDeleteRFP}
+                  onPreview={onPreviewRFP}
+                  onShare={onShareRFP}
+                  onSetCurrent={(rfp) => rfp ? onSetCurrentRfp(typeof rfp.id === 'string' ? parseInt(rfp.id) : rfp.id) : onClearCurrentRfp()}
+                  currentItemId={currentRfpId || undefined}
+                  showPopover={showRFPMenu}
+                  setShowPopover={setShowRFPMenu}
+                  title="RFP"
+                />
+              </>
+            ) : null;
+          })()}
           
-          <GenericMenu
-            items={rfps}
-            getLabel={r => r.name || `RFP #${r.id}`}
-            onNew={onNewRFP}
-            onEdit={onEditRFP}
-            onDelete={onDeleteRFP}
-            onPreview={onPreviewRFP}
-            onShare={onShareRFP}
-            onSetCurrent={(rfp) => rfp ? onSetCurrentRfp(typeof rfp.id === 'string' ? parseInt(rfp.id) : rfp.id) : onClearCurrentRfp()}
-            currentItemId={currentRfpId || undefined}
-            showPopover={showRFPMenu}
-            setShowPopover={setShowRFPMenu}
-            title="RFP"
-          />
-          
-          {/* Agents Menu - Available to authenticated users for agent management */}
-          <IonButton 
-            fill="clear" 
-            onClick={() => setShowAgentsMenu(true)}
-            data-testid="agents-menu-button"
-          >
-            <IonIcon icon={personCircle} slot="start" /> 
-            Agents
-          </IonButton>
-          
-          <AgentsMenu
-            agents={agents}
-            onNew={onNewAgent}
-            onEdit={onEditAgent}
-            onDelete={onDeleteAgent}
-            showPopover={showAgentsMenu}
-            setShowPopover={setShowAgentsMenu}
-          />
+          {/* Agents Menu - Only available to administrators */}
+          {(() => {
+            const shouldShowAgentsMenu = userProfile?.role && RoleService.isAdministrator(userProfile.role);
+            console.log('Agents Menu visibility check:', {
+              userRole: userProfile?.role,
+              shouldShow: shouldShowAgentsMenu,
+              isAdministrator: userProfile?.role ? RoleService.isAdministrator(userProfile.role) : false
+            });
+            return shouldShowAgentsMenu ? (
+              <>
+                <IonButton 
+                  fill="clear" 
+                  onClick={() => setShowAgentsMenu(true)}
+                  data-testid="agents-menu-button"
+                >
+                  <IonIcon icon={personCircle} slot="start" /> 
+                  Agents
+                </IonButton>
+                
+                <AgentsMenu
+                  agents={agents}
+                  onNew={onNewAgent}
+                  onEdit={onEditAgent}
+                  onDelete={onDeleteAgent}
+                  showPopover={showAgentsMenu}
+                  setShowPopover={setShowAgentsMenu}
+                />
+              </>
+            ) : null;
+          })()}
           
           {isAuthenticated && user && userProfile && !isMobile && (
             <span style={{ 

@@ -9,13 +9,22 @@ import HomeHeader from '../HomeHeader';
 
 // Mock the dependencies
 jest.mock('../../utils/useMediaQuery');
-jest.mock('../../services/roleService');
+jest.mock('../../services/roleService', () => ({
+  RoleService: {
+    isDeveloperOrHigher: jest.fn(),
+    isAdministrator: jest.fn(),
+  }
+}));
 
 // Mock the Ionic components
 jest.mock('@ionic/react', () => ({
   IonHeader: ({ children }: any) => <div data-testid="ion-header">{children}</div>,
   IonToolbar: ({ children }: any) => <div data-testid="ion-toolbar">{children}</div>,
   IonButtons: ({ children }: any) => <div data-testid="ion-buttons">{children}</div>,
+  IonButton: ({ children, onClick, 'data-testid': dataTestId, ...props }: any) => (
+    <div data-testid={dataTestId} onClick={onClick} {...props}>{children}</div>
+  ),
+  IonIcon: ({ icon }: any) => <div data-testid="ion-icon">{icon}</div>,
 }));
 
 // Mock the component dependencies
@@ -89,6 +98,7 @@ describe('HomeHeader', () => {
     jest.clearAllMocks();
     mockUseIsMobile.mockReturnValue(false);
     mockRoleService.isDeveloperOrHigher.mockReturnValue(false);
+    mockRoleService.isAdministrator.mockReturnValue(false);
   });
 
   it('should render basic header structure', () => {
@@ -191,11 +201,43 @@ describe('HomeHeader', () => {
     expect(screen.queryByText('Saved')).not.toBeInTheDocument();
   });
 
-  it('should render all required components', () => {
-    render(<HomeHeader {...defaultProps} />);
+  it('should show RFP and Agents menus for administrator roles', () => {
+    const userProfile = { 
+      supabase_user_id: 'user-123',
+      role: 'administrator' as any,
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z'
+    };
+    mockRoleService.isAdministrator.mockReturnValue(true);
 
+    render(<HomeHeader {...defaultProps} userProfile={userProfile} />);
+
+    expect(screen.getByTestId('rfp-menu-button')).toBeInTheDocument();
+    expect(screen.getByTestId('agents-menu-button')).toBeInTheDocument();
     expect(screen.getByTestId('generic-menu')).toBeInTheDocument();
     expect(screen.getByTestId('agents-menu')).toBeInTheDocument();
+  });
+
+  it('should not show RFP and Agents menus for non-administrator roles', () => {
+    const userProfile = { 
+      supabase_user_id: 'user-123',
+      role: 'user' as any,
+      created_at: '2024-01-01T00:00:00.000Z',
+      updated_at: '2024-01-01T00:00:00.000Z'
+    };
+    mockRoleService.isAdministrator.mockReturnValue(false);
+
+    render(<HomeHeader {...defaultProps} userProfile={userProfile} />);
+
+    expect(screen.queryByTestId('rfp-menu-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('agents-menu-button')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('generic-menu')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('agents-menu')).not.toBeInTheDocument();
+  });
+
+  it('should render required components that are always visible', () => {
+    render(<HomeHeader {...defaultProps} />);
+
     expect(screen.getByTestId('agent-indicator')).toBeInTheDocument();
     expect(screen.getByTestId('auth-buttons')).toBeInTheDocument();
   });

@@ -8,9 +8,14 @@
 - **Administrator Role**: ✅ Full access via Main Menu → Debug
 
 ### RFP Editing Access
-- **User Role**: ✅ Full access via RFP header menu
-- **Developer Role**: ✅ Full access via RFP header menu + Main Menu options
-- **Administrator Role**: ✅ Full access via RFP header menu + Main Menu options
+- **User Role**: ❌ No access (RFP header menu not visible)
+- **Developer Role**: ❌ No access (RFP header menu not visible)
+- **Administrator Role**: ✅ Full access via RFP header menu
+
+### Agent Management Access
+- **User Role**: ❌ No access (Agents header menu not visible)
+- **Developer Role**: ❌ No access (Agents header menu not visible)
+- **Administrator Role**: ✅ Full access via Agents header menu
 
 ## Access Paths
 
@@ -21,19 +26,26 @@
 
 ### RFP Editing
 **Path**: RFP Menu (Header) → Edit RFP  
-**Implementation**: `HomeHeader.tsx` - RFP GenericMenu available to all authenticated users  
+**Implementation**: `HomeHeader.tsx` - RFP GenericMenu only available to administrators via `RoleService.isAdministrator()`  
 **Modal**: Opens `RFPEditModal` component
+
+### Agent Management
+**Path**: Agents Menu (Header) → Manage Agents  
+**Implementation**: `HomeHeader.tsx` - AgentsMenu only available to administrators via `RoleService.isAdministrator()`  
+**Modal**: Opens agent management interface
 
 ## Current Implementation Status
 
 ✅ **Debug Menu Access**: Working correctly for developer and administrator roles  
-✅ **RFP Editing Access**: Working correctly for all authenticated users
+✅ **RFP Editing Access**: Working correctly for administrator role only  
+✅ **Agent Management Access**: Working correctly for administrator role only
 
 ## Key Points
 
-1. **RFP editing is NOT restricted by role** - all authenticated users can create and edit RFPs
-2. **Debug menu access is role-restricted** - only developer and administrator roles can access debug features
-3. **Main Menu visibility** controls access to advanced development tools, not basic RFP functionality
+1. **RFP editing is role-restricted** - only administrator role can create and edit RFPs
+2. **Agent management is role-restricted** - only administrator role can manage agents
+3. **Debug menu access is role-restricted** - only developer and administrator roles can access debug features
+4. **Main Menu visibility** controls access to advanced development tools
 
 ## Troubleshooting
 

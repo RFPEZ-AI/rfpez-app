@@ -858,8 +858,8 @@ Key UI elements are decorated with `data-testid` attributes for reliable MCP bro
 **Navigation & Menu Access:**
 - `data-testid="new-session-button"` - New session creation button in sidebar (✅ CRITICAL)
 - `data-testid="main-menu-button"` - Main developer/admin menu trigger button (developer role+)
-- `data-testid="rfp-menu-button"` - RFP management menu trigger button (all authenticated users)
-- `data-testid="agents-menu-button"` - Agent management menu trigger button (all authenticated users)
+- `data-testid="rfp-menu-button"` - RFP management menu trigger button (administrators only)
+- `data-testid="agents-menu-button"` - Agent management menu trigger button (administrators only)
 
 **Core Messaging & Actions:**
 - `data-testid="message-input"` - Main message input textarea (✅ CRITICAL)
