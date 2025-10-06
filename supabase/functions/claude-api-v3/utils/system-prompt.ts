@@ -291,20 +291,52 @@ async function loadAgentWithRetry(
 
 /**
  * Load default Solutions agent with detailed logging
+ * 🚨 FALLBACK PREVENTION: Only fallback in critical scenarios
  */
-async function loadDefaultAgent(supabase: any, reason: string, originalError?: any): Promise<{ agent: Agent | null; fallbackInfo?: any }> {
+async function loadDefaultAgent(supabase: any, reason: string, originalError?: any, currentAgentId?: string): Promise<{ agent: Agent | null; fallbackInfo?: any }> {
   console.log(`🔄 AGENT FALLBACK TRIGGERED - Reason: ${reason}`);
   console.log('📊 Fallback context:', {
     originalError: originalError?.message || 'Unknown',
     errorCode: originalError?.code || 'N/A',
     timestamp: new Date().toISOString(),
+    currentAgentId: currentAgentId || 'Unknown',
     fallbackAgent: 'Solutions'
   });
+
+  // 🚨 CRITICAL CHANGE: Prevent fallback during normal operation errors
+  // Only fallback for truly critical system failures, not temporary database issues
+  const isCriticalFailure = (
+    reason.includes('CRITICAL') || 
+    reason.includes('no active agents found') || 
+    !originalError || 
+    originalError?.code === 'PGRST116' // Table not found
+  );
+
+  if (!isCriticalFailure) {
+    console.log('⚠️ FALLBACK PREVENTED - Non-critical error, preserving current agent context');
+    console.log('🔧 Error details:', { 
+      reason, 
+      errorCode: originalError?.code,
+      shouldPreserveContext: true 
+    });
+    
+    // Return null to prevent fallback - let system attempt retry or preserve current state
+    return { 
+      agent: null, 
+      fallbackInfo: {
+        occurred: false,
+        reason: 'Fallback prevented - non-critical error',
+        originalAgent: currentAgentId || 'Unknown',
+        preservedContext: true,
+        timestamp: new Date().toISOString()
+      }
+    };
+  }
   
   const fallbackInfo = {
     occurred: true,
     reason: reason,
-    originalAgent: 'Unknown',
+    originalAgent: currentAgentId || 'Unknown',
     fallbackAgent: 'Solutions',
     timestamp: new Date().toISOString()
   };
@@ -434,11 +466,32 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
           timestamp: new Date().toISOString()
         });
         
-        // Only fallback for session-based lookups  
+        // 🚨 CRITICAL FIX: Get current agent ID to prevent unnecessary fallback
+        let currentAgentId = 'Unknown';
+        try {
+          // Attempt to get the current agent ID from session context
+          const sessionResult = await (supabase as any)
+            .from('session_agents')
+            .select('agent_id')
+            .eq('session_id', sessionId)
+            .eq('is_active', true)
+            .order('started_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+          
+          if (sessionResult.data?.agent_id) {
+            currentAgentId = sessionResult.data.agent_id;
+          }
+        } catch (_e) {
+          console.log('⚠️ Could not retrieve current agent ID for fallback prevention');
+        }
+
+        // Only fallback for session-based lookups with enhanced context
         const fallbackResult = await loadDefaultAgent(
           supabase, 
           `Session agent lookup failed: ${result.finalError}`, 
-          result.error
+          result.error,
+          currentAgentId
         );
         
         // Store fallback info in a way that the system prompt can access it

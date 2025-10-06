@@ -374,6 +374,11 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
     throw error;
   }
 
+  console.log('✅ Form artifact successfully inserted into database:', (artifact as unknown as { id: string }).id);
+  
+  // Add explicit wait to ensure database commit completes
+  await new Promise(resolve => setTimeout(resolve, 100));
+
   // ARTIFACT-RFP LINKING: Auto-link form artifacts to current RFP when session has one
   try {
     // Get the current RFP for this session
@@ -423,9 +428,24 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
     // Don't fail the main artifact creation
   }
 
+  // Verify the artifact was actually saved by querying it back
+  const createdArtifactId = (artifact as unknown as { id: string }).id;
+  const { data: verification, error: verifyError } = await supabase
+    .from('artifacts')
+    .select('id, name, type')
+    .eq('id', createdArtifactId)
+    .single();
+
+  if (verifyError || !verification) {
+    console.error('⚠️ Form artifact verification failed:', verifyError);
+    throw new Error(`Failed to verify artifact creation: ${typeof verifyError === 'object' && verifyError && 'message' in verifyError ? String(verifyError.message) : 'Artifact not found after creation'}`);
+  }
+
+  console.log('✅ Form artifact creation verified:', verification);
+
   return {
     success: true,
-    artifact_id: (artifact as unknown as { id: string }).id,
+    artifact_id: createdArtifactId,
     artifact_name: name, // Include the name in the response
     message: `Created ${mappedRole} artifact: ${name}`,
     clientCallbacks: [
@@ -433,7 +453,7 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
         type: 'ui_refresh',
         target: 'artifact_panel',
         payload: {
-          artifact_id: (artifact as unknown as { id: string }).id,
+          artifact_id: createdArtifactId,
           artifact_name: name,
           artifact_type: 'form',
           artifact_role: mappedRole,
