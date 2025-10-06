@@ -589,7 +589,10 @@ export const useArtifactManagement = (
               const updated = [...prev, formArtifact];
               console.log('📝 Artifact added to state immediately:', formArtifact.id, 'Total:', updated.length);
               
-              // Defer selection and callback to next tick to ensure state is updated
+              // IMMEDIATE selection to prevent race conditions with auto-selection effect
+              setSelectedArtifactId(formArtifact.id);
+              
+              // Defer callback and async selection updates to next tick
               setTimeout(() => {
                 selectArtifact(formArtifact.id);
                 if (onArtifactAdded) {
@@ -1170,7 +1173,7 @@ export const useArtifactManagement = (
   // Auto-select most recent artifact when session changes, but not if already selected
   useEffect(() => {
     if (currentSessionId && artifacts.length > 0 && !selectedArtifactId) {
-      // Only auto-select if no artifact is currently selected
+      // Only auto-select if no artifact is currently selected AND this isn't a recent artifact creation
       // Find the most recent artifact in this session
       const sessionArtifacts = artifacts.filter(artifact => 
         artifact.sessionId === currentSessionId || 
@@ -1180,10 +1183,11 @@ export const useArtifactManagement = (
       if (sessionArtifacts.length > 0) {
         // Select the most recently created artifact
         const mostRecent = sessionArtifacts[sessionArtifacts.length - 1];
+        console.log('🔄 Auto-selecting most recent artifact:', mostRecent.id, mostRecent.name);
         setSelectedArtifactId(mostRecent.id);
       }
     }
-  }, [currentSessionId, artifacts, selectedArtifactId]);
+  }, [currentSessionId, artifacts.length]); // Removed selectedArtifactId dependency to prevent interference
 
   return {
     artifacts,
