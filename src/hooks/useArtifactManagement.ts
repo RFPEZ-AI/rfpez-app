@@ -819,17 +819,26 @@ export const useArtifactManagement = (
             processedArtifactIds.add(artifactId);
             console.log('📝 Processing new document artifact:', artifactId);
             
+            // Type the result object for document artifacts
+            const typedResult = result as {
+              artifact_name?: string;
+              description?: string;
+              content?: string;
+              content_type?: string;
+              tags?: string[];
+            };
+            
             const documentArtifact: Artifact = {
               id: artifactId,
-              name: (result as any).artifact_name || 'Generated Document',
+              name: typedResult.artifact_name || 'Generated Document',
               type: 'document',
-              size: `${(result as any).content?.length || 0} characters`,
+              size: `${typedResult.content?.length || 0} characters`,
               content: JSON.stringify({
-                name: (result as any).artifact_name,
-                description: (result as any).description || null,
-                content: (result as any).content || '',
-                content_type: (result as any).content_type || 'markdown',
-                tags: (result as any).tags || []
+                name: typedResult.artifact_name,
+                description: typedResult.description || null,
+                content: typedResult.content || '',
+                content_type: typedResult.content_type || 'markdown',
+                tags: typedResult.tags || []
               }),
               sessionId: currentSessionId,
               messageId,
