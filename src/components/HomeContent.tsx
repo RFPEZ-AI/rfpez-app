@@ -47,6 +47,9 @@ interface HomeContentProps {
   // Tool transparency props
   toolInvocations?: ToolInvocationEvent[];
   isToolExecutionActive?: boolean;
+  
+  // Session loading prop
+  forceScrollToBottom?: boolean;
 }
 
 const HomeContent: React.FC<HomeContentProps> = ({
@@ -75,7 +78,9 @@ const HomeContent: React.FC<HomeContentProps> = ({
   onSessionHistoryToggle,
   // Tool transparency props
   toolInvocations = [],
-  isToolExecutionActive = false
+  isToolExecutionActive = false,
+  // Session loading prop
+  forceScrollToBottom = false
 }) => {
   const isMobile = useIsMobile();
   // Use selected artifact based on window state if available, otherwise fall back to most recent
@@ -148,6 +153,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
             onCancelRequest={onCancelRequest}
             toolInvocations={toolInvocations}
             isToolExecutionActive={isToolExecutionActive}
+            forceScrollToBottom={forceScrollToBottom}
           />
         </div>
 
