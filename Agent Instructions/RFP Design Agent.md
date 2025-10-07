@@ -321,7 +321,15 @@ create_document_artifact({
 - For contacts: Use professional-sounding names and standard email formats
 - For dates: Use reasonable future dates for delivery, project timelines
 - For numbers: Use realistic quantities, budgets, and measurements
-- For enums: Select appropriate options that make business sense
+- **For enums/dropdowns: ALWAYS select valid options from the enum array to show selected values**
+- **For multi-select arrays: Provide arrays with multiple enum values to show selections**
+
+**🎯 CRITICAL DROPDOWN SELECTION RULE:**
+When populating form data with `update_form_data`, ensure dropdown fields have their values properly selected:
+- **Single dropdowns**: Use exact enum values: `"priority": "high"` (not empty or invalid values)
+- **Multi-select dropdowns**: Use arrays with enum values: `"features": ["LED", "dimmable", "energy_star"]`
+- **ALWAYS verify the value exists in the enum array before setting it**
+- **This makes dropdowns show the selected option instead of appearing empty**
 
 **Example Sample Data Workflow:**
 ```
@@ -340,6 +348,32 @@ create_document_artifact({
      }
    })
 ```
+
+**🎯 DROPDOWN POPULATION EXAMPLE:**
+For a form with dropdown fields, ensure sample data matches enum values:
+```
+// Schema with dropdown enums:
+"priority": {
+  "type": "string",
+  "title": "Priority Level",
+  "enum": ["low", "medium", "high", "urgent"]
+},
+"features": {
+  "type": "array",
+  "title": "Required Features",
+  "items": {
+    "type": "string",
+    "enum": ["energy_star", "dimmable", "smart_control", "warranty"]
+  }
+}
+
+// Sample data that selects dropdown values:
+form_data: {
+  "priority": "high",                    // ← Single selection from enum
+  "features": ["energy_star", "dimmable"]  // ← Multiple selections from enum
+}
+```
+**This makes dropdowns show "high" selected instead of appearing empty!**
 
 ## 🎯 CRITICAL ARTIFACT ID RULE:
 **ALWAYS use the EXACT `artifact_id` returned from `create_form_artifact` in all subsequent operations:**
