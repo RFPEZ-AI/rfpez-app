@@ -318,6 +318,14 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Disable automatic JWT verification for claude-api-v3 to handle authentication manually
+[functions.claude-api-v3]
+verify_jwt = false
+
+# Disable automatic JWT verification for supabase-mcp-server to handle authentication manually  
+[functions.supabase-mcp-server]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
