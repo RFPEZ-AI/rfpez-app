@@ -224,6 +224,7 @@ const Home: React.FC = () => {
   const [forceSessionHistoryCollapsed, setForceSessionHistoryCollapsed] = useState(false);
   const [isCreatingNewSession, setIsCreatingNewSession] = useState(false);
   const [forceScrollToBottom, setForceScrollToBottom] = useState(false);
+  const [isSessionLoading, setIsSessionLoading] = useState(false);
 
   const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling();
 
@@ -240,6 +241,9 @@ const Home: React.FC = () => {
     
     // Clear the new session creation flag since we're now selecting a session
     setIsCreatingNewSession(false);
+    
+    // Set session loading flag to trigger input focus
+    setIsSessionLoading(true);
     
     // On mobile, collapse the session history to give more space for messages
     const windowWidth = window.innerWidth;
@@ -310,6 +314,9 @@ const Home: React.FC = () => {
     setForceScrollToBottom(true);
     // Reset the flag after a short delay to allow for one-time scroll
     setTimeout(() => setForceScrollToBottom(false), 500);
+    
+    // Reset session loading flag and trigger input focus after session is loaded
+    setTimeout(() => setIsSessionLoading(false), 200);
     
     // Load tool invocations for this session
     loadToolInvocationsForSession(sessionId);
@@ -1018,6 +1025,7 @@ const Home: React.FC = () => {
   const handleNewSession = async () => {
     console.log('🆕 Starting new session creation...');
     setIsCreatingNewSession(true);
+    setIsSessionLoading(true); // Trigger auto-focus on message input
     
     try {
       // Clear the current RFP for a fresh new session BEFORE clearing session ID
@@ -1100,10 +1108,11 @@ const Home: React.FC = () => {
         setMessages([initialMessage]);
       }
     } finally {
-      // Clear the flag after successfully setting up the new session
+      // Clear the flags after successfully setting up the new session
       setTimeout(() => {
-        console.log('🏁 New session creation complete, clearing flag');
+        console.log('🏁 New session creation complete, clearing flags');
         setIsCreatingNewSession(false);
+        setIsSessionLoading(false); // Reset auto-focus trigger
       }, 100); // Small delay to ensure all state updates are processed
     }
   };
@@ -1761,6 +1770,7 @@ const Home: React.FC = () => {
             onToggleArtifactCollapse={artifactWindowState.toggleCollapse}
             forceSessionHistoryCollapsed={forceSessionHistoryCollapsed}
             forceScrollToBottom={forceScrollToBottom}
+            isSessionLoading={isSessionLoading}
             onSessionHistoryToggle={(expanded) => {
               // Reset force collapsed state when user manually expands
               if (expanded) {

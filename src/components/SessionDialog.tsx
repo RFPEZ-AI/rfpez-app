@@ -33,8 +33,9 @@ interface SessionDialogProps {
   // Tool execution props
   toolInvocations?: ToolInvocationEvent[];
   isToolExecutionActive?: boolean;
-  // Session loading prop
+  // Session loading props
   forceScrollToBottom?: boolean; // Force scroll to bottom when session is loaded
+  isSessionLoading?: boolean; // Force focus on input when session is loading/refreshing
 }
 
 const SessionDialog: React.FC<SessionDialogProps> = ({ 
@@ -49,8 +50,9 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   // Tool execution props
   toolInvocations = [],
   isToolExecutionActive = false,
-  // Session loading prop
-  forceScrollToBottom = false
+  // Session loading props
+  forceScrollToBottom = false,
+  isSessionLoading = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
@@ -309,7 +311,7 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
               onAttachFile={onAttachFile}
               isLoading={isLoading}
               placeholder={promptPlaceholder}
-              autoFocus={messages.length === 0} // Only auto-focus if no messages yet
+              autoFocus={messages.length === 0 || isSessionLoading} // Auto-focus for new sessions OR when session is loading
             />
           </div>
         </div>

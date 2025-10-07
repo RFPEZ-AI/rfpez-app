@@ -48,6 +48,9 @@ interface HomeContentProps {
   toolInvocations?: ToolInvocationEvent[];
   isToolExecutionActive?: boolean;
   
+  // Session loading prop for auto-focus behavior
+  isSessionLoading?: boolean;
+  
   // Session loading prop
   forceScrollToBottom?: boolean;
 }
@@ -79,8 +82,9 @@ const HomeContent: React.FC<HomeContentProps> = ({
   // Tool transparency props
   toolInvocations = [],
   isToolExecutionActive = false,
-  // Session loading prop
-  forceScrollToBottom = false
+  // Session loading props
+  forceScrollToBottom = false,
+  isSessionLoading = false
 }) => {
   const isMobile = useIsMobile();
   // Use selected artifact based on window state if available, otherwise fall back to most recent
@@ -154,6 +158,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
             toolInvocations={toolInvocations}
             isToolExecutionActive={isToolExecutionActive}
             forceScrollToBottom={forceScrollToBottom}
+            isSessionLoading={isSessionLoading}
           />
         </div>
 
