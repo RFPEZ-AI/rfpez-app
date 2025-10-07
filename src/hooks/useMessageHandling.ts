@@ -3,7 +3,7 @@
 import { useRef, useEffect, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Message, ArtifactReference, Artifact } from '../types/home';
-import { RFP } from '../types/rfp';
+import { RFP, FormSpec } from '../types/rfp';
 import { SessionActiveAgent, UserProfile } from '../types/database';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
 import DatabaseService from '../services/database';
@@ -33,7 +33,9 @@ interface EnhancedFunctionResult {
   [key: string]: unknown;
 }
 
-export const useMessageHandling = () => {
+export const useMessageHandling = (
+  setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>
+) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const isProcessingRef = useRef<boolean>(false); // Add processing guard
   
@@ -245,26 +247,55 @@ export const useMessageHandling = () => {
                   });
                 }
                 
-                // ENHANCED: Send context refresh message
-                if (enhancedResult.current_rfp_id) {
-                  console.log('🔄 DEBUG: Sending context refresh message for RFP:', enhancedResult.current_rfp_id);
+                // ENHANCED: Update global RFP context when agents create new RFPs
+                if (enhancedResult.current_rfp_id && setGlobalRFPContext) {
+                  console.log('🌐 Agent created new RFP - updating global context:', enhancedResult.current_rfp_id);
                   
-                  window.postMessage({ 
-                    type: 'RFP_CREATED_SUCCESS',
-                    rfp_id: enhancedResult.current_rfp_id,
-                    rfp_name: rfpData?.name,
-                    message: `New RFP created: ${rfpData?.name || 'Unknown'}`
-                  }, '*');
-                  
-                  // Also trigger context refresh in useSessionState
-                  window.postMessage({ 
-                    type: 'REFRESH_SESSION_CONTEXT',
-                    trigger: 'rfp_creation_success',
-                    data: {
-                      current_rfp_id: enhancedResult.current_rfp_id,
-                      rfp_name: rfpData?.name
+                  try {
+                    // Convert current_rfp_id to number if it's a string
+                    const rfpId = typeof enhancedResult.current_rfp_id === 'string' 
+                      ? parseInt(enhancedResult.current_rfp_id, 10) 
+                      : enhancedResult.current_rfp_id;
+                    
+                    // If we have RFP data from the function result, use it directly
+                    if (rfpData && rfpData.name) {
+                      const rfpForContext: RFP = {
+                        id: rfpId,
+                        name: rfpData.name as string,
+                        description: rfpData.description as string || '',
+                        specification: rfpData.specification as string || '',
+                        due_date: rfpData.due_date as string || '',
+                        created_at: new Date().toISOString(),
+                        updated_at: new Date().toISOString(),
+                        bid_form_questionaire: rfpData.bid_form_questionaire as FormSpec || undefined,
+                        is_template: rfpData.is_template as boolean || false,
+                        is_public: rfpData.is_public as boolean || false,
+                        suppliers: rfpData.suppliers as number[] || undefined
+                      };
+                      
+                      // Use setTimeout to make this async without blocking
+                      setTimeout(async () => {
+                        try {
+                          await setGlobalRFPContext(rfpId, rfpForContext);
+                          console.log('✅ Global RFP context updated with agent-created RFP:', rfpForContext.name);
+                        } catch (error) {
+                          console.error('❌ Failed to update global RFP context with RFP data:', error);
+                        }
+                      }, 100);
+                    } else {
+                      // Fallback to setting just the ID (will trigger database fetch)
+                      setTimeout(async () => {
+                        try {
+                          await setGlobalRFPContext(rfpId);
+                          console.log('✅ Global RFP context updated with agent-created RFP ID:', rfpId);
+                        } catch (error) {
+                          console.error('❌ Failed to update global RFP context with RFP ID:', error);
+                        }
+                      }, 100);
                     }
-                  }, '*');
+                  } catch (error) {
+                    console.error('❌ Failed to update global RFP context from agent creation:', error);
+                  }
                 }
               } else {
                 console.error('❌ create_and_set_rfp result missing current_rfp_id field!', result);

@@ -6,15 +6,27 @@ import { RFPFormValues } from '../components/RFPEditModal';
 import { RFPService } from '../services/rfpService';
 import DatabaseService from '../services/database';
 
-export const useRFPManagement = (currentSessionId?: string) => {
+export const useRFPManagement = (
+  currentSessionId?: string,
+  globalCurrentRfpId?: number | null,
+  globalCurrentRfp?: RFP | null,
+  setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>,
+  clearGlobalRFPContext?: () => void
+) => {
   const [rfps, setRFPs] = useState<RFP[]>([]);
   const [showRFPMenu, setShowRFPMenu] = useState(false);
   const [showRFPModal, setShowRFPModal] = useState(false);
   const [showRFPPreviewModal, setShowRFPPreviewModal] = useState(false);
   const [editingRFP, setEditingRFP] = useState<RFP | null>(null);
   const [previewingRFP, setPreviewingRFP] = useState<RFP | null>(null);
-  const [currentRfpId, setCurrentRfpId] = useState<number | null>(null);
-  const [currentRfp, setCurrentRfp] = useState<RFP | null>(null);
+  
+  // Session-specific RFP context (can override global context for individual sessions)
+  const [sessionRfpId, setSessionRfpId] = useState<number | null>(null);
+  const [sessionRfp, setSessionRfp] = useState<RFP | null>(null);
+  
+  // Computed current RFP: session-specific overrides global
+  const currentRfpId = sessionRfpId || globalCurrentRfpId;
+  const currentRfp = sessionRfp || globalCurrentRfp;
 
   // Load data for menus
   useEffect(() => { 
@@ -98,8 +110,8 @@ export const useRFPManagement = (currentSessionId?: string) => {
   const handleCancelRFP = () => setShowRFPModal(false);
   const handleClosePreview = () => setShowRFPPreviewModal(false);
   
-  const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP) => {
-    console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId, 'rfpData provided:', !!rfpData);
+  const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP, setAsGlobal: boolean = false) => {
+    console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId, 'rfpData provided:', !!rfpData, 'setAsGlobal:', setAsGlobal);
     try {
       let rfp: RFP | null = null;
       
@@ -115,10 +127,18 @@ export const useRFPManagement = (currentSessionId?: string) => {
       }
       
       if (rfp) {
-        console.log('✅ DEBUG: RFP found, setting state - rfp.name:', rfp.name, 'rfp.id:', rfp.id);
-        setCurrentRfpId(rfpId);
-        setCurrentRfp(rfp);
-        console.log('Current RFP context set:', rfp.name, rfpId);
+        console.log('✅ DEBUG: RFP found, setting context - rfp.name:', rfp.name, 'rfp.id:', rfp.id);
+        
+        if (setAsGlobal && setGlobalRFPContext) {
+          // Set as global RFP context
+          await setGlobalRFPContext(rfpId, rfp);
+          console.log('🌐 Global RFP context set:', rfp.name, rfpId);
+        } else {
+          // Set as session-specific RFP context
+          setSessionRfpId(rfpId);
+          setSessionRfp(rfp);
+          console.log('📍 Session RFP context set:', rfp.name, rfpId);
+        }
 
         // Update session context if we have an active session
         if (currentSessionId) {
@@ -152,10 +172,17 @@ export const useRFPManagement = (currentSessionId?: string) => {
     }
   };
   
-  const handleClearCurrentRfp = async () => {
-    setCurrentRfpId(null);
-    setCurrentRfp(null);
-    console.log('Current RFP context cleared');
+  const handleClearCurrentRfp = async (clearGlobal: boolean = false) => {
+    if (clearGlobal && clearGlobalRFPContext) {
+      // Clear global RFP context
+      clearGlobalRFPContext();
+      console.log('🌐 Global RFP context cleared');
+    } else {
+      // Clear session-specific RFP context
+      setSessionRfpId(null);
+      setSessionRfp(null);
+      console.log('📍 Session RFP context cleared');
+    }
 
     // Clear RFP context from session if we have an active session
     if (currentSessionId) {
@@ -184,9 +211,9 @@ export const useRFPManagement = (currentSessionId?: string) => {
     previewingRFP,
     setPreviewingRFP,
     currentRfpId,
-    setCurrentRfpId,
     currentRfp,
-    setCurrentRfp,
+    sessionRfpId,
+    sessionRfp,
     handleNewRFP,
     handleEditRFP,
     handlePreviewRFP,
