@@ -480,6 +480,21 @@ npm run mcp:test   # Test MCP server connection
 ### Server Management Rules
 **ALWAYS use VS Code tasks for starting/stopping development and API servers to avoid port conflicts.**
 
+### Workspace Startup & Shutdown
+
+#### **Automatic Startup (When Opening Workspace):**
+- **Supabase Stack**: Starts automatically via "Startup Workspace" task
+- **Test Runner**: Jest watch mode auto-starts on folder open
+- **Dependency Check**: Installs missing packages automatically
+- **Service Verification**: Checks edge functions and database connectivity
+- **Manual Trigger**: `Ctrl+Shift+P` → "Tasks: Run Task" → "Startup Workspace"
+
+#### **Workspace Shutdown (When Closing VS Code):**
+- **Recommended**: `Ctrl+Shift+P` → "Tasks: Run Task" → "Shutdown Workspace"
+- **Alternative**: Run `./scripts/shutdown-workspace.sh` (Linux/Mac) or `./scripts/shutdown-workspace.bat` (Windows)
+- **Manual**: Use "Tasks: Terminate Task" for individual services, then "Tasks: Run Task" → "Stop Supabase"
+- **Benefits**: Prevents port conflicts, cleans up Docker containers, ensures clean restart
+
 
 ### Database Operations
 - Use Supabase MCP tools for SQL operations, not raw queries

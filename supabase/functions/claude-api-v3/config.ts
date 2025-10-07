@@ -12,8 +12,9 @@ declare const Deno: {
 
 // Environment variables
 // Note: Using DATABASE_ prefix instead of SUPABASE_ because Supabase skips SUPABASE_ prefixed env vars
+// BUGFIX: Prefer SUPABASE_URL in Docker context to avoid localhost issues
 export const config = {
-  supabaseUrl: Deno.env.get('DATABASE_URL') || Deno.env.get('SUPABASE_URL')!,
+  supabaseUrl: Deno.env.get('SUPABASE_URL') || Deno.env.get('DATABASE_URL')!,
   supabaseServiceKey: Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   anthropicApiKey: Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('CLAUDE_API_KEY'),
   supabaseAnonKey: Deno.env.get('DATABASE_ANON_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
