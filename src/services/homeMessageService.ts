@@ -231,9 +231,25 @@ export class HomeMessageService {
           // Update session context if we have an active session
           if (currentSessionId) {
             try {
+              // Also update session title with RFP name if available
+              const rfpName = eventData.payload.rfp_data?.name || eventData.payload.rfp_name;
+              let titleUpdate = undefined;
+              
+              if (rfpName) {
+                const { generateSessionTitleFromRfp } = await import('../utils/sessionTitleUtils');
+                titleUpdate = generateSessionTitleFromRfp(rfpName);
+                console.log('🏷️ Updating session title from RFP name:', titleUpdate);
+              }
+              
+              // Update both RFP context and title if available
               await DatabaseService.updateSessionContext(currentSessionId, { 
-                current_rfp_id: eventData.payload.rfp_id 
+                current_rfp_id: parseInt(eventData.payload.rfp_id)
               });
+              
+              // Update title separately if we have one
+              if (titleUpdate) {
+                await DatabaseService.updateSession(currentSessionId, { title: titleUpdate });
+              }
               console.log('✅ RFP context saved to session via direct data:', currentSessionId, eventData.payload.rfp_id);
             } catch (error) {
               console.warn('⚠️ Failed to save RFP context to session via direct data:', error);

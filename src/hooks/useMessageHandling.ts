@@ -11,6 +11,7 @@ import { ClaudeService } from '../services/claudeService';
 import { AgentService } from '../services/agentService';
 import { SmartAutoPromptManager } from '../utils/smartAutoPromptManager';
 import { categorizeError } from '../components/APIErrorHandler';
+import { generateSessionTitleFromMessage } from '../utils/sessionTitleUtils';
 
 // Client update interfaces for edge function communication
 interface ClientAction {
@@ -504,10 +505,13 @@ export const useMessageHandling = () => {
           );
           console.log('User message saved:', savedMessage);
           
-          // Check if this is the first message in the session and update title
+          // Check if this is the first user message in the session and update title
           const sessionMessages = await DatabaseService.getSessionMessages(activeSessionId);
-          if (sessionMessages.length === 1) {
-            const sessionTitle = content.length > 50 ? content.substring(0, 47) + '...' : content;
+          const userMessages = sessionMessages.filter(msg => msg.role === 'user');
+          
+          if (userMessages.length === 1) {
+            // Generate a meaningful title from the first user message
+            const sessionTitle = generateSessionTitleFromMessage(content);
             await DatabaseService.updateSession(activeSessionId, { title: sessionTitle });
             console.log('Updated session title to:', sessionTitle);
             await loadUserSessions();
