@@ -1102,13 +1102,14 @@ export const useMessageHandling = () => {
         // This ensures artifacts are available when references are clicked, preventing "could not be loaded" errors
         addClaudeArtifacts(claudeResponse.metadata, aiMessageId);
         
-        // CRITICAL FIX: Refresh artifacts from database after Claude creates new ones
-        // This ensures the artifact panel shows all newly created documents
-        const hasArtifactCreation = claudeResponse.metadata?.function_results || 
-                                  claudeResponse.metadata?.buyer_questionnaire ||
-                                  claudeResponse.metadata?.create_document_artifact;
+        // CRITICAL FIX: Refresh artifacts from database after Claude creates or updates artifacts
+        // This ensures the artifact panel shows all newly created documents and updated forms
+        const hasArtifactModification = claudeResponse.metadata?.function_results?.some((fr: any) => 
+          ['create_form_artifact', 'create_document_artifact', 'generate_proposal_artifact', 'update_form_data', 'update_form_artifact'].includes(fr.function)
+        ) || claudeResponse.metadata?.buyer_questionnaire ||
+           claudeResponse.metadata?.create_document_artifact;
         
-        if (currentSessionId && hasArtifactCreation) {
+        if (currentSessionId && hasArtifactModification) {
           console.log('🔄 Refreshing artifacts from database after Claude response (includes document artifacts)');
           // Small delay to ensure database operations complete
           setTimeout(async () => {
@@ -1238,7 +1239,9 @@ export const useMessageHandling = () => {
               const hasArtifactCreation = claudeResponse.metadata.function_results.some((fr: EnhancedFunctionResult) => 
                 (fr.function === 'create_form_artifact' || 
                 fr.function === 'create_document_artifact' ||
-                fr.function === 'generate_proposal_artifact')
+                fr.function === 'generate_proposal_artifact' ||
+                fr.function === 'update_form_data' ||
+                fr.function === 'update_form_artifact')
               );
               
               console.log('🔍 DEBUG: hasArtifactCreation:', hasArtifactCreation, 'artifactRefs length:', artifactRefs.length);
