@@ -48,5 +48,4 @@ temp/
 
 .fake
 nul
-database/backups/local-supabase-backup-20251006-160750.sql
-database/backups/local-supabase-backup-20251006-160822.sql
+database/backups/

@@ -11,20 +11,25 @@ declare const Deno: {
 };
 
 // Environment variables
+// Note: Using DATABASE_ prefix instead of SUPABASE_ because Supabase skips SUPABASE_ prefixed env vars
 export const config = {
-  supabaseUrl: Deno.env.get('SUPABASE_URL')!,
-  supabaseServiceKey: Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
+  supabaseUrl: Deno.env.get('DATABASE_URL') || Deno.env.get('SUPABASE_URL')!,
+  supabaseServiceKey: Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   anthropicApiKey: Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('CLAUDE_API_KEY'),
-  supabaseAnonKey: Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+  supabaseAnonKey: Deno.env.get('DATABASE_ANON_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
 };
 
 // Validate required environment variables
 if (!config.supabaseUrl) {
-  throw new Error('Missing SUPABASE_URL environment variable');
+  throw new Error('Missing DATABASE_URL or SUPABASE_URL environment variable');
 }
 
 if (!config.supabaseServiceKey) {
-  throw new Error('Missing SUPABASE_SERVICE_ROLE_KEY environment variable');
+  throw new Error('Missing DATABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY environment variable');
+}
+
+if (!config.anthropicApiKey) {
+  throw new Error('Missing ANTHROPIC_API_KEY or CLAUDE_API_KEY environment variable');
 }
 
 if (!config.anthropicApiKey) {

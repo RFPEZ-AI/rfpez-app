@@ -24,11 +24,15 @@ export function disableTestMode() {
 export function getAuthenticatedSupabaseClient(request: Request) {
   // Get authorization header
   const authHeader = request.headers.get('Authorization');
+  
+  // Handle missing authorization by using anonymous key
+  let token: string;
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    throw new Error('Missing or invalid Authorization header');
+    console.log('🔓 No auth header in getAuthenticatedSupabaseClient, using anonymous key');
+    token = config.supabaseAnonKey;
+  } else {
+    token = authHeader.substring(7);
   }
-
-  const token = authHeader.substring(7);
   
   // Return mock client in test mode
   if (isTestMode && mockClientFactory) {
