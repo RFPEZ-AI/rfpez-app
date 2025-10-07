@@ -223,6 +223,7 @@ const Home: React.FC = () => {
   const artifactWindowState = useArtifactWindowState();
   const [forceSessionHistoryCollapsed, setForceSessionHistoryCollapsed] = useState(false);
   const [isCreatingNewSession, setIsCreatingNewSession] = useState(false);
+  const [forceScrollToBottom, setForceScrollToBottom] = useState(false);
 
   const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling();
 
@@ -304,6 +305,11 @@ const Home: React.FC = () => {
     await loadSessionMessages(sessionId);
     await loadSessionAgent(sessionId);
     const sessionArtifacts = await loadSessionArtifacts(sessionId);
+    
+    // Trigger scroll to bottom after session is fully loaded
+    setForceScrollToBottom(true);
+    // Reset the flag after a short delay to allow for one-time scroll
+    setTimeout(() => setForceScrollToBottom(false), 500);
     
     // Load tool invocations for this session
     loadToolInvocationsForSession(sessionId);
@@ -1754,6 +1760,7 @@ const Home: React.FC = () => {
             onToggleArtifactWindow={artifactWindowState.toggleWindow}
             onToggleArtifactCollapse={artifactWindowState.toggleCollapse}
             forceSessionHistoryCollapsed={forceSessionHistoryCollapsed}
+            forceScrollToBottom={forceScrollToBottom}
             onSessionHistoryToggle={(expanded) => {
               // Reset force collapsed state when user manually expands
               if (expanded) {

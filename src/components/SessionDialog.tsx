@@ -1,7 +1,8 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useEffect, useRef } from 'react';
-import { IonCard, IonCardContent } from '@ionic/react';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
+import { IonCard, IonCardContent, IonButton, IonIcon } from '@ionic/react';
+import { chevronDownOutline } from 'ionicons/icons';
 import PromptComponent from './PromptComponent';
 import ArtifactReferenceTag from './ArtifactReferenceTag';
 import ToolExecutionDisplay from './ToolExecutionDisplay';
@@ -32,6 +33,8 @@ interface SessionDialogProps {
   // Tool execution props
   toolInvocations?: ToolInvocationEvent[];
   isToolExecutionActive?: boolean;
+  // Session loading prop
+  forceScrollToBottom?: boolean; // Force scroll to bottom when session is loaded
 }
 
 const SessionDialog: React.FC<SessionDialogProps> = ({ 
@@ -45,23 +48,89 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   onCancelRequest,
   // Tool execution props
   toolInvocations = [],
-  isToolExecutionActive = false
+  isToolExecutionActive = false,
+  // Session loading prop
+  forceScrollToBottom = false
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
 
-  const scrollToBottom = () => {
+  const scrollToBottom = useCallback(() => {
     // Try to scroll to prompt first, then to messages end
     if (promptRef.current) {
       promptRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     } else {
       messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }
-  };
+  }, []);
 
+  // Enhanced scroll detection to determine if prompt is visible
+  const checkPromptVisibility = useCallback(() => {
+    if (!promptRef.current || !scrollContainerRef.current) return;
+
+    const promptRect = promptRef.current.getBoundingClientRect();
+    const containerRect = scrollContainerRef.current.getBoundingClientRect();
+    
+    // Check if the prompt is at least partially visible
+    const isVisible = promptRect.bottom <= containerRect.bottom + 50; // 50px buffer
+    
+    setShowScrollButton(!isVisible && messages.length > 2); // Only show if we have messages and prompt is not visible
+  }, [messages.length]);
+
+  // Set up intersection observer for better prompt visibility detection
   useEffect(() => {
-    scrollToBottom();
-  }, [messages, isLoading]);
+    if (!promptRef.current || !scrollContainerRef.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        const isVisible = entry.isIntersecting || entry.intersectionRatio > 0.1;
+        setShowScrollButton(!isVisible && messages.length > 2);
+      },
+      {
+        root: scrollContainerRef.current,
+        rootMargin: '0px 0px 50px 0px', // 50px buffer at bottom
+        threshold: [0, 0.1, 0.5, 1]
+      }
+    );
+
+    observer.observe(promptRef.current);
+
+    return () => observer.disconnect();
+  }, [messages.length]);
+
+  // Auto-scroll when messages change or loading state changes
+  useEffect(() => {
+    // Add a small delay to ensure DOM updates are complete
+    const timer = setTimeout(() => {
+      scrollToBottom();
+    }, 100);
+
+    return () => clearTimeout(timer);
+  }, [messages, isLoading, scrollToBottom]);
+
+  // Force scroll to bottom when session is loaded/refreshed
+  useEffect(() => {
+    if (forceScrollToBottom && messages.length > 0) {
+      // Longer delay to ensure all content is rendered after session load
+      const timer = setTimeout(() => {
+        scrollToBottom();
+      }, 300);
+
+      return () => clearTimeout(timer);
+    }
+  }, [forceScrollToBottom, messages.length, scrollToBottom]);
+
+  // Additional scroll on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      checkPromptVisibility();
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [checkPromptVisibility]);
 
   return (
     <div style={{ 
@@ -69,13 +138,18 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
       display: 'flex', 
       flexDirection: 'column',
       padding: '16px',
-      overflow: 'hidden'
+      overflow: 'hidden',
+      position: 'relative'
     }}>
-      <div style={{ 
-        flex: 1, 
-        overflow: 'auto',
-        marginBottom: '16px'
-      }}>
+      <div 
+        ref={scrollContainerRef}
+        style={{ 
+          flex: 1, 
+          overflow: 'auto',
+          marginBottom: '16px',
+          scrollBehavior: 'smooth'
+        }}
+      >
         {messages.map((message) => (
             <IonCard 
               key={message.id}
@@ -239,6 +313,47 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
             />
           </div>
         </div>
+
+        {/* Floating Scroll-to-Bottom Button */}
+        {showScrollButton && (
+          <IonButton
+            fill="solid"
+            color="primary"
+            size="small"
+            onClick={scrollToBottom}
+            style={{
+              position: 'absolute',
+              bottom: '20px',
+              right: '20px',
+              borderRadius: '50%',
+              width: '48px',
+              height: '48px',
+              minWidth: '48px',
+              minHeight: '48px',
+              zIndex: 1000,
+              boxShadow: '0 4px 12px rgba(0, 0, 0, 0.2)',
+              animation: 'fadeInUp 0.3s ease-out'
+            }}
+            data-testid="scroll-to-bottom-button"
+          >
+            <IonIcon icon={chevronDownOutline} />
+          </IonButton>
+        )}
+
+        <style>
+          {`
+            @keyframes fadeInUp {
+              from {
+                opacity: 0;
+                transform: translateY(20px);
+              }
+              to {
+                opacity: 1;
+                transform: translateY(0);
+              }
+            }
+          `}
+        </style>
     </div>
   );
 };
