@@ -1702,12 +1702,83 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
       console.error('❌ No data returned from update - possible RLS policy block');
       throw new Error('Update succeeded but no data returned - check RLS policies');
     }
+
+    // CRITICAL: Verify the update actually worked by checking the returned data
+    const returnedDefaultValues = (updatedData as unknown as { default_values: Record<string, unknown> }).default_values;
+    if (!returnedDefaultValues || typeof returnedDefaultValues !== 'object') {
+      console.error('❌ Update claimed success but default_values is null/invalid:', { returnedDefaultValues });
+      throw new Error('Update failed: default_values was not properly updated');
+    }
+
+    // Verify at least some of the form_data was actually saved
+    const expectedFormKeys = Object.keys(form_data);
+    const savedDataKeys = Object.keys(returnedDefaultValues);
+    const commonKeys = expectedFormKeys.filter(key => savedDataKeys.includes(key));
     
-    console.log('✅ Form data updated successfully:', { 
+    if (commonKeys.length === 0 && expectedFormKeys.length > 0) {
+      console.error('❌ Update claimed success but no form data was actually saved:', {
+        expectedKeys: expectedFormKeys,
+        actualKeys: savedDataKeys,
+        form_data,
+        returnedDefaultValues
+      });
+      throw new Error('Update failed: none of the provided form data was saved to the database');
+    }
+
+    console.log('✅ Update verification passed:', {
+      expectedKeys: expectedFormKeys.length,
+      savedKeys: savedDataKeys.length,
+      commonKeys: commonKeys.length,
+      sampleSavedData: commonKeys.slice(0, 3).reduce((obj, key) => ({ ...obj, [key]: returnedDefaultValues[key] }), {})
+    });
+    
+    // FINAL VERIFICATION: Re-read the artifact to ensure data persistence
+    console.log('🔍 Final verification: re-reading artifact to confirm persistence...');
+    // @ts-ignore - Supabase client type compatibility
+    const { data: verificationData, error: verificationError } = await supabase
+      .from('artifacts')
+      .select('id, name, default_values, updated_at')
+      .eq('id', resolvedArtifactId)
+      .single();
+    
+    if (verificationError) {
+      console.error('❌ Verification read failed:', verificationError);
+      throw new Error(`Update appeared successful but verification read failed: ${JSON.stringify(verificationError)}`);
+    }
+    
+    if (!verificationData) {
+      console.error('❌ Verification read returned no data - artifact may have been deleted');
+      throw new Error('Update appeared successful but artifact no longer exists');
+    }
+    
+    const verifiedDefaultValues = (verificationData as unknown as { default_values: Record<string, unknown> }).default_values;
+    if (!verifiedDefaultValues || typeof verifiedDefaultValues !== 'object') {
+      console.error('❌ Verification failed: default_values is null/invalid after update');
+      throw new Error('Update failed: default_values was not persisted to database');
+    }
+    
+    // Compare the verification data with what we expected to save
+    const finalFormKeys = Object.keys(form_data);
+    const verifiedKeys = Object.keys(verifiedDefaultValues);
+    const persistedKeys = finalFormKeys.filter(key => verifiedKeys.includes(key));
+    
+    if (persistedKeys.length === 0 && finalFormKeys.length > 0) {
+      console.error('❌ Verification failed: no form data was actually persisted:', {
+        expectedKeys: finalFormKeys,
+        verifiedKeys: verifiedKeys,
+        expectedData: form_data,
+        verifiedData: verifiedDefaultValues
+      });
+      throw new Error('Update failed: form data was not persisted to database');
+    }
+
+    console.log('✅ Form data updated and verified successfully:', { 
       original_artifact_id: artifact_id,
       resolved_artifact_id: resolvedArtifactId,
       name: (existingArtifact as { name: string }).name,
-      default_values_length: Object.keys((updatedData as unknown as { default_values: Record<string, unknown> }).default_values || {}).length
+      expected_keys: finalFormKeys.length,
+      persisted_keys: persistedKeys.length,
+      verification_timestamp: (verificationData as unknown as { updated_at: string }).updated_at
     });
     
     return {
@@ -1717,8 +1788,10 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
       name: (existingArtifact as { name: string }).name,
       form_data,
       session_id,
-      updated_at: new Date().toISOString(),
-      message: `Form data for "${(existingArtifact as { name: string }).name}" updated successfully with sample values. ${artifact_id !== resolvedArtifactId ? `(Resolved "${artifact_id}" to UUID: ${resolvedArtifactId})` : ''}`
+      updated_at: (verificationData as unknown as { updated_at: string }).updated_at,
+      verified: true,
+      persisted_keys: persistedKeys.length,
+      message: `Form data for "${(existingArtifact as { name: string }).name}" updated and verified successfully with ${persistedKeys.length} fields. ${artifact_id !== resolvedArtifactId ? `(Resolved "${artifact_id}" to UUID: ${resolvedArtifactId})` : ''}`
     };
   } catch (error) {
     console.error('❌ Error updating form data:', error);
