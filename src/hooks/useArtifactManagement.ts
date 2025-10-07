@@ -167,110 +167,15 @@ export const useArtifactManagement = (
     return artifactWithMessage;
   };
 
-  // Load RFP-related artifacts when RFP context changes
+  // Load RFP-associated artifacts when RFP context changes
   useEffect(() => {
     console.log('=== RFP CONTEXT CHANGED - LOADING ARTIFACTS ===');
     
-    if (currentRfp) {
-      console.log('Current RFP data:', currentRfp);
+    if (currentRfp && currentRfp.id) {
+      console.log('Loading artifacts for RFP:', currentRfp.id, currentRfp.name);
       
-      // Get existing artifacts that are NOT from database (preserve Claude-generated ones)
-      const existingClaudeArtifacts = artifacts.filter(artifact => 
-        !artifact.id.startsWith('buyer-form-') && 
-        !artifact.id.startsWith('bid-form-') &&
-        !artifact.id.startsWith('request-')
-      );
-      console.log('Preserving existing Claude artifacts:', existingClaudeArtifacts);
-      
-      const newArtifacts: Artifact[] = [...existingClaudeArtifacts];
-    
-      // Load buyer questionnaire if exists
-      if (currentRfp.buyer_questionnaire) {
-        console.log('🟢 Loading buyer questionnaire from RFP database');
-        console.log('🔍 buyer_questionnaire type:', typeof currentRfp.buyer_questionnaire);
-        console.log('🔍 buyer_questionnaire value:', currentRfp.buyer_questionnaire);
-        
-        try {
-          let formData;
-          
-          // Check if it's already an object
-          if (typeof currentRfp.buyer_questionnaire === 'object' && currentRfp.buyer_questionnaire !== null) {
-            formData = currentRfp.buyer_questionnaire;
-          } 
-          // Check if it's a string that looks like JSON
-          else if (typeof currentRfp.buyer_questionnaire === 'string') {
-            const questionnaireStr = currentRfp.buyer_questionnaire as string;
-            // Check if it looks like a form artifact ID (starts with 'form_')
-            if (questionnaireStr.startsWith('form_')) {
-              console.log('⚠️ buyer_questionnaire contains artifact ID instead of form data:', questionnaireStr);
-              console.log('⚠️ Skipping buyer questionnaire loading - need to fetch from artifacts table');
-              // Skip this for now, we need to fetch the actual form data from the artifacts table
-              return;
-            } else {
-              // Try to parse as JSON
-              formData = JSON.parse(questionnaireStr);
-            }
-          } else {
-            console.log('⚠️ Unexpected buyer_questionnaire format:', typeof currentRfp.buyer_questionnaire);
-            return;
-          }
-            
-          const buyerFormArtifact: Artifact = {
-            id: `buyer-form-${currentRfp.id}`,
-            name: 'Buyer Questionnaire',
-            type: 'form',
-            size: 'Interactive Form',
-            content: JSON.stringify(formData)
-          };
-          
-          newArtifacts.push(buyerFormArtifact);
-          console.log('✅ Added buyer questionnaire artifact:', buyerFormArtifact);
-        } catch (e) {
-          console.error('❌ Failed to parse buyer questionnaire JSON:', e);
-          console.error('❌ Raw buyer_questionnaire value:', currentRfp.buyer_questionnaire);
-        }
-      }
-      
-      // Load bid form questionnaire if exists
-      if (currentRfp.bid_form_questionaire) {
-        console.log('🟢 Loading bid form questionnaire from RFP database');
-        try {
-          const formData = typeof currentRfp.bid_form_questionaire === 'string'
-            ? JSON.parse(currentRfp.bid_form_questionaire)
-            : currentRfp.bid_form_questionaire;
-            
-          const bidFormArtifact: Artifact = {
-            id: `bid-form-${currentRfp.id}`,
-            name: 'Supplier Bid Form',
-            type: 'form', 
-            size: 'Interactive Form',
-            content: JSON.stringify(formData)
-          };
-          
-          newArtifacts.push(bidFormArtifact);
-          console.log('✅ Added bid form questionnaire artifact:', bidFormArtifact);
-        } catch (e) {
-          console.error('❌ Failed to parse bid form questionnaire JSON:', e);
-        }
-      }
-      
-      // Load request content if exists
-      if (currentRfp.request) {
-        console.log('🟢 Loading request content from RFP database');
-        const requestArtifact: Artifact = {
-          id: `request-${currentRfp.id}`,
-          name: 'RFP Request',
-          type: 'document',
-          size: 'Generated Content',
-          content: currentRfp.request
-        };
-        
-        newArtifacts.push(requestArtifact);
-        console.log('✅ Added request artifact:', requestArtifact);
-      }
-    
-      setArtifacts(newArtifacts);
-      console.log(`🎉 Total artifacts after RFP load: ${newArtifacts.length}`);
+      // Use the new loadRFPArtifacts function to load all RFP-associated artifacts
+      loadRFPArtifacts(parseInt(currentRfp.id.toString()));
       
     } else {
       // No current RFP, only keep Claude-generated artifacts
@@ -454,6 +359,117 @@ export const useArtifactManagement = (
       return formattedArtifacts;
     } catch (error) {
       console.error('Failed to load session artifacts:', error);
+    }
+  };
+
+  // Load RFP-associated artifacts when RFP context changes
+  const loadRFPArtifacts = async (rfpId: number) => {
+    try {
+      console.log('📋 Loading RFP-associated artifacts for RFP:', rfpId);
+      const artifactsData = await DatabaseService.getRFPArtifacts(rfpId);
+      
+      const formattedArtifacts: Artifact[] = (artifactsData as DatabaseArtifact[]).map(artifact => {
+        let content: string | undefined;
+        
+        // For form artifacts, we need to handle two storage methods:
+        // 1. New method: separate fields (schema, ui_schema, default_values, submit_action)
+        // 2. Legacy method: everything in processed_content
+        if (artifact.type === 'form') {
+          console.log('📋 Processing RFP form artifact:', {
+            id: artifact.id,
+            name: artifact.name,
+            hasSchema: !!artifact.schema,
+            hasProcessedContent: !!artifact.processed_content,
+            schemaKeys: artifact.schema ? Object.keys(artifact.schema) : [],
+            processedContentPreview: artifact.processed_content?.substring(0, 100)
+          });
+          
+          // Try to use separate fields first (new method)
+          if (artifact.schema || artifact.default_values) {
+            const formSpec = {
+              schema: artifact.schema || {},
+              uiSchema: artifact.ui_schema || {},
+              formData: artifact.default_values || {},
+              submitAction: artifact.submit_action || { type: 'save_session' }
+            };
+            content = JSON.stringify(formSpec);
+            console.log('📋 Using separate fields for RFP form content');
+          }
+          // Fall back to processed_content (legacy method)
+          else if (artifact.processed_content) {
+            content = artifact.processed_content;
+            console.log('📋 Using processed_content for RFP form content');
+          }
+          // Default fallback
+          else {
+            console.warn('⚠️ RFP form artifact has no schema or processed_content, creating minimal form');
+            const formSpec = {
+              schema: { type: 'object', properties: {}, required: [] },
+              uiSchema: {},
+              formData: {},
+              submitAction: { type: 'save_session' }
+            };
+            content = JSON.stringify(formSpec);
+          }
+        }
+        // For non-form artifacts, use processed_content
+        else {
+          content = artifact.processed_content;
+        }
+        
+        // Map database type to frontend type
+        let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other';
+        switch (artifact.type) {
+          case 'form':
+            frontendType = 'form';
+            break;
+          case 'document':
+            frontendType = 'document';
+            break;
+          case 'text':
+            frontendType = 'text';
+            break;
+          case 'image':
+            frontendType = 'image';
+            break;
+          case 'pdf':
+            frontendType = 'pdf';
+            break;
+          case 'bid_view':
+            frontendType = 'bid_view';
+            break;
+          default:
+            frontendType = 'other';
+        }
+        
+        return {
+          id: artifact.id,
+          name: artifact.name,
+          type: frontendType,
+          size: artifact.description || 'RFP Artifact',
+          content: content || '',
+          sessionId: artifact.session_id || undefined
+        };
+      });
+      
+      console.log(`📋 Loaded ${formattedArtifacts.length} RFP-associated artifacts`);
+      console.log(`📋 Previous artifact count: ${artifacts.length}`);
+      
+      // Preserve Claude-generated artifacts (these don't have database IDs)
+      const existingClaudeArtifacts = artifacts.filter(artifact => 
+        artifact.id.includes('claude-artifact') ||
+        (!artifact.id.startsWith('form_') && !artifact.id.includes('-'))
+      );
+      console.log(`📋 Preserving ${existingClaudeArtifacts.length} Claude-generated artifacts`);
+      
+      const combinedArtifacts = [...existingClaudeArtifacts, ...formattedArtifacts];
+      setArtifacts(combinedArtifacts);
+
+      // Return the artifacts so the caller can handle selection
+      return formattedArtifacts;
+    } catch (error) {
+      console.error('Failed to load RFP artifacts:', error);
+      return [];
     }
   };
 
@@ -1229,6 +1245,7 @@ export const useArtifactManagement = (
     setSelectedArtifactFromState,
     addArtifactWithMessage,
     loadSessionArtifacts,
+    loadRFPArtifacts,
     handleAttachFile,
     addClaudeArtifacts,
     clearArtifacts

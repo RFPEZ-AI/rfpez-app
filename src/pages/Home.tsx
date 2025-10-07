@@ -18,6 +18,7 @@ import { useRFPManagement } from '../hooks/useRFPManagement';
 import { useArtifactManagement } from '../hooks/useArtifactManagement';
 import { useMessageHandling } from '../hooks/useMessageHandling';
 import { useArtifactWindowState } from '../hooks/useArtifactWindowState';
+import { useGlobalRFPContext } from '../hooks/useGlobalRFPContext';
 
 // Import clickable element decorator for development testing
 import '../utils/clickableElementDecorator';
@@ -121,6 +122,17 @@ const Home: React.FC = () => {
     setNeedsSessionRestore
   } = useHomeState(user?.id, !!session);
 
+  // Global RFP context that persists across sessions
+  const {
+    currentRfpId: globalCurrentRfpId,
+    currentRfp: globalCurrentRfp,
+    isLoading: globalRfpLoading,
+    setGlobalRFPContext,
+    clearGlobalRFPContext,
+    getGlobalRFPContext,
+    refreshGlobalRFPContext
+  } = useGlobalRFPContext();
+
   // CRITICAL FIX: Use ref to keep session ID synchronized and avoid stale closures
   const currentSessionIdRef = useRef<string | undefined>(currentSessionId);
   
@@ -171,6 +183,8 @@ const Home: React.FC = () => {
     previewingRFP,
     currentRfpId,
     currentRfp,
+    sessionRfpId,
+    sessionRfp,
     handleNewRFP,
     handleEditRFP,
     handlePreviewRFP,
@@ -181,7 +195,13 @@ const Home: React.FC = () => {
     handleClosePreview,
     handleSetCurrentRfp,
     handleClearCurrentRfp
-  } = useRFPManagement(currentSessionId);
+  } = useRFPManagement(
+    currentSessionId,
+    globalCurrentRfpId ?? null,
+    globalCurrentRfp ?? null,
+    setGlobalRFPContext,
+    clearGlobalRFPContext
+  );
 
   const {
     artifacts,
@@ -194,7 +214,7 @@ const Home: React.FC = () => {
     addClaudeArtifacts,
     clearArtifacts
   } = useArtifactManagement(
-    currentRfp, 
+    currentRfp ?? null, 
     currentSessionId, 
     isAuthenticated, 
     user, 
@@ -226,7 +246,7 @@ const Home: React.FC = () => {
   const [forceScrollToBottom, setForceScrollToBottom] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(false);
 
-  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling();
+  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling(setGlobalRFPContext);
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -288,8 +308,9 @@ const Home: React.FC = () => {
       if (sessionWithContext?.current_rfp_id) {
         console.log('🎯 RESTORING RFP CONTEXT from session:', sessionWithContext.current_rfp_id);
         try {
-          await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
-          console.log('✅ RFP context restoration completed');
+          // FIXED: Set as global RFP context so UI components update properly
+          await handleSetCurrentRfp(sessionWithContext.current_rfp_id, undefined, true);
+          console.log('✅ RFP context restoration completed as GLOBAL context');
         } catch (rfpError) {
           console.error('❌ RFP context restoration FAILED:', rfpError);
         }
@@ -545,7 +566,7 @@ const Home: React.FC = () => {
           const sessionWithContext = await DatabaseService.getSessionWithContext(currentSessionId);
           if (sessionWithContext?.current_rfp_id && sessionWithContext.current_rfp_id !== currentRfpId) {
             console.log('🔄 MCP UI REFRESH: Found missing RFP context, updating UI:', sessionWithContext.current_rfp_id);
-            await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+            await handleSetCurrentRfp(sessionWithContext.current_rfp_id, undefined, true);
           }
           
           // Check for new artifacts if current RFP exists but artifact list is empty
@@ -866,7 +887,7 @@ const Home: React.FC = () => {
             // Reload session context to get updated RFP context
             const sessionWithContext = await DatabaseService.getSessionWithContext(event.data.sessionId);
             if (sessionWithContext?.current_rfp_id) {
-              await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+              await handleSetCurrentRfp(sessionWithContext.current_rfp_id, undefined, true);
               console.log('✅ HOME MESSAGE DEBUG: Session context refreshed with RFP:', sessionWithContext.current_rfp_id);
             }
             
@@ -928,7 +949,7 @@ const Home: React.FC = () => {
               
               if (sessionWithContext?.current_rfp_id) {
                 console.log('🎯 DEBUG: Setting current RFP from session context:', sessionWithContext.current_rfp_id);
-                await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+                await handleSetCurrentRfp(sessionWithContext.current_rfp_id, undefined, true);
                 console.log('🎯 DEBUG: RFP context refreshed from session successfully');
               } else if (retryCount < 3) {
                 // If we have an RFP name but no session context yet, retry after delay
@@ -988,7 +1009,7 @@ const Home: React.FC = () => {
               const sessionWithContext = await DatabaseService.getSessionWithContext(currentSessionId);
               if (sessionWithContext?.current_rfp_id && sessionWithContext.current_rfp_id !== currentRfpId) {
                 console.log('🔄 MCP UI REFRESH: Immediate poll found missing RFP context:', sessionWithContext.current_rfp_id);
-                await handleSetCurrentRfp(sessionWithContext.current_rfp_id);
+                await handleSetCurrentRfp(sessionWithContext.current_rfp_id, undefined, true);
               }
             } catch (error) {
               console.warn('🔄 MCP UI REFRESH: Error during immediate poll:', error);
@@ -1023,15 +1044,16 @@ const Home: React.FC = () => {
   }, [currentSessionId, userId, isAuthenticated]);
 
   const handleNewSession = async () => {
-    console.log('🆕 Starting new session creation...');
+    console.log('🆕 Starting new session creation with global RFP context inheritance...');
     setIsCreatingNewSession(true);
     setIsSessionLoading(true); // Trigger auto-focus on message input
     
     try {
-      // Clear the current RFP for a fresh new session BEFORE clearing session ID
-      handleClearCurrentRfp();
+      // Get global RFP context for inheritance
+      const globalContext = getGlobalRFPContext();
+      console.log('🌐 Global RFP context for new session:', globalContext);
       
-      // Clear ALL UI state completely
+      // Clear ALL UI state completely (but preserve global RFP context)
       setMessages([]);
       clearArtifacts();
       setSelectedSessionId(undefined);
@@ -1045,11 +1067,11 @@ const Home: React.FC = () => {
       artifactWindowState.saveLastSession(null);
       // Don't force-collapse session history - let user access session management naturally
       
-      // 🔥 CRITICAL FIX: Actually create a new session in the database
+      // 🔥 CRITICAL FIX: Actually create a new session in the database with global RFP context
       if (isAuthenticated && userId && createNewSession) {
-        console.log('🔥 Creating actual new session in database...');
-        // For new sessions, always use the default Solutions agent and no RFP ID
-        const newSessionId = await createNewSession(null, undefined);
+        console.log('🔥 Creating actual new session in database with inherited RFP:', globalContext.rfpId);
+        // For new sessions, inherit global RFP context but use default Solutions agent
+        const newSessionId = await createNewSession(null, globalContext.rfpId ?? undefined);
         
         if (newSessionId) {
           console.log('✅ New session created successfully:', newSessionId);
@@ -1163,11 +1185,11 @@ const Home: React.FC = () => {
         messagesLength: messages.length
       });
       
-      // Create an emergency session synchronously
+      // Create an emergency session synchronously with global RFP context
       if (createNewSession) {
         try {
-          console.log('🆘 Creating emergency session...');
-          const emergencySessionId = await createNewSession(currentAgent, undefined);
+          console.log('🆘 Creating emergency session with global RFP context:', globalCurrentRfpId);
+          const emergencySessionId = await createNewSession(currentAgent, globalCurrentRfpId ?? undefined);
           if (emergencySessionId) {
             console.log('✅ Emergency session created:', emergencySessionId);
             activeSessionId = emergencySessionId;
@@ -1209,7 +1231,7 @@ const Home: React.FC = () => {
       userId,
       currentAgent,
       userProfile,
-      currentRfp,
+      currentRfp ?? null,
       addClaudeArtifacts,
       loadSessionAgent,
       (agent) => {
@@ -1444,7 +1466,7 @@ const Home: React.FC = () => {
         userId,
         currentAgent,
         userProfile,
-        currentRfp,
+        currentRfp ?? null,
         addClaudeArtifacts,
         loadSessionAgent,
         (agent) => {
@@ -1707,7 +1729,7 @@ const Home: React.FC = () => {
         isAuthenticated={isAuthenticated}
         user={user}
         rfps={rfps}
-        currentRfpId={currentRfpId}
+        currentRfpId={currentRfpId ?? null}
         showRFPMenu={showRFPMenu}
         setShowRFPMenu={setShowRFPMenu}
         onNewRFP={handleNewRFP}
@@ -1756,7 +1778,7 @@ const Home: React.FC = () => {
             onAttachFile={handleAttachFile}
             artifacts={artifacts}
             selectedArtifact={selectedArtifact}
-            currentRfpId={currentRfpId}
+            currentRfpId={currentRfpId ?? null}
             onDownloadArtifact={handleDownloadArtifact}
             onArtifactSelect={handleArtifactSelect}
             onFormSubmit={handleFormSubmissionWithAutoPrompt}
@@ -1800,8 +1822,24 @@ const Home: React.FC = () => {
 
       {/* Footer outside of IonContent for better MCP browser compatibility */}
       <HomeFooter 
-        currentRfp={currentRfp} 
+        currentRfp={currentRfp ?? null} 
         onViewBids={handleViewBids}
+        onClearRfpContext={() => clearGlobalRFPContext()}
+        onSelectRfp={() => setShowRFPMenu(true)}
+        onRfpChange={async (rfpId: number) => {
+          console.log('RFP selected from dropdown:', rfpId);
+          await handleSetCurrentRfp(rfpId);
+          
+          // Update the current session's RFP context
+          if (currentSessionId) {
+            try {
+              await DatabaseService.updateSessionContext(currentSessionId, { current_rfp_id: rfpId });
+              console.log('✅ Session RFP context updated:', { sessionId: currentSessionId, rfpId });
+            } catch (error) {
+              console.error('❌ Failed to update session RFP context:', error);
+            }
+          }
+        }}
       />
 
       {/* Debug toggle for development testing */}

@@ -64,21 +64,24 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     }
   };
 
-  const createNewSession = async (currentAgent: SessionActiveAgent | null, currentRfpId?: number): Promise<string | null> => {
-    console.log('Creating new session, auth state:', { isAuthenticated, user: !!userId, currentRfpId });
+  const createNewSession = async (currentAgent: SessionActiveAgent | null, inheritedRfpId?: number): Promise<string | null> => {
+    console.log('Creating new session, auth state:', { isAuthenticated, user: !!userId, inheritedRfpId });
     if (!isAuthenticated || !userId) {
       console.log('Not authenticated or userId not available, skipping session creation');
       return null;
     }
     
     try {
-      console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id, 'and RFP:', currentRfpId);
+      // Use inherited RFP ID if provided, otherwise session will have no RFP context initially
+      const rfpIdForSession = inheritedRfpId || undefined;
+      console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id, 'and inherited RFP:', rfpIdForSession);
+      
       const session = await DatabaseService.createSessionWithAgent(
         userId, 
         'Chat Session', // Will be updated to message content when first message is sent
         currentAgent?.agent_id,
         undefined, // description
-        currentRfpId
+        rfpIdForSession
       );
       console.log('Session created:', session);
       if (session) {
