@@ -1571,29 +1571,103 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     throw new Error('Session ID is required for updating form data');
   }
   
+  let resolvedArtifactId = artifact_id;
+  let existingArtifact: Record<string, unknown> | null = null;
+  
   try {
-    // First verify the artifact exists and is a form and check user permissions
-    // @ts-ignore - Supabase client type compatibility
-    const { data: existingArtifact, error: fetchError } = await supabase
-      .from('artifacts')
-      .select('id, name, type, artifact_role, schema, user_id')
-      .eq('id', artifact_id)
-      .eq('type', 'form')
-      .single();
+    // First try to find the artifact by ID (UUID format)
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(artifact_id);
     
-    if (fetchError) {
-      console.error('❌ Error fetching artifact:', fetchError);
-      throw new Error(`Artifact not found: ${artifact_id}`);
+    if (isUUID) {
+      console.log('🔍 Searching by UUID:', artifact_id);
+      // @ts-ignore - Supabase client type compatibility
+      const { data, error } = await supabase
+        .from('artifacts')
+        .select('id, name, type, artifact_role, schema, user_id, session_id')
+        .eq('id', artifact_id)
+        .eq('type', 'form')
+        .single();
+      
+      if (!error && data) {
+        existingArtifact = data;
+        resolvedArtifactId = artifact_id;
+      }
     }
     
+    // If not found by UUID or not a UUID, try to find by name in the current session
     if (!existingArtifact) {
-      throw new Error(`Form artifact not found: ${artifact_id}`);
+      console.log('🔍 Searching by name in session:', { name: artifact_id, session_id });
+      
+      // Try exact name match first
+      // @ts-ignore - Supabase client type compatibility
+      const { data, error } = await supabase
+        .from('artifacts')
+        .select('id, name, type, artifact_role, schema, user_id, session_id')
+        .eq('session_id', session_id)
+        .eq('type', 'form')
+        .eq('name', artifact_id)
+        .single();
+      
+      if (!error && data) {
+        existingArtifact = data as Record<string, unknown>;
+        resolvedArtifactId = (data as unknown as { id: string }).id;
+        console.log('✅ Found artifact by exact name match:', resolvedArtifactId);
+      } else {
+        // Try fuzzy name matching (case-insensitive, partial matches)
+        console.log('🔍 Trying fuzzy name matching...');
+        // @ts-ignore - Supabase client type compatibility
+        const { data: candidates, error: fuzzyError } = await supabase
+          .from('artifacts')
+          .select('id, name, type, artifact_role, schema, user_id, session_id')
+          .eq('session_id', session_id)
+          .eq('type', 'form')
+          .ilike('name', `%${artifact_id}%`);
+        
+        if (!fuzzyError && candidates && Array.isArray(candidates) && candidates.length > 0) {
+          // Pick the first candidate (could be enhanced with better matching logic)
+          existingArtifact = candidates[0] as Record<string, unknown>;
+          resolvedArtifactId = (existingArtifact as { id: string }).id;
+          console.log('✅ Found artifact by fuzzy name match:', { 
+            resolvedId: resolvedArtifactId, 
+            actualName: (existingArtifact as { name: string }).name 
+          });
+        }
+      }
+    }
+    
+    // If still not found, get the currently active artifact as fallback
+    if (!existingArtifact) {
+      console.log('🔍 Trying to get currently active form artifact...');
+      // @ts-ignore - Supabase client type compatibility
+      const { data: currentArtifacts, error: currentError } = await supabase
+        .from('artifacts')
+        .select('id, name, type, artifact_role, schema, user_id, session_id')
+        .eq('session_id', session_id)
+        .eq('type', 'form')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      
+      if (!currentError && currentArtifacts && Array.isArray(currentArtifacts) && currentArtifacts.length > 0) {
+        existingArtifact = currentArtifacts[0] as Record<string, unknown>;
+        resolvedArtifactId = (existingArtifact as { id: string }).id;
+        console.log('✅ Using most recently updated form artifact:', { 
+          resolvedId: resolvedArtifactId, 
+          actualName: (existingArtifact as { name: string }).name 
+        });
+      }
+    }
+    
+    // Final check - if no artifact found, throw error
+    if (!existingArtifact) {
+      console.error('❌ No form artifact found for:', { artifact_id, session_id });
+      throw new Error(`No form artifact found matching: ${artifact_id}`);
     }
     
     console.log('✅ Found existing form artifact:', {
-      name: (existingArtifact as unknown as { name: string }).name,
-      user_id: (existingArtifact as unknown as { user_id: string }).user_id,
-      current_user: _userId
+      name: (existingArtifact as { name: string }).name,
+      user_id: (existingArtifact as { user_id: string }).user_id,
+      current_user: _userId,
+      resolvedId: resolvedArtifactId
     });
     
     // Get current auth context for debugging
@@ -1602,11 +1676,11 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     console.log('🔐 Auth context:', { 
       authError, 
       user_id: user?.id,
-      artifact_user_id: (existingArtifact as unknown as { user_id: string }).user_id,
-      match: user?.id === (existingArtifact as unknown as { user_id: string }).user_id
+      artifact_user_id: (existingArtifact as { user_id: string }).user_id,
+      match: user?.id === (existingArtifact as { user_id: string }).user_id
     });
     
-    // Update the default_values field with the new form data
+    // Update the default_values field with the new form data using the resolved artifact ID
     // @ts-ignore - Supabase client type compatibility
     const { data: updatedData, error: updateError } = await supabase
       .from('artifacts')
@@ -1614,7 +1688,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
         default_values: form_data,
         updated_at: new Date().toISOString()
       })
-      .eq('id', artifact_id)
+      .eq('id', resolvedArtifactId)
       .select('id, name, default_values, updated_at')
       .single();
     
@@ -1630,19 +1704,21 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     }
     
     console.log('✅ Form data updated successfully:', { 
-      artifact_id, 
-      name: (existingArtifact as unknown as { name: string }).name,
+      original_artifact_id: artifact_id,
+      resolved_artifact_id: resolvedArtifactId,
+      name: (existingArtifact as { name: string }).name,
       default_values_length: Object.keys((updatedData as unknown as { default_values: Record<string, unknown> }).default_values || {}).length
     });
     
     return {
       success: true,
-      artifact_id,
-      name: (existingArtifact as unknown as { name: string }).name,
+      artifact_id: resolvedArtifactId,
+      original_artifact_id: artifact_id,
+      name: (existingArtifact as { name: string }).name,
       form_data,
       session_id,
       updated_at: new Date().toISOString(),
-      message: `Form data for "${(existingArtifact as unknown as { name: string }).name}" updated successfully with sample values`
+      message: `Form data for "${(existingArtifact as { name: string }).name}" updated successfully with sample values. ${artifact_id !== resolvedArtifactId ? `(Resolved "${artifact_id}" to UUID: ${resolvedArtifactId})` : ''}`
     };
   } catch (error) {
     console.error('❌ Error updating form data:', error);

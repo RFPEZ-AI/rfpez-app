@@ -26,8 +26,8 @@ interface SupabaseQueryBuilder {
 }
 
 const supabase = createClient(
-  Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+  Deno.env.get('DATABASE_URL') || Deno.env.get('SUPABASE_URL')!,
+  Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
 )
 
 // Version that accepts an authenticated Supabase client

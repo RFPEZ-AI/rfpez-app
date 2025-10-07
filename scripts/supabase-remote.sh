@@ -1,5 +1,7 @@
 #!/bin/bash
 # Switch to Supabase REMOTE production
+  echo "Don't switch to remote accidentally"
+  exit 1      # exit with status code 1 (error)
 
 echo "🔄 Switching to Supabase REMOTE production..."
 

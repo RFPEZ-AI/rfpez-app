@@ -338,13 +338,13 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'update_form_data',
-    description: 'Update the form data (default_values) for an existing form artifact. This populates the form with sample or real data while keeping the schema intact. Use this to fill forms with test data or update existing form values.',
+    description: 'Update the form data (default_values) for an existing form artifact. This populates the form with sample or real data while keeping the schema intact. Use this to fill forms with test data or update existing form values. Can accept either a UUID or form name.',
     input_schema: {
       type: 'object',
       properties: {
         artifact_id: {
           type: 'string',
-          description: 'ID of the form artifact to update with new data'
+          description: 'ID or name of the form artifact to update. Can be a UUID (preferred) or a form name like "LED Lighting Requirements". The function will intelligently resolve names to IDs.'
         },
         session_id: {
           type: 'string',

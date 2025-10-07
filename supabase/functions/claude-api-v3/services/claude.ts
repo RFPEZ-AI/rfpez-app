@@ -178,6 +178,11 @@ export class ClaudeAPIService {
             try {
               const parsed = JSON.parse(eventData);
               console.log('📡 Streaming event:', parsed.type);
+              
+              // DEBUG: Log all streaming events to understand what Claude is actually sending
+              if (parsed.type === 'content_block_start' || parsed.type === 'content_block_stop' || parsed.type.includes('tool')) {
+                console.log('🔍 DETAILED EVENT DEBUG:', JSON.stringify(parsed, null, 2));
+              }
 
               if (parsed.type === 'content_block_delta') {
                 console.log('🔧 Delta event type:', parsed.delta?.type, 'activeToolCall.id:', activeToolCall.id);

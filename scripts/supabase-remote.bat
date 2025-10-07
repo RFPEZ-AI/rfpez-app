@@ -1,6 +1,8 @@
 @echo off
-REM Windows batch script to switch to Supabase REMOTE production
 
+ECHO - dont' switch to remote accideentally
+EXIT 
+REM Windows batch script to switch to Supabase REMOTE production
 echo 🔄 Switching to Supabase REMOTE production...
 
 REM Backup current .env.local
