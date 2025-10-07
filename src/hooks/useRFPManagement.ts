@@ -127,6 +127,18 @@ export const useRFPManagement = (currentSessionId?: string) => {
               current_rfp_id: rfpId 
             });
             console.log('✅ RFP context saved to session:', currentSessionId, rfpId);
+
+            // Update session title with RFP name
+            if (rfp.name) {
+              try {
+                const { generateSessionTitleFromRfp } = await import('../utils/sessionTitleUtils');
+                const newTitle = generateSessionTitleFromRfp(rfp.name);
+                await DatabaseService.updateSession(currentSessionId, { title: newTitle });
+                console.log('🏷️ Updated session title from RFP name:', newTitle);
+              } catch (titleError) {
+                console.warn('⚠️ Failed to update session title from RFP name:', titleError);
+              }
+            }
           } catch (error) {
             console.warn('⚠️ Failed to save RFP context to session:', error);
           }

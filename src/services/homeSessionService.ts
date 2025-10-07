@@ -237,6 +237,7 @@ export class HomeSessionService {
       // Update local state
       setCurrentRfpId(rfpId);
       
+      let rfpToUse = rfpData;
       if (rfpData) {
         setCurrentRfp(rfpData);
       } else {
@@ -245,9 +246,22 @@ export class HomeSessionService {
           const { RFPService } = await import('./rfpService');
           const rfp = await RFPService.getById(parseInt(rfpId));
           setCurrentRfp(rfp);
+          rfpToUse = rfp;
         } catch (error) {
           console.error('Failed to load RFP data:', error);
           setCurrentRfp(null);
+        }
+      }
+      
+      // Update session title with RFP name if we have RFP data
+      if (rfpToUse?.name) {
+        try {
+          const { generateSessionTitleFromRfp } = await import('../utils/sessionTitleUtils');
+          const newTitle = generateSessionTitleFromRfp(rfpToUse.name);
+          await DatabaseService.updateSession(sessionId, { title: newTitle });
+          console.log('🏷️ Updated session title from RFP name:', newTitle);
+        } catch (error) {
+          console.warn('⚠️ Failed to update session title from RFP name:', error);
         }
       }
       
