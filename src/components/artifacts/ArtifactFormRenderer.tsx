@@ -27,18 +27,22 @@ interface FormSubmissionData {
 interface ArtifactFormRendererProps {
   artifact: Artifact;
   onSubmit: (formData: Record<string, unknown>) => void;
+  onSave?: (artifact: Artifact, formData: Record<string, unknown>) => void;
   isPortrait?: boolean;
 }
 
 const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({ 
   artifact, 
   onSubmit, 
+  onSave,
   isPortrait = false 
 }) => {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const formRef = useRef<any>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInModal, setIsInModal] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [currentFormData, setCurrentFormData] = useState<Record<string, unknown>>({});
 
   // Detect if we're inside a modal
   useEffect(() => {
@@ -78,6 +82,26 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
       if (data.formData) {
         onSubmit(data.formData);
       }
+    };
+
+    const handleSave = async () => {
+      if (!onSave) return;
+      
+      setIsSaving(true);
+      try {
+        // Get current form data from the form
+        const formData = formRef.current?.state?.formData || currentFormData;
+        console.log('Saving form data:', formData);
+        await onSave(artifact, formData);
+      } catch (error) {
+        console.error('Error saving form:', error);
+      } finally {
+        setIsSaving(false);
+      }
+    };
+
+    const handleFormChange = (formData: Record<string, unknown>) => {
+      setCurrentFormData(formData);
     };
 
     const handleError = (errors: Record<string, unknown>[]) => {
@@ -222,6 +246,7 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
             validator={validator as any}
             onSubmit={handleSubmit}
             onError={handleError}
+            onChange={(e) => handleFormChange(e.formData || {})}
             showErrorList={false}
             ref={formRef}
           >
@@ -236,8 +261,35 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
           style={{ 
           padding: isPortrait ? '8px 0' : '12px 0',
           borderTop: '1px solid var(--ion-color-light)',
-          flexShrink: 0
+          flexShrink: 0,
+          display: 'flex',
+          flexDirection: isPortrait ? 'column' : 'row',
+          gap: isPortrait ? '8px' : '12px'
         }}>
+          {/* Save Button (Draft Mode) */}
+          {onSave && (
+            <IonButton
+              className="form-save-button"
+              data-testid="form-save-button"
+              data-form-action="save"
+              expand="block"
+              fill="outline"
+              size={isPortrait ? 'default' : 'default'}
+              disabled={isSaving}
+              style={{
+                '--min-height': isPortrait ? '44px' : '40px',
+                fontSize: isPortrait ? '14px' : '13px',
+                flex: isPortrait ? 'none' : '1'
+              }}
+              onClick={handleSave}
+            >
+              <span data-testid="form-save-text">
+                {isSaving ? 'Saving...' : '💾 Save Draft'}
+              </span>
+            </IonButton>
+          )}
+
+          {/* Submit Button */}
           <IonButton
             className="form-submit-button"
             data-testid="form-submit"
@@ -246,7 +298,8 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
             size={isPortrait ? 'default' : 'default'}
             style={{
               '--min-height': isPortrait ? '48px' : '44px',
-              fontSize: isPortrait ? '16px' : '14px'
+              fontSize: isPortrait ? '16px' : '14px',
+              flex: isPortrait ? 'none' : onSave ? '2' : '1'
             }}
             onClick={() => {
               console.log('Submit button clicked');

@@ -29,6 +29,7 @@ export interface SingletonArtifactWindowProps {
   artifacts?: Artifact[]; // All available artifacts for dropdown
   onDownload?: (artifact: Artifact) => void;
   onFormSubmit?: (artifact: Artifact, formData: Record<string, unknown>) => void;
+  onFormSave?: (artifact: Artifact, formData: Record<string, unknown>) => void; // Save form data without validation
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
   currentRfpId?: number | null;

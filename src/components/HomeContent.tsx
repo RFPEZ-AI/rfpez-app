@@ -31,6 +31,7 @@ interface HomeContentProps {
   onDownloadArtifact: (artifact: Artifact) => void;
   onArtifactSelect?: (artifactRef: ArtifactReference) => void;
   onFormSubmit?: (artifact: Artifact, formData: Record<string, unknown>) => void;
+  onFormSave?: (artifact: Artifact, formData: Record<string, unknown>) => void;
   
   // Agent and cancel functionality
   currentAgent?: { agent_name: string } | null;
@@ -71,6 +72,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
   onDownloadArtifact,
   onArtifactSelect,
   onFormSubmit,
+  onFormSave,
   currentAgent,
   onCancelRequest,
   artifactWindowOpen = false,
@@ -175,6 +177,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
             artifacts={artifacts}
             onDownload={onDownloadArtifact}
             onFormSubmit={onFormSubmit}
+            onFormSave={onFormSave}
             currentRfpId={currentRfpId}
             isCollapsed={artifactWindowCollapsed}
             onToggleCollapse={onToggleArtifactCollapse}

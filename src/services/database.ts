@@ -696,6 +696,104 @@ export class DatabaseService {
     return true;
   }
 
+  // Form save operations (draft mode - no validation)
+  static async saveFormData(
+    artifactId: string,
+    formData: Record<string, unknown>,
+    userId?: string
+  ): Promise<{ success: boolean; saveCount?: number; lastSavedAt?: string }> {
+    try {
+      console.log('💾 Saving form data for artifact:', artifactId);
+      
+      // Use the database function for atomic save operation
+      const { data, error } = await supabase
+        .rpc('save_form_data', {
+          artifact_id_param: artifactId,
+          form_data_param: formData,
+          user_id_param: userId || null
+        });
+
+      if (error) {
+        console.error('❌ Error saving form data:', error);
+        return { success: false };
+      }
+
+      if (!data) {
+        console.warn('⚠️ No artifact found to save data to:', artifactId);
+        return { success: false };
+      }
+
+      // Get updated artifact info for confirmation
+      const { data: artifactData } = await supabase
+        .from('artifacts')
+        .select('save_count, last_saved_at')
+        .eq('id', artifactId)
+        .single();
+
+      console.log('✅ Form data saved successfully for artifact:', artifactId);
+      
+      return {
+        success: true,
+        saveCount: artifactData?.save_count || undefined,
+        lastSavedAt: artifactData?.last_saved_at || undefined
+      };
+    } catch (err) {
+      console.error('❌ Exception saving form data:', err);
+      return { success: false };
+    }
+  }
+
+  static async getFormData(artifactId: string): Promise<Record<string, unknown> | null> {
+    try {
+      console.log('📥 Getting form data for artifact:', artifactId);
+      
+      // Use the database function to get form data (draft + fallback)
+      const { data, error } = await supabase
+        .rpc('get_form_data', {
+          artifact_id_param: artifactId
+        });
+
+      if (error) {
+        console.error('❌ Error getting form data:', error);
+        return null;
+      }
+
+      console.log('✅ Form data retrieved for artifact:', artifactId);
+      return data as Record<string, unknown> | null;
+    } catch (err) {
+      console.error('❌ Exception getting form data:', err);
+      return null;
+    }
+  }
+
+  static async getFormSaveStats(artifactId: string): Promise<{
+    saveCount: number;
+    lastSavedAt: string | null;
+    dataStatus: 'has_draft' | 'has_data' | 'empty';
+  } | null> {
+    try {
+      const { data, error } = await supabase
+        .from('form_save_stats')
+        .select('save_count, last_saved_at, data_status')
+        .eq('artifact_id', artifactId)
+        .single();
+
+      if (error) {
+        console.error('❌ Error getting form save stats:', error);
+        return null;
+      }
+
+      return {
+        saveCount: data.save_count || 0,
+        lastSavedAt: data.last_saved_at || null,
+        dataStatus: data.data_status || 'empty'
+      };
+    } catch (err) {
+      console.error('❌ Exception getting form save stats:', err);
+      return null;
+    }
+  }
+
   // User profile operations
   static async createOrUpdateUserProfile(profile: Partial<UserProfile>): Promise<UserProfile | null> {
     const { data: { user } } = await supabase.auth.getUser();
