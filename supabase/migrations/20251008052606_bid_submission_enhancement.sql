@@ -177,6 +177,9 @@ $$ LANGUAGE plpgsql SECURITY DEFINER;
 -- 4. CREATE BID RETRIEVAL FUNCTIONS
 -- =======================================================
 
+-- Drop existing function if it has different signature
+DROP FUNCTION IF EXISTS public.get_rfp_bids(INTEGER);
+
 -- Get bids for an RFP with full details
 CREATE OR REPLACE FUNCTION public.get_rfp_bids(rfp_id_param INTEGER)
 RETURNS TABLE (
