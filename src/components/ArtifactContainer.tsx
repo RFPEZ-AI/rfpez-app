@@ -22,6 +22,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   artifacts = [],
   onDownload, 
   onFormSubmit,
+  onFormSave,
   isCollapsed: externalCollapsed,
   onToggleCollapse: externalToggleCollapse,
   currentRfpId,
@@ -102,6 +103,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
         <ArtifactFormRenderer
           artifact={artifact}
           onSubmit={(formData) => onFormSubmit(artifact, formData)}
+          onSave={onFormSave}
           isPortrait={isPortrait}
         />
       );
@@ -298,6 +300,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
         artifact={artifact}
         currentRfpId={currentRfpId}
         onFormSubmit={onFormSubmit}
+        onFormSave={onFormSave}
         onDownload={onDownload}
       />
     </>

@@ -454,4 +454,72 @@ export class ArtifactService {
       addSystemMessage(`⚠️ Artifact "${artifactRef.artifactName}" could not be loaded. Please try refreshing the page.`, 'warning');
     }
   }
+
+  /**
+   * Save form data without validation (draft mode)
+   */
+  static async saveFormData(
+    artifact: Artifact,
+    formData: Record<string, unknown>,
+    user: { id: string } | null,
+    addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
+  ): Promise<boolean> {
+    console.log('=== FORM SAVE (DRAFT MODE) ===');
+    console.log('Artifact name:', artifact.name);
+    console.log('Form data:', formData);
+    
+    try {
+      // Save to database using draft mode
+      const result = await DatabaseService.saveFormData(
+        artifact.id,
+        formData,
+        user?.id
+      );
+
+      if (result.success) {
+        console.log('✅ Form data saved successfully');
+        addSystemMessage(
+          `💾 Form saved${result.saveCount ? ` (save #${result.saveCount})` : ''}`,
+          'success'
+        );
+        return true;
+      } else {
+        console.error('❌ Failed to save form data');
+        addSystemMessage('❌ Failed to save form data', 'error');
+        return false;
+      }
+    } catch (error) {
+      console.error('❌ Exception during form save:', error);
+      addSystemMessage('❌ An error occurred while saving the form', 'error');
+      return false;
+    }
+  }
+
+  /**
+   * Get saved form data for an artifact
+   */
+  static async getSavedFormData(artifactId: string): Promise<Record<string, unknown> | null> {
+    try {
+      return await DatabaseService.getFormData(artifactId);
+    } catch (error) {
+      console.error('❌ Error loading saved form data:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get form save statistics
+   */
+  static async getFormSaveStats(artifactId: string): Promise<{
+    saveCount: number;
+    lastSavedAt: string | null;
+    dataStatus: 'has_draft' | 'has_data' | 'empty';
+  } | null> {
+    try {
+      return await DatabaseService.getFormSaveStats(artifactId);
+    } catch (error) {
+      console.error('❌ Error getting form save stats:', error);
+      return null;
+    }
+  }
 }

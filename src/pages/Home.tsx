@@ -5,6 +5,7 @@ import { IonContent, IonPage } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
 import DatabaseService from '../services/database';
+import { ArtifactService } from '../services/artifactService';
 import { Message, ArtifactReference, Artifact } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import { DocxExporter } from '../utils/docxExporter';
@@ -1390,6 +1391,22 @@ const Home: React.FC = () => {
     }, 100);
   };
 
+  // Form save handler (draft save without submission)
+  const handleFormSave = async (artifact: Artifact, formData: Record<string, unknown>) => {
+    console.log('=== FORM SAVE (DRAFT) ===');
+    console.log('Artifact name:', artifact.name);
+    console.log('Form data:', formData);
+    
+    try {
+      await ArtifactService.saveFormData(artifact, formData, user, addSystemMessage);
+      console.log('✅ Form draft saved successfully');
+    } catch (error) {
+      console.error('❌ Failed to save form draft:', error);
+      addSystemMessage('Failed to save draft', 'error');
+      throw error;
+    }
+  };
+
   // Form submission handler with auto-prompt
   const handleFormSubmissionWithAutoPrompt = async (artifact: Artifact, formData: Record<string, unknown>) => {
     console.log('=== FORM SUBMISSION WITH AUTO-PROMPT ===');
@@ -1778,6 +1795,7 @@ const Home: React.FC = () => {
             onDownloadArtifact={handleDownloadArtifact}
             onArtifactSelect={handleArtifactSelect}
             onFormSubmit={handleFormSubmissionWithAutoPrompt}
+            onFormSave={handleFormSave}
             currentAgent={currentAgent}
             onCancelRequest={cancelRequest}
             toolInvocations={toolInvocations}

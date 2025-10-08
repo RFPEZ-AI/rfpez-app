@@ -16,6 +16,7 @@ interface ArtifactModalProps {
   artifact: Artifact | null;
   currentRfpId?: number | null;
   onFormSubmit?: (artifact: Artifact, formData: Record<string, unknown>) => void;
+  onFormSave?: (artifact: Artifact, formData: Record<string, unknown>) => void;
   onDownload?: (artifact: Artifact) => void;
 }
 
@@ -25,6 +26,7 @@ const ArtifactModal: React.FC<ArtifactModalProps> = ({
   artifact,
   currentRfpId,
   onFormSubmit,
+  onFormSave,
   onDownload
 }) => {
   const typeDetection = useArtifactTypeDetection(artifact);
@@ -37,6 +39,7 @@ const ArtifactModal: React.FC<ArtifactModalProps> = ({
         <ArtifactFormRenderer
           artifact={artifact}
           onSubmit={(formData) => onFormSubmit(artifact, formData)}
+          onSave={onFormSave}
           isPortrait={false} // Modal is never in portrait mode
         />
       );
