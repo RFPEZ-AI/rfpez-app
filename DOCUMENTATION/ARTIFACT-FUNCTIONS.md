@@ -247,6 +247,40 @@ All functions include proper error handling and return structured responses:
 }
 ```
 
+## Bid View Artifacts
+
+### Design Pattern: One Bid View Per RFP
+
+The bid view artifact follows a **singleton pattern** per RFP, ensuring that only one bid view exists for each RFP at any given time.
+
+**Key Characteristics:**
+- **Deterministic ID**: Bid view artifacts use a consistent ID format: `bid-view-{rfpId}` (no timestamp)
+- **Reusable**: When a bid view is requested for an RFP that already has one, the existing artifact is reused
+- **Dynamic Content**: Bid views load fresh data from the database each time they're displayed
+- **Auto-Update**: The bid list automatically refreshes with new submissions
+
+**Implementation Details:**
+```typescript
+// Deterministic ID generation
+const bidViewId = `bid-view-${rfpId}`;
+
+// Check for existing bid view before creating
+const existingBidView = artifacts.find(a => a.id === bidViewId);
+
+if (existingBidView) {
+  // Reuse existing artifact (update name if needed)
+  // Content is dynamically loaded by BidView component
+} else {
+  // Create new bid view artifact only if none exists
+}
+```
+
+**Why This Design:**
+1. **Prevents Clutter**: Avoids multiple duplicate bid views for the same RFP
+2. **Consistent State**: Single source of truth for bid viewing per RFP
+3. **Better UX**: Users always see the same bid view, avoiding confusion
+4. **Dynamic Data**: Fresh bid data is loaded on every view, ensuring accuracy
+
 ## Future Extensions
 
 The artifact system is designed to be extensible. Future artifact types may include:

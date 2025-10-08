@@ -369,10 +369,11 @@ export class ArtifactService {
 
   /**
    * Create a bid view artifact for viewing bids for an RFP
+   * Note: Uses deterministic ID based on RFP ID only to ensure one view per RFP
    */
   static createBidViewArtifact(currentRfp: RFP): Artifact {
     const bidViewArtifact: Artifact = {
-      id: `bid-view-${currentRfp.id}-${Date.now()}`,
+      id: `bid-view-${currentRfp.id}`, // Deterministic ID without timestamp for reusability
       name: `Bids for ${currentRfp.name}`,
       type: 'bid_view',
       size: '0 KB',
