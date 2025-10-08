@@ -142,8 +142,7 @@ export const HomeProvider: React.FC<HomeProviderProps> = ({
       rfpContext.clearCurrentRfp,
       handleAgentChanged,
       handleArtifactSelect,
-      loadSessionArtifacts,
-      setArtifacts
+      loadSessionArtifacts
     );
 
     messageHandlerRef.current = handler;
@@ -238,26 +237,20 @@ export const HomeProvider: React.FC<HomeProviderProps> = ({
 
   const handleFormSubmit = useCallback(async (
     artifact: any,
-    formData: Record<string, any>,
-    autoPrompt?: string
+    formData: Record<string, any>
   ): Promise<void> => {
     if (!sessionId) return;
     
     setIsSubmittingForm(true);
     try {
       const user = { id: 'current-user-id' }; // TODO: Get from auth context
-      const sendAutoPrompt = () => {
-        // TODO: Implement auto prompt sending
-        console.log('Auto prompt sending not yet implemented');
-      };
       await ArtifactService.submitFormWithAutoPrompt(
         artifact,
         formData,
         sessionId,
         currentRfpId,
         user,
-        addSystemMessage,
-        sendAutoPrompt
+        addSystemMessage
       );
       
       // Clear form data after successful submission

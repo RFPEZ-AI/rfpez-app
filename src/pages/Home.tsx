@@ -126,11 +126,9 @@ const Home: React.FC = () => {
   const {
     currentRfpId: globalCurrentRfpId,
     currentRfp: globalCurrentRfp,
-    isLoading: globalRfpLoading,
     setGlobalRFPContext,
     clearGlobalRFPContext,
-    getGlobalRFPContext,
-    refreshGlobalRFPContext
+    getGlobalRFPContext
   } = useGlobalRFPContext();
 
   // CRITICAL FIX: Use ref to keep session ID synchronized and avoid stale closures
@@ -183,8 +181,6 @@ const Home: React.FC = () => {
     previewingRFP,
     currentRfpId,
     currentRfp,
-    sessionRfpId,
-    sessionRfp,
     handleNewRFP,
     handleEditRFP,
     handlePreviewRFP,

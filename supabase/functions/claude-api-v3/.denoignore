@@ -1,0 +1,6 @@
+# Ignore backup and old versions during linting
+backup/
+
+# Ignore coverage and test output
+coverage/
+tests/
