@@ -18,6 +18,32 @@ const HomeFooter: React.FC<HomeFooterProps> = ({
   onClearRfpContext, 
   onRfpChange
 }) => {
+  // Add styles to constrain the IonSelect height
+  useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .footer-select {
+        --height: 28px !important;
+        height: 28px !important;
+        max-height: 28px !important;
+        min-height: 28px !important;
+      }
+      .footer-select .select-text {
+        padding: 4px 8px !important;
+        line-height: 20px !important;
+        font-size: 14px !important;
+      }
+      .footer-select .select-icon {
+        height: 20px !important;
+        width: 20px !important;
+      }
+    `;
+    document.head.appendChild(style);
+    
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
   const [allRfps, setAllRfps] = useState<RFP[]>([]);
   const [isLoadingRfps, setIsLoadingRfps] = useState(false);
 
@@ -67,30 +93,48 @@ const HomeFooter: React.FC<HomeFooterProps> = ({
       fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
       boxShadow: '0 -2px 8px rgba(0,0,0,0.1)' // Add shadow for better visibility
     }}>
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        <span>Current RFP:</span>
-        <IonSelect
-          value={currentRfp?.id || ''}
-          placeholder="Select RFP..."
-          onIonChange={(e) => handleRfpSelection(e.detail.value)}
-          disabled={isLoadingRfps}
-          interface="popover"
-          style={{
-            '--min-width': '200px',
-            '--max-width': '300px',
-            fontSize: '14px',
-            border: '1px solid #d4d4d8',
-            borderRadius: '4px',
-            backgroundColor: 'white'
-          }}
-          data-testid="current-rfp-dropdown"
-        >
-          {allRfps.map((rfp) => (
-            <IonSelectOption key={rfp.id} value={rfp.id}>
-              {rfp.name}
-            </IonSelectOption>
-          ))}
-        </IonSelect>
+      <div style={{ 
+        display: 'flex', 
+        alignItems: 'center', 
+        gap: '8px',
+        height: '100%' // Ensure container takes full height
+      }}>
+        <span style={{ 
+          lineHeight: '28px', 
+          fontSize: '14px',
+          display: 'flex',
+          alignItems: 'center',
+          height: '28px'
+        }}>RFP:</span>
+        <div style={{ 
+          height: '28px',
+          display: 'flex',
+          alignItems: 'center'
+        }}>
+          <IonSelect
+            value={currentRfp?.id || ''}
+            placeholder="Select RFP..."
+            onIonChange={(e) => handleRfpSelection(e.detail.value)}
+            disabled={isLoadingRfps}
+            interface="popover"
+            className="footer-select"
+            style={{
+              '--min-width': '200px',
+              '--max-width': '300px',
+              fontSize: '14px',
+              height: '28px',
+              maxHeight: '28px',
+              overflow: 'hidden'
+            }}
+            data-testid="current-rfp-dropdown"
+          >
+            {allRfps.map((rfp) => (
+              <IonSelectOption key={rfp.id} value={rfp.id}>
+                {rfp.name}
+              </IonSelectOption>
+            ))}
+          </IonSelect>
+        </div>
       </div>
       
       {/* Right side buttons */}

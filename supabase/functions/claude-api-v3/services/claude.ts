@@ -509,6 +509,24 @@ export class ToolExecutionService {
           return await updateFormArtifact(this.supabase, sessionId!, this.userId, input);
         }
 
+        case 'submit_bid': {
+          const { submitBid } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await submitBid(this.supabase, sessionId!, this.userId, input);
+        }
+
+        case 'get_rfp_bids': {
+          const { getRfpBids } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await getRfpBids(this.supabase, input);
+        }
+
+        case 'update_bid_status': {
+          const { updateBidStatus } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await updateBidStatus(this.supabase, input);
+        }
+
         default:
           console.log(`Unknown tool: ${name}`);
           return {

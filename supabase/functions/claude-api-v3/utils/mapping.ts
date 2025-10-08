@@ -1,18 +1,17 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Data mapping utilities for Claude API v3
 
-// Type definitions for Claude API structures
-interface ClaudeMessage {
-  role: string;
-  content: string | ClaudeContentBlock[];
-}
+// Import types from the main types file to avoid duplication
+import { ClaudeMessage } from '../types.ts';
 
 interface ClaudeContentBlock {
-  type: 'text' | 'tool_use';
+  type: 'text' | 'tool_use' | 'tool_result';
   text?: string;
   id?: string;
   name?: string;
   input?: Record<string, unknown>;
+  content?: string;
+  is_error?: boolean;
 }
 
 interface ToolCall {

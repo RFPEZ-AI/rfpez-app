@@ -375,6 +375,88 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       },
       required: ['artifact_id', 'updates']
     }
+  },
+  {
+    name: 'submit_bid',
+    description: 'Submit a bid to create a permanent bid record. Can be used in two ways: (1) With artifact_id to submit from a form artifact, or (2) Directly with supplier_name, bid_price, and delivery_days for quick bid submission without a form.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        rfp_id: {
+          type: 'number',
+          description: 'ID of the RFP this bid is for'
+        },
+        artifact_id: {
+          type: 'string',
+          description: 'Optional: ID of the form artifact containing the bid data (for form-based submission)'
+        },
+        supplier_id: {
+          type: 'number',
+          description: 'Optional: ID of the supplier submitting the bid'
+        },
+        form_data: {
+          type: 'object',
+          description: 'Optional: Form data to save before submission (used with artifact_id)'
+        },
+        supplier_name: {
+          type: 'string',
+          description: 'Optional: Company/supplier name for direct bid submission (when no artifact_id)'
+        },
+        bid_price: {
+          type: 'number',
+          description: 'Optional: Bid amount in dollars for direct submission (when no artifact_id)'
+        },
+        delivery_days: {
+          type: 'number',
+          description: 'Optional: Number of days for delivery for direct submission (when no artifact_id)'
+        }
+      },
+      required: ['rfp_id']
+    }
+  },
+  {
+    name: 'get_rfp_bids',
+    description: 'Get all bids for a specific RFP with their current status and details',
+    input_schema: {
+      type: 'object',
+      properties: {
+        rfp_id: {
+          type: 'number',
+          description: 'ID of the RFP to get bids for'
+        }
+      },
+      required: ['rfp_id']
+    }
+  },
+  {
+    name: 'update_bid_status',
+    description: 'Update the status of a bid (draft, submitted, under_review, accepted, rejected)',
+    input_schema: {
+      type: 'object',
+      properties: {
+        bid_id: {
+          type: 'number',
+          description: 'ID of the bid to update'
+        },
+        status: {
+          type: 'string',
+          description: 'New status: draft, submitted, under_review, accepted, rejected'
+        },
+        status_reason: {
+          type: 'string',
+          description: 'Optional: Reason for the status change'
+        },
+        reviewer_id: {
+          type: 'string',
+          description: 'Optional: ID of the person making the status change'
+        },
+        score: {
+          type: 'number',
+          description: 'Optional: Score for the bid (0-100)'
+        }
+      },
+      required: ['bid_id', 'status']
+    }
   }
 ];
 
