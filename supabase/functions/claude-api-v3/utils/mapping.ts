@@ -1,6 +1,27 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Data mapping utilities for Claude API v3
 
+// Type definitions for Claude API structures
+interface ClaudeMessage {
+  role: string;
+  content: string | ClaudeContentBlock[];
+}
+
+interface ClaudeContentBlock {
+  type: 'text' | 'tool_use';
+  text?: string;
+  id?: string;
+  name?: string;
+  input?: Record<string, unknown>;
+}
+
+interface ToolCall {
+  type: 'tool_use';
+  id: string;
+  name: string;
+  input: Record<string, unknown>;
+}
+
 // Map artifact roles to valid database constraint values
 export function mapArtifactRole(role: string): string | null {
   const roleMapping: Record<string, string> = {
@@ -24,7 +45,7 @@ export function mapArtifactRole(role: string): string | null {
 }
 
 // Map frontend message format to Claude API format
-export function mapMessageToClaudeFormat(message: any): any {
+export function mapMessageToClaudeFormat(message: ClaudeMessage): ClaudeMessage {
   if (typeof message.content === 'string') {
     return {
       role: message.role,
@@ -42,7 +63,7 @@ export function mapMessageToClaudeFormat(message: any): any {
 }
 
 // Extract text content from Claude API response
-export function extractTextFromClaudeResponse(content: any[]): string {
+export function extractTextFromClaudeResponse(content: ClaudeContentBlock[]): string {
   let textResponse = '';
   if (content && content.length > 0) {
     for (const contentBlock of content) {
@@ -55,13 +76,13 @@ export function extractTextFromClaudeResponse(content: any[]): string {
 }
 
 // Extract tool calls from Claude API response
-export function extractToolCallsFromClaudeResponse(content: any[]): any[] {
-  const toolCalls = [];
+export function extractToolCallsFromClaudeResponse(content: ClaudeContentBlock[]): ToolCall[] {
+  const toolCalls: ToolCall[] = [];
   if (content && content.length > 0) {
     for (const contentBlock of content) {
-      if (contentBlock.type === 'tool_use') {
+      if (contentBlock.type === 'tool_use' && contentBlock.id && contentBlock.name && contentBlock.input) {
         toolCalls.push({
-          type: 'tool_use',
+          type: 'tool_use' as const,
           id: contentBlock.id,
           name: contentBlock.name,
           input: contentBlock.input

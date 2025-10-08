@@ -150,7 +150,7 @@ export class ArtifactService {
     
     // If response data is empty, show a warning but still proceed with empty fields
     if (Object.keys(responseData).length === 0) {
-      console.warn('⚠️ No response data available for this form, will create document with empty fields');
+      addSystemMessage('No response data available for this form, will create document with empty fields', 'warning');
       const proceed = confirm(
         'This form has not been submitted yet or has no response data. ' +
         'The downloaded document will contain empty fields for you to fill out. Do you want to continue?'
@@ -174,7 +174,7 @@ export class ArtifactService {
     
     // Download as DOCX
     await DocxExporter.downloadBidDocx(formSpec, responseData, exportOptions);
-    console.log('✅ Form artifact downloaded as DOCX');
+    addSystemMessage('Form artifact downloaded successfully as DOCX', 'success');
   }
 
   /**
@@ -301,8 +301,7 @@ export class ArtifactService {
     currentSessionId: string | undefined,
     currentRfpId: string | undefined,
     user: { id: string } | null,
-    addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void,
-    sendAutoPrompt: any // TODO: Type this properly
+    addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
   ): Promise<void> {
     console.log('=== FORM SUBMISSION WITH AUTO-PROMPT ===');
     console.log('Artifact name:', artifact.name);

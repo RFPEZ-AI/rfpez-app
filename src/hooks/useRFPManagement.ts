@@ -110,7 +110,7 @@ export const useRFPManagement = (
   const handleCancelRFP = () => setShowRFPModal(false);
   const handleClosePreview = () => setShowRFPPreviewModal(false);
   
-  const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP, setAsGlobal: boolean = false) => {
+  const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP, setAsGlobal = false) => {
     console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId, 'rfpData provided:', !!rfpData, 'setAsGlobal:', setAsGlobal);
     try {
       let rfp: RFP | null = null;
@@ -172,7 +172,7 @@ export const useRFPManagement = (
     }
   };
   
-  const handleClearCurrentRfp = async (clearGlobal: boolean = false) => {
+  const handleClearCurrentRfp = async (clearGlobal = false) => {
     if (clearGlobal && clearGlobalRFPContext) {
       // Clear global RFP context
       clearGlobalRFPContext();

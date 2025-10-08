@@ -26,5 +26,6 @@ module.exports = {
   rules: {
     'no-console': 'off', // Allow console statements for development and debugging
     'no-debugger': process.env.NODE_ENV === 'production' ? 'warn' : 'off',
+    '@typescript-eslint/no-explicit-any': 'off', // Allow any for flexibility in API responses and form data
   }
 }

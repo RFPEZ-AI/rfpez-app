@@ -42,8 +42,7 @@ export class HomeMessageService {
     handleClearCurrentRfp: () => void,
     handleAgentChanged: (agent: SessionActiveAgent) => Promise<Message | null>,
     handleArtifactSelect: (artifactRef: any) => Promise<void>,
-    loadSessionArtifacts: (sessionId: string) => Promise<any>,
-    setArtifacts: (artifacts: any[]) => void
+    loadSessionArtifacts: (sessionId: string) => Promise<any>
   ) {
     return async (event: MessageEvent) => {
       console.log('🐛 HOME MESSAGE DEBUG: Window message received:', {
