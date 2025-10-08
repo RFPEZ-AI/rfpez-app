@@ -53,7 +53,7 @@ export class ClaudeAPIService {
     const formattedMessages = messages.map(mapMessageToClaudeFormat);
 
     const requestBody = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: maxTokens,
       temperature: 0.3,
       messages: formattedMessages,
@@ -107,7 +107,7 @@ export class ClaudeAPIService {
     const formattedMessages = messages.map(mapMessageToClaudeFormat);
 
     const requestBody = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       max_tokens: 8000,  // Increased from 4000 to prevent truncation
       temperature: 0.3,
       messages: formattedMessages,

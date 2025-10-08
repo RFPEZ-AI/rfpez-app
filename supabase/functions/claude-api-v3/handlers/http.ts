@@ -803,7 +803,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
 
     // Prepare metadata in format expected by client
     const metadata: Record<string, unknown> = {
-      model: 'claude-sonnet-4-20250514',
+      model: 'claude-sonnet-4-5-20250929',
       response_time: 0,
       temperature: 0.3,
       tokens_used: claudeResponse.usage?.output_tokens || 0,

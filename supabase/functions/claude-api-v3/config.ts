@@ -62,7 +62,7 @@ export const corsHeaders = {
 
 // Default Claude API parameters
 export const defaultClaudeParams = {
-  model: 'claude-sonnet-4-20250514',
+  model: 'claude-sonnet-4-5-20250929',
   maxTokens: 4000,
   temperature: 0.3,
   timeoutMs: 25000
