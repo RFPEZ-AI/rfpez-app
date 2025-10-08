@@ -1,9 +1,9 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { Message } from '../types/home';
+import { Message, Artifact, ArtifactReference } from '../types/home';
 import DatabaseService from './database';
 import { RFP } from '../types/rfp';
-import { SessionActiveAgent } from '../types/database';
+import { SessionActiveAgent, Agent } from '../types/database';
 
 export class HomeMessageService {
   /**
@@ -35,15 +35,16 @@ export class HomeMessageService {
   static createMessageHandler(
     currentSessionId: string | undefined,
     currentRfpId: string | undefined,
-    session: any,
-    agents: any[],
-    artifacts: any[],
+    session: { id: string; title: string } | null,
+    agents: Agent[],
+    artifacts: Artifact[],
     handleSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>,
     handleClearCurrentRfp: () => void,
     handleAgentChanged: (agent: SessionActiveAgent) => Promise<Message | null>,
-    handleArtifactSelect: (artifactRef: any) => Promise<void>,
-    loadSessionArtifacts: (sessionId: string) => Promise<any>,
-    setArtifacts: (artifacts: any[]) => void
+    handleArtifactSelect: (artifactRef: ArtifactReference) => Promise<void>,
+    loadSessionArtifacts: (sessionId: string) => Promise<Artifact[]>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _setArtifacts: (artifacts: Artifact[]) => void
   ) {
     return async (event: MessageEvent) => {
       console.log('🐛 HOME MESSAGE DEBUG: Window message received:', {
@@ -156,12 +157,12 @@ export class HomeMessageService {
    * Handle Edge Function callback messages
    */
   private static async handleEdgeFunctionCallback(
-    eventData: any,
+    eventData: { callbackType: string; target: string; payload?: Record<string, unknown>; debugInfo?: unknown },
     currentSessionId: string | undefined,
-    agents: any[],
+    agents: Agent[],
     handleSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>,
     handleAgentChanged: (agent: SessionActiveAgent) => Promise<Message | null>,
-    handleArtifactSelect: (artifactRef: any) => Promise<void>
+    handleArtifactSelect: (artifactRef: ArtifactReference) => Promise<void>
   ): Promise<void> {
     console.log('🎯 HOME MESSAGE DEBUG: Edge Function callback detected:', {
       callbackType: eventData.callbackType,
@@ -200,7 +201,7 @@ export class HomeMessageService {
    * Handle RFP context callback
    */
   private static async handleRfpContextCallback(
-    eventData: any,
+    eventData: { callbackType: string; payload?: { rfp_id?: string; rfp_name?: string; rfp_data?: RFP; message?: string } },
     currentSessionId: string | undefined,
     handleSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>
   ): Promise<void> {
@@ -232,7 +233,7 @@ export class HomeMessageService {
           if (currentSessionId) {
             try {
               await DatabaseService.updateSessionContext(currentSessionId, { 
-                current_rfp_id: eventData.payload.rfp_id 
+                current_rfp_id: parseInt(eventData.payload.rfp_id) 
               });
               console.log('✅ RFP context saved to session via direct data:', currentSessionId, eventData.payload.rfp_id);
             } catch (error) {
@@ -265,8 +266,8 @@ export class HomeMessageService {
    * Handle agent context callback
    */
   private static async handleAgentContextCallback(
-    eventData: any,
-    agents: any[],
+    eventData: { callbackType: string; payload?: { agent_id?: string; agent_name?: string; message?: string } },
+    agents: Agent[],
     handleAgentChanged: (agent: SessionActiveAgent) => Promise<Message | null>
   ): Promise<void> {
     console.log('🤖 HOME MESSAGE DEBUG: Agent context callback processing:', {
@@ -284,7 +285,7 @@ export class HomeMessageService {
         const startTime = Date.now();
         
         // Find the agent and convert to SessionActiveAgent format
-        const targetAgent = agents.find(agent => agent.id === eventData.payload.agent_id);
+        const targetAgent = agents.find(agent => agent.id === eventData.payload?.agent_id);
         if (targetAgent) {
           const sessionAgent: SessionActiveAgent = {
             agent_id: targetAgent.id,
@@ -321,8 +322,8 @@ export class HomeMessageService {
    * Handle artifact viewer callback
    */
   private static async handleArtifactViewerCallback(
-    eventData: any,
-    handleArtifactSelect: (artifactRef: any) => Promise<void>
+    eventData: { callbackType: string; payload?: { artifactId?: string; artifactName?: string; artifactType?: string; type?: string; name?: string } },
+    handleArtifactSelect: (artifactRef: ArtifactReference) => Promise<void>
   ): Promise<void> {
     console.log('📎 HOME MESSAGE DEBUG: Artifact viewer callback processing:', {
       callbackType: eventData.callbackType,
@@ -338,10 +339,10 @@ export class HomeMessageService {
         const startTime = Date.now();
         
         // Create artifact reference for the handler
-        const artifactRef = {
+        const artifactRef: ArtifactReference = {
           artifactId: eventData.payload.artifactId,
           artifactName: eventData.payload.name || `Artifact ${eventData.payload.artifactId}`,
-          artifactType: eventData.payload.type || 'form',
+          artifactType: (eventData.payload.type as 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other') || 'form',
           isCreated: true
         };
         
@@ -366,10 +367,10 @@ export class HomeMessageService {
    * Handle RFP created success messages
    */
   private static async handleRfpCreatedSuccess(
-    eventData: any,
+    eventData: { rfp_id?: string; rfp_name?: string; sessionId?: string; rfp_data?: RFP },
     currentSessionId: string | undefined,
     handleSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>,
-    loadSessionArtifacts: (sessionId: string) => Promise<any>
+    loadSessionArtifacts: (sessionId: string) => Promise<Artifact[]>
   ): Promise<void> {
     console.log('🎯 HOME MESSAGE DEBUG: RFP_CREATED_SUCCESS received:', {
       rfpId: eventData.rfp_id,
@@ -398,10 +399,10 @@ export class HomeMessageService {
    * Handle refresh session context messages
    */
   private static async handleRefreshSessionContext(
-    eventData: any,
+    eventData: { sessionId?: string },
     currentSessionId: string | undefined,
     handleSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>,
-    loadSessionArtifacts: (sessionId: string) => Promise<any>
+    loadSessionArtifacts: (sessionId: string) => Promise<Artifact[]>
   ): Promise<void> {
     console.log('🎯 HOME MESSAGE DEBUG: REFRESH_SESSION_CONTEXT received:', {
       sessionId: eventData.sessionId,
@@ -430,9 +431,9 @@ export class HomeMessageService {
    * Handle artifact refresh needed messages
    */
   private static async handleArtifactRefreshNeeded(
-    eventData: any,
+    eventData: { sessionId?: string; timestamp?: string },
     currentSessionId: string | undefined,
-    loadSessionArtifacts: (sessionId: string) => Promise<any>
+    loadSessionArtifacts: (sessionId: string) => Promise<Artifact[]>
   ): Promise<void> {
     console.log('🎯 HOME MESSAGE DEBUG: ARTIFACT_REFRESH_NEEDED received:', {
       sessionId: eventData.sessionId,
@@ -454,7 +455,7 @@ export class HomeMessageService {
    * Handle legacy refresh current RFP messages
    */
   private static async handleRefreshCurrentRfp(
-    eventData: any,
+    eventData: { rfp_id?: string; rfp_name?: string; rfp_data?: RFP },
     currentSessionId: string | undefined,
     handleSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>,
     handleClearCurrentRfp: () => void
@@ -539,7 +540,7 @@ export class HomeMessageService {
   private static triggerImmediatePoll(
     currentSessionId: string | undefined,
     currentRfpId: string | undefined,
-    session: any,
+    session: { id: string; title: string } | null,
     handleSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>
   ): void {
     console.log('🔄 MCP UI REFRESH: Triggering immediate state poll after message event');

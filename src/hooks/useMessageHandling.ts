@@ -1104,8 +1104,8 @@ export const useMessageHandling = () => {
         
         // CRITICAL FIX: Refresh artifacts from database after Claude creates or updates artifacts
         // This ensures the artifact panel shows all newly created documents and updated forms
-        const hasArtifactModification = claudeResponse.metadata?.function_results?.some((fr: any) => 
-          ['create_form_artifact', 'create_document_artifact', 'generate_proposal_artifact', 'update_form_data', 'update_form_artifact'].includes(fr.function)
+        const hasArtifactModification = claudeResponse.metadata?.function_results?.some((fr: { function?: string }) => 
+          ['create_form_artifact', 'create_document_artifact', 'generate_proposal_artifact', 'update_form_data', 'update_form_artifact'].includes(fr.function || '')
         ) || claudeResponse.metadata?.buyer_questionnaire ||
            claudeResponse.metadata?.create_document_artifact;
         

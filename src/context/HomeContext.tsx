@@ -20,13 +20,13 @@ interface HomeContextType {
   // Session state
   currentSessionId: string | undefined;
   selectedSessionId: string | undefined;
-  sessions: any[];
+  sessions: { id: string; title: string; timestamp: Date; agent_name?: string }[];
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
   
   // Agent state
   currentAgent: SessionActiveAgent | null;
-  agents: any[];
+  agents: { id: string; name: string; description?: string; role?: string }[];
   showAgentSelector: boolean;
   setShowAgentSelector: (show: boolean) => void;
   
@@ -82,15 +82,15 @@ interface HomeContextType {
   onShareRFP: (rfp: RFP) => void;
   onSetCurrentRfp: (rfpId: string, rfpData?: RFP) => Promise<void>;
   onClearCurrentRfp: () => void;
-  onSaveRFP: (values: any) => Promise<void>;
+  onSaveRFP: (values: Record<string, unknown>) => Promise<void>;
   onCancelRFP: () => void;
   onClosePreview: () => void;
   
   // Agent handlers
   onNewAgent: () => void;
-  onEditAgent: (agent: any) => void;
+  onEditAgent: (agent: { id: string; name: string }) => void;
   onDeleteAgent: (agentId: string) => Promise<void>;
-  onSaveAgent: (agent: any) => Promise<void>;
+  onSaveAgent: (agent: { id?: string; name: string; description?: string }) => Promise<void>;
   onCancelAgent: () => void;
   onSwitchAgent: () => void;
   

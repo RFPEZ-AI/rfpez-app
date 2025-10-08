@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import { RFP } from './rfp';
-import { SessionActiveAgent } from './database';
+import { SessionActiveAgent, Agent } from './database';
 
 // Local interfaces for UI compatibility
 export interface Message {
@@ -91,15 +91,15 @@ export interface HomeProviderProps {
     setSelectedArtifact: (artifact: Artifact | null) => void;
     debugMode: boolean;
     setDebugMode: (debug: boolean) => void;
-    formData: Record<string, any>;
-    setFormData: (data: Record<string, any>) => void;
+    formData: Record<string, unknown>;
+    setFormData: (data: Record<string, unknown>) => void;
     isSubmittingForm: boolean;
     setIsSubmittingForm: (submitting: boolean) => void;
   };
-  agents: any[];
+  agents: Agent[];
   artifacts: Artifact[];
   setArtifacts: (artifacts: Artifact[]) => void;
-  loadSessionArtifacts: (sessionId: string) => Promise<any>;
+  loadSessionArtifacts: (sessionId: string) => Promise<Artifact[]>;
 }
 
 // Context interface for HomeProvider
@@ -126,8 +126,8 @@ export interface HomeContext {
   newSessionTitle: string;
   setNewSessionTitle: (title: string) => void;
   isCreatingSession: boolean;
-  formData: Record<string, any>;
-  setFormData: (data: Record<string, any>) => void;
+  formData: Record<string, unknown>;
+  setFormData: (data: Record<string, unknown>) => void;
   isSubmittingForm: boolean;
   
   // RFP context
@@ -137,12 +137,12 @@ export interface HomeContext {
   handleCreateSession: (title?: string) => Promise<string | null>;
   handleLoadSession: (sessionId: string) => Promise<void>;
   handleAgentChanged: (agent: SessionActiveAgent) => Promise<Message | null>;
-  handleArtifactSelect: (artifactRef: any) => Promise<void>;
+  handleArtifactSelect: (artifactRef: ArtifactReference) => Promise<void>;
   handleDownloadArtifact: (artifact: Artifact) => Promise<void>;
-  handleFormSubmit: (artifact: Artifact, formData: Record<string, any>, autoPrompt?: string) => Promise<void>;
+  handleFormSubmit: (artifact: Artifact, formData: Record<string, unknown>, autoPrompt?: string) => Promise<void>;
   addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void;
   
   // Data
-  agents: any[];
+  agents: Agent[];
   artifacts: Artifact[];
 }

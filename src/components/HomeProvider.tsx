@@ -2,7 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useParams, useHistory } from 'react-router-dom';
-import { HomeContext, HomeProviderProps, Message, RFPContextState } from '../types/home';
+import { HomeContext, HomeProviderProps, Message, RFPContextState, Artifact, ArtifactReference } from '../types/home';
 import { RFP } from '../types/rfp';
 import { SessionActiveAgent } from '../types/database';
 import { ArtifactService } from '../services/artifactService';
@@ -204,7 +204,7 @@ export const HomeProvider: React.FC<HomeProviderProps> = ({
   }, [sessionId, setSessionActiveAgent, setError]);
 
   // Artifact management
-  const handleArtifactSelect = useCallback(async (artifactRef: any): Promise<void> => {
+  const handleArtifactSelect = useCallback(async (artifactRef: ArtifactReference): Promise<void> => {
     try {
       const selectArtifact = (id: string) => {
         const artifact = artifacts.find(a => a.id === id);
@@ -227,7 +227,7 @@ export const HomeProvider: React.FC<HomeProviderProps> = ({
     }
   }, [artifacts, setSelectedArtifact, setShowArtifactWindow, loadSessionArtifacts, sessionId, setError]);
 
-  const handleDownloadArtifact = useCallback(async (artifact: any): Promise<void> => {
+  const handleDownloadArtifact = useCallback(async (artifact: Artifact): Promise<void> => {
     try {
       await ArtifactService.downloadArtifact(artifact, currentRfp, addSystemMessage);
     } catch (error) {
@@ -237,9 +237,10 @@ export const HomeProvider: React.FC<HomeProviderProps> = ({
   }, [setError]);
 
   const handleFormSubmit = useCallback(async (
-    artifact: any,
-    formData: Record<string, any>,
-    autoPrompt?: string
+    artifact: Artifact,
+    formData: Record<string, unknown>,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _autoPrompt?: string
   ): Promise<void> => {
     if (!sessionId) return;
     

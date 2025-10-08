@@ -3,7 +3,7 @@
 import { Message } from '../types/home';
 import { RFP } from '../types/rfp';
 import DatabaseService from './database';
-import { Session, SessionActiveAgent } from '../types/database';
+import { Session, SessionActiveAgent, Agent } from '../types/database';
 
 export class HomeSessionService {
   /**
@@ -14,7 +14,7 @@ export class HomeSessionService {
     setCurrentRfpId: (rfpId: string | undefined) => void,
     setCurrentRfp: (rfp: RFP | null) => void,
     setSessionActiveAgent: (agent: SessionActiveAgent | null) => void,
-    agents: any[]
+    agents: Agent[]
   ): Promise<Session | null> {
     try {
       console.log('Loading session with context:', sessionId);
@@ -174,7 +174,7 @@ export class HomeSessionService {
     try {
       console.log('Updating session context:', { sessionId, updates });
       
-      const contextUpdates: any = {};
+      const contextUpdates: Record<string, unknown> = {};
       
       if (updates.current_rfp_id !== undefined) {
         contextUpdates.current_rfp_id = parseInt(updates.current_rfp_id);
