@@ -9,8 +9,8 @@ describe('HomeFooter', () => {
   it('should display "none" when no current RFP', () => {
     render(<HomeFooter currentRfp={null} />);
     
-    // Check for the "Current RFP:" label
-    expect(screen.getByText('Current RFP:')).toBeInTheDocument();
+    // Check for the "RFP:" label (updated from "Current RFP:")
+    expect(screen.getByText('RFP:')).toBeInTheDocument();
     
     // Check for the dropdown with empty value (no selection)
     const dropdown = screen.getByTestId('current-rfp-dropdown');
@@ -39,8 +39,8 @@ describe('HomeFooter', () => {
 
     render(<HomeFooter currentRfp={mockRfp} />);
     
-    // Check for the "Current RFP:" label
-    expect(screen.getByText('Current RFP:')).toBeInTheDocument();
+    // Check for the "RFP:" label (updated from "Current RFP:")
+    expect(screen.getByText('RFP:')).toBeInTheDocument();
     
     // Check for the dropdown with the RFP id as value
     const dropdown = screen.getByTestId('current-rfp-dropdown');
@@ -84,8 +84,8 @@ describe('HomeFooter', () => {
   it('should handle null currentRfp gracefully', () => {
     render(<HomeFooter currentRfp={null} />);
     
-    // Check for the "Current RFP:" label
-    expect(screen.getByText('Current RFP:')).toBeInTheDocument();
+    // Check for the "RFP:" label (updated from "Current RFP:")
+    expect(screen.getByText('RFP:')).toBeInTheDocument();
     
     // Check for the dropdown with empty value (no selection)
     const dropdown = screen.getByTestId('current-rfp-dropdown');
@@ -114,7 +114,7 @@ describe('HomeFooter', () => {
 
     render(<HomeFooter currentRfp={mockRfp} />);
     
-    expect(screen.getByText('Current RFP:')).toBeInTheDocument();
+    expect(screen.getByText('RFP:')).toBeInTheDocument();
   });
 
   it('should show Bids button when RFP is selected and onViewBids is provided', () => {

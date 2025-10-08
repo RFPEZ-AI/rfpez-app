@@ -161,25 +161,22 @@ const BidView: React.FC<BidViewProps> = ({ currentRfpId, rfpName }) => {
         
         console.log('Loading bids for RFP ID:', currentRfpId);
 
-        // First, get bids without join to avoid relationship errors
-        const { data: bidsData, error: bidsError } = await supabase
-          .from('bids')
-          .select(`
-            id,
-            rfp_id,
-            agent_id,
-            supplier_id,
-            response,
-            created_at,
-            updated_at
-          `)
-          .eq('rfp_id', currentRfpId)
-          .order('created_at', { ascending: false });
+        // Use edge function to bypass PostgREST RLS issues
+        const { data: functionResponse, error: bidsError } = await supabase.functions.invoke('get-rfp-bids', {
+          body: { rfp_id: currentRfpId }
+        });
 
         if (bidsError) {
-          console.error('Error fetching bids:', bidsError);
+          console.error('Error calling get-rfp-bids function:', bidsError);
           throw new Error(`Failed to load bids: ${bidsError.message}`);
         }
+
+        if (functionResponse?.error) {
+          console.error('Error from get-rfp-bids function:', functionResponse.error);
+          throw new Error(`Failed to load bids: ${functionResponse.error}`);
+        }
+
+        const bidsData = functionResponse?.bids || [];
 
         if (!bidsData || bidsData.length === 0) {
           setBids([]);
@@ -190,7 +187,7 @@ const BidView: React.FC<BidViewProps> = ({ currentRfpId, rfpName }) => {
         // (supplier_id column has caching issues)
 
         // Transform the data to include supplier name from response
-        const transformedBids = bidsData.map((bidRow): Bid => {
+        const transformedBids = bidsData.map((bidRow: any): Bid => {
           // Extract supplier name from response.supplier_info
           let supplierName = 'Anonymous Supplier';
           if (bidRow.response && typeof bidRow.response === 'object') {

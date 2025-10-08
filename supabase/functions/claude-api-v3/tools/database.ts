@@ -1885,3 +1885,331 @@ export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: s
     throw error;
   }
 }
+
+// =====================================
+// BID SUBMISSION FUNCTIONS
+// =====================================
+
+export async function submitBid(supabase: SupabaseClient, sessionId: string, userId: string, data: {
+  rfp_id: number;
+  artifact_id?: string;
+  supplier_id?: number;
+  form_data?: Record<string, unknown>;
+  supplier_name?: string;
+  bid_price?: number;
+  delivery_days?: number;
+}) {
+  console.log('🎯 Submitting bid:', data);
+
+  try {
+    // DIRECT DATABASE INSERT PATH (when no artifact_id provided)
+    if (!data.artifact_id && (data.supplier_name || data.bid_price || data.delivery_days)) {
+      console.log('💾 Direct bid submission without artifact (simplified path)');
+      
+      // Get agent_id from session (default to 1 if not found)
+      const { data: sessionData } = await supabase
+        .from('sessions')
+        .select('agent_id')
+        .eq('id', sessionId)
+        .single();
+      
+      const agentId = (sessionData && typeof sessionData === 'object' && 'agent_id' in sessionData) 
+        ? (sessionData.agent_id as number) 
+        : 1;
+
+      // Build response JSONB with bid details
+      const response: Record<string, unknown> = {
+        supplier_name: data.supplier_name || 'Unknown Supplier',
+        amount: data.bid_price || 0,
+        delivery_timeline: data.delivery_days ? `${data.delivery_days} days` : 'Not specified',
+        status: 'pending',
+        submitted_via: 'direct_agent_submission',
+        submitted_at: new Date().toISOString()
+      };
+
+      // Direct INSERT into bids table
+      const { data: insertedBid, error: insertError } = await supabase
+        .from('bids')
+        .insert({
+          rfp_id: data.rfp_id,
+          agent_id: agentId,
+          supplier_id: data.supplier_id || null,
+          response: response
+        })
+        .select('id')
+        .single();
+
+      if (insertError) {
+        console.error('❌ Error inserting bid directly:', insertError);
+        throw new Error(`Failed to insert bid: ${String(insertError)}`);
+      }
+
+      const bidId = insertedBid && typeof insertedBid === 'object' && 'id' in insertedBid 
+        ? (insertedBid.id as number) 
+        : undefined;
+
+      console.log('✅ Bid inserted directly:', { bidId });
+
+      return {
+        success: true,
+        bid_id: bidId,
+        status: 'submitted',
+        submitted_at: new Date().toISOString(),
+        message: `✅ **Bid Successfully Submitted!**
+
+📋 **Submission Details:**
+- **Bid ID**: ${bidId}
+- **Status**: Submitted
+- **Submitted At**: ${new Date().toLocaleString()}
+
+💰 **Bid Information:**
+- **Supplier**: ${data.supplier_name}
+- **Amount**: $${Number(data.bid_price).toLocaleString()}
+- **Delivery**: ${data.delivery_days} days
+
+🎯 **Next Steps:**
+- Bid is now visible in the Bids view
+- RFP owner will be notified of the submission
+- Bid status can be tracked through the system
+- Evaluation and ranking will be conducted by the buyer`
+      };
+    }
+
+    // ARTIFACT-BASED SUBMISSION PATH (original logic)
+    if (!data.artifact_id) {
+      throw new Error('Either artifact_id or direct bid data (supplier_name, bid_price, delivery_days) must be provided');
+    }
+
+    // If form data is provided, save it to artifact first
+    if (data.form_data) {
+      console.log('💾 Saving form data to artifact before submission');
+      const { error: saveError } = await supabase
+        .from('artifacts')
+        .update({
+          default_values: data.form_data,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', data.artifact_id);
+
+      if (saveError) {
+        console.error('⚠️ Error saving form data:', saveError);
+        // Continue anyway, as the data might already be saved
+      }
+    }
+
+    // Call the submit_bid database function
+    // Note: Using type assertion for RPC call as SupabaseClient type doesn't include rpc method
+    const rpcClient = supabase as unknown as { rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: string; error: unknown }> };
+    const rpcResult = await rpcClient.rpc('submit_bid', {
+      rfp_id_param: data.rfp_id,
+      artifact_id_param: data.artifact_id,
+      supplier_id_param: data.supplier_id || null,
+      agent_id_param: null,
+      session_id_param: sessionId,
+      user_id_param: userId
+    });
+
+    if (rpcResult.error) {
+      console.error('❌ Error submitting bid:', rpcResult.error);
+      throw new Error(`Failed to submit bid: ${String(rpcResult.error)}`);
+    }
+
+    if (!rpcResult.data) {
+      throw new Error('No submission ID returned from database function');
+    }
+
+    const submissionId = rpcResult.data;
+    console.log('✅ Bid submitted successfully:', { submissionId });
+
+    // Get the created bid ID from the submission metadata
+    const { data: submissionData, error: _submissionError } = await supabase
+      .from('artifact_submissions')
+      .select('metadata')
+      .eq('id', submissionId)
+      .single();
+
+    let bidId: number | undefined;
+    if (submissionData && typeof submissionData === 'object') {
+      const record = submissionData as Record<string, unknown>;
+      if (record.metadata && typeof record.metadata === 'object') {
+        const metadata = record.metadata as Record<string, unknown>;
+        if (typeof metadata.bid_id === 'number') {
+          bidId = metadata.bid_id;
+        }
+      }
+    }
+
+    // Extract bid information for the summary
+    const { data: artifactData } = await supabase
+      .from('artifacts')
+      .select('default_values')
+      .eq('id', data.artifact_id)
+      .single();
+
+    let formData: Record<string, unknown> = {};
+    if (artifactData && typeof artifactData === 'object') {
+      const record = artifactData as Record<string, unknown>;
+      if (record.default_values && typeof record.default_values === 'object') {
+        formData = record.default_values as Record<string, unknown>;
+      }
+    }
+    
+    // Extract bid details
+    const bidAmount = formData.bid_amount || formData.amount || formData.price || formData.cost;
+    const deliveryDate = formData.delivery_date || formData.deliveryDate || formData.delivery;
+    const companyName = formData.company_name || formData.companyName || formData.supplier_name;
+
+    return {
+      success: true,
+      submission_id: submissionId,
+      bid_id: bidId,
+      status: 'submitted',
+      submitted_at: new Date().toISOString(),
+      message: `✅ **Bid Successfully Submitted!**
+
+📋 **Submission Details:**
+- **Bid ID**: ${bidId || 'Pending'}
+- **Submission ID**: ${submissionId}
+- **Status**: Submitted
+- **Submitted At**: ${new Date().toLocaleString()}
+
+💰 **Bid Information:**${bidAmount ? `
+- **Amount**: $${Number(bidAmount).toLocaleString()}` : ''}${deliveryDate ? `
+- **Delivery Date**: ${deliveryDate}` : ''}${companyName ? `
+- **Company**: ${companyName}` : ''}
+
+🎯 **Next Steps:**
+- Bid is now visible in the Bids view
+- RFP owner will be notified of the submission
+- Bid status can be tracked through the system
+- Evaluation and ranking will be conducted by the buyer`
+    };
+
+  } catch (error) {
+    console.error('❌ Error in submitBid:', error);
+    return {
+      success: false,
+      error: String(error),
+      message: `❌ **Bid Submission Failed**: ${String(error)}`
+    };
+  }
+}
+
+export async function getRfpBids(supabase: SupabaseClient, data: {
+  rfp_id: number;
+}) {
+  console.log('📋 Getting RFP bids:', data);
+
+  try {
+    // Debug: Log which database we're querying
+    // @ts-ignore - accessing private property for debugging
+    const clientUrl = String(supabase['supabaseUrl'] || 'unknown');
+    console.log('🔍 Supabase client connected to:', clientUrl);
+    
+    // 🚨 TEMPORARY TEST: Import service role client to test RLS hypothesis
+    const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.45.0');
+    // @ts-ignore - Deno env access
+    const testClient = createClient(
+      Deno.env.get('SUPABASE_URL') || '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
+    );
+    
+    const { data: serviceRoleTest, error: serviceError } = await testClient
+      .from('bids')
+      .select('count');
+    console.log('🧪 SERVICE ROLE TEST:', { count: serviceRoleTest, error: serviceError });
+    
+    // Direct table query instead of RPC to bypass PostgREST REST API issue
+    console.log('🔍 Executing query: bids table, rfp_id =', data.rfp_id);
+    
+    // First, test if we can query the table at all
+    const { data: testBids, error: testError } = await supabase
+      .from('bids')
+      .select('count');
+    
+    console.log('🔍 Test query (count all bids WITH RLS CLIENT):', { count: testBids, testError });
+    
+    const { data: bids, error } = await supabase
+      .from('bids')
+      .select('*')
+      .eq('rfp_id', data.rfp_id)
+      .order('created_at', { ascending: false });
+
+    console.log('🔍 Query result:', { bids, error, hasData: !!bids, bidCount: Array.isArray(bids) ? bids.length : 0 });
+
+    if (error) {
+      console.error('❌ Error getting RFP bids:', error);
+      throw new Error(`Failed to get RFP bids: ${String(error)}`);
+    }
+
+    const bidsArray = Array.isArray(bids) ? bids : [];
+    console.log('✅ Retrieved RFP bids:', { count: bidsArray.length, firstBid: bidsArray[0] });
+
+    return {
+      success: true,
+      bids: bidsArray,
+      count: bidsArray.length,
+      message: `Found ${bidsArray.length} bids for RFP ${data.rfp_id}`,
+      _debug: {
+        serviceRoleCount: Array.isArray(serviceRoleTest) && serviceRoleTest.length > 0 ? serviceRoleTest[0].count : 0,
+        rlsClientCount: Array.isArray(testBids) && testBids.length > 0 ? testBids[0].count : 0,
+        clientUrl: clientUrl,
+        queryRfpId: data.rfp_id
+      }
+    };
+
+  } catch (error) {
+    console.error('❌ Error in getRfpBids:', error);
+    return {
+      success: false,
+      error: String(error),
+      bids: [],
+      count: 0,
+      message: `Failed to get bids: ${String(error)}`
+    };
+  }
+}
+
+export async function updateBidStatus(supabase: SupabaseClient, data: {
+  bid_id: number;
+  status: string;
+  status_reason?: string;
+  reviewer_id?: string;
+  score?: number;
+}) {
+  console.log('🔄 Updating bid status:', data);
+
+  try {
+    const rpcClient = supabase as unknown as { rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
+    const { data: _result, error } = await rpcClient.rpc('update_bid_status', {
+      bid_id_param: data.bid_id,
+      new_status: data.status,
+      status_reason_param: data.status_reason || null,
+      reviewer_id_param: data.reviewer_id || null,
+      score_param: data.score || null
+    });
+
+    if (error) {
+      console.error('❌ Error updating bid status:', error);
+      throw new Error(`Failed to update bid status: ${String(error)}`);
+    }
+
+    console.log('✅ Bid status updated successfully');
+
+    return {
+      success: true,
+      bid_id: data.bid_id,
+      new_status: data.status,
+      updated_at: new Date().toISOString(),
+      message: `Bid ${data.bid_id} status updated to "${data.status}"${data.status_reason ? ` (${data.status_reason})` : ''}`
+    };
+
+  } catch (error) {
+    console.error('❌ Error in updateBidStatus:', error);
+    return {
+      success: false,
+      error: String(error),
+      message: `Failed to update bid status: ${String(error)}`
+    };
+  }
+}
