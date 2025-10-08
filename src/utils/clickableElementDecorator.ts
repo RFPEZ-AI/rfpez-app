@@ -18,6 +18,8 @@ class ClickableElementDecorator {
   private observer?: MutationObserver;
   private decoratedElements = new Set<Element>();
   private styleSheet?: CSSStyleSheet;
+  private refreshTimeout?: number;
+  private isRefreshing = false;
 
   constructor() {
     // Only enable in development mode
@@ -301,16 +303,38 @@ class ClickableElementDecorator {
     // Initial decoration
     this.refreshDecorations();
 
-    // Watch for DOM changes
-    this.observer = new MutationObserver(() => {
-      this.refreshDecorations();
+    // Watch for DOM changes with debouncing to prevent infinite loops
+    this.observer = new MutationObserver((mutations) => {
+      // Skip if we're currently refreshing to avoid infinite loops
+      if (this.isRefreshing) return;
+      
+      // Filter out mutations caused by our own decorations
+      const relevantMutations = mutations.filter(mutation => {
+        if (mutation.type === 'attributes') {
+          // Skip our own attribute changes
+          const attrName = mutation.attributeName;
+          return !['data-test-id', 'data-test-type', 'data-test-label', 'data-test-text'].includes(attrName || '');
+        }
+        return true;
+      });
+      
+      if (relevantMutations.length === 0) return;
+      
+      // Debounce refresh calls
+      if (this.refreshTimeout) {
+        clearTimeout(this.refreshTimeout);
+      }
+      
+      this.refreshTimeout = window.setTimeout(() => {
+        this.refreshDecorations();
+      }, 100);
     });
 
     this.observer.observe(document.body, {
       childList: true,
       subtree: true,
       attributes: true,
-      attributeFilter: ['class', 'style', 'hidden']
+      attributeFilter: ['class', 'style', 'hidden', 'data-testid']
     });
 
     console.log('✅ Clickable element decorations enabled');
@@ -321,6 +345,13 @@ class ClickableElementDecorator {
 
     console.log('🔧 Disabling clickable element decorations...');
     this.isEnabled = false;
+    this.isRefreshing = false;
+
+    // Clear any pending refresh
+    if (this.refreshTimeout) {
+      clearTimeout(this.refreshTimeout);
+      this.refreshTimeout = undefined;
+    }
 
     // Remove decorations
     this.decoratedElements.forEach(element => {
@@ -347,18 +378,24 @@ class ClickableElementDecorator {
   }
 
   public refreshDecorations() {
-    if (!this.isEnabled) return;
+    if (!this.isEnabled || this.isRefreshing) return;
 
-    const elements = this.findClickableElements();
-    elements.forEach(element => this.decorateElement(element));
+    this.isRefreshing = true;
+    
+    try {
+      const elements = this.findClickableElements();
+      elements.forEach(element => this.decorateElement(element));
 
-    // Update count in debug panel
-    const countElement = document.getElementById('element-count');
-    if (countElement) {
-      countElement.textContent = elements.length.toString();
+      // Update count in debug panel
+      const countElement = document.getElementById('element-count');
+      if (countElement) {
+        countElement.textContent = elements.length.toString();
+      }
+
+      console.log(`🔄 Refreshed decorations for ${elements.length} clickable elements`);
+    } finally {
+      this.isRefreshing = false;
     }
-
-    console.log(`🔄 Refreshed decorations for ${elements.length} clickable elements`);
   }
 
   public exportTestIds(): { [key: string]: string } {
