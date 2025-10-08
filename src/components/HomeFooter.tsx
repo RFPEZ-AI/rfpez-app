@@ -9,15 +9,13 @@ interface HomeFooterProps {
   currentRfp: RFP | null;
   onViewBids?: () => void;
   onClearRfpContext?: () => void;
-  onSelectRfp?: () => void;
-  onRfpChange?: (rfpId: number) => void; // New prop for handling RFP selection
+  onRfpChange?: (rfpId: number) => void; // Prop for handling RFP selection
 }
 
 const HomeFooter: React.FC<HomeFooterProps> = ({ 
   currentRfp, 
   onViewBids, 
   onClearRfpContext, 
-  onSelectRfp,
   onRfpChange
 }) => {
   const [allRfps, setAllRfps] = useState<RFP[]>([]);
@@ -97,23 +95,6 @@ const HomeFooter: React.FC<HomeFooterProps> = ({
       
       {/* Right side buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {/* Always show RFP selection button */}
-        <IonButton 
-          size="small" 
-          fill="outline" 
-          color="primary"
-          onClick={onSelectRfp}
-          style={{ 
-            '--height': '28px',
-            '--padding-start': '8px',
-            '--padding-end': '8px',
-            fontSize: '12px'
-          }}
-          title="Select or change current RFP for new sessions"
-        >
-          {currentRfp ? 'Change' : 'Select'} RFP
-        </IonButton>
-        
         {/* Show clear button when RFP is selected */}
         {currentRfp && onClearRfpContext && (
           <IonButton 

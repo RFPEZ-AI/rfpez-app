@@ -1839,7 +1839,6 @@ const Home: React.FC = () => {
         currentRfp={currentRfp ?? null} 
         onViewBids={handleViewBids}
         onClearRfpContext={() => clearGlobalRFPContext()}
-        onSelectRfp={() => setShowRFPMenu(true)}
         onRfpChange={async (rfpId: number) => {
           console.log('RFP selected from dropdown:', rfpId);
           await handleSetCurrentRfp(rfpId);
