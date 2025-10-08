@@ -17,6 +17,7 @@ import {
   IonBadge,
   IonProgressBar,
   IonText,
+  IonContent,
   IonRefresher,
   IonRefresherContent,
   IonSpinner,
@@ -175,7 +176,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
   }
 
   return (
-    <>
+    <IonContent>
       <IonRefresher slot="fixed" onIonRefresh={handleRefresh}>
         <IonRefresherContent></IonRefresherContent>
       </IonRefresher>
@@ -460,7 +461,7 @@ const PerformanceMonitoringDashboard: React.FC = () => {
         message={alertMessage}
         buttons={['OK']}
       />
-    </>
+    </IonContent>
   );
 };
 
