@@ -9,7 +9,13 @@ describe('HomeFooter', () => {
   it('should display "none" when no current RFP', () => {
     render(<HomeFooter currentRfp={null} />);
     
-    expect(screen.getByText('Current RFP: none')).toBeInTheDocument();
+    // Check for the "Current RFP:" label
+    expect(screen.getByText('Current RFP:')).toBeInTheDocument();
+    
+    // Check for the dropdown with empty value (no selection)
+    const dropdown = screen.getByTestId('current-rfp-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown).toHaveAttribute('value', '');
   });
 
   it('should display RFP name when current RFP exists', () => {
@@ -33,7 +39,13 @@ describe('HomeFooter', () => {
 
     render(<HomeFooter currentRfp={mockRfp} />);
     
-    expect(screen.getByText('Current RFP: Test RFP Project')).toBeInTheDocument();
+    // Check for the "Current RFP:" label
+    expect(screen.getByText('Current RFP:')).toBeInTheDocument();
+    
+    // Check for the dropdown with the RFP id as value
+    const dropdown = screen.getByTestId('current-rfp-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown).toHaveAttribute('value', '1');
   });
 
   it('should apply correct CSS styles for fixed positioning', () => {
@@ -72,7 +84,13 @@ describe('HomeFooter', () => {
   it('should handle null currentRfp gracefully', () => {
     render(<HomeFooter currentRfp={null} />);
     
-    expect(screen.getByText('Current RFP: none')).toBeInTheDocument();
+    // Check for the "Current RFP:" label
+    expect(screen.getByText('Current RFP:')).toBeInTheDocument();
+    
+    // Check for the dropdown with empty value (no selection)
+    const dropdown = screen.getByTestId('current-rfp-dropdown');
+    expect(dropdown).toBeInTheDocument();
+    expect(dropdown).toHaveAttribute('value', '');
   });
 
   it('should handle RFP with empty name', () => {
