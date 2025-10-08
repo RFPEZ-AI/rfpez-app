@@ -1341,34 +1341,50 @@ const Home: React.FC = () => {
     }
   };
 
-  // Handler for viewing bids - creates and displays a bid view artifact
+  // Handler for viewing bids - creates or reuses a single bid view artifact per RFP
   const handleViewBids = () => {
     if (!currentRfp) {
       console.warn('No current RFP selected');
       return;
     }
 
-    // Create a bid view artifact
-    const bidViewArtifact: Artifact = {
-      id: `bid-view-${currentRfp.id}-${Date.now()}`,
-      name: `Bids for ${currentRfp.name}`,
-      type: 'bid_view',
-      size: '0 KB',
-      content: currentRfp.name, // Pass RFP name as content
-      rfpId: currentRfp.id,
-      role: 'buyer'
-    };
-
-    console.log('Creating bid view artifact:', bidViewArtifact.id);
-
-    // Add artifact to state
-    setArtifacts((prev: Artifact[]) => {
-      const existing = prev.find(a => a.id === bidViewArtifact.id);
-      if (existing) {
-        return prev;
-      }
-      return [...prev, bidViewArtifact];
-    });
+    // Generate deterministic ID for this RFP's bid view (one per RFP)
+    const bidViewId = `bid-view-${currentRfp.id}`;
+    
+    // Check if a bid view already exists for this RFP
+    const existingBidView = artifacts.find(a => a.id === bidViewId);
+    
+    let bidViewArtifact: Artifact;
+    
+    if (existingBidView) {
+      console.log('Reusing existing bid view artifact:', existingBidView.id);
+      // Update the name in case RFP name changed
+      bidViewArtifact = {
+        ...existingBidView,
+        name: `Bids for ${currentRfp.name}`,
+        content: currentRfp.name
+      };
+      
+      // Update in state if name changed
+      setArtifacts((prev: Artifact[]) => 
+        prev.map(a => a.id === bidViewId ? bidViewArtifact : a)
+      );
+    } else {
+      console.log('Creating new bid view artifact:', bidViewId);
+      // Create a new bid view artifact (one per RFP - no timestamp in ID)
+      bidViewArtifact = {
+        id: bidViewId,
+        name: `Bids for ${currentRfp.name}`,
+        type: 'bid_view',
+        size: '0 KB',
+        content: currentRfp.name, // Pass RFP name as content
+        rfpId: currentRfp.id,
+        role: 'buyer'
+      };
+      
+      // Add artifact to state
+      setArtifacts((prev: Artifact[]) => [...prev, bidViewArtifact]);
+    }
 
     // Select the artifact after a brief delay to ensure state is updated
     setTimeout(() => {

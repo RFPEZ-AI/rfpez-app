@@ -154,6 +154,17 @@ const status = await updateBidStatus(supabase, {
 - Status tracking visible to all parties
 - Professional summary generation
 
+### Bid View Design Pattern
+**Single Bid View Per RFP**: The system uses a singleton pattern for bid views:
+- **Deterministic IDs**: Each RFP has exactly one bid view artifact (`bid-view-{rfpId}`)
+- **Reusable**: Existing bid views are reused when requested again
+- **Dynamic Content**: Bid data is loaded fresh from the database on each view
+- **Benefits**: 
+  - Prevents artifact clutter
+  - Consistent user experience
+  - Always shows current bid data
+  - Reduces memory footprint
+
 ## 🚀 Testing & Validation
 
 ### Deployment Status
