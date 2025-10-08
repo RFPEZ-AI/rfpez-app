@@ -94,14 +94,15 @@ export class ArtifactService {
    */
   private static async downloadFormArtifact(
     artifact: Artifact,
-    formData: any,
+    formData: { schema?: Record<string, unknown>; uiSchema?: Record<string, unknown>; formData?: Record<string, unknown>; title?: string },
     currentRfp: RFP | null,
-    addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
   ): Promise<void> {
     // Convert to FormSpec format expected by DocxExporter
     const formSpec: FormSpec = {
       version: 'rfpez-form@1',
-      schema: formData.schema,
+      schema: formData.schema || {},
       uiSchema: formData.uiSchema || {},
       defaults: formData.formData || {}
     };
@@ -182,12 +183,12 @@ export class ArtifactService {
    */
   private static async downloadDocumentArtifact(
     artifact: Artifact,
-    formData: any,
+    formData: { content?: string; content_type?: string; title?: string },
     currentRfp: RFP | null,
     addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
   ): Promise<void> {
     // Extract the actual document content from the JSON structure
-    const documentContent = formData.content;
+    const documentContent = formData.content || '';
     const contentType = formData.content_type || 'markdown';
     
     console.log('Document content type:', contentType);
@@ -302,7 +303,8 @@ export class ArtifactService {
     currentRfpId: string | undefined,
     user: { id: string } | null,
     addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void,
-    sendAutoPrompt: any // TODO: Type this properly
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    _sendAutoPrompt: (message: string) => void | Promise<void>
   ): Promise<void> {
     console.log('=== FORM SUBMISSION WITH AUTO-PROMPT ===');
     console.log('Artifact name:', artifact.name);
@@ -393,9 +395,13 @@ export class ArtifactService {
     artifactRef: ArtifactReference,
     artifacts: Artifact[],
     selectArtifact: (id: string) => void,
-    artifactWindowState: any, // TODO: Type this properly
+    artifactWindowState: { 
+      selectArtifact?: (artifact: Artifact | null) => void;
+      openWindow?: () => void;
+      expandWindow?: () => void;
+    },
     currentSessionId: string | undefined,
-    loadSessionArtifacts: (sessionId: string) => Promise<any>,
+    loadSessionArtifacts: (sessionId: string) => Promise<Artifact[]>,
     addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
   ): Promise<void> {
     console.log('Artifact selected:', artifactRef);
@@ -407,9 +413,9 @@ export class ArtifactService {
       
       if (artifact) {
         selectArtifact(artifact.id);
-        artifactWindowState.selectArtifact(artifact.id);
-        artifactWindowState.openWindow();
-        artifactWindowState.expandWindow();
+        artifactWindowState.selectArtifact?.(artifact);
+        artifactWindowState.openWindow?.();
+        artifactWindowState.expandWindow?.();
         console.log('✅ Selected artifact for display:', artifact.name);
         return true;
       }
@@ -440,9 +446,9 @@ export class ArtifactService {
           const artifactAfterReload = artifacts.find(a => a.id === artifactRef.artifactId);
           if (artifactAfterReload) {
             selectArtifact(artifactAfterReload.id);
-            artifactWindowState.selectArtifact(artifactAfterReload.id);
-            artifactWindowState.openWindow();
-            artifactWindowState.expandWindow();
+            artifactWindowState.selectArtifact?.(artifactAfterReload);
+            artifactWindowState.openWindow?.();
+            artifactWindowState.expandWindow?.();
             console.log('✅ Found artifact after database reload:', artifactAfterReload.name);
             return;
           }
