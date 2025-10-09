@@ -90,7 +90,8 @@ const HomeContent: React.FC<HomeContentProps> = ({
 }) => {
   const isMobile = useIsMobile();
   // Use selected artifact based on window state if available, otherwise fall back to most recent
-  const displayedArtifact = selectedArtifact || null;
+  // Singleton pattern: auto-select most recent artifact when none explicitly selected
+  const displayedArtifact = selectedArtifact || (artifacts.length > 0 ? artifacts[artifacts.length - 1] : null);
 
   return (
     <div style={{ 
