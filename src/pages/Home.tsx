@@ -36,7 +36,7 @@ import '../test-claude-functions';
 // Import custom hooks
 import { useDebugMonitoring } from '../hooks/useDebugMonitoring';
 import { useSessionInitialization } from '../hooks/useSessionInitialization';
-import { useHomeHandlers } from '../hooks/useHomeHandlers';
+// import { useHomeHandlers } from '../hooks/useHomeHandlers'; // Unused - commented out to fix lint warning
 
 // Import layout components
 import HomeHeader from '../components/HomeHeader';

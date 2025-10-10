@@ -4,7 +4,7 @@
 // Purpose: API functions to handle bid submission workflow
 // =======================================================
 
-import { createClient } from '@supabase/supabase-js';
+// import { createClient } from '@supabase/supabase-js'; // Unused - commented out to fix lint warning
 
 /**
  * Submit a bid from form data
@@ -61,7 +61,7 @@ export async function submitBidFromForm(
     }
 
     // Get the created bid ID from the submission metadata
-    const { data: submissionData, error: submissionError } = await supabaseClient
+    const { data: submissionData } = await supabaseClient
       .from('artifact_submissions')
       .select('metadata')
       .eq('id', data)
@@ -137,7 +137,7 @@ export async function updateBidStatus(
   }
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const { data, error } = await supabaseClient.rpc('update_bid_status', {
+    const { error } = await supabaseClient.rpc('update_bid_status', {
       bid_id_param: params.bidId,
       new_status: params.status,
       status_reason_param: params.statusReason || null,

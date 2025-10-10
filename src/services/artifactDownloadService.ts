@@ -88,12 +88,14 @@ export class ArtifactDownloadService {
   /**
    * Handle form artifact download with DOCX conversion
    */
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   private static async handleFormDownload(
     artifact: Artifact,
     formData: Record<string, unknown>,
     currentRfp: RFP | null,
-    addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
+    _addSystemMessage: (content: string, type?: 'info' | 'success' | 'warning' | 'error') => void
   ): Promise<void> {
+    /* eslint-enable @typescript-eslint/no-unused-vars */
     console.log('Valid form schema found, proceeding with document generation...');
     
     // Convert to FormSpec format expected by DocxExporter

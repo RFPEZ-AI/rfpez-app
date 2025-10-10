@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { useState, useCallback, useRef, Dispatch, SetStateAction } from 'react';
+import { useCallback, useRef, Dispatch, SetStateAction } from 'react';
 import DatabaseService from '../services/database';
 import { ArtifactService } from '../services/artifactService';
 import { ArtifactDownloadService } from '../services/artifactDownloadService';
@@ -137,7 +137,7 @@ export const useHomeHandlers = (params: UseHomeHandlersParams) => {
     loadSessionAgent,
     loadSessionArtifacts,
     deleteSession,
-    clearUIState,
+    // clearUIState, // Unused - commented out to fix lint warning
     clearArtifacts,
     createNewSession,
     loadUserSessions,
