@@ -7,7 +7,7 @@ import type {
   MemorySearchOptions,
   StoreMemoryOptions,
   MemoryStatistics,
-  MemoryType,
+  // MemoryType, // Unused - commented out to fix lint warning
 } from '../types/memory';
 
 /**
@@ -22,7 +22,8 @@ export class MemoryService {
    * Generate an embedding for text content
    * ALWAYS returns null - embeddings are generated server-side only
    */
-  private static async generateEmbedding(text: string): Promise<number[] | null> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  private static async generateEmbedding(_text: string): Promise<number[] | null> {
     // Client-side embedding removed - all embeddings generated server-side
     return null;
   }
@@ -32,30 +33,34 @@ export class MemoryService {
    * NOTE: Memory storage is handled server-side via edge function tools
    * This method is kept for backward compatibility but should not be used
    */
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   static async storeMemory(
-    memory: AgentMemory,
-    options?: StoreMemoryOptions
+    _memory: AgentMemory,
+    _options?: StoreMemoryOptions
   ): Promise<string | null> {
     console.warn('⚠️ MEMORY STORE: Client-side memory storage deprecated. Use edge function tools instead.');
     // All memory storage should go through edge function tools (create_memory)
     return null;
   }
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   /**
    * Search memories by semantic similarity
    * NOTE: Memory search is handled server-side via edge function tools
    * This method is kept for backward compatibility but always returns empty
    */
+  /* eslint-disable @typescript-eslint/no-unused-vars */
   static async searchMemories(
-    userId: string,
-    agentId: string,
-    query: string,
-    options: MemorySearchOptions = {}
+    _userId: string,
+    _agentId: string,
+    _query: string,
+    _options: MemorySearchOptions = {}
   ): Promise<MemorySearchResult[]> {
     console.log('⚠️ Client-side memory search deprecated. Edge function handles all memory search.');
     // All memory search should go through edge function tools (search_memories)
     return [];
   }
+  /* eslint-enable @typescript-eslint/no-unused-vars */
 
   /**
    * Get recent memories for context
@@ -63,7 +68,7 @@ export class MemoryService {
   static async getRecentMemories(
     userId: string,
     agentId: string,
-    limit: number = 10
+    limit = 10
   ): Promise<AgentMemory[]> {
     try {
       const { data, error } = await supabase
