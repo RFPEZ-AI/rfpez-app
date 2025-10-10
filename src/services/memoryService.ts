@@ -1,7 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import { supabase } from '../supabaseClient';
-import { pipeline } from '@xenova/transformers';
 import type {
   AgentMemory,
   MemorySearchResult,
@@ -13,146 +12,39 @@ import type {
 
 /**
  * Service for managing agent memory system
- * Provides semantic search, storage, and retrieval of agent memories
+ * 
+ * NOTE: All embedding generation and semantic search is handled server-side
+ * by the edge function. Client-side embedding has been removed to simplify
+ * the architecture and avoid unnecessary dependencies.
  */
 export class MemoryService {
-  private static embeddingGenerator: any = null;
-  private static isInitializing = false;
-
-  /**
-   * Initialize the embedding generator (lazy loading)
-   */
-  private static async getEmbeddingGenerator() {
-    if (this.embeddingGenerator) {
-      return this.embeddingGenerator;
-    }
-
-    // Prevent multiple simultaneous initializations
-    if (this.isInitializing) {
-      // Wait for initialization to complete
-      while (this.isInitializing) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-      }
-      return this.embeddingGenerator;
-    }
-
-    try {
-      this.isInitializing = true;
-      console.log('Initializing embedding generator...');
-      this.embeddingGenerator = await pipeline(
-        'feature-extraction',
-        'Supabase/gte-small'
-      );
-      console.log('Embedding generator initialized successfully');
-      return this.embeddingGenerator;
-    } catch (error) {
-      console.error('Error initializing embedding generator:', error);
-      throw error;
-    } finally {
-      this.isInitializing = false;
-    }
-  }
-
   /**
    * Generate an embedding for text content
-   * Returns null if embedding generation fails (graceful fallback)
+   * ALWAYS returns null - embeddings are generated server-side only
    */
   private static async generateEmbedding(text: string): Promise<number[] | null> {
-    try {
-      const generator = await this.getEmbeddingGenerator();
-      const output = await generator(text, {
-        pooling: 'mean',
-        normalize: true,
-      });
-      return Array.from(output.data);
-    } catch (error) {
-      console.warn('⚠️ Client-side embedding generation failed, will use server-side fallback:', error);
-      // Return null to indicate we should use server-side embeddings
-      return null;
-    }
+    // Client-side embedding removed - all embeddings generated server-side
+    return null;
   }
 
   /**
    * Store a new memory for an agent
+   * NOTE: Memory storage is handled server-side via edge function tools
+   * This method is kept for backward compatibility but should not be used
    */
   static async storeMemory(
     memory: AgentMemory,
     options?: StoreMemoryOptions
   ): Promise<string | null> {
-    try {
-      console.log('🧠 MEMORY STORE: Creating new memory...', {
-        type: memory.memory_type,
-        content: memory.content.substring(0, 100) + '...',
-        importance: options?.importance_score ?? memory.importance_score ?? 0.5
-      });
-
-      // Generate embedding for the memory content
-      const embedding = await this.generateEmbedding(memory.content);
-
-      // If embedding generation failed, log warning but continue
-      if (!embedding) {
-        console.warn('⚠️ MEMORY STORE: Client-side embedding failed, server will handle it');
-        // Return null to indicate we should use server-side memory creation
-        return null;
-      }
-
-      const memoryData = {
-        agent_id: memory.agent_id,
-        user_id: memory.user_id,
-        session_id: memory.session_id || null,
-        content: memory.content,
-        memory_type: memory.memory_type,
-        embedding,
-        importance_score: options?.importance_score ?? memory.importance_score ?? 0.5,
-        expires_at: options?.expires_at ?? memory.expires_at ?? null,
-        metadata: options?.metadata ?? memory.metadata ?? {},
-      };
-
-      const { data, error } = await supabase
-        .from('agent_memories')
-        .insert(memoryData)
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('Error storing memory:', error);
-        return null;
-      }
-
-      const memoryId = data?.id;
-
-      // Store references if provided
-      if (memoryId && options?.references && options.references.length > 0) {
-        const references = options.references.map(ref => ({
-          memory_id: memoryId,
-          reference_type: ref.reference_type,
-          reference_id: ref.reference_id,
-        }));
-
-        const { error: refError } = await supabase
-          .from('memory_references')
-          .insert(references);
-
-        if (refError) {
-          console.error('Error storing memory references:', refError);
-        } else {
-          console.log(`🔗 MEMORY STORE: Added ${options.references.length} references`);
-        }
-      }
-
-      if (memoryId) {
-        console.log(`✅ MEMORY STORE: Successfully stored memory ${memoryId}`);
-      }
-
-      return memoryId || null;
-    } catch (error) {
-      console.error('❌ MEMORY STORE ERROR:', error);
-      return null;
-    }
+    console.warn('⚠️ MEMORY STORE: Client-side memory storage deprecated. Use edge function tools instead.');
+    // All memory storage should go through edge function tools (create_memory)
+    return null;
   }
 
   /**
    * Search memories by semantic similarity
+   * NOTE: Memory search is handled server-side via edge function tools
+   * This method is kept for backward compatibility but always returns empty
    */
   static async searchMemories(
     userId: string,
@@ -160,37 +52,9 @@ export class MemoryService {
     query: string,
     options: MemorySearchOptions = {}
   ): Promise<MemorySearchResult[]> {
-    try {
-      // Generate embedding for the query
-      const queryEmbedding = await this.generateEmbedding(query);
-
-      // If client-side embedding failed, skip semantic search and return empty
-      // The edge function will handle memory search server-side
-      if (!queryEmbedding) {
-        console.log('⚠️ Skipping client-side memory search, edge function will handle it');
-        return [];
-      }
-
-      // Call the search function
-      const { data, error } = await supabase.rpc('search_agent_memories', {
-        p_user_id: userId,
-        p_agent_id: agentId,
-        p_query_embedding: queryEmbedding,
-        p_memory_types: options.memoryTypes || null,
-        p_limit: options.limit || 10,
-        p_similarity_threshold: options.similarityThreshold || 0.7,
-      });
-
-      if (error) {
-        console.error('Error searching memories:', error);
-        return [];
-      }
-
-      return (data || []) as MemorySearchResult[];
-    } catch (error) {
-      console.warn('⚠️ Client-side memory search failed, edge function will handle it:', error);
-      return [];
-    }
+    console.log('⚠️ Client-side memory search deprecated. Edge function handles all memory search.');
+    // All memory search should go through edge function tools (search_memories)
+    return [];
   }
 
   /**

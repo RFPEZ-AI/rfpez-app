@@ -458,8 +458,10 @@ export const useArtifactManagement = (
       
       // Preserve Claude-generated artifacts (these don't have database IDs)
       const existingClaudeArtifacts = artifacts.filter(artifact => 
-        artifact.id.includes('claude-artifact') ||
-        (!artifact.id.startsWith('form_') && !artifact.id.includes('-'))
+        artifact.id && (
+          artifact.id.includes('claude-artifact') ||
+          (!artifact.id.startsWith('form_') && !artifact.id.includes('-'))
+        )
       );
       console.log(`📋 Preserving ${existingClaudeArtifacts.length} Claude-generated artifacts`);
       

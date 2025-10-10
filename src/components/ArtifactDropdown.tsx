@@ -144,7 +144,7 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
         data-testid="artifact-dropdown-popover"
       >
         <IonList style={{ minWidth: '400px', maxWidth: '600px', width: 'max-content' }}>
-          {artifacts.map((artifact) => (
+          {artifacts.filter(a => a.id).map((artifact) => (
             <IonItem
               key={artifact.id}
               button

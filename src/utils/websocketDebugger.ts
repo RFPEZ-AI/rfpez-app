@@ -73,6 +73,19 @@ class WebSocketDebugger {
         return; // Suppress the warning
       }
       
+      // Filter out embedding generator initialization errors (expected - using server-side fallback)
+      if (
+        message.includes('Error initializing embedding generator') ||
+        (message.includes('Unexpected token') && message.includes('is not valid JSON') && args.some((arg: any) => arg?.stack?.includes('getModelJSON')))
+      ) {
+        // Only show the first occurrence, then suppress
+        if (!this.suppressedConnections.has('embedding-generator')) {
+          this.suppressedConnections.add('embedding-generator');
+          console.log('ℹ️ Client-side embedding model not available, using server-side processing (this is normal)');
+        }
+        return; // Suppress the error
+      }
+      
       // Pass through all other errors
       originalConsoleError.apply(console, args);
     };

@@ -135,7 +135,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'store_message',
-    description: 'Store a message in the conversation history',
+    description: 'Store a message in the conversation history with optional metadata for tool execution tracking',
     input_schema: {
       type: 'object',
       properties: {
@@ -155,6 +155,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         content: {
           type: 'string',
           description: 'Message content'
+        },
+        metadata: {
+          type: 'object',
+          description: 'Optional metadata for tool execution tracking (functions_called, agent_id, model, etc.)'
         }
       },
       required: ['sender', 'content']
