@@ -76,6 +76,16 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       console.log('User not authenticated, clearing UI state and loading default agent...');
       clearUIState();
       clearArtifacts();
+      
+      // Show loading message immediately
+      setMessages([{
+        id: 'agent-loading',
+        content: '🤖 Activating Solutions agent...',
+        isUser: false,
+        timestamp: new Date(),
+        agentName: 'System'
+      }]);
+      
       loadDefaultAgentWithPrompt().then(initialMessage => {
         if (initialMessage) {
           setMessages([initialMessage]);
@@ -88,6 +98,16 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     // This prevents overriding active agent selections during routine auth state changes
     if (!supabaseLoading && !currentSessionId && messages.length === 0) {
       console.log('Loading default agent for initial app startup...');
+      
+      // Show loading message immediately
+      setMessages([{
+        id: 'agent-loading',
+        content: '🤖 Activating Solutions agent...',
+        isUser: false,
+        timestamp: new Date(),
+        agentName: 'System'
+      }]);
+      
       loadDefaultAgentWithPrompt().then(initialMessage => {
         if (initialMessage) {
           setMessages([initialMessage]);
