@@ -4,32 +4,62 @@ A modern React-based application for intelligent RFP (Request for Proposal) mana
 
 ## 🚀 Features
 
-- **Multi-Agent System**: Different AI agents for specialized RFP tasks
-- **Claude API Integration**: Powered by Anthropic's Claude for intelligent responses
-- **MCP Protocol Support**: Model Context Protocol for advanced AI interactions
-- **Real-time Collaboration**: Supabase-powered backend with real-time updates
-- **PWA Ready**: Progressive Web App with offline capabilities
-- **Modern UI**: Built with Ionic React components
+- **🧠 Agent Memory System**: Semantic memory with vector embeddings for context-aware conversations
+- **🤖 Multi-Agent System**: Specialized AI agents with seamless handoffs and memory sharing
+- **⚡ Dynamic Agent Activation**: Personalized welcome messages based on conversation history
+- **🔮 Claude API Integration**: Powered by Anthropic's Claude Sonnet 4.5 with function calling
+- **🔗 MCP Protocol Support**: Model Context Protocol for advanced AI interactions
+- **⚡ Real-time Collaboration**: Supabase-powered backend with real-time updates
+- **📱 PWA Ready**: Progressive Web App with offline capabilities
+- **🎨 Modern UI**: Built with Ionic React components
 
-## � Recent Updates (August 2025)
+## 🎉 Recent Updates (October 2025)
 
-### Agent Switching Enhancements
+### 🧠 Agent Memory System (NEW!)
+- ✅ **Semantic Memory Storage**: Agents can now create and search memories using pgvector embeddings
+- ✅ **Cross-Agent Memory Access**: Memories created by one agent are searchable by others
+- ✅ **Context-Aware Agent Handoffs**: Agents search memory on activation to provide personalized welcomes
+- ✅ **Server-Side Embeddings**: All embedding generation handled by edge functions for performance
+- ✅ **Memory Search Function**: `search_memories` tool with similarity threshold and filtering
+- ✅ **Memory Creation Workflow**: Solutions agent creates memories before switching to specialist agents
+
+### 🔄 Seamless Agent Switching
+- ✅ **Dynamic Initial Prompts**: Agent welcome messages now processed through Claude for personalization
+- ✅ **Memory-Aware Welcomes**: RFP Design agent searches memory and references user's requirements
+- ✅ **System Prompt Integration**: Agent `initial_prompt` properly passed via Claude API system parameter
+- ✅ **Automatic Continuation**: Agent switches trigger immediate responses from new agent with full context
+- ✅ **Loading Feedback**: UI displays "🤖 Activating [Agent]..." during agent initialization
+
+### 🏗️ Technical Architecture Improvements
+- 🔧 **pgvector Extension**: PostgreSQL vector embeddings for semantic search (v0.8.0)
+- 🔧 **Memory Tables**: `agent_memories`, `memory_references`, `memory_access_log` for comprehensive tracking
+- 🔧 **Edge Function Enhancement**: `claude-api-v3` handles memory operations and agent continuation
+- 🔧 **Client-Side Optimization**: Removed client-side embedding generation for cleaner architecture
+- 🔧 **Enhanced Error Handling**: Better authentication and session management error messages
+
+### 📊 Database Schema Updates
+- �️ **Memory System**: Vector embeddings (384 dimensions), importance scoring, metadata
+- 🗄️ **Memory References**: Link memories to RFPs, bids, artifacts, messages, and user profiles
+- 🗄️ **Access Logging**: Track memory retrievals with relevance scores and usage patterns
+- �️ **Agent Instructions**: Updated Solutions and RFP Design agents with memory workflows
+
+For detailed information, see:
+- `DOCUMENTATION/MEMORY-SYSTEM.md` - Complete memory system architecture
+- `DOCUMENTATION/AGENTS.md` - Updated multi-agent system documentation
+- `database/memory-system-schema.sql` - Memory database schema and functions
+
+## � Previous Updates (August 2025)
+
+### Agent Switching Foundation
 - ✅ **Fixed Claude Function Agent Switching**: Resolved issues where Claude function calls for agent switching weren't working
 - ✅ **Session Context Integration**: Claude now receives explicit session context for reliable function calls
 - ✅ **UI Synchronization**: Agent switches via Claude functions now properly update the UI in real-time
-- ✅ **Initial Prompt Display**: Both manual and automatic agent switches now show new agent greetings
 - ✅ **Enhanced Debugging**: Comprehensive logging for troubleshooting agent switch operations
 
 ### Technical Improvements
 - 🔧 **Session ID Parameter Fix**: Fixed missing session context in Claude API calls
 - 🔧 **Database Consistency**: Added retry logic and verification for agent switch operations
 - 🔧 **Error Handling**: Improved error handling and recovery for failed agent switches
-- 📖 **Documentation**: Updated documentation with troubleshooting guides and implementation details
-
-For detailed information about these fixes, see:
-- `DOCUMENTATION/AGENT-SWITCHING-FIXES.md` - Complete implementation guide
-- `DOCUMENTATION/AGENTS.md` - Updated agent system documentation
-- `DOCUMENTATION/CLAUDE-API-INTEGRATION.md` - Enhanced Claude integration details
 
 ## �🏗️ Architecture
 
@@ -41,45 +71,150 @@ For detailed information about these fixes, see:
 
 ### Backend Services
 - **Supabase** for database, authentication, and real-time features
-- **Supabase Edge Functions** for serverless API endpoints
-- **Row Level Security** for data protection
+- **PostgreSQL with pgvector** for semantic memory storage (vector embeddings)
+- **Supabase Edge Functions** for serverless API endpoints (Deno runtime)
+- **Row Level Security** for data protection and multi-tenancy
 
 ### AI Integration
-- **Claude API** for AI-powered responses
-- **MCP Protocol** for advanced model interactions
-- **Function Calling** for database operations
+- **Claude Sonnet 4.5** for AI-powered responses and function calling
+- **MCP Protocol** for advanced model interactions and tool integration
+- **Function Calling**: `create_memory`, `search_memories`, `switch_agent`, `create_form_artifact`
+- **Embedding Generation**: Server-side text-embedding-3-small (384 dimensions)
 
-## 🤖 Multi-Agent System
+## 🤖 Multi-Agent System with Memory
 
-The application features a sophisticated multi-agent system where each AI agent has specialized instructions and capabilities:
+The application features a sophisticated multi-agent system where each AI agent has specialized instructions, memory capabilities, and seamless handoff workflows:
 
 ### Available Agents
 
 1. **Solutions Agent** (Default)
    - **Purpose**: Sales agent for EZRFP.APP
    - **Specialization**: Product guidance and procurement assistance
-   - **Initial Prompt**: Helps users understand platform capabilities
+   - **Memory Workflow**: Creates memories before switching to specialist agents
+   - **Initial Prompt**: Personalized greeting based on user authentication state
 
-2. **Technical Support Agent**
+2. **RFP Design Agent**
+   - **Purpose**: RFP creation and requirements gathering
+   - **Specialization**: Form generation and questionnaire design
+   - **Memory Integration**: Searches memory on activation to reference user's requirements
+   - **Initial Prompt**: Context-aware welcome mentioning specific procurement needs
+
+3. **Technical Support Agent**
    - **Purpose**: Technical assistance and troubleshooting
    - **Specialization**: Platform usage and technical questions
    - **Features**: Debug assistance and technical guidance
 
-3. **RFP Assistant Agent**
-   - **Purpose**: Specialized RFP creation and management
+4. **RFP Assistant Agent**
+   - **Purpose**: Specialized RFP management
    - **Specialization**: RFP optimization and procurement processes
    - **Features**: RFP best practices and process guidance
 
-### Agent Features
-- **Dynamic Agent Selection**: Users can switch between agents mid-conversation
-- **Session-based Tracking**: Each conversation session tracks the active agent
-- **Personalized Responses**: Agents respond according to their specialized instructions
-- **Agent Indicators**: UI shows which agent is currently active
+### 🧠 Memory System Features
+- **Semantic Search**: pgvector-powered similarity search with 384-dimensional embeddings
+- **Cross-Agent Memory**: Memories created by Solutions are accessible to RFP Design and others
+- **Contextual Activation**: Agents search memory when activated to provide relevant greetings
+- **Memory Metadata**: Importance scoring, memory types, and reference linking
+- **Automatic Cleanup**: Memory access logging for analytics and optimization
+
+### Agent Handoff Workflow
+1. **User Request**: User states procurement need (e.g., "I need 100 tons of concrete")
+2. **Memory Creation**: Solutions agent creates memory with requirement details
+3. **Agent Switch**: Solutions calls `switch_agent` to RFP Design
+4. **Memory Search**: RFP Design searches for recent memories on activation
+5. **Context-Aware Welcome**: "I see you need 100 tons of concrete. Let me help you create an RFP..."
 
 ### Implementation
-- **Database**: Agent definitions stored in Supabase with instructions and prompts
-- **Service Layer**: `AgentService` manages agent operations and selection
-- **UI Components**: `AgentSelector` and `AgentIndicator` for user interaction
+- **Database**: Agent definitions with `initial_prompt` field for dynamic welcomes
+- **Memory Tables**: `agent_memories`, `memory_references`, `memory_access_log`
+- **Edge Functions**: `create_memory`, `search_memories` tools for Claude function calling
+- **Service Layer**: `MemoryService` (server-side only), `AgentService` for agent operations
+- **UI Components**: `AgentSelector`, `AgentIndicator`, loading states during activation
+
+## 🧠 Agent Memory System
+
+The memory system enables agents to create, store, and retrieve contextual information using semantic search with vector embeddings.
+
+### Memory Architecture
+
+**Database Schema:**
+```sql
+-- Vector storage with pgvector extension
+agent_memories (
+  id UUID PRIMARY KEY,
+  user_id UUID REFERENCES auth.users,
+  agent_id UUID REFERENCES agents,
+  content TEXT,
+  embedding VECTOR(384),  -- text-embedding-3-small
+  memory_type TEXT,       -- 'fact', 'preference', 'context', 'requirement'
+  importance_score FLOAT, -- 0.0 to 1.0
+  metadata JSONB,
+  created_at TIMESTAMPTZ
+)
+
+-- Link memories to entities
+memory_references (
+  memory_id UUID REFERENCES agent_memories,
+  rfp_id INT REFERENCES rfps,
+  bid_id INT REFERENCES bids,
+  artifact_id UUID REFERENCES artifacts,
+  message_id UUID REFERENCES messages,
+  user_profile_id UUID REFERENCES user_profiles
+)
+
+-- Track memory access patterns
+memory_access_log (
+  memory_id UUID REFERENCES agent_memories,
+  accessed_by_agent_id UUID REFERENCES agents,
+  relevance_score FLOAT,
+  accessed_at TIMESTAMPTZ
+)
+```
+
+### Memory Operations
+
+**Create Memory** (via Claude function call):
+```typescript
+{
+  name: "create_memory",
+  input: {
+    content: "User needs 100 tons of concrete for November delivery",
+    memory_type: "requirement",
+    importance_score: 0.9,
+    reference_type: "message",
+    reference_id: "msg_uuid"
+  }
+}
+```
+
+**Search Memories** (via Claude function call):
+```typescript
+{
+  name: "search_memories",
+  input: {
+    query: "concrete procurement requirements",
+    memory_types: ["requirement", "context"],
+    limit: 5,
+    similarity_threshold: 0.75
+  }
+}
+// Returns: Array of memories with similarity scores
+```
+
+### Memory Workflow
+
+1. **Solutions Agent** receives user requirement
+2. **Create Memory** stores requirement with embedding
+3. **Switch Agent** to RFP Design specialist
+4. **Search Memories** executed by RFP Design on activation
+5. **Context Injection** into agent's initial prompt
+6. **Personalized Welcome** referencing specific requirements
+
+### Technical Details
+- **Embedding Model**: OpenAI text-embedding-3-small (384 dimensions)
+- **Similarity Search**: Cosine similarity via pgvector `<=>` operator
+- **Server-Side Only**: All embedding generation in edge functions
+- **Multi-Tenancy**: Row-level security based on user_id
+- **Performance**: Indexed vector search with HNSW algorithm
 
 ## 🔐 Role-Based Access Control
 
