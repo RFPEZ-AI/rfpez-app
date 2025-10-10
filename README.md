@@ -11,9 +11,17 @@ A modern React-based application for intelligent RFP (Request for Proposal) mana
 - **PWA Ready**: Progressive Web App with offline capabilities
 - **Modern UI**: Built with Ionic React components
 
-## � Recent Updates (August 2025)
+## � Recent Updates (August - October 2025)
 
-### Agent Switching Enhancements
+### Memory System Integration (October 2025)
+- 🧠 **Agent Memory System**: AI agents can now create and retrieve memories for seamless context preservation
+- 🔄 **Intent Handoff**: Solutions agent stores procurement intent before switching to RFP Design agent
+- 🔍 **Semantic Search**: Memory retrieval with vector similarity search for relevant context
+- ✨ **Seamless Experience**: Users no longer need to repeat requirements when agents switch
+- 📊 **Memory Types**: Support for decisions, preferences, facts, context, and conversation memories
+- ⚡ **Automatic Retrieval**: RFP Design agent automatically searches memories at session start
+
+### Agent Switching Enhancements (August 2025)
 - ✅ **Fixed Claude Function Agent Switching**: Resolved issues where Claude function calls for agent switching weren't working
 - ✅ **Session Context Integration**: Claude now receives explicit session context for reliable function calls
 - ✅ **UI Synchronization**: Agent switches via Claude functions now properly update the UI in real-time
@@ -21,12 +29,16 @@ A modern React-based application for intelligent RFP (Request for Proposal) mana
 - ✅ **Enhanced Debugging**: Comprehensive logging for troubleshooting agent switch operations
 
 ### Technical Improvements
+- 🔧 **Memory Tools**: Added `create_memory` and `search_memories` Claude API tools
+- 🔧 **Vector Embeddings**: PostgreSQL pgvector integration for semantic memory search
 - 🔧 **Session ID Parameter Fix**: Fixed missing session context in Claude API calls
 - 🔧 **Database Consistency**: Added retry logic and verification for agent switch operations
 - 🔧 **Error Handling**: Improved error handling and recovery for failed agent switches
 - 📖 **Documentation**: Updated documentation with troubleshooting guides and implementation details
 
-For detailed information about these fixes, see:
+For detailed information about these enhancements, see:
+- `DOCUMENTATION/MEMORY-HANDOFF-WORKFLOW.md` - Complete memory system workflow
+- `DOCUMENTATION/MEMORY-SYSTEM-DEPLOYMENT-SUMMARY.md` - Memory system deployment details
 - `DOCUMENTATION/AGENT-SWITCHING-FIXES.md` - Complete implementation guide
 - `DOCUMENTATION/AGENTS.md` - Updated agent system documentation
 - `DOCUMENTATION/CLAUDE-API-INTEGRATION.md` - Enhanced Claude integration details
@@ -75,11 +87,35 @@ The application features a sophisticated multi-agent system where each AI agent 
 - **Session-based Tracking**: Each conversation session tracks the active agent
 - **Personalized Responses**: Agents respond according to their specialized instructions
 - **Agent Indicators**: UI shows which agent is currently active
+- **Memory System**: Agents create and retrieve memories for context preservation across switches
+- **Seamless Handoff**: Solutions agent stores procurement intent before switching to RFP Design
+- **Intent Preservation**: No need for users to repeat requirements when switching agents
+
+### Memory System
+The application features an advanced memory system that enables seamless agent handoffs:
+
+#### Memory Capabilities
+- **Automatic Context Capture**: Solutions agent creates memories before switching to RFP Design
+- **Semantic Search**: Vector-based memory retrieval finds relevant context across sessions
+- **Memory Types**: Decisions, preferences, facts, context, and conversation memories
+- **Importance Scoring**: Memories ranked by relevance (0.0 to 1.0 scale)
+- **Cross-Session Persistence**: Memories available across different conversation sessions
+- **Reference Linking**: Memories can link to RFPs, bids, artifacts, and messages
+
+#### Memory Workflow Example
+1. User tells Solutions agent: "I need to source 100 LED bulbs for our warehouse"
+2. Solutions agent creates memory with procurement intent and requirements
+3. Solutions agent switches to RFP Design agent
+4. RFP Design agent automatically searches memories and finds intent
+5. RFP Design agent proceeds with RFP creation without asking user to repeat
 
 ### Implementation
 - **Database**: Agent definitions stored in Supabase with instructions and prompts
+- **Memory Tables**: `agent_memories`, `memory_references`, and `memory_access_log`
 - **Service Layer**: `AgentService` manages agent operations and selection
+- **Memory Functions**: PostgreSQL functions for vector search and memory management
 - **UI Components**: `AgentSelector` and `AgentIndicator` for user interaction
+- **Claude Tools**: `create_memory` and `search_memories` for AI-powered memory operations
 
 ## 🔐 Role-Based Access Control
 
@@ -162,6 +198,8 @@ The application uses two specialized edge functions for different AI integration
 - `store_message` - Save new messages  
 - `create_session` - Create conversation sessions
 - `search_messages` - Search across conversations
+- `create_memory` - Store agent memories with context and importance scoring
+- `search_memories` - Semantic search for relevant memories using vector similarity
 
 ### Function Comparison
 
@@ -328,6 +366,8 @@ The application includes PWA features:
 
 ### Agent System Testing
 - **Agent Selection**: Test agent switching and session tracking
+- **Memory System**: Test memory creation, retrieval, and agent handoff workflows
+- **Intent Preservation**: Verify seamless context transfer between agents
 - **Role-based Testing**: Validate access controls for different user roles
 - **Conversation Flow**: Test agent-specific responses and behavior
 
@@ -366,8 +406,12 @@ This README contains comprehensive information about:
 - **🧪 Testing & Debugging** - Comprehensive testing suite (see above)
 
 ### Additional Documentation Files
+- **Memory System**: See `DOCUMENTATION/MEMORY-HANDOFF-WORKFLOW.md` for complete memory system workflow
+- **Memory Deployment**: See `DOCUMENTATION/MEMORY-SYSTEM-DEPLOYMENT-SUMMARY.md` for deployment details
+- **Agent Memory Integration**: See `DOCUMENTATION/AGENT-MEMORY-INTEGRATION.md` for integration guide
 - **MCP Integration**: See `DOCUMENTATION/MCP-README.md` for detailed MCP setup
 - **Claude API**: See `DOCUMENTATION/CLAUDE-INTEGRATION.md` for API integration guide
+- **Agent Switching**: See `DOCUMENTATION/AGENT-SWITCHING-FIXES.md` for implementation details
 - **Deployment & Versioning**: See `DOCUMENTATION/DEPLOYMENT-AND-VERSIONING.md` for comprehensive deployment guide
 - **Quick Deployment Reference**: See `DOCUMENTATION/DEPLOYMENT-QUICK-REFERENCE.md` for common commands
 - **Database Schema**: See `database/README.md` for schema information
