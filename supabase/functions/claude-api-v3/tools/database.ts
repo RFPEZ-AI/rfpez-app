@@ -81,6 +81,7 @@ interface MessageData {
   function_name?: string;
   function_arguments?: Record<string, unknown>;
   artifacts?: Record<string, unknown>[];
+  metadata?: Record<string, unknown>; // Tool execution metadata (functions_called, model, etc.)
 }
 
 interface DatabaseMessageResult {
@@ -605,9 +606,17 @@ export async function getConversationHistory(supabase: SupabaseClient, sessionId
 
 // Store a message in the conversation
 export async function storeMessage(supabase: SupabaseClient, data: MessageData) {
-  const { sessionId, agentId, userId, sender, content } = data;
+  const { sessionId, agentId, userId, sender, content, metadata } = data;
   
-  console.log('Storing message:', { sessionId, agentId, userId, sender, contentLength: content?.length });
+  console.log('Storing message:', { 
+    sessionId, 
+    agentId, 
+    userId, 
+    sender, 
+    contentLength: content?.length,
+    hasMetadata: !!metadata,
+    metadataKeys: metadata ? Object.keys(metadata) : []
+  });
   
   const { data: message, error } = await supabase
     .from('messages')
@@ -615,8 +624,9 @@ export async function storeMessage(supabase: SupabaseClient, data: MessageData) 
       session_id: sessionId,
       agent_id: agentId,
       user_id: userId,
-      sender: sender,
+      role: sender, // Use 'role' column (not 'sender')
       content: content,
+      metadata: metadata || {}, // Store tool execution metadata
       created_at: new Date().toISOString()
     })
     .select()
@@ -2248,14 +2258,31 @@ export async function createMemory(
       throw new Error('importance_score must be between 0.0 and 1.0');
     }
 
+    // CRITICAL FIX: userId is actually the Supabase auth user ID, but agent_memories.user_id 
+    // is a foreign key to user_profiles.id. We need to look up the user_profiles.id first.
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('supabase_user_id', userId)
+      .single();
+
+    if (profileError || !userProfile) {
+      console.error('❌ Error finding user profile:', profileError);
+      throw new Error(`User profile not found for supabase_user_id: ${userId}`);
+    }
+
+    // @ts-ignore - We know userProfile has an id property
+    const userProfileId = userProfile.id;
+    console.log('✅ Found user_profile.id:', userProfileId, 'for supabase_user_id:', userId);
+
     // Generate placeholder embedding (will be replaced with real embeddings later)
     const embedding = generatePlaceholderEmbedding();
 
-    // Insert memory record
+    // Insert memory record using user_profiles.id (not supabase auth user id)
     const { data: memory, error: memoryError } = await supabase
       .from('agent_memories')
       .insert({
-        user_id: userId,
+        user_id: userProfileId, // Use user_profiles.id, not supabase auth id
         agent_id: agentId,
         session_id: sessionId,
         content: params.content,
