@@ -567,7 +567,7 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
 // Get conversation history for a session
 export async function getConversationHistory(supabase: SupabaseClient, sessionId: string, limit = 50) {
   const { data: messages, error } = await supabase
-    .from('conversation_messages')
+    .from('messages')
     .select(`
       id,
       session_id,
@@ -610,7 +610,7 @@ export async function storeMessage(supabase: SupabaseClient, data: MessageData) 
   console.log('Storing message:', { sessionId, agentId, userId, sender, contentLength: content?.length });
   
   const { data: message, error } = await supabase
-    .from('conversation_messages')
+    .from('messages')
     .insert({
       session_id: sessionId,
       agent_id: agentId,
@@ -800,7 +800,7 @@ export async function searchMessages(supabase: SupabaseClient, data: SearchData)
   console.log('Searching messages:', { userId, query, limit });
   
   const { data: messages, error } = await supabase
-    .from('conversation_messages')
+    .from('messages')
     .select(`
       id,
       session_id,
@@ -2210,6 +2210,178 @@ export async function updateBidStatus(supabase: SupabaseClient, data: {
       success: false,
       error: String(error),
       message: `Failed to update bid status: ${String(error)}`
+    };
+  }
+}
+
+/**
+ * Generate placeholder embedding vector
+ * Returns array of 384 zeros for vector(384) column
+ * TODO: Replace with real embedding generation (OpenAI or local model)
+ */
+function generatePlaceholderEmbedding(): number[] {
+  return new Array(384).fill(0);
+}
+
+/**
+ * Create a new memory entry for an agent
+ * Stores important information about user preferences, decisions, facts, and context
+ */
+export async function createMemory(
+  supabase: SupabaseClient,
+  params: {
+    content: string;
+    memory_type: 'preference' | 'fact' | 'decision' | 'context' | 'conversation';
+    importance_score: number;
+    reference_type?: 'rfp' | 'bid' | 'artifact' | 'message' | 'user_profile';
+    reference_id?: string;
+  },
+  userId: string,
+  agentId: string,
+  sessionId: string
+): Promise<{ success: boolean; memory_id?: string; message: string; error?: string }> {
+  console.log('🧠 Creating memory:', { ...params, userId, agentId, sessionId });
+
+  try {
+    // Validate importance score
+    if (params.importance_score < 0 || params.importance_score > 1) {
+      throw new Error('importance_score must be between 0.0 and 1.0');
+    }
+
+    // Generate placeholder embedding (will be replaced with real embeddings later)
+    const embedding = generatePlaceholderEmbedding();
+
+    // Insert memory record
+    const { data: memory, error: memoryError } = await supabase
+      .from('agent_memories')
+      .insert({
+        user_id: userId,
+        agent_id: agentId,
+        session_id: sessionId,
+        content: params.content,
+        memory_type: params.memory_type,
+        importance_score: params.importance_score,
+        embedding: embedding,
+        metadata: {}
+      })
+      .select('id')
+      .single();
+
+    if (memoryError) {
+      console.error('❌ Error creating memory:', memoryError);
+      throw new Error(`Failed to create memory: ${String(memoryError)}`);
+    }
+
+    const memoryId = (memory as { id: string }).id;
+    console.log('✅ Memory created:', memoryId);
+
+    // Create memory reference if reference_id provided
+    if (params.reference_id && params.reference_type) {
+      console.log('🔗 Creating memory reference:', { reference_type: params.reference_type, reference_id: params.reference_id });
+      
+      const { error: refError } = await supabase
+        .from('memory_references')
+        .insert({
+          memory_id: memoryId,
+          reference_type: params.reference_type,
+          reference_id: params.reference_id
+        });
+
+      if (refError) {
+        console.warn('⚠️ Warning: Failed to create memory reference:', refError);
+        // Don't fail the entire operation if reference creation fails
+      } else {
+        console.log('✅ Memory reference created');
+      }
+    }
+
+    return {
+      success: true,
+      memory_id: memoryId,
+      message: `Memory stored successfully: "${params.content.substring(0, 50)}${params.content.length > 50 ? '...' : ''}"`
+    };
+
+  } catch (error) {
+    console.error('❌ Error in createMemory:', error);
+    return {
+      success: false,
+      error: String(error),
+      message: `Failed to create memory: ${String(error)}`
+    };
+  }
+}
+
+/**
+ * Search for relevant memories from past conversations
+ * Uses semantic search with vector similarity (currently using placeholder embeddings)
+ */
+export async function searchMemories(
+  supabase: SupabaseClient,
+  params: {
+    query: string;
+    memory_types?: string; // Comma-separated: "preference,fact"
+    limit?: number;
+  },
+  userId: string,
+  agentId: string
+): Promise<{ success: boolean; memories?: Array<{ id: string; content: string; memory_type: string; importance_score: number; created_at: string; similarity: number }>; message: string; error?: string }> {
+  console.log('🔍 Searching memories:', { ...params, userId, agentId });
+
+  try {
+    // Parse memory types from comma-separated string
+    const memoryTypes = params.memory_types 
+      ? params.memory_types.split(',').map(t => t.trim())
+      : undefined;
+
+    const limit = params.limit || 10;
+
+    // Generate placeholder embedding for query (will be replaced with real embeddings later)
+    const queryEmbedding = generatePlaceholderEmbedding();
+
+    // Call database search function
+    const rpcClient = supabase as unknown as { 
+      rpc: (name: string, params: Record<string, unknown>) => Promise<{ 
+        data: Array<{
+          id: string;
+          content: string;
+          memory_type: string;
+          importance_score: number;
+          created_at: string;
+          similarity: number;
+        }> | null;
+        error: unknown;
+      }> 
+    };
+
+    const { data: memories, error } = await rpcClient.rpc('search_agent_memories', {
+      query_user_id: userId,
+      query_agent_id: agentId,
+      query_embedding: queryEmbedding,
+      memory_type_filter: memoryTypes || [],
+      match_threshold: 0.5, // Lower threshold since using placeholder embeddings
+      match_count: limit
+    });
+
+    if (error) {
+      console.error('❌ Error searching memories:', error);
+      throw new Error(`Failed to search memories: ${String(error)}`);
+    }
+
+    const memoryList = memories || [];
+    console.log(`✅ Found ${memoryList.length} memories`);
+
+    return {
+      success: true,
+      memories: memoryList,
+      message: `Found ${memoryList.length} relevant memories`
+    };
+
+  } catch (error) {
+    console.error('❌ Error in searchMemories:', error);
+    return {
+      success: false,
+      error: String(error),
+      message: `Failed to search memories: ${String(error)}`
     };
   }
 }

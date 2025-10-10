@@ -84,6 +84,9 @@ const Home: React.FC = () => {
   // CRITICAL FIX: Use ref to keep session ID synchronized and avoid stale closures
   const currentSessionIdRef = useRef<string | undefined>(currentSessionId);
   
+  // Track if initial agent message has been loaded to prevent infinite loops
+  const initialAgentLoadedRef = useRef<boolean>(false);
+  
   // Keep ref synchronized with state
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
@@ -781,7 +784,11 @@ const Home: React.FC = () => {
     if (currentSessionId && userId) {
       // Only load agent - artifacts and messages are handled by handleSelectSession
       loadSessionAgent(currentSessionId);
-    } else if (!currentSessionId && isAuthenticated && userId && messages.length === 0) {
+      // Reset initial load flag when switching sessions
+      initialAgentLoadedRef.current = false;
+    } else if (!currentSessionId && isAuthenticated && userId && !initialAgentLoadedRef.current) {
+      // Only load once using ref to prevent infinite loop
+      initialAgentLoadedRef.current = true;
       loadDefaultAgentWithPrompt().then(initialMessage => {
         if (initialMessage) {
           setMessages([initialMessage]);

@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import type { User } from '@supabase/supabase-js';
 import { Artifact as DatabaseArtifact } from '../types/database';
 import { Artifact, ArtifactReference, Message } from '../types/home';
@@ -29,12 +29,13 @@ export const useArtifactManagement = (
 
   // Effect to load submission data when artifact is selected
   useEffect(() => {
-    const loadArtifactWithSubmission = async () => {
-      if (!selectedArtifactId) {
-        setSelectedArtifactWithSubmission(null);
-        return;
-      }
+    // Early return if no artifact selected
+    if (!selectedArtifactId) {
+      setSelectedArtifactWithSubmission(null);
+      return;
+    }
 
+    const loadArtifactWithSubmission = async () => {
       const baseArtifact = artifacts.find(artifact => artifact.id === selectedArtifactId);
       if (!baseArtifact) {
         setSelectedArtifactWithSubmission(null);
@@ -113,7 +114,7 @@ export const useArtifactManagement = (
     };
 
     loadArtifactWithSubmission();
-  }, [selectedArtifactId, artifacts, currentSessionId]);
+  }, [selectedArtifactId, currentSessionId]); // FIXED: Removed 'artifacts' from dependencies to prevent infinite loop
 
   // Function to select an artifact
   const selectArtifact = async (artifactId: string) => {
@@ -1212,10 +1213,10 @@ export const useArtifactManagement = (
     }
   };
 
-  const clearArtifacts = () => {
+  const clearArtifacts = useCallback(() => {
     setArtifacts([]);
     setSelectedArtifactId(null);
-  };
+  }, []); // No dependencies - setArtifacts and setSelectedArtifactId are stable
 
   // Auto-select most recent artifact when session changes, but not if already selected
   useEffect(() => {

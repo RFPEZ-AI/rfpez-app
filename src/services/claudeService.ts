@@ -306,6 +306,23 @@ export class ClaudeService {
       }
     }
     
+    // Build memory context (only if user is authenticated)
+    let memoryContext = '';
+    if (userProfile?.id && agent.id) {
+      try {
+        const { MemoryService } = await import('./memoryService');
+        memoryContext = await MemoryService.buildMemoryContext(
+          userProfile.id,
+          agent.id,
+          userMessage,
+          { limit: 5, similarityThreshold: 0.75 }
+        );
+      } catch (error) {
+        console.warn('Failed to build memory context:', error);
+        // Continue without memory context rather than failing the whole request
+      }
+    }
+    
     const payload = {
       userMessage,
       agent,
@@ -315,6 +332,7 @@ export class ClaudeService {
       currentRfp,
       currentArtifact,
       loginEvidence, // Add login evidence to payload
+      memoryContext, // Add memory context to payload
       stream: stream // Enable streaming - claude-api-v3 supports proper streaming
     };
 
@@ -742,7 +760,24 @@ ${currentArtifact.type === 'form' ? `
 This is the form currently displayed in the artifact window. When users ask you to "fill out the form" or "update the form", they are referring to this specific form artifact. Use the update_form_artifact function with this artifact ID (${currentArtifact.id}) to populate or modify the form data.` : `
 This is the ${currentArtifact.type} currently displayed in the artifact window.`}` : '';
 
-      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}${artifactContext}
+      // Build memory context (only if user is authenticated)
+      let memoryContext = '';
+      if (userProfile?.id && agent.id) {
+        try {
+          const { MemoryService } = await import('./memoryService');
+          memoryContext = await MemoryService.buildMemoryContext(
+            userProfile.id,
+            agent.id,
+            userMessage,
+            { limit: 5, similarityThreshold: 0.75 }
+          );
+        } catch (error) {
+          console.warn('Failed to build memory context:', error);
+          // Continue without memory context rather than failing the whole request
+        }
+      }
+
+      const systemPrompt = `${agent.instructions || `You are ${agent.name}, an AI assistant.`}${userContext}${sessionContext}${rfpContext}${artifactContext}${memoryContext}
 
 You are part of a multi-agent system with integrated MCP (Model Context Protocol) support and have access to several powerful functions:
 

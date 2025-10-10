@@ -73,6 +73,7 @@ async function streamWithRecursiveTools(
   toolService: ToolExecutionService,
   controller: ReadableStreamDefaultController<Uint8Array>,
   sessionId?: string,
+  agentId?: string,
   recursionDepth: number = 0
 ): Promise<{ fullContent: string; toolsUsed: string[]; executedToolResults: unknown[] }> {
   const MAX_RECURSION_DEPTH = 5;
@@ -161,7 +162,7 @@ async function streamWithRecursiveTools(
       if (!isClaudeToolCall(toolCall)) continue;
       
       try {
-        const result = await toolService.executeTool(toolCall, sessionId);
+        const result = await toolService.executeTool(toolCall, sessionId, agentId);
         toolResults.push({
           type: 'tool_result',
           tool_use_id: toolCall.id,
@@ -271,6 +272,7 @@ async function streamWithRecursiveTools(
           toolService,
           controller,
           sessionId,
+          agentId,
           recursionDepth + 1
         );
         
@@ -336,6 +338,7 @@ async function streamWithRecursiveTools(
       toolService,
       controller,
       sessionId,
+      agentId,
       recursionDepth + 1
     );
     
@@ -406,7 +409,8 @@ function handleStreamingResponse(
           claudeService,
           toolService,
           controller,
-          sessionId
+          sessionId,
+          agentId
         );
         
         const { fullContent, toolsUsed, executedToolResults } = result;
@@ -497,6 +501,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       currentRfp: _currentRfp,
       currentArtifact: _currentArtifact,
       loginEvidence: _loginEvidence,
+      memoryContext = '', // Memory context from client-side embedding generation
       stream = false, 
       clientCallback,
       // Legacy support for direct messages format
@@ -518,7 +523,8 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       agent: agentContext || undefined,
       userProfile: loadedUserProfile || undefined,
       sessionId: sessionId,
-      isAnonymous: !loadedUserProfile
+      isAnonymous: !loadedUserProfile,
+      memoryContext: memoryContext || undefined
     });
     console.log('🎯 POST REQUEST: System prompt built:', systemPrompt ? 'Yes' : 'No');
     

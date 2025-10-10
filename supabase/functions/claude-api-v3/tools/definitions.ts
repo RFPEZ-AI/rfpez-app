@@ -457,6 +457,58 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       },
       required: ['bid_id', 'status']
     }
+  },
+  {
+    name: 'create_memory',
+    description: 'Store important information about user preferences, decisions, facts, or context that should be remembered for future interactions. Use this when users explicitly state preferences, make important decisions, or share information that will be relevant later. ALWAYS create memories when users say "prefer", "always", "never", "for all future", "remember this", etc.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        content: {
+          type: 'string',
+          description: 'The memory content to store (clear, concise description of what to remember)'
+        },
+        memory_type: {
+          type: 'string',
+          description: 'Type of memory: "preference"=user likes/dislikes/requirements, "fact"=important info about user/organization, "decision"=choices made during conversation, "context"=RFP/bid details, "conversation"=notable conversation snippets'
+        },
+        importance_score: {
+          type: 'number',
+          description: 'Importance score 0.0-1.0. Use 0.9 for explicit preferences ("I always prefer..."), 0.7 for decisions, 0.5 for context, 0.3 for conversation notes'
+        },
+        reference_type: {
+          type: 'string',
+          description: 'Optional: What this memory relates to: "rfp", "bid", "artifact", "message", "user_profile"'
+        },
+        reference_id: {
+          type: 'string',
+          description: 'Optional: UUID of the related entity (RFP ID, bid ID, etc.)'
+        }
+      },
+      required: ['content', 'memory_type', 'importance_score']
+    }
+  },
+  {
+    name: 'search_memories',
+    description: 'Search for relevant memories from past conversations to provide personalized, context-aware responses. Use when starting new sessions, when user refers to past preferences, or when needing to recall user context. Returns semantically similar memories.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query describing what to look for (e.g., "vendor preferences", "budget constraints", "LED lighting requirements")'
+        },
+        memory_types: {
+          type: 'string',
+          description: 'Optional: Comma-separated memory types to filter by: "preference,fact" or "decision" or "context,conversation"'
+        },
+        limit: {
+          type: 'number',
+          description: 'Maximum number of memories to return (default 10, max 20)'
+        }
+      },
+      required: ['query']
+    }
   }
 ];
 
@@ -467,8 +519,8 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
     blocked: ['create_and_set_rfp']
   },
   'design': {
-    // RFP Design has access to all RFP creation tools - REMOVED switch_agent to prevent self-switching loops
-    allowed: ['create_and_set_rfp', 'create_form_artifact', 'create_document_artifact', 'update_form_data', 'update_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent']
+    // RFP Design has access to all RFP creation tools and memory tools - REMOVED switch_agent to prevent self-switching loops
+    allowed: ['create_and_set_rfp', 'create_form_artifact', 'create_document_artifact', 'update_form_data', 'update_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
   },
   'support': {
     // Support agents don't need RFP creation tools but can create documents
