@@ -42,15 +42,25 @@ export const useAgentManagement = (sessionId: string | null = null) => {
         
         console.log('Loaded default agent with prompt:', sessionActiveAgent);
 
-        // Return the initial message to be displayed
+        // 🎭 DYNAMIC WELCOME: Process initial_prompt through Claude for dynamic greeting
+        const { ClaudeService } = await import('../services/claudeService');
+        const userProfile = await DatabaseService.getUserProfile();
+        
+        const dynamicWelcome = await ClaudeService.processInitialPrompt(
+          defaultAgent,
+          sessionId || undefined,
+          userProfile || undefined
+        );
+
+        // Return the dynamic welcome message
         const initialMessage: Message = {
           id: 'initial-prompt',
-          content: defaultAgent.initial_prompt,
+          content: dynamicWelcome,
           isUser: false,
           timestamp: new Date(),
           agentName: defaultAgent.name
         };
-        console.log('Created initial prompt message:', defaultAgent.initial_prompt);
+        console.log('Created dynamic welcome message:', dynamicWelcome.substring(0, 100) + '...');
         return initialMessage;
       }
     } catch (error) {
@@ -84,16 +94,48 @@ export const useAgentManagement = (sessionId: string | null = null) => {
       console.error('Failed to persist agent change:', error);
     }
     
-    // Return the agent's initial prompt message if available
+    // 🎭 DYNAMIC WELCOME: Process initial_prompt through Claude for context-aware greeting
     if (newAgent.agent_initial_prompt) {
-      const initialMessage: Message = {
-        id: `agent-greeting-${newAgent.agent_id}-${Date.now()}`,
-        content: newAgent.agent_initial_prompt,
-        isUser: false,
-        timestamp: new Date(),
-        agentName: newAgent.agent_name
-      };
-      return initialMessage;
+      try {
+        const { ClaudeService } = await import('../services/claudeService');
+        const userProfile = await DatabaseService.getUserProfile();
+        
+        // Reconstruct partial Agent object for ClaudeService (only needed fields)
+        const agentForProcessing = {
+          id: newAgent.agent_id,
+          name: newAgent.agent_name,
+          instructions: newAgent.agent_instructions,
+          initial_prompt: newAgent.agent_initial_prompt,
+          avatar_url: newAgent.agent_avatar_url
+        } as Agent;
+        
+        const dynamicWelcome = await ClaudeService.processInitialPrompt(
+          agentForProcessing,
+          sessionId || undefined,
+          userProfile || undefined
+        );
+
+        const initialMessage: Message = {
+          id: `agent-greeting-${newAgent.agent_id}-${Date.now()}`,
+          content: dynamicWelcome,
+          isUser: false,
+          timestamp: new Date(),
+          agentName: newAgent.agent_name
+        };
+        console.log('Created dynamic agent switch message:', dynamicWelcome.substring(0, 100) + '...');
+        return initialMessage;
+      } catch (error) {
+        console.error('Failed to process initial prompt through Claude, using static:', error);
+        // Fallback to static prompt on error
+        const fallbackMessage: Message = {
+          id: `agent-greeting-${newAgent.agent_id}-${Date.now()}`,
+          content: newAgent.agent_initial_prompt,
+          isUser: false,
+          timestamp: new Date(),
+          agentName: newAgent.agent_name
+        };
+        return fallbackMessage;
+      }
     }
     return null;
   };

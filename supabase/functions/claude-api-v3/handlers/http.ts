@@ -360,7 +360,8 @@ function handleStreamingResponse(
   agentId?: string,
   userMessage?: string,
   agent?: { role?: string },
-  newSessionData?: { success: boolean; session_id: string; message: string } | null
+  newSessionData?: { success: boolean; session_id: string; message: string } | null,
+  processInitialPrompt = false
 ): Promise<Response> {
   // Create readable stream for SSE
   const stream = new ReadableStream({
@@ -390,8 +391,9 @@ function handleStreamingResponse(
           userProfile: userProfile || undefined,
           sessionId: sessionId,
           isAnonymous: !userProfile
-        }, userMessageText);
+        }, userMessageText, processInitialPrompt);
         console.log('🎯 STREAMING: System prompt built:', systemPrompt ? 'Yes' : 'No');
+        console.log('🎭 STREAMING: Using initial_prompt as system:', processInitialPrompt);
         console.log('🔄 STREAMING: Agent switch context detection:', userMessageText?.includes('User context from previous agent:') || false);
         
         // 🔍 DEBUG: Log agent role before getting tools - USE agentContext not agent from request
@@ -491,6 +493,10 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     
     // Parse request body
     const body = await request.json();
+    
+    // 🚨 VERY EARLY DEBUG: Log the raw processInitialPrompt value from request
+    console.log('🚨🚨🚨 RAW BODY processInitialPrompt:', body.processInitialPrompt, 'Type:', typeof body.processInitialPrompt);
+    
     const { 
       userMessage, 
       agent, 
@@ -504,13 +510,68 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       memoryContext = '', // Memory context from client-side embedding generation
       stream = false, 
       clientCallback,
+      processInitialPrompt = false, // New flag to process initial_prompt through Claude
       // Legacy support for direct messages format
       messages
     } = body;
     
+    // 🚨 AFTER DESTRUCTURE: Log the processInitialPrompt variable value
+    console.log('🚨🚨🚨 AFTER DESTRUCTURE processInitialPrompt:', processInitialPrompt, 'Type:', typeof processInitialPrompt);
+    
     // Load agent context and user profile, then build system prompt
-    const agentContext = await loadAgentContext(supabase, sessionId, agentId);
+    // Use agent.id from the agent object if agentId is not explicitly provided
+    const agentIdForContext = agentId || agent?.id;
+    const agentContext = await loadAgentContext(supabase, sessionId, agentIdForContext);
     const loadedUserProfile = await loadUserProfile(supabase);
+    
+    // 🎯 INITIAL PROMPT PROCESSING: If processInitialPrompt flag is set, use initial_prompt instructions to generate welcome
+    let effectiveUserMessage = userMessage;
+    let effectiveConversationHistory = conversationHistory;
+    
+    console.log('🔍 INITIAL PROMPT CHECK:', {
+      processInitialPrompt,
+      hasAgentContext: !!agentContext,
+      hasInitialPrompt: !!agentContext?.initial_prompt,
+      agentName: agentContext?.name,
+      initialPromptLength: agentContext?.initial_prompt?.length || 0,
+      willProcess: !!(processInitialPrompt && agentContext?.initial_prompt)
+    });
+    
+    if (processInitialPrompt && agentContext?.initial_prompt) {
+      console.log('🎭 Processing initial_prompt through Claude for agent:', agentContext.name);
+      console.log('🎭 Initial prompt preview:', agentContext.initial_prompt.substring(0, 100) + '...');
+      
+      // Build authentication context for the welcome message
+      let authContext = '';
+      let authStatus = '';
+      if (loadedUserProfile) {
+        const userName = loadedUserProfile.full_name || loadedUserProfile.email?.split('@')[0] || 'there';
+        authContext = `The current user IS AUTHENTICATED (logged in).\nUser name: ${userName}`;
+        if (loadedUserProfile.email) {
+          authContext += `\nUser email: ${loadedUserProfile.email}`;
+        }
+        authStatus = 'authenticated';
+      } else {
+        authContext = `The current user IS ANONYMOUS (not logged in).`;
+        authStatus = 'anonymous';
+      }
+      
+      // Create a clear, directive meta-prompt with explicit auth information
+      effectiveUserMessage = `You must generate a welcome message right now. Do not ask for more information.
+
+${authContext}
+
+Follow these instructions exactly to create the welcome message:
+
+${agentContext.initial_prompt}
+
+Generate the ${authStatus} user welcome message now.`;
+      
+      // Clear conversation history for welcome prompts
+      effectiveConversationHistory = [];
+      
+      console.log('🎭 Effective user message set to initial_prompt generation request with auth context:', authStatus);
+    }
     
     // 🔍 LOADED AGENT CONTEXT DEBUG
     console.log('🗄️🗄️🗄️ DATABASE AGENT CONTEXT 🗄️🗄️🗄️');
@@ -525,8 +586,9 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       sessionId: sessionId,
       isAnonymous: !loadedUserProfile,
       memoryContext: memoryContext || undefined
-    });
+    }, undefined, false); // Always use normal instructions as system prompt
     console.log('🎯 POST REQUEST: System prompt built:', systemPrompt ? 'Yes' : 'No');
+    console.log('🎭 POST REQUEST: Processing initial prompt:', processInitialPrompt);
     
     // Convert ClaudeService format to messages format
     let processedMessages: unknown[] = [];
@@ -534,11 +596,15 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     if (messages && Array.isArray(messages)) {
       // Direct messages format (legacy)
       processedMessages = messages;
-    } else if (userMessage) {
-      // ClaudeService format - convert to messages
+    } else if (effectiveUserMessage) {
+      // 🐛 DEBUG: Log what user message is being sent
+      console.log('🐛 DEBUG effectiveUserMessage:', effectiveUserMessage.substring(0, 200) + '...');
+      console.log('🐛 DEBUG processInitialPrompt flag:', processInitialPrompt);
+      
+      // ClaudeService format - convert to messages (use effective values for initial prompt processing)
       processedMessages = [
-        ...conversationHistory,
-        { role: 'user', content: userMessage }
+        ...effectiveConversationHistory,
+        { role: 'user', content: effectiveUserMessage }
       ];
     } else {
       return new Response(
@@ -593,7 +659,9 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       hasAgent: !!agent,
       hasConversationHistory: conversationHistory.length > 0,
       stream,
-      hasClientCallback: !!clientCallback 
+      hasClientCallback: !!clientCallback,
+      processInitialPrompt,
+      usingInitialPrompt: processInitialPrompt && !!agentContext?.initial_prompt
     });
 
     // Auto-create session if none provided (for first message)
@@ -628,7 +696,7 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     // If streaming is requested, handle it separately
     if (stream) {
       console.log('🌊 Streaming requested - using streaming handler');
-      return handleStreamingResponse(processedMessages, supabase, userId, actualSessionId, effectiveAgentId, userMessage, agent, newSessionData);
+      return handleStreamingResponse(processedMessages, supabase, userId, actualSessionId, effectiveAgentId, effectiveUserMessage, agent, newSessionData, processInitialPrompt);
     }
 
     // Initialize services
@@ -750,11 +818,21 @@ export async function handlePostRequest(request: Request): Promise<Response> {
               content: claudeResponse.textResponse || ''
             });
             
-            // Add system message prompting new agent to continue
-            continuationMessages.push({
-              role: 'system' as const,
-              content: `You are now the active agent for this conversation. Please review the conversation history above and continue assisting the user based on your role as ${newAgentData?.name}. Respond naturally and appropriately to the user's needs based on the full context.`
+            // 🎯 USE NEW AGENT'S INITIAL_PROMPT if available (for memory-aware welcomes)
+            const hasInitialPrompt = !!newAgentData?.initial_prompt;
+            const initialPromptPreview = newAgentData?.initial_prompt 
+              ? String(newAgentData.initial_prompt).substring(0, 150) + '...'
+              : 'none';
+            
+            console.log('🎭 Agent continuation initial_prompt check:', {
+              agent_name: newAgentData?.name,
+              has_initial_prompt: hasInitialPrompt,
+              initial_prompt_preview: initialPromptPreview
             });
+            
+            // NOTE: We DO NOT add system messages to continuationMessages anymore
+            // Instead, we pass the system prompt separately via the sendMessage() systemPrompt parameter
+            // This is the correct way per Claude API specifications
             
             // Get new agent context and tools
             const newAgentContext = await loadAgentContext(
@@ -774,15 +852,28 @@ export async function handlePostRequest(request: Request): Promise<Response> {
             
             const newTools = getToolDefinitions(newAgentData?.role as string);
             
+            // 🎯 Build enhanced system prompt that includes agent instructions + initial_prompt
+            const enhancedSystemPrompt = hasInitialPrompt
+              ? `${newSystemPrompt}\n\n---\n\n🎯 AGENT ACTIVATION INSTRUCTIONS:\n${newAgentData.initial_prompt}\n\n---\n\nYou are now the active agent for this conversation. The user has been handed off to you from another agent. If your activation instructions above tell you to search memory or perform other actions, do so FIRST before generating your welcome message.`
+              : newSystemPrompt;
+            
             console.log('🤖 Triggering new agent response:', {
               agent_name: newAgentData?.name,
               agent_role: newAgentData?.role,
               tools_count: newTools.length,
-              system_prompt_length: newSystemPrompt.length
+              system_prompt_length: newSystemPrompt.length,
+              enhanced_system_prompt_length: enhancedSystemPrompt.length,
+              has_activation_instructions: hasInitialPrompt
             });
             
             // **NON-STREAMING AGENT CONTINUATION** - Get response from new agent
-            const continuationResponse = await claudeService.sendMessage(continuationMessages as ClaudeMessage[], newTools);
+            // IMPORTANT: Pass system prompt separately, not as a message in the array
+            const continuationResponse = await claudeService.sendMessage(
+              continuationMessages.filter(m => m.role !== 'system') as ClaudeMessage[], 
+              newTools,
+              4000,
+              enhancedSystemPrompt
+            );
             
             // Update the main response with continuation
             if (continuationResponse.textResponse) {

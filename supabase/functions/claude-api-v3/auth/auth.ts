@@ -110,7 +110,10 @@ export async function getUserId(supabase: unknown, request: Request): Promise<st
   const { data: { user }, error } = await supabase.auth.getUser();
   
   if (error || !user) {
-    throw new Error('Failed to get authenticated user');
+    console.error('🔒 Authentication failed:', error);
+    console.error('🔒 This usually means the user token is invalid or expired');
+    console.error('🔒 User should logout and login again to refresh their session');
+    throw new Error('AUTHENTICATION_REQUIRED: Your session has expired. Please logout and login again to continue.');
   }
   
   return user.id;

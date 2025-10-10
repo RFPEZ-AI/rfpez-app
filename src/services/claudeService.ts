@@ -264,7 +264,8 @@ export class ClaudeService {
     } | null,
     abortSignal?: AbortSignal,
     stream = false,
-    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void,
+    processInitialPrompt = false // New parameter for initial prompt processing
   ): Promise<ClaudeResponse> {
     // Use centralized Supabase client to avoid multiple instance warnings
     
@@ -333,7 +334,8 @@ export class ClaudeService {
       currentArtifact,
       loginEvidence, // Add login evidence to payload
       memoryContext, // Add memory context to payload
-      stream: stream // Enable streaming - claude-api-v3 supports proper streaming
+      stream: stream, // Enable streaming - claude-api-v3 supports proper streaming
+      processInitialPrompt // Add flag to indicate initial prompt processing
     };
 
     console.log('🚀 Calling claude-api-v3 edge function with payload:', {
@@ -596,14 +598,24 @@ export class ClaudeService {
 
         if (error) {
           console.error('🚨 Edge function error:', error);
-          // Check for Claude API service outage patterns
+          
           const errorMessage = error.message || '';
+          
+          // Check for authentication errors (expired/invalid session)
+          if (errorMessage.includes('AUTHENTICATION_REQUIRED') || 
+              errorMessage.includes('Failed to get authenticated user') ||
+              errorMessage.includes('session has expired')) {
+            throw new Error('⚠️ SESSION_EXPIRED: Your session has expired. Please logout and login again to continue.');
+          }
+          
+          // Check for Claude API service outage patterns
           if (errorMessage.includes('503') || 
               errorMessage.includes('upstream connect error') ||
               errorMessage.includes('remote connection failure') ||
               errorMessage.includes('Connection refused')) {
             throw new Error('Claude API error: 503 upstream connect error or disconnect/reset before headers. reset reason: remote connection failure, transport failure reason: delayed connect error: Connection refused');
           }
+          
           throw new Error(`Edge function failed: ${error.message}`);
         }
 
@@ -637,6 +649,63 @@ export class ClaudeService {
       console.error('🚨 Error calling edge function:', error);
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       throw new Error(`Failed to call claude-api-v3: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * Process an agent's initial_prompt through Claude to generate a dynamic welcome message
+   * This replaces static welcome messages with context-aware greetings
+   */
+  static async processInitialPrompt(
+    agent: Agent,
+    sessionId?: string,
+    userProfile?: {
+      id?: string;
+      email?: string;
+      full_name?: string;
+      role?: string;
+    }
+  ): Promise<string> {
+    console.log('🎭 Processing initial prompt for agent:', agent.name);
+    console.log('🎭 Initial prompt preview:', agent.initial_prompt?.substring(0, 100) + '...');
+    console.log('🎭 Session ID:', sessionId);
+    console.log('🎭 User profile:', userProfile ? 'Present' : 'None');
+    
+    try {
+      // Use the edge function with processInitialPrompt flag
+      console.log('🎭 Calling edge function with processInitialPrompt=true');
+      const response = await this.generateResponseViaEdgeFunction(
+        agent.initial_prompt || 'Hello! How can I help you today?',
+        agent,
+        [], // No conversation history for initial prompts
+        sessionId,
+        userProfile,
+        null, // No current RFP
+        null, // No current artifact
+        undefined, // No abort signal
+        false, // No streaming for initial prompts
+        undefined, // No onChunk callback for non-streaming
+        true // processInitialPrompt = true
+      );
+      
+      console.log('🎭 Edge function response received:', response.content.substring(0, 100) + '...');
+      console.log('🎭 Response type:', typeof response.content);
+      console.log('🎭 Full response object:', response);
+      
+      return response.content;
+    } catch (error) {
+      console.error('❌ Error processing initial prompt:', error);
+      console.error('❌ Error details:', JSON.stringify(error, null, 2));
+      
+      // Check if this is a session expiration error
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      if (errorMessage.includes('SESSION_EXPIRED') || errorMessage.includes('AUTHENTICATION_REQUIRED')) {
+        // Return a clear message to the user about session expiration
+        return `⚠️ **Session Expired**\n\nYour session has expired. Please **logout and login again** to continue using EZRFP.APP.\n\nThis usually happens when your authentication token becomes invalid. A fresh login will restore full functionality.`;
+      }
+      
+      // Fallback to static initial prompt for other errors
+      return agent.initial_prompt || `Hello! I'm ${agent.name}. How can I assist you today?`;
     }
   }
 
