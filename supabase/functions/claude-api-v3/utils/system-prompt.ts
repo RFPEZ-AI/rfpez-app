@@ -35,6 +35,7 @@ export interface SystemPromptContext {
   currentRfp?: { id: string; name: string };
   currentArtifact?: { id: string; type: string };
   isAnonymous?: boolean;
+  memoryContext?: string; // Pre-built memory context from client-side embeddings
   loginEvidence?: {
     hasPreviousLogin: boolean;
     loginCount?: number;
@@ -173,6 +174,11 @@ export function buildSystemPrompt(context: SystemPromptContext, userMessage?: st
   if (context.currentArtifact) {
     systemPrompt += `\n\nCurrent Artifact: ${context.currentArtifact.type} (ID: ${context.currentArtifact.id})`;
   }
+  
+  // Add memory context if provided (from client-side semantic search)
+  if (context.memoryContext) {
+    systemPrompt += `\n\n${context.memoryContext}`;
+  }
 
   // 🔍 DEBUG: Log final system prompt length and key sections
   console.log('🎯 buildSystemPrompt - Final prompt details:', {
@@ -180,7 +186,8 @@ export function buildSystemPrompt(context: SystemPromptContext, userMessage?: st
     startsWithInstructions: systemPrompt.startsWith(context.agent?.instructions?.substring(0, 50) || ''),
     containsCriticalRules: systemPrompt.includes('🚨 CRITICAL AGENT SWITCHING PREVENTION') && systemPrompt.includes('🔥 CRITICAL RFP CREATION RULE'),
     containsCreateRfpRule: systemPrompt.includes('create_and_set_rfp'),
-    containsSwitchAgentRule: systemPrompt.includes('DO NOT call switch_agent')
+    containsSwitchAgentRule: systemPrompt.includes('DO NOT call switch_agent'),
+    hasMemoryContext: !!context.memoryContext
   });
 
   return systemPrompt;

@@ -274,14 +274,15 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         
         console.log('Calling supabase.auth.getSession()...');
         
-        // Add a timeout to prevent hanging
+        // Add a timeout to prevent hanging - increased to 30 seconds for local dev
         const sessionPromise = supabase.auth.getSession();
         const timeoutPromise = new Promise<never>((_, reject) => 
-          setTimeout(() => reject(new Error('Session request timeout')), 10000)
+          setTimeout(() => reject(new Error('Session request timeout')), 30000)
         );
         
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { data: { session }, error } = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const result = await Promise.race([sessionPromise, timeoutPromise]) as any;
+        const { data: { session } = { session: null }, error } = result || { data: { session: null }, error: null };
         
         console.log('Session call completed. Error:', error, 'Session:', session);
         console.log('Session details:', {
@@ -374,7 +375,18 @@ export const SupabaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         console.error('Error in auth initialization:', error);
         
         if (active) {
-          // Check if we should retry
+          // Special handling for timeout errors - allow app to work without auth
+          if (error instanceof Error && error.message.includes('Session request timeout')) {
+            console.log('⚠️ Session request timed out - continuing without authentication');
+            console.log('💡 App will work in anonymous mode. You can try logging in manually.');
+            setSession(null);
+            setUser(null);
+            setUserProfile(null);
+            setLoading(false);
+            return;
+          }
+          
+          // Check if we should retry for other errors
           if (authRetryCount < MAX_AUTH_RETRIES) {
             console.log(`🔄 Retrying auth initialization in 2 seconds... (${authRetryCount + 1}/${MAX_AUTH_RETRIES})`);
             setTimeout(() => {

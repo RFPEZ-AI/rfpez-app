@@ -303,7 +303,7 @@ export class ToolExecutionService {
   }
 
   // Execute a tool call and return the result
-  async executeTool(toolCall: ClaudeToolCall, sessionId?: string): Promise<ToolResult> {
+  async executeTool(toolCall: ClaudeToolCall, sessionId?: string, agentId?: string): Promise<ToolResult> {
     const { name, input } = toolCall;
     
     console.log(`Executing tool: ${name}`, input);
@@ -527,6 +527,51 @@ export class ToolExecutionService {
           return await updateBidStatus(this.supabase, input);
         }
 
+        case 'create_memory': {
+          // Validate required parameters
+          if (!sessionId || !agentId) {
+            console.error('❌ CREATE_MEMORY ERROR: sessionId and agentId are required');
+            return {
+              success: false,
+              error: 'Session ID and Agent ID are required for memory creation',
+              message: 'Cannot create memories without valid session and agent context.'
+            };
+          }
+
+          const { createMemory } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await createMemory(
+            // @ts-ignore - Supabase client type compatibility
+            this.supabase,
+            input,
+            this.userId,
+            agentId,
+            sessionId
+          );
+        }
+
+        case 'search_memories': {
+          // Validate required parameters
+          if (!agentId) {
+            console.error('❌ SEARCH_MEMORIES ERROR: agentId is required');
+            return {
+              success: false,
+              error: 'Agent ID is required for memory search',
+              message: 'Cannot search memories without valid agent context.'
+            };
+          }
+
+          const { searchMemories } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await searchMemories(
+            // @ts-ignore - Supabase client type compatibility
+            this.supabase,
+            input,
+            this.userId,
+            agentId
+          );
+        }
+
         default:
           console.log(`Unknown tool: ${name}`);
           return {
@@ -544,11 +589,11 @@ export class ToolExecutionService {
   }
 
   // Execute multiple tool calls in sequence
-  async executeToolCalls(toolCalls: ClaudeToolCall[], sessionId?: string): Promise<ToolResult[]> {
+  async executeToolCalls(toolCalls: ClaudeToolCall[], sessionId?: string, agentId?: string): Promise<ToolResult[]> {
     const results: ToolResult[] = [];
     
     for (const toolCall of toolCalls) {
-      const result = await this.executeTool(toolCall, sessionId);
+      const result = await this.executeTool(toolCall, sessionId, agentId);
       results.push(result);
     }
     

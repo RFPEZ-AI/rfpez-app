@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Agent, SessionActiveAgent } from '../types/database';
 import { AgentService } from '../services/agentService';
 import { DatabaseService } from '../services/database';
@@ -20,7 +20,7 @@ export const useAgentManagement = (sessionId: string | null = null) => {
     AgentService.getActiveAgents().then(setAgents);
   }, []);
 
-  const loadDefaultAgentWithPrompt = async (): Promise<Message | null> => {
+  const loadDefaultAgentWithPrompt = useCallback(async (): Promise<Message | null> => {
     try {
       const defaultAgent = await AgentService.getDefaultAgent();
       if (defaultAgent) {
@@ -57,7 +57,7 @@ export const useAgentManagement = (sessionId: string | null = null) => {
       console.error('Failed to load default agent with prompt:', error);
     }
     return null;
-  };
+  }, [sessionId]); // Only depends on sessionId
 
   const loadSessionAgent = async (sessionId: string) => {
     try {

@@ -403,21 +403,22 @@ ORDER BY created_at DESC LIMIT 5;
 ```
 
 #### **MCP Browser Access for Log Inspection**
+**Example Code Pattern (for reference only):**
 ```javascript
-// Use MCP browser tools to access Supabase Dashboard logs
-// when immediate log access is needed during debugging
+// Example: Use MCP browser tools to access Supabase Dashboard logs
+// Note: These are examples for documentation purposes only
 
 // 1. Navigate to Supabase Dashboard
-await mcp_browser_navigate({ 
-  url: 'https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc/logs/edge-functions' 
-});
+// await mcp_browser_navigate({ 
+//   url: 'https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc/logs/edge-functions' 
+// });
 
 // 2. Access Edge Function Logs via Browser
-await mcp_browser_click({ element: 'claude-api-v3 function', ref: '[function-link]' });
-await mcp_browser_screenshot(); // Capture current log state
+// await mcp_browser_click({ element: 'claude-api-v3 function', ref: '[function-link]' });
+// await mcp_browser_screenshot(); // Capture current log state
 
 // 3. Browser Console Access for Client-side Errors
-const consoleLogs = await mcp_browser_get_console_logs();
+// const consoleLogs = await mcp_browser_get_console_logs();
 // Check for JavaScript errors, network failures, API call issues
 
 // 4. Real-time Log Monitoring
@@ -697,108 +698,115 @@ The project includes comprehensive browser automation through MCP (Model Context
 ### ⚡ MCP Browser Testing Speed Tips & Best Practices
 
 #### **Quick Test Setup Workflow**
+**Example Code Pattern (for test scripts, not Copilot execution):**
 ```javascript
-// ESSENTIAL: Always activate tools first in this order
-await activate_mcp_browser_navigation_tools();    // Navigate, tabs
-await activate_mcp_browser_interaction_tools();   // Click, fill, keys
-await activate_mcp_browser_script_tools();        // Get elements, evaluate
-await activate_mcp_browser_visual_tools();        // Screenshot, scroll
+// EXAMPLE: Tool activation pattern for test scripts
+// Note: These are examples for documentation purposes only
+// activate_mcp_browser_navigation_tools();    // Navigate, tabs
+// activate_mcp_browser_interaction_tools();   // Click, fill, keys
+// activate_mcp_browser_script_tools();        // Get elements, evaluate
+// activate_mcp_browser_visual_tools();        // Screenshot, scroll
 
 // SPEED TIP: Navigate and screenshot in one go
-await mcp_browser_navigate({ url: 'http://localhost:3100' });
-await mcp_browser_screenshot({ name: 'initial-state' });
+// mcp_browser_navigate({ url: 'http://localhost:3100' });
+// mcp_browser_screenshot({ name: 'initial-state' });
 ```
 
 #### **Authentication Testing Pattern**
+**Example Code Pattern (for reference only):**
 ```javascript
-// FAST LOGIN SEQUENCE - Use this exact pattern
-const loginSequence = async () => {
-  // 1. Get elements (always fresh)
-  const elements = await mcp_browser_get_clickable_elements();
-  
-  // 2. Click Login button (usually index 2)
-  await mcp_browser_click({ index: 2 });
-  
-  // 3. Fill credentials (email: index 3, password: index 5)
-  await mcp_browser_form_input_fill({ index: 3, value: 'mskiba@esphere.com' });
-  await mcp_browser_form_input_fill({ index: 5, value: 'thisisatest' });
-  
-  // 4. Submit (Sign In button: index 6)
-  await mcp_browser_click({ index: 6 });
-  
-  // 5. Verify success (look for username in top right)
-  await mcp_browser_screenshot({ name: 'logged-in' });
-};
+// FAST LOGIN SEQUENCE - Use this exact pattern (example)
+// const loginSequence = async () => {
+//   // 1. Get elements (always fresh)
+//   const elements = await mcp_browser_get_clickable_elements();
+//   
+//   // 2. Click Login button (usually index 2)
+//   await mcp_browser_click({ index: 2 });
+//   
+//   // 3. Fill credentials (email: index 3, password: index 5)
+//   await mcp_browser_form_input_fill({ index: 3, value: 'mskiba@esphere.com' });
+//   await mcp_browser_form_input_fill({ index: 5, value: 'thisisatest' });
+//   
+//   // 4. Submit (Sign In button: index 6)
+//   await mcp_browser_click({ index: 6 });
+//   
+//   // 5. Verify success (look for username in top right)
+//   await mcp_browser_screenshot({ name: 'logged-in' });
+// };
 ```
 
 #### **Browser Session Reset Prevention**
+**Example Code Pattern (for reference only):**
 ```javascript
 // CRITICAL: Browser can reset unexpectedly
-// Always check login state before running tests
-const verifyAuthentication = async () => {
-  const elements = await mcp_browser_get_clickable_elements();
-  const hasLoginButton = elements.some(el => el.text?.includes('Login'));
-  
-  if (hasLoginButton) {
-    console.log('⚠️ Session reset detected - need to login again');
-    await loginSequence();
-  }
-  return !hasLoginButton;
-};
+// Always check login state before running tests (example)
+// const verifyAuthentication = async () => {
+//   const elements = await mcp_browser_get_clickable_elements();
+//   const hasLoginButton = elements.some(el => el.text?.includes('Login'));
+//   
+//   if (hasLoginButton) {
+//     console.log('⚠️ Session reset detected - need to login again');
+//     await loginSequence();
+//   }
+//   return !hasLoginButton;
+// };
 ```
 
 #### **Message Testing Optimization**
+**Example Code Pattern (for reference only):**
 ```javascript
-// FAST MESSAGE SENDING - Always use this pattern
-const sendTestMessage = async (message) => {
-  // 1. Get current elements
-  const elements = await mcp_browser_get_clickable_elements();
-  
-  // 2. Find textarea (usually last input element)
-  const textareaIndex = elements.findIndex(el => el.tag === 'textarea');
-  
-  // 3. Click and fill
-  await mcp_browser_click({ index: textareaIndex });
-  await mcp_browser_form_input_fill({ index: textareaIndex, value: message });
-  
-  // 4. Submit with Enter key (faster than finding button)
-  await mcp_browser_press_key({ key: 'Enter' });
-  
-  // 5. Take screenshot for verification
-  await mcp_browser_screenshot({ name: 'message-sent' });
-};
+// FAST MESSAGE SENDING - Always use this pattern (example)
+// const sendTestMessage = async (message) => {
+//   // 1. Get current elements
+//   const elements = await mcp_browser_get_clickable_elements();
+//   
+//   // 2. Find textarea (usually last input element)
+//   const textareaIndex = elements.findIndex(el => el.tag === 'textarea');
+//   
+//   // 3. Click and fill
+//   await mcp_browser_click({ index: textareaIndex });
+//   await mcp_browser_form_input_fill({ index: textareaIndex, value: message });
+//   
+//   // 4. Submit with Enter key (faster than finding button)
+//   await mcp_browser_press_key({ key: 'Enter' });
+//   
+//   // 5. Take screenshot for verification
+//   await mcp_browser_screenshot({ name: 'message-sent' });
+// };
 ```
 
 #### **Element Finding Speed Tips**
+**Example Code Pattern (for reference only):**
 ```javascript
 // DON'T: Call get_clickable_elements multiple times
-// ❌ Slow approach
-const elements1 = await mcp_browser_get_clickable_elements();
-await mcp_browser_click({ index: 2 });
-const elements2 = await mcp_browser_get_clickable_elements(); // Unnecessary
+// ❌ Slow approach (example)
+// const elements1 = await mcp_browser_get_clickable_elements();
+// await mcp_browser_click({ index: 2 });
+// const elements2 = await mcp_browser_get_clickable_elements(); // Unnecessary
 
-// ✅ Fast approach - reuse elements until interaction changes page
-const elements = await mcp_browser_get_clickable_elements();
-await mcp_browser_click({ index: 2 });
-await mcp_browser_form_input_fill({ index: 3, value: 'test' });
+// ✅ Fast approach - reuse elements until interaction changes page (example)
+// const elements = await mcp_browser_get_clickable_elements();
+// await mcp_browser_click({ index: 2 });
+// await mcp_browser_form_input_fill({ index: 3, value: 'test' });
 // Only refresh elements after major page changes
 ```
 
 #### **Common Index Patterns (for speed)**
+**Example Code Pattern (for reference only):**
 ```javascript
-// These indices are typically consistent:
-const COMMON_INDICES = {
-  LOGIN_BUTTON: 2,           // Main login button
-  EMAIL_FIELD: 3,            // Email input in login modal
-  PASSWORD_FIELD: 5,         // Password input in login modal  
-  SIGNIN_BUTTON: 6,          // Sign in submit button
-  MAIN_TEXTAREA: 11,         // Main chat textarea (when logged in)
-  AGENT_SELECTOR: 1,         // Agent chip in header
-  ARTIFACT_TOGGLE: 13        // Artifact panel toggle
-};
+// These indices are typically consistent (example pattern):
+// const COMMON_INDICES = {
+//   LOGIN_BUTTON: 2,           // Main login button
+//   EMAIL_FIELD: 3,            // Email input in login modal
+//   PASSWORD_FIELD: 5,         // Password input in login modal  
+//   SIGNIN_BUTTON: 6,          // Sign in submit button
+//   MAIN_TEXTAREA: 11,         // Main chat textarea (when logged in)
+//   AGENT_SELECTOR: 1,         // Agent chip in header
+//   ARTIFACT_TOGGLE: 13        // Artifact panel toggle
+// };
 
 // Use with caution - verify with screenshot if failing
-await mcp_browser_click({ index: COMMON_INDICES.LOGIN_BUTTON });
+// await mcp_browser_click({ index: COMMON_INDICES.LOGIN_BUTTON });
 ```
 
 #### **Error Recovery Patterns**
@@ -847,18 +855,20 @@ const robustClick = async (index, retries = 2) => {
 - `nail-procurement/mcp-browser-demo.js` - Demonstration of MCP capabilities
 
 ### Activating Real Browser Tools
+**Example Code Pattern (for test scripts, not Copilot execution):**
 ```javascript
-// Activate MCP browser tool categories
-await activate_mcp_browser_navigation_tools();
-await activate_mcp_browser_interaction_tools();
-await activate_mcp_browser_content_tools();
-await activate_mcp_browser_visual_tools();
+// EXAMPLE: MCP browser tool activation pattern for test scripts
+// Note: These are examples for documentation purposes only
+// activate_mcp_browser_navigation_tools();
+// activate_mcp_browser_interaction_tools();
+// activate_mcp_browser_content_tools();
+// activate_mcp_browser_visual_tools();
 
-// Example usage
-await mcp_browser_navigate({ url: 'http://localhost:3100' });
-await mcp_browser_screenshot({ name: 'homepage' });
-const elements = await mcp_browser_get_clickable_elements();
-await mcp_browser_click({ index: elements[0].index });
+// Example usage after activation
+// mcp_browser_navigate({ url: 'http://localhost:3100' });
+// mcp_browser_screenshot({ name: 'homepage' });
+// const elements = mcp_browser_get_clickable_elements();
+// mcp_browser_click({ index: elements[0].index });
 ```
 
 ### UI Test Automation Identifiers
@@ -890,46 +900,49 @@ Key UI elements are decorated with `data-testid` attributes for reliable MCP bro
 - `data-testid="artifact-toggle"` - Artifact panel expand/collapse button
 
 **Preferred MCP Browser Testing Approach:**
+**Example Code Pattern (for reference only):**
 ```javascript
 // 🎯 RECOMMENDED: Use selector-based targeting instead of index-based
-// ✅ Reliable approach - works across UI changes
-await mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
-await mcp_browser_form_input_fill({ selector: '[data-testid="message-input"]', value: 'test message' });
-await mcp_browser_press_key({ key: 'Enter' }); // Submit message
-await mcp_browser_click({ selector: '[data-testid="agent-selector"]' }); // Switch agent
+// ✅ Reliable approach - works across UI changes (examples)
+// await mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
+// await mcp_browser_form_input_fill({ selector: '[data-testid="message-input"]', value: 'test message' });
+// await mcp_browser_press_key({ key: 'Enter' }); // Submit message
+// await mcp_browser_click({ selector: '[data-testid="agent-selector"]' }); // Switch agent
 
 // ❌ Avoid index-based targeting when possible (brittle)
-await mcp_browser_click({ index: 2 });  // Index can change with UI updates
+// await mcp_browser_click({ index: 2 });  // Index can change with UI updates
 
 // 🔍 Fallback: Use index when selector not available (with screenshot verification)
-const elements = await mcp_browser_get_clickable_elements();
-await mcp_browser_screenshot({ name: 'before-click' }); // Debug screenshot
-await mcp_browser_click({ index: elements.findIndex(el => el.text?.includes('Target Text')) });
+// const elements = await mcp_browser_get_clickable_elements();
+// await mcp_browser_screenshot({ name: 'before-click' }); // Debug screenshot
+// await mcp_browser_click({ index: elements.findIndex(el => el.text?.includes('Target Text')) });
 ```
 
 **Complete Testing Workflow Example:**
+**Example Code Pattern (for test scripts, not Copilot execution):**
 ```javascript
-// Standard test session setup with new identifiers
-await activate_mcp_browser_navigation_tools();
-await activate_mcp_browser_interaction_tools();
-await activate_mcp_browser_visual_tools();
+// EXAMPLE: Standard test session setup with new identifiers
+// Note: These are examples for documentation purposes only
+// activate_mcp_browser_navigation_tools();
+// activate_mcp_browser_interaction_tools();
+// activate_mcp_browser_visual_tools();
 
 // Navigate and start session
-await mcp_browser_navigate({ url: 'http://localhost:3100' });
-await mcp_browser_screenshot({ name: 'homepage' });
+// mcp_browser_navigate({ url: 'http://localhost:3100' });
+// mcp_browser_screenshot({ name: 'homepage' });
 
 // Create new session (much more reliable now!)
-await mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
+// mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
 
 // Send message using selector instead of guessing index
-await mcp_browser_form_input_fill({ 
-  selector: '[data-testid="message-input"]', 
-  value: 'Create a new RFP for LED lighting procurement' 
-});
-await mcp_browser_press_key({ key: 'Enter' });
+// mcp_browser_form_input_fill({ 
+//   selector: '[data-testid="message-input"]', 
+//   value: 'Create a new RFP for LED lighting procurement' 
+// });
+// mcp_browser_press_key({ key: 'Enter' });
 
 // Verify state changes
-const footer = await mcp_browser_get_text({ selector: '[data-testid="current-rfp-display"]' });
+// const footer = mcp_browser_get_text({ selector: '[data-testid="current-rfp-display"]' });
 // Should show "Current RFP: [name]" immediately after creation
 ```
 

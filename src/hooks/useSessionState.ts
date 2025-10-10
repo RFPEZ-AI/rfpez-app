@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { Message, Session, ArtifactReference } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import DatabaseService from '../services/database';
@@ -126,11 +126,11 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     }
   };
 
-  const clearUIState = () => {
+  const clearUIState = useCallback(() => {
     console.log('Clearing UI state for logout');
     setMessages([]);
     setSessions([]);
-  };
+  }, []); // No dependencies - setMessages and setSessions are stable
 
   return {
     sessions,
