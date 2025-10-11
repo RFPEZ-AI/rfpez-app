@@ -917,7 +917,7 @@ Do NOT wait for a new user message - generate your introduction and welcome mess
             // Filter out system messages from continuation (passed separately)
             // The enhanced system prompt instructs Claude to generate a welcome message
             // without requiring a new user message
-            let currentMessages = continuationMessages.filter(m => m.role !== 'system') as ClaudeMessage[];
+            const currentMessages = continuationMessages.filter(m => m.role !== 'system') as ClaudeMessage[];
             
             console.log('📝 Continuation messages prepared:', {
               message_count: currentMessages.length,
