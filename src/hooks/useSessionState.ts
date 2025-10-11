@@ -8,6 +8,7 @@ import DatabaseService from '../services/database';
 export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
+  const [pendingWelcomeMessage, setPendingWelcomeMessage] = useState<Message | null>(null);
 
   // Load user sessions on mount if authenticated
   useEffect(() => {
@@ -64,8 +65,13 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     }
   };
 
-  const createNewSession = async (currentAgent: SessionActiveAgent | null, inheritedRfpId?: number): Promise<string | null> => {
-    console.log('Creating new session, auth state:', { isAuthenticated, user: !!userId, inheritedRfpId });
+  const createNewSession = async (
+    currentAgent: SessionActiveAgent | null, 
+    inheritedRfpId?: number,
+    firstUserMessage?: string
+  ): Promise<string | null> => {
+    console.log('🎯 Lazy Session Creation - Creating session with first user message');
+    console.log('Creating new session, auth state:', { isAuthenticated, user: !!userId, inheritedRfpId, hasFirstMessage: !!firstUserMessage });
     if (!isAuthenticated || !userId) {
       console.log('Not authenticated or userId not available, skipping session creation');
       return null;
@@ -76,9 +82,14 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
       const rfpIdForSession = inheritedRfpId || undefined;
       console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id, 'and inherited RFP:', rfpIdForSession);
       
+      // Use first user message as title if provided (lazy creation pattern)
+      const sessionTitle = firstUserMessage 
+        ? firstUserMessage.substring(0, 50) + (firstUserMessage.length > 50 ? '...' : '')
+        : 'Chat Session';
+      
       const session = await DatabaseService.createSessionWithAgent(
         userId, 
-        'Chat Session', // Will be updated to message content when first message is sent
+        sessionTitle,
         currentAgent?.agent_id,
         undefined, // description
         rfpIdForSession
@@ -130,6 +141,8 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     console.log('Clearing UI state for logout');
     setMessages([]);
     setSessions([]);
+    setPendingWelcomeMessage(null);
+    console.log('✨ Pending welcome message cleared on logout');
   }, []); // No dependencies - setMessages and setSessions are stable
 
   return {
@@ -137,6 +150,8 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     setSessions,
     messages,
     setMessages,
+    pendingWelcomeMessage,
+    setPendingWelcomeMessage,
     loadUserSessions,
     loadSessionMessages,
     createNewSession,

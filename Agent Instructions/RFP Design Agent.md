@@ -279,6 +279,48 @@ create_and_set_rfp({
 - form_schema: Complete JSON Schema object with properties and required fields (REQUIRED)
 - artifact_role: "buyer_questionnaire" (REQUIRED for buyer forms)
 
+**🎯 CRITICAL: Form Schema Structure Rules (MUST FOLLOW):**
+
+1. **ALWAYS use FLAT schema structure** - All fields at root `properties` level
+2. **NEVER nest objects** - NO nested `type: "object"` properties
+3. **Use snake_case** - Field names like `company_name`, `contact_person`, `budget_range`
+4. **Match database storage** - Flat structure aligns with JSONB `default_values` column
+5. **Group visually** - Use field ordering, not nested objects
+
+**✅ CORRECT - Flat Schema:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "company_name": { "type": "string", "title": "Company Name" },
+    "contact_person": { "type": "string", "title": "Contact Person" },
+    "quantity": { "type": "number", "title": "Quantity Needed" },
+    "budget_range": {
+      "type": "string",
+      "title": "Budget Range",
+      "enum": ["Under $5,000", "$5,000 - $15,000", "$15,000+"]
+    },
+    "delivery_date": { "type": "string", "format": "date", "title": "Delivery Date" }
+  },
+  "required": ["company_name", "quantity"]
+}
+```
+
+**❌ WRONG - Nested Schema (DO NOT USE):**
+```json
+{
+  "type": "object",
+  "properties": {
+    "project_information": {
+      "type": "object",  // ❌ NO nested objects!
+      "properties": {
+        "company_name": { "type": "string" }
+      }
+    }
+  }
+}
+```
+
 **Example create_form_artifact call:**
 ```json
 {

@@ -346,7 +346,12 @@ export const useArtifactManagement = (
           size: artifact.file_size ? `${(artifact.file_size / 1024).toFixed(1)} KB` : 'Unknown',
           content: content,
           sessionId: artifact.session_id,
-          messageId: artifact.message_id
+          messageId: artifact.message_id,
+          // Preserve database fields for form rendering (CRITICAL for form data population)
+          schema: artifact.schema,
+          ui_schema: artifact.ui_schema,
+          default_values: artifact.default_values,
+          submit_action: artifact.submit_action
         };
       });
       
@@ -790,23 +795,27 @@ export const useArtifactManagement = (
             if (existingArtifactIndex !== -1) {
               console.log('📝 Updating existing form artifact:', artifactId);
               
-              // Refresh the artifact by reloading session artifacts
-              // This will pick up the updated default_values from the database
-              console.log('🔄 Refreshing artifacts to get updated form data...');
-              if (currentSessionId) {
-                loadSessionArtifacts(currentSessionId); // This will reload all artifacts with fresh data from database
-              }
-              
-              // Auto-select the updated artifact to show the changes
-              setSelectedArtifactId(artifactId);
-              
-              // Trigger auto-opening of artifact window (this was missing!)
-              if (onArtifactAdded) {
-                console.log('🚀 Triggering auto-open for updated form artifact:', artifactId);
-                onArtifactAdded(artifactId);
-              }
-              
-              console.log('✅ Triggered artifact refresh and auto-open for:', artifactId);
+              // Use async IIFE to await artifact reload
+              (async () => {
+                // Refresh the artifact by reloading session artifacts
+                // This will pick up the updated default_values from the database
+                console.log('🔄 Refreshing artifacts to get updated form data...');
+                if (currentSessionId) {
+                  await loadSessionArtifacts(currentSessionId); // CRITICAL: Wait for database reload to complete
+                  console.log('✅ Artifacts reloaded from database with updated form data');
+                }
+                
+                // Auto-select the updated artifact to show the changes
+                setSelectedArtifactId(artifactId);
+                
+                // Trigger auto-opening of artifact window (this was missing!)
+                if (onArtifactAdded) {
+                  console.log('🚀 Triggering auto-open for updated form artifact:', artifactId);
+                  onArtifactAdded(artifactId);
+                }
+                
+                console.log('✅ Completed artifact refresh and auto-open for:', artifactId);
+              })();
             } else {
               console.log('⚠️ Could not find existing form artifact to update:', artifactId);
               // Optionally, try to fetch the artifact from the database
@@ -830,23 +839,27 @@ export const useArtifactManagement = (
             if (existingArtifactIndex !== -1) {
               console.log('📝 Updating existing form artifact with new data:', artifactId);
               
-              // Refresh the artifact by reloading session artifacts
-              // This will pick up the updated default_values from the database
-              console.log('🔄 Refreshing artifacts to get updated form data...');
-              if (currentSessionId) {
-                loadSessionArtifacts(currentSessionId); // This will reload all artifacts with fresh data from database
-              }
-              
-              // Auto-select the updated artifact to show the changes
-              setSelectedArtifactId(artifactId);
-              
-              // Trigger auto-opening of artifact window for form data updates too!
-              if (onArtifactAdded) {
-                console.log('🚀 Triggering auto-open for form data update:', artifactId);
-                onArtifactAdded(artifactId);
-              }
-              
-              console.log('✅ Triggered artifact refresh and auto-open for form data update:', artifactId);
+              // Use async IIFE to await artifact reload
+              (async () => {
+                // Refresh the artifact by reloading session artifacts (AWAIT to ensure data is loaded)
+                // This will pick up the updated default_values from the database
+                console.log('🔄 Refreshing artifacts to get updated form data...');
+                if (currentSessionId) {
+                  await loadSessionArtifacts(currentSessionId); // CRITICAL: Wait for database reload to complete
+                  console.log('✅ Artifacts reloaded from database with updated form data');
+                }
+                
+                // Auto-select the updated artifact to show the changes (after data is loaded)
+                setSelectedArtifactId(artifactId);
+                
+                // Trigger auto-opening of artifact window for form data updates too!
+                if (onArtifactAdded) {
+                  console.log('🚀 Triggering auto-open for form data update:', artifactId);
+                  onArtifactAdded(artifactId);
+                }
+                
+                console.log('✅ Completed artifact refresh and auto-open for form data update:', artifactId);
+              })();
             } else {
               console.log('⚠️ Could not find existing form artifact to update data for:', artifactId);
               console.log('ℹ️ Available artifacts:', artifacts.map(a => a.id));

@@ -33,13 +33,19 @@ const AgentIndicator: React.FC<AgentIndicatorProps> = ({
     return (
       <IonChip className="agent-indicator no-agent" color="warning" data-testid="agent-selector">
         <IonIcon icon={informationCircleOutline} />
-        <IonLabel>No agent selected</IonLabel>
+        <IonLabel>
+          <span>No agent selected</span>
+          <IonText color="medium" style={{ fontSize: '0.75em', display: 'block', marginTop: '2px' }}>
+            Check browser console for details
+          </IonText>
+        </IonLabel>
         {showSwitchButton && (
           <IonButton 
             fill="clear" 
             size="small" 
             onClick={onSwitchAgent}
             data-testid="select-agent-button"
+            title="Select an agent to start chatting"
           >
             Select Agent
           </IonButton>

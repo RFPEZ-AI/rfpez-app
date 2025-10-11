@@ -378,6 +378,21 @@ function handleStreamingResponse(
         const agentContext = await loadAgentContext(supabase, sessionId, agentId);
         const userProfile = await loadUserProfile(supabase);
         
+        // 🎭 Send activation notice if processing initial_prompt (agent activation/welcome)
+        if (processInitialPrompt && agentContext) {
+          const activationNotice = {
+            type: 'agent_activation',
+            agent_name: agentContext.name,
+            agent_role: agentContext.role,
+            message: `Activating ${agentContext.name} agent...`,
+            timestamp: new Date().toISOString()
+          };
+          controller.enqueue(
+            new TextEncoder().encode(`data: ${JSON.stringify(activationNotice)}\n\n`)
+          );
+          console.log('📣 Sent activation notice for initial_prompt:', activationNotice.message);
+        }
+        
         // Extract user message for agent switch context detection
         const lastUserMessage = messages && messages.length > 0 ? 
           messages[messages.length - 1] : null;
@@ -693,9 +708,14 @@ Generate the ${authStatus} user welcome message now.`;
       }
     }
 
-    // If streaming is requested, handle it separately
-    if (stream) {
-      console.log('🌊 Streaming requested - using streaming handler');
+    // If streaming is requested OR processInitialPrompt is true, handle with streaming
+    // Initial prompt processing ALWAYS uses streaming for better UX and memory search
+    if (stream || processInitialPrompt) {
+      if (processInitialPrompt) {
+        console.log('🌊 Initial prompt processing - forcing streaming for activation notice and memory search');
+      } else {
+        console.log('🌊 Streaming requested - using streaming handler');
+      }
       return handleStreamingResponse(processedMessages, supabase, userId, actualSessionId, effectiveAgentId, effectiveUserMessage, agent, newSessionData, processInitialPrompt);
     }
 
@@ -713,21 +733,30 @@ Generate the ${authStatus} user welcome message now.`;
     
     // Send request to Claude API
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const claudeResponse = await claudeService.sendMessage(processedMessages as ClaudeMessage[], tools);
+    let claudeResponse = await claudeService.sendMessage(processedMessages as ClaudeMessage[], tools);
     
-    // Execute any tool calls
+    // Execute any tool calls with recursive support (up to 5 rounds)
+    const MAX_TOOL_ROUNDS = 5;
     let toolResults: unknown[] = [];
-    if (claudeResponse.toolCalls && claudeResponse.toolCalls.length > 0) {
-      console.log('Executing tool calls:', claudeResponse.toolCalls.length);
-      toolResults = await toolService.executeToolCalls(claudeResponse.toolCalls, sessionId);
+    let currentMessages = processedMessages as ClaudeMessage[];
+    let currentResponse = claudeResponse;
+    let toolRound = 0;
+    
+    while (currentResponse.toolCalls && currentResponse.toolCalls.length > 0 && toolRound < MAX_TOOL_ROUNDS) {
+      toolRound++;
+      console.log(`🔧 Tool execution round ${toolRound}/${MAX_TOOL_ROUNDS}, executing ${currentResponse.toolCalls.length} tools`);
+      
+      toolResults = await toolService.executeToolCalls(currentResponse.toolCalls, sessionId, effectiveAgentId);
       
       // If there were tool calls, send follow-up message to Claude with results
       if (toolResults.length > 0) {
+        console.log(`🔧 Tool round ${toolRound}: Sending results back to Claude`);
+        
         const followUpMessages = [
-          ...processedMessages,
+          ...currentMessages,
           {
             role: 'assistant',
-            content: claudeResponse.toolCalls.map((call: unknown) => ({
+            content: currentResponse.toolCalls.map((call: unknown) => ({
               type: 'tool_use',
               id: isClaudeToolCall(call) ? call.id : String((call as Record<string, unknown>).id || ''),
               name: isClaudeToolCall(call) ? call.name : String((call as Record<string, unknown>).name || ''),
@@ -738,18 +767,30 @@ Generate the ${authStatus} user welcome message now.`;
             role: 'user',
             content: toolResults.map((result: unknown, index: number) => ({
               type: 'tool_result',
-              tool_use_id: claudeResponse.toolCalls[index].id, // Use the original tool call ID
+              tool_use_id: currentResponse.toolCalls[index].id, // Use the original tool call ID
               content: JSON.stringify(result) // The result itself is the output
             }))
           }
-        ];
+        ] as ClaudeMessage[];
         
-        // Get final response from Claude
+        // Get next response from Claude (may have more tool calls)
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const finalResponse = await claudeService.sendMessage(followUpMessages as ClaudeMessage[], tools);
-        claudeResponse.textResponse = finalResponse.textResponse;
+        currentResponse = await claudeService.sendMessage(followUpMessages, tools);
+        currentMessages = followUpMessages;
+        
+        console.log(`✅ Tool round ${toolRound} completed, has_more_tools: ${!!currentResponse.toolCalls?.length}`);
+      } else {
+        break; // No results, stop
       }
     }
+    
+    if (toolRound >= MAX_TOOL_ROUNDS && currentResponse.toolCalls?.length > 0) {
+      console.warn(`⚠️ Reached max tool rounds (${MAX_TOOL_ROUNDS}), stopping with ${currentResponse.toolCalls.length} pending tools`);
+    }
+    
+    // Update claudeResponse with the final response
+    claudeResponse = currentResponse;
+    console.log(`✅ Tool execution completed after ${toolRound} rounds`);
 
     // Detect if an agent switch occurred successfully
     // In non-streaming mode, we need to check both the tool calls and the results
@@ -854,7 +895,11 @@ Generate the ${authStatus} user welcome message now.`;
             
             // 🎯 Build enhanced system prompt that includes agent instructions + initial_prompt
             const enhancedSystemPrompt = hasInitialPrompt
-              ? `${newSystemPrompt}\n\n---\n\n🎯 AGENT ACTIVATION INSTRUCTIONS:\n${newAgentData.initial_prompt}\n\n---\n\nYou are now the active agent for this conversation. The user has been handed off to you from another agent. If your activation instructions above tell you to search memory or perform other actions, do so FIRST before generating your welcome message.`
+              ? `${newSystemPrompt}\n\n---\n\n🎯 AGENT ACTIVATION INSTRUCTIONS:\n${newAgentData.initial_prompt}\n\n---\n\nYou are now the active agent for this conversation. The user has been handed off to you from another agent. 
+
+CRITICAL: You must respond immediately with a welcome message to the user. The conversation above shows the context, but you should now introduce yourself as the new agent and offer assistance. If your activation instructions above tell you to search memory or perform other actions, do so FIRST, then use the memory context to personalize your welcome message.
+
+Do NOT wait for a new user message - generate your introduction and welcome message right now based on the conversation context above.`
               : newSystemPrompt;
             
             console.log('🤖 Triggering new agent response:', {
@@ -866,35 +911,111 @@ Generate the ${authStatus} user welcome message now.`;
               has_activation_instructions: hasInitialPrompt
             });
             
-            // **NON-STREAMING AGENT CONTINUATION** - Get response from new agent
-            // IMPORTANT: Pass system prompt separately, not as a message in the array
-            const continuationResponse = await claudeService.sendMessage(
-              continuationMessages.filter(m => m.role !== 'system') as ClaudeMessage[], 
-              newTools,
-              4000,
-              enhancedSystemPrompt
-            );
+            // **STREAMING AGENT CONTINUATION** - Return streaming response with activation notice
+            console.log('🌊 STREAMING: Continuing with new agent, using initial_prompt in enhanced system prompt');
             
-            // Update the main response with continuation
-            if (continuationResponse.textResponse) {
-              claudeResponse.textResponse = continuationResponse.textResponse;
-            }
+            // Filter out system messages from continuation (passed separately)
+            // The enhanced system prompt instructs Claude to generate a welcome message
+            // without requiring a new user message
+            let currentMessages = continuationMessages.filter(m => m.role !== 'system') as ClaudeMessage[];
             
-            console.log('✅ Agent continuation completed successfully', {
-              continuation_content_length: continuationResponse.textResponse?.length || 0,
-              has_tool_calls: continuationResponse.toolCalls?.length > 0
+            console.log('📝 Continuation messages prepared:', {
+              message_count: currentMessages.length,
+              last_message_role: currentMessages[currentMessages.length - 1]?.role,
+              last_message_preview: String(currentMessages[currentMessages.length - 1]?.content).substring(0, 100),
+              will_use_enhanced_system_prompt: hasInitialPrompt
             });
             
+            // Create streaming response with activation notice
+            const stream = new ReadableStream({
+              async start(controller) {
+                try {
+                  // 1. Send activation notice immediately
+                  const activationNotice = {
+                    type: 'agent_activation',
+                    agent_name: newAgentData?.name,
+                    agent_role: newAgentData?.role,
+                    message: `Activating ${newAgentData?.name} agent...`,
+                    timestamp: new Date().toISOString()
+                  };
+                  controller.enqueue(
+                    new TextEncoder().encode(`data: ${JSON.stringify(activationNotice)}\n\n`)
+                  );
+                  
+                  console.log('📣 Sent activation notice:', activationNotice.message);
+                  
+                  // 2. Use streamWithRecursiveTools for streaming with recursive tool execution
+                  console.log('🔄 Starting recursive tool execution with streaming...');
+                  await streamWithRecursiveTools(
+                    currentMessages,
+                    newTools,
+                    enhancedSystemPrompt,
+                    claudeService,
+                    toolService,
+                    controller,
+                    actualSessionId,
+                    newAgentData?.id as string
+                  );
+                  
+                  // 3. Send completion event
+                  const completeEvent = {
+                    type: 'complete',
+                    timestamp: new Date().toISOString()
+                  };
+                  controller.enqueue(
+                    new TextEncoder().encode(`data: ${JSON.stringify(completeEvent)}\n\n`)
+                  );
+                  
+                  controller.close();
+                  console.log('✅ Agent continuation streaming completed successfully');
+                } catch (error) {
+                  console.error('❌ Agent continuation streaming failed:', error);
+                  const errorEvent = {
+                    type: 'error',
+                    error: error instanceof Error ? error.message : 'Unknown error',
+                    timestamp: new Date().toISOString()
+                  };
+                  controller.enqueue(
+                    new TextEncoder().encode(`data: ${JSON.stringify(errorEvent)}\n\n`)
+                  );
+                  controller.close();
+                }
+              }
+            });
+            
+            // Return streaming response immediately (bypassing normal response flow)
+            return new Response(stream, {
+              headers: {
+                ...corsHeaders,
+                'Content-Type': 'text/event-stream',
+                'Cache-Control': 'no-cache',
+                'Connection': 'keep-alive',
+              }
+            });
           } catch (continuationError) {
-            console.error('❌ Automatic agent continuation failed:', continuationError);
-            // Fallback to original behavior - just notify about the switch
-            claudeResponse.textResponse = `*Connected to ${newAgentData?.name} agent. Please continue your conversation.*`;
+            console.error('❌ Agent continuation streaming failed:', continuationError);
+            // Return error response
+            return new Response(
+              JSON.stringify({ error: 'Agent continuation failed', details: continuationError instanceof Error ? continuationError.message : 'Unknown error' }),
+              { status: 500, headers: corsHeaders }
+            );
           }
-          
-        } catch (continuationError) {
-          console.error('❌ Agent continuation setup failed:', continuationError);
-          // Don't fail the whole request, just log the error
+        } catch (historyError) {
+          console.error('❌ Failed to fetch conversation history for agent continuation:', historyError);
+          // Continue with original response if history fetch fails
         }
+            
+            // � Handle multiple rounds of tool calls (up to MAX_TOOL_ROUNDS)
+
+
+              
+
+              
+
+            
+
+          
+
       }
     }
 

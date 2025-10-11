@@ -674,6 +674,8 @@ export class ClaudeService {
     try {
       // Use the edge function with processInitialPrompt flag
       console.log('🎭 Calling edge function with processInitialPrompt=true');
+      // 🎯 IMPORTANT: processInitialPrompt MUST use streaming because edge function forces streaming
+      // when processInitialPrompt=true to enable activation notices and memory search
       const response = await this.generateResponseViaEdgeFunction(
         agent.initial_prompt || 'Hello! How can I help you today?',
         agent,
@@ -683,8 +685,14 @@ export class ClaudeService {
         null, // No current RFP
         null, // No current artifact
         undefined, // No abort signal
-        false, // No streaming for initial prompts
-        undefined, // No onChunk callback for non-streaming
+        true, // ✅ Enable streaming - edge function forces streaming for processInitialPrompt
+        (chunk: string, isComplete: boolean) => {
+          // Silent streaming - no UI updates during initial prompt processing
+          // The streaming handler accumulates chunks internally in fullContent
+          if (isComplete) {
+            console.log('✅ Initial prompt streaming complete');
+          }
+        },
         true // processInitialPrompt = true
       );
       

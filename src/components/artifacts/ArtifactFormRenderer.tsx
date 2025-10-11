@@ -1,11 +1,12 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useRef, useEffect, useState } from 'react';
+import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { IonButton } from '@ionic/react';
 import Form from '@rjsf/core';
 import validator from '@rjsf/validator-ajv8';
 import { RJSFSchema, UiSchema } from '@rjsf/utils';
 import { Artifact } from '../../types/home';
+import CustomFormRenderer from './CustomFormRenderer';
 
 interface BuyerQuestionnaireData {
   schema: RJSFSchema;
@@ -42,7 +43,41 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const [isInModal, setIsInModal] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [currentFormData, setCurrentFormData] = useState<Record<string, unknown>>({});
+  
+  // Initialize currentFormData with artifact data immediately
+  const dbArtifact = artifact as Artifact & {schema?: object; ui_schema?: object; default_values?: object};
+  const initialFormData = (dbArtifact.default_values || {}) as Record<string, unknown>;
+  
+  console.log('🔍 COMPONENT INITIALIZATION:', {
+    artifactId: artifact.id,
+    artifactName: artifact.name,
+    hasDefaultValues: !!dbArtifact.default_values,
+    initialFormDataKeys: Object.keys(initialFormData).length,
+    initialFormDataSample: {
+      company_name: initialFormData['company_name'],
+      contact_person: initialFormData['contact_person'],
+      project_name: initialFormData['project_name']
+    }
+  });
+  
+  const [currentFormData, setCurrentFormData] = useState<Record<string, unknown>>(initialFormData);
+  
+  // Use artifact ID + data hash as key to force complete remount when data changes
+  // This ensures React JSON Schema Form starts fresh with new data
+  const formKey = `${artifact.id}-${JSON.stringify(dbArtifact.default_values || {}).substring(0, 50)}`;
+  
+  // Force complete unmount/remount when data is ready
+  const [isFormReady, setIsFormReady] = useState(false);
+  
+  useEffect(() => {
+    // Reset form ready state when artifact changes
+    setIsFormReady(false);
+    // Use setTimeout to ensure complete unmount before remount
+    const timer = setTimeout(() => {
+      setIsFormReady(true);
+    }, 10);
+    return () => clearTimeout(timer);
+  }, [artifact.id]);
 
   // Detect if we're inside a modal
   useEffect(() => {
@@ -58,24 +93,78 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
     checkModalContext();
   }, []);
 
-  try {
-    let formSpec: BuyerQuestionnaireData;
-
-    // Handle database Artifact (has schema/ui_schema properties)
+  // Update form when artifact default_values change (for form population)
+  useEffect(() => {
+    console.log('🔄 ArtifactFormRenderer: Artifact changed, checking for form data updates...');
+    
+    // Extract database artifact with form fields
     const dbArtifact = artifact as Artifact & {schema?: object; ui_schema?: object; default_values?: object};
+    console.log('📋 Form artifact data:', {
+      id: artifact.id,
+      name: artifact.name,
+      hasSchema: !!dbArtifact.schema,
+      hasDefaultValues: !!dbArtifact.default_values,
+      defaultValuesKeys: dbArtifact.default_values ? Object.keys(dbArtifact.default_values) : [],
+      defaultValuesPreview: dbArtifact.default_values ? JSON.stringify(dbArtifact.default_values).substring(0, 100) : 'none'
+    });
+
+    // CRITICAL FIX: Update state with form data when artifact changes
+    if (dbArtifact.default_values && Object.keys(dbArtifact.default_values).length > 0) {
+      console.log('🔧 Updating form data state with', Object.keys(dbArtifact.default_values).length, 'fields');
+      setCurrentFormData(dbArtifact.default_values as Record<string, unknown>);
+      console.log('✅ Form data state updated, will re-render');
+    } else {
+      // No data, reset to empty
+      setCurrentFormData({});
+    }
+  }, [artifact]); // Watch artifact for changes only
+
+  // Memoize formSpec to create fresh object instances only when artifact changes
+  const formSpec = useMemo(() => {
+    const dbArtifact = artifact as Artifact & {schema?: object; ui_schema?: object; default_values?: object};
+    
     if (dbArtifact.schema && typeof dbArtifact.schema === 'object') {
-      formSpec = {
-        schema: dbArtifact.schema,
-        uiSchema: dbArtifact.ui_schema || {},
-        formData: (dbArtifact.default_values || {}) as Record<string, unknown>
+      console.log('✅ Using database artifact format with separate fields');
+      console.log('📊 default_values object:', {
+        hasDefaultValues: !!dbArtifact.default_values,
+        defaultValuesType: typeof dbArtifact.default_values,
+        defaultValuesKeys: dbArtifact.default_values ? Object.keys(dbArtifact.default_values).length : 0,
+        firstThreeKeys: dbArtifact.default_values ? Object.keys(dbArtifact.default_values).slice(0, 3) : [],
+        sampleValue: dbArtifact.default_values ? Object.entries(dbArtifact.default_values)[0] : null
+      });
+      
+      // Create deep copies of ALL objects to break any references
+      // This ensures React JSON Schema Form sees everything as completely fresh
+      const formDataCopy = dbArtifact.default_values 
+        ? JSON.parse(JSON.stringify(dbArtifact.default_values))
+        : {};
+      
+      const spec: BuyerQuestionnaireData = {
+        schema: JSON.parse(JSON.stringify(dbArtifact.schema)), // Deep copy schema
+        uiSchema: JSON.parse(JSON.stringify(dbArtifact.ui_schema || {})), // Deep copy uiSchema
+        formData: formDataCopy as Record<string, unknown>
       };
+      
+      console.log('📋 formSpec.formData will be:', Object.keys(spec.formData || {}).length, 'fields');
+      console.log('🔍 Sample form data values:', {
+        company_name: spec.formData?.['company_name'],
+        contact_person: spec.formData?.['contact_person'],
+        project_name: spec.formData?.['project_name']
+      });
+      
+      return spec;
     } else if (artifact.content) {
       // Handle legacy content-based format
-      formSpec = JSON.parse(artifact.content);
+      console.log('⚠️ Using legacy content-based format');
+      return JSON.parse(artifact.content);
     } else {
       // Fallback to empty form
-      formSpec = { schema: {}, uiSchema: {}, formData: {} };
+      console.warn('❌ No schema or content found, using empty form');
+      return { schema: {}, uiSchema: {}, formData: {} };
     }
+  }, [artifact.id, artifact.content]);
+
+  try {
     
     const handleSubmit = (data: FormSubmissionData) => {
       console.log('Form submitted:', data.formData);
@@ -119,6 +208,19 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
 
     // Use title from the form spec if available, fallback to artifact name
     const formTitle = formSpec.title || artifact.name;
+
+    // Debug: Log rendering state
+    console.log('🎨 RENDERING Form component with:', {
+      formKey,
+      currentFormDataKeys: currentFormData ? Object.keys(currentFormData).length : 0,
+      currentFormDataSample: currentFormData ? {
+        company_name: currentFormData['company_name'],
+        contact_person: currentFormData['contact_person'],
+        project_name: currentFormData['project_name']
+      } : null,
+      artifactId: artifact.id,
+      artifactName: artifact.name
+    });
 
     return (
       <div 
@@ -234,27 +336,55 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
           data-testid="form-content"
           style={{ 
           flex: 1, 
-          overflow: 'auto', 
-          marginBottom: isPortrait ? '8px' : '12px',
-          paddingTop: isPortrait ? '8px' : '12px'
+          overflow: 'hidden', 
+          display: 'flex',
+          flexDirection: 'column'
         }}>
-          <Form
-            schema={formSpec.schema}
-            uiSchema={(formSpec.uiSchema || {}) as UiSchema<Record<string, unknown>>}
-            formData={formSpec.formData || {}}
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            validator={validator as any}
-            onSubmit={handleSubmit}
-            onError={handleError}
-            onChange={(e) => handleFormChange(e.formData || {})}
-            showErrorList={false}
-            ref={formRef}
-          >
-            {/* Hidden submit button for react-jsonschema-form */}
-            <button type="submit" style={{ display: 'none' }} />
-          </Form>
+          {(() => {
+            console.log('🎯 FORM RENDER STATE:', {
+              isFormReady,
+              hasFormSpec: !!formSpec,
+              hasSchema: !!formSpec?.schema,
+              hasFormData: !!formSpec?.formData,
+              formDataKeys: formSpec?.formData ? Object.keys(formSpec.formData).length : 0
+            });
+            
+            if (!isFormReady) {
+              return (
+                <div style={{ padding: '20px', textAlign: 'center', color: '#666' }}>
+                  Loading form...
+                </div>
+              );
+            }
+            
+            console.log('🚀 Rendering CustomFormRenderer with:', {
+              schemaProperties: Object.keys(formSpec.schema.properties || {}).length,
+              formDataKeys: Object.keys(formSpec.formData || currentFormData).length
+            });
+            
+            return (
+              <CustomFormRenderer
+                key={formKey}
+                schema={formSpec.schema}
+                formData={formSpec.formData || currentFormData}
+                onSubmit={(data) => handleSubmit({ formData: data })}
+                onSave={onSave ? async (data) => {
+                  setIsSaving(true);
+                  try {
+                    await onSave(artifact, data);
+                  } catch (error) {
+                    console.error('Error saving form:', error);
+                  } finally {
+                    setIsSaving(false);
+                  }
+                } : undefined}
+                isPortrait={isPortrait}
+              />
+            );
+          })()}
         </div>
         
+        {/* Hide duplicate action buttons - CustomFormRenderer has its own */}
         <div 
           className="form-submit-container"
           data-testid="form-submit-area"
@@ -262,12 +392,10 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
           padding: isPortrait ? '8px 0' : '12px 0',
           borderTop: '1px solid var(--ion-color-light)',
           flexShrink: 0,
-          display: 'flex',
-          flexDirection: isPortrait ? 'column' : 'row',
-          gap: isPortrait ? '8px' : '12px'
+          display: 'none' // Hidden - CustomFormRenderer has its own buttons
         }}>
           {/* Save Button (Draft Mode) */}
-          {onSave && (
+          {false && onSave && (
             <IonButton
               className="form-save-button"
               data-testid="form-save-button"

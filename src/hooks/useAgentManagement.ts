@@ -21,8 +21,11 @@ export const useAgentManagement = (sessionId: string | null = null) => {
   }, []);
 
   const loadDefaultAgentWithPrompt = useCallback(async (): Promise<Message | null> => {
+    console.log('🎯 loadDefaultAgentWithPrompt: Starting...');
     try {
       const defaultAgent = await AgentService.getDefaultAgent();
+      console.log('🎯 loadDefaultAgentWithPrompt: Default agent fetched:', defaultAgent?.name);
+      
       if (defaultAgent) {
         const sessionActiveAgent: SessionActiveAgent = {
           agent_id: defaultAgent.id,
@@ -31,7 +34,10 @@ export const useAgentManagement = (sessionId: string | null = null) => {
           agent_initial_prompt: defaultAgent.initial_prompt,
           agent_avatar_url: defaultAgent.avatar_url
         };
+        
+        console.log('🎯 loadDefaultAgentWithPrompt: Setting currentAgent state to:', sessionActiveAgent.agent_name);
         setCurrentAgent(sessionActiveAgent);
+        console.log('🎯 loadDefaultAgentWithPrompt: currentAgent state set successfully');
         
         // Persist agent to session context only (agents are session-based now)
         if (sessionId) {
@@ -41,41 +47,126 @@ export const useAgentManagement = (sessionId: string | null = null) => {
         }
         
         console.log('Loaded default agent with prompt:', sessionActiveAgent);
+        console.log('🔍 DEBUG: defaultAgent.initial_prompt exists?', !!defaultAgent.initial_prompt);
+        console.log('🔍 DEBUG: sessionId:', sessionId);
 
-        // 🎭 DYNAMIC WELCOME: Process initial_prompt through Claude for dynamic greeting
-        const { ClaudeService } = await import('../services/claudeService');
-        const userProfile = await DatabaseService.getUserProfile();
-        
-        const dynamicWelcome = await ClaudeService.processInitialPrompt(
-          defaultAgent,
-          sessionId || undefined,
-          userProfile || undefined
-        );
-
-        // Return the dynamic welcome message
-        const initialMessage: Message = {
-          id: 'initial-prompt',
-          content: dynamicWelcome,
-          isUser: false,
-          timestamp: new Date(),
-          agentName: defaultAgent.name
-        };
-        console.log('Created dynamic welcome message:', dynamicWelcome.substring(0, 100) + '...');
-        return initialMessage;
+        // 🎭 DYNAMIC WELCOME: Process initial_prompt through edge function with streaming
+        // This allows the agent to search memory across sessions and personalize the welcome
+        if (defaultAgent.initial_prompt) {
+          console.log('🌊 Processing initial_prompt with streaming agent continuation...');
+          console.log('🔍 DEBUG: About to import ClaudeService...');
+          
+          // Import ClaudeService to trigger initial prompt processing
+          const { ClaudeService } = await import('../services/claudeService');
+          console.log('🔍 DEBUG: ClaudeService imported, calling processInitialPrompt...');
+          
+          try {
+            // Call edge function with processInitialPrompt=true
+            // This triggers the same streaming continuation logic used for agent switches
+            const dynamicWelcome = await ClaudeService.processInitialPrompt(defaultAgent, sessionId || undefined, undefined);
+            console.log('🔍 DEBUG: processInitialPrompt returned:', dynamicWelcome?.substring(0, 100));
+            
+            const initialMessage: Message = {
+              id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
+              content: dynamicWelcome,
+              isUser: false,
+              timestamp: new Date(),
+              agentName: defaultAgent.name
+            };
+            
+            console.log('✅ Created dynamic agent greeting from initial_prompt');
+            return initialMessage;
+          } catch (error) {
+            console.error('❌ Failed to process initial_prompt, using simple fallback:', error);
+            // Fallback to simple welcome if processing fails
+            const simpleWelcome = `Welcome! I'm your ${defaultAgent.name}, here to help with procurement and sourcing.`;
+            return {
+              id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
+              content: simpleWelcome,
+              isUser: false,
+              timestamp: new Date(),
+              agentName: defaultAgent.name
+            };
+          }
+        } else {
+          // No initial_prompt defined, use simple static welcome
+          const simpleWelcome = `Welcome to **EZRFP.APP**! 👋\n\nI'm your ${defaultAgent.name}, here to help you streamline your procurement process.`;
+          
+          const initialMessage: Message = {
+            id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
+            content: simpleWelcome,
+            isUser: false,
+            timestamp: new Date(),
+            agentName: defaultAgent.name
+          };
+          
+          console.log('Created simple agent greeting (no initial_prompt)');
+          return initialMessage;
+        }
+      } else {
+        console.error('❌ loadDefaultAgentWithPrompt: No default agent found from AgentService.getDefaultAgent()');
       }
     } catch (error) {
-      console.error('Failed to load default agent with prompt:', error);
+      console.error('❌ loadDefaultAgentWithPrompt: Exception caught:', error);
     }
+    
+    console.log('🎯 loadDefaultAgentWithPrompt: Returning null (no agent loaded)');
     return null;
+    
+    /* OLD APPROACH - Commented out, now handled by edge function agent continuation
+    const { ClaudeService} = await import('../services/claudeService');
+    const dynamicWelcome = await ClaudeService.processInitialPrompt(defaultAgent, sessionId, userProfile);
+    return { id: 'initial-prompt', content: dynamicWelcome, isUser: false, timestamp: new Date(), agentName: defaultAgent.name };
+    */
   }, [sessionId]); // Only depends on sessionId
 
   const loadSessionAgent = async (sessionId: string) => {
+    console.log('🔄 loadSessionAgent called with sessionId:', sessionId);
+    
+    // Guard: Don't load if sessionId is invalid
+    if (!sessionId || typeof sessionId !== 'string') {
+      console.error('❌ loadSessionAgent: Invalid sessionId provided:', sessionId);
+      return;
+    }
+    
     try {
       const agent = await AgentService.getSessionActiveAgent(sessionId);
-      setCurrentAgent(agent);
-      console.log('Loaded session agent:', agent);
+      console.log('✅ Agent data received from service:', agent);
+      
+      if (!agent) {
+        console.warn('⚠️ No agent returned from AgentService.getSessionActiveAgent');
+        console.warn('💡 This could indicate:');
+        console.warn('  1. Database query returned no results');
+        console.warn('  2. RPC function get_session_active_agent failed');
+        console.warn('  3. Network/Supabase connectivity issue');
+        console.warn('  4. Session has no active agent assigned');
+        console.warn('⚠️ NOT clearing current agent - keeping existing agent state');
+        
+        // CRITICAL: Don't set agent to null if we don't have one
+        // This prevents clearing the default agent when switching to a new session
+        // Show user-friendly error in UI
+        // TODO: Add toast notification here
+        return; // Exit early without clearing agent
+      } else {
+        console.log('✅ Setting currentAgent state with:', {
+          agent_id: agent.agent_id,
+          agent_name: agent.agent_name
+        });
+        // Only set agent if we got a valid agent from the database
+        setCurrentAgent(agent);
+        console.log('✅ setCurrentAgent called - state should update on next render');
+      }
     } catch (error) {
-      console.error('Failed to load session agent:', error);
+      console.error('❌ CRITICAL: Failed to load session agent:', error);
+      console.error('🔍 Error details:', {
+        error,
+        errorType: error instanceof Error ? error.name : 'Unknown',
+        errorMessage: error instanceof Error ? error.message : 'Unknown error',
+        sessionId
+      });
+      
+      // Show user-friendly error in UI  
+      // TODO: Add toast notification here
     }
   };
 
@@ -94,50 +185,18 @@ export const useAgentManagement = (sessionId: string | null = null) => {
       console.error('Failed to persist agent change:', error);
     }
     
-    // 🎭 DYNAMIC WELCOME: Process initial_prompt through Claude for context-aware greeting
-    if (newAgent.agent_initial_prompt) {
-      try {
-        const { ClaudeService } = await import('../services/claudeService');
-        const userProfile = await DatabaseService.getUserProfile();
-        
-        // Reconstruct partial Agent object for ClaudeService (only needed fields)
-        const agentForProcessing = {
-          id: newAgent.agent_id,
-          name: newAgent.agent_name,
-          instructions: newAgent.agent_instructions,
-          initial_prompt: newAgent.agent_initial_prompt,
-          avatar_url: newAgent.agent_avatar_url
-        } as Agent;
-        
-        const dynamicWelcome = await ClaudeService.processInitialPrompt(
-          agentForProcessing,
-          sessionId || undefined,
-          userProfile || undefined
-        );
-
-        const initialMessage: Message = {
-          id: `agent-greeting-${newAgent.agent_id}-${Date.now()}`,
-          content: dynamicWelcome,
-          isUser: false,
-          timestamp: new Date(),
-          agentName: newAgent.agent_name
-        };
-        console.log('Created dynamic agent switch message:', dynamicWelcome.substring(0, 100) + '...');
-        return initialMessage;
-      } catch (error) {
-        console.error('Failed to process initial prompt through Claude, using static:', error);
-        // Fallback to static prompt on error
-        const fallbackMessage: Message = {
-          id: `agent-greeting-${newAgent.agent_id}-${Date.now()}`,
-          content: newAgent.agent_initial_prompt,
-          isUser: false,
-          timestamp: new Date(),
-          agentName: newAgent.agent_name
-        };
-        return fallbackMessage;
-      }
-    }
+    // 🎭 AGENT CONTINUATION: Initial prompt processing now handled by edge function streaming
+    // When agent switch occurs, the edge function processes initial_prompt and streams the response
+    // No client-side processing needed - this function is obsolete
+    console.log('⚠️ createAgentSwitchMessage called - this is now handled by edge function agent continuation');
     return null;
+    
+    /* OLD APPROACH - Commented out, replaced by streaming agent continuation in edge function
+    if (newAgent.agent_initial_prompt) {
+      const dynamicWelcome = await ClaudeService.processInitialPrompt(agentForProcessing, sessionId, userProfile);
+      return { id: `agent-greeting-${newAgent.agent_id}-${Date.now()}`, content: dynamicWelcome, isUser: false, timestamp: new Date(), agentName: newAgent.agent_name };
+    }
+    */
   };
 
   const handleNewAgent = () => {

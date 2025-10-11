@@ -97,6 +97,8 @@ const Home: React.FC = () => {
     sessions,
     messages,
     setMessages,
+    pendingWelcomeMessage,
+    setPendingWelcomeMessage,
     loadUserSessions,
     loadSessionMessages,
     createNewSession,
@@ -210,6 +212,10 @@ const Home: React.FC = () => {
     
     // Clear the new session creation flag since we're now selecting a session
     setIsCreatingNewSession(false);
+    
+    // Clear pending welcome message since we're loading an existing session
+    setPendingWelcomeMessage(null);
+    console.log('✨ Pending welcome message cleared for existing session');
     
     // Set session loading flag to trigger input focus
     setIsSessionLoading(true);
@@ -780,33 +786,62 @@ const Home: React.FC = () => {
   }, [currentSessionId, handleSetCurrentRfp, handleClearCurrentRfp]);
 
   // Load active agent when session changes - but only if not already handled by handleSelectSession
+  // Note: Intentionally excluding loadSessionAgent, loadDefaultAgentWithPrompt, and currentAgent from deps
+  // to prevent infinite loop when agent state changes
   useEffect(() => {
-    if (currentSessionId && userId) {
+    console.log('🔍 AGENT LOAD EFFECT:', { 
+      currentSessionId, 
+      currentSessionIdType: typeof currentSessionId,
+      currentSessionIdValue: currentSessionId === undefined ? 'undefined' : currentSessionId === null ? 'null' : 'has value',
+      userId, 
+      isAuthenticated, 
+      initialAgentLoaded: initialAgentLoadedRef.current,
+      currentAgent: currentAgent?.agent_name 
+    });
+    
+    // CRITICAL: Only load session agent if we have a REAL session ID (not null, not undefined)
+    if (currentSessionId && typeof currentSessionId === 'string' && userId) {
       // Only load agent - artifacts and messages are handled by handleSelectSession
+      console.log('📥 Loading session agent for:', currentSessionId);
       loadSessionAgent(currentSessionId);
       // Reset initial load flag when switching sessions
       initialAgentLoadedRef.current = false;
-    } else if (!currentSessionId && isAuthenticated && userId && !initialAgentLoadedRef.current) {
+    } else if ((!currentSessionId || currentSessionId === null) && isAuthenticated && userId && !initialAgentLoadedRef.current) {
       // Only load once using ref to prevent infinite loop
+      console.log('✨ Loading default agent (no session)...');
       initialAgentLoadedRef.current = true;
       loadDefaultAgentWithPrompt().then(initialMessage => {
         if (initialMessage) {
+          console.log('✅ Default agent loaded, setting messages:', initialMessage.agentName);
           setMessages([initialMessage]);
+        } else {
+          console.warn('⚠️ loadDefaultAgentWithPrompt returned null');
+          // Reset flag so it can try again
+          initialAgentLoadedRef.current = false;
         }
+      }).catch(error => {
+        console.error('❌ Failed to load default agent:', error);
+        // Reset flag so it can try again
+        initialAgentLoadedRef.current = false;
+      });
+    } else {
+      console.log('⏭️ Skipping agent load:', {
+        reason: !currentSessionId ? 'no session (expected)' :
+                !isAuthenticated ? 'not authenticated' :
+                !userId ? 'no user ID' :
+                initialAgentLoadedRef.current ? 'already loaded' : 'unknown'
       });
     }
-  }, [currentSessionId, userId, isAuthenticated]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSessionId, userId, isAuthenticated]); // Removed currentAgent, loadSessionAgent, loadDefaultAgentWithPrompt to prevent infinite loop
 
   const handleNewSession = async () => {
-    console.log('🆕 Starting new session creation with global RFP context inheritance...');
+    console.log('🆕 LAZY SESSION CREATION: Starting new session WITHOUT database creation');
+    console.log('✨ Session will be created when user sends first message');
     setIsCreatingNewSession(true);
     setIsSessionLoading(true); // Trigger auto-focus on message input
     
     try {
-      // Get global RFP context for inheritance
-      const globalContext = getGlobalRFPContext();
-      console.log('🌐 Global RFP context for new session:', globalContext);
-      
       // Clear ALL UI state completely (but preserve global RFP context)
       setMessages([]);
       clearArtifacts();
@@ -821,72 +856,30 @@ const Home: React.FC = () => {
       artifactWindowState.saveLastSession(null);
       // Don't force-collapse session history - let user access session management naturally
       
-      // 🔥 CRITICAL FIX: Actually create a new session in the database with global RFP context
-      if (isAuthenticated && userId && createNewSession) {
-        console.log('🔥 Creating actual new session in database with inherited RFP:', globalContext.rfpId);
-        // For new sessions, inherit global RFP context but use default Solutions agent
-        const newSessionId = await createNewSession(null, globalContext.rfpId ?? undefined);
-        
-        if (newSessionId) {
-          console.log('✅ New session created successfully:', newSessionId);
-          console.log('🔄 Setting currentSessionId and selectedSessionId...');
-          setCurrentSessionId(newSessionId);
-          setSelectedSessionId(newSessionId);
-          // CRITICAL: Update ref immediately for synchronous access
-          currentSessionIdRef.current = newSessionId;
-          console.log('📌 Session ID ref updated immediately:', newSessionId);
-          
-          // Clear tool invocations for the new session (start fresh)
-          clearToolInvocations(newSessionId);
-          loadToolInvocationsForSession(newSessionId);
-          
-          console.log('⏳ State set, isCreatingNewSession should be cleared by useEffect when currentSessionId updates');
-          
-          // Wait for React state to update before continuing
-          // Use a small delay to ensure state updates are processed
-          await new Promise(resolve => setTimeout(resolve, 50));
-          
-          // Reload sessions to include the new session
-          if (loadUserSessions) {
-            console.log('♻️  Reloading sessions to include new session...');
-            await loadUserSessions();
-          }
-          
-          // Always load the default agent for new sessions since we passed null to createNewSession
-          const initialMessage = await loadDefaultAgentWithPrompt();
-          if (initialMessage) {
-            setMessages([initialMessage]);
-            console.log('New session started with default agent:', initialMessage.agentName);
-          }
-          
-          console.log('🎉 New session created successfully with clean state');
-        } else {
-          console.error('❌ Failed to create new session');
-          // Fallback to loading default agent without session
-          const initialMessage = await loadDefaultAgentWithPrompt();
-          if (initialMessage) {
-            setMessages([initialMessage]);
-          }
-        }
-      } else {
-        console.log('⚠️  Not authenticated or missing dependencies, creating local session only');
-        const initialMessage = await loadDefaultAgentWithPrompt();
-        if (initialMessage) {
-          setMessages([initialMessage]);
-        }
+      // 🎯 LAZY SESSION CREATION: Only load agent and welcome message
+      // Do NOT create database session yet - wait for first user message
+      console.log('🎭 Loading default agent welcome message (no session creation yet)');
+      const initialMessage = await loadDefaultAgentWithPrompt();
+      if (initialMessage) {
+        // Store welcome message in pending state instead of messages array
+        setPendingWelcomeMessage(initialMessage);
+        setMessages([initialMessage]);
+        console.log('✅ Pending welcome message stored - session will be created on first user message');
+        console.log('👋 Welcome message from:', initialMessage.agentName);
       }
       
     } catch (error) {
-      console.error('❌ Error creating new session:', error);
-      // Ensure we still have some UI state even if session creation fails
+      console.error('❌ Error preparing new session:', error);
+      // Ensure we still have some UI state even if loading fails
       const initialMessage = await loadDefaultAgentWithPrompt();
       if (initialMessage) {
+        setPendingWelcomeMessage(initialMessage);
         setMessages([initialMessage]);
       }
     } finally {
       // Clear the flags after successfully setting up the new session
       setTimeout(() => {
-        console.log('🏁 New session creation complete, clearing flags');
+        console.log('🏁 New session preparation complete, clearing flags');
         setIsCreatingNewSession(false);
         setIsSessionLoading(false); // Reset auto-focus trigger
       }, 100); // Small delay to ensure all state updates are processed
@@ -917,7 +910,8 @@ const Home: React.FC = () => {
       refSessionId,
       isCreatingNewSession,
       isAuthenticated,
-      userId
+      userId,
+      hasPendingWelcome: !!pendingWelcomeMessage
     });
     
     // Prevent sending messages while creating a new session to avoid session ID race conditions
@@ -929,7 +923,62 @@ const Home: React.FC = () => {
     // CRITICAL FIX: Use ref for most current session ID value
     let activeSessionId = refSessionId;
     
-    if (!activeSessionId && isAuthenticated && userId) {
+    // 🎯 LAZY SESSION CREATION: If no session exists but we have a pending welcome message,
+    // this is the user's first message - create the session now
+    if (!activeSessionId && isAuthenticated && userId && pendingWelcomeMessage) {
+      console.log('🎯 LAZY SESSION CREATION: First user message detected - creating session now');
+      console.log('👋 Pending welcome message will be saved with session');
+      
+      if (createNewSession) {
+        try {
+          // Get global RFP context for session creation
+          const globalContext = getGlobalRFPContext();
+          console.log('🌐 Creating session with global RFP context:', globalContext.rfpId);
+          
+          // Create session with first user message as title
+          const newSessionId = await createNewSession(
+            currentAgent, 
+            globalContext.rfpId ?? undefined,
+            content // Pass first user message for title generation
+          );
+          
+          if (newSessionId) {
+            console.log('✅ Session created on first user message:', newSessionId);
+            activeSessionId = newSessionId;
+            
+            // Update state to reflect the new session
+            setCurrentSessionId(newSessionId);
+            setSelectedSessionId(newSessionId);
+            // CRITICAL: Update ref immediately for synchronous access
+            currentSessionIdRef.current = newSessionId;
+            console.log('📌 Session ID ref updated:', newSessionId);
+            
+            // Clear pending welcome message since session is now created
+            setPendingWelcomeMessage(null);
+            console.log('✨ Pending welcome message cleared - session now active');
+            
+            // Clear tool invocations for the new session (start fresh)
+            clearToolInvocations(newSessionId);
+            loadToolInvocationsForSession(newSessionId);
+            
+            // Reload sessions to include the new session
+            if (loadUserSessions) {
+              await loadUserSessions();
+            }
+          } else {
+            console.error('❌ Failed to create session on first message');
+            return;
+          }
+        } catch (error) {
+          console.error('❌ Error creating session on first message:', error);
+          return;
+        }
+      } else {
+        console.error('❌ No createNewSession function available');
+        return;
+      }
+    } else if (!activeSessionId && isAuthenticated && userId) {
+      // No session and no pending welcome - this is an older emergency path
       console.warn('⚠️  No session ID available for authenticated user - creating emergency session');
       console.log('🔍 State before emergency session:', {
         currentSessionId,
@@ -943,7 +992,7 @@ const Home: React.FC = () => {
       if (createNewSession) {
         try {
           console.log('🆘 Creating emergency session with global RFP context:', globalCurrentRfpId);
-          const emergencySessionId = await createNewSession(currentAgent, globalCurrentRfpId ?? undefined);
+          const emergencySessionId = await createNewSession(currentAgent, globalCurrentRfpId ?? undefined, content);
           if (emergencySessionId) {
             console.log('✅ Emergency session created:', emergencySessionId);
             activeSessionId = emergencySessionId;

@@ -58,6 +58,11 @@ export interface Artifact {
   rfpId?: number;
   role?: 'buyer' | 'supplier' | 'system';
   status?: 'ready' | 'processing' | 'error' | string;
+  // Form-specific fields (required for form data population)
+  schema?: Record<string, unknown>;
+  ui_schema?: Record<string, unknown>;
+  default_values?: Record<string, unknown>;
+  submit_action?: Record<string, unknown>;
 }
 
 // RFP Context State for managing current RFP
