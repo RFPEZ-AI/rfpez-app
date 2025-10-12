@@ -175,18 +175,127 @@ export const useArtifactManagement = (
     if (currentRfp && currentRfp.id) {
       console.log('Loading artifacts for RFP:', currentRfp.id, currentRfp.name);
       
-      // Use the new loadRFPArtifacts function to load all RFP-associated artifacts
-      loadRFPArtifacts(parseInt(currentRfp.id.toString()));
+      // Load RFP artifacts directly in the effect
+      const loadArtifacts = async () => {
+        try {
+          console.log('📋 Loading RFP-associated artifacts for RFP:', currentRfp.id);
+          const artifactsData = await DatabaseService.getRFPArtifacts(parseInt(currentRfp.id.toString()));
+          
+          const formattedArtifacts: Artifact[] = (artifactsData as DatabaseArtifact[]).map(artifact => {
+            let content: string | undefined;
+            
+            // For form artifacts, handle schema and processed_content
+            if (artifact.type === 'form') {
+              if (artifact.schema || artifact.default_values) {
+                const formSpec = {
+                  schema: artifact.schema || {},
+                  uiSchema: artifact.ui_schema || {},
+                  formData: artifact.default_values || {},
+                  submitAction: artifact.submit_action || { type: 'save_session' }
+                };
+                content = JSON.stringify(formSpec);
+              } else if (artifact.processed_content) {
+                content = artifact.processed_content;
+              } else {
+                const formSpec = {
+                  schema: { type: 'object', properties: {}, required: [] },
+                  uiSchema: {},
+                  formData: {},
+                  submitAction: { type: 'save_session' }
+                };
+                content = JSON.stringify(formSpec);
+              }
+            } else {
+              content = artifact.processed_content;
+            }
+            
+            let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other';
+            switch (artifact.type) {
+              case 'form':
+                frontendType = 'form';
+                break;
+              case 'document':
+                frontendType = 'document';
+                break;
+              case 'text':
+                frontendType = 'text';
+                break;
+              case 'image':
+                frontendType = 'image';
+                break;
+              case 'pdf':
+                frontendType = 'pdf';
+                break;
+              case 'bid_view':
+                frontendType = 'bid_view';
+                break;
+              default:
+                frontendType = 'other';
+            }
+            
+            return {
+              id: artifact.id,
+              name: artifact.name,
+              type: frontendType,
+              size: artifact.description || 'RFP Artifact',
+              content: content || '',
+              sessionId: artifact.session_id || undefined,
+              created_at: artifact.created_at // Preserve created_at for dropdown display
+            };
+          });
+          
+          console.log(`📋 Loaded ${formattedArtifacts.length} RFP-associated artifacts`);
+          console.log('📋 Formatted artifacts preview:', formattedArtifacts.map(a => ({
+            id: a.id,
+            name: a.name,
+            type: a.type,
+            created_at: a.created_at,
+            hasCreatedAt: !!a.created_at
+          })));
+          
+          // Use functional update to avoid dependency on artifacts
+          setArtifacts(prev => {
+            // Preserve Claude-generated artifacts
+            const existingClaudeArtifacts = prev.filter(artifact => 
+              artifact.id && (
+                artifact.id.includes('claude-artifact') ||
+                (!artifact.id.startsWith('form_') && !artifact.id.includes('-'))
+              )
+            );
+            console.log(`📋 Preserving ${existingClaudeArtifacts.length} Claude-generated artifacts`);
+            
+            const newArtifacts = [...existingClaudeArtifacts, ...formattedArtifacts];
+            console.log('📋 Final artifacts after merge:', {
+              total: newArtifacts.length,
+              artifacts: newArtifacts.map(a => ({
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                created_at: a.created_at,
+                hasCreatedAt: !!a.created_at
+              }))
+            });
+            
+            return newArtifacts;
+          });
+        } catch (error) {
+          console.error('Failed to load RFP artifacts:', error);
+        }
+      };
+      
+      loadArtifacts();
       
     } else {
       // No current RFP, only keep Claude-generated artifacts
-      const claudeArtifacts = artifacts.filter(artifact => 
-        artifact.id.includes('claude-artifact')
-      );
-      setArtifacts(claudeArtifacts);
-      console.log('🧹 Cleared database artifacts - kept Claude artifacts');
+      setArtifacts(prev => {
+        const claudeArtifacts = prev.filter(artifact => 
+          artifact.id.includes('claude-artifact')
+        );
+        console.log('🧹 Cleared database artifacts - kept Claude artifacts');
+        return claudeArtifacts;
+      });
     }
-  }, [currentRfp]);
+  }, [currentRfp]); // Only depend on currentRfp
 
   // Load form artifacts from database when user or authentication changes
   // DISABLED for session isolation - artifacts should only be session-specific
@@ -273,7 +382,18 @@ export const useArtifactManagement = (
   // Load session artifacts when session changes
   const loadSessionArtifacts = async (sessionId: string) => {
     try {
+      console.log('🔄 loadSessionArtifacts called for session:', sessionId);
       const artifactsData: DatabaseArtifact[] = await DatabaseService.getSessionArtifacts(sessionId);
+      console.log('📦 Retrieved artifacts from database:', {
+        count: artifactsData.length,
+        artifacts: artifactsData.map(a => ({
+          id: a.id,
+          name: a.name,
+          type: a.type,
+          hasDefaultValues: !!a.default_values,
+          defaultValuesKeys: a.default_values ? Object.keys(a.default_values) : []
+        }))
+      });
       const formattedArtifacts: Artifact[] = artifactsData.map(artifact => {
         let content: string | undefined;
         
@@ -347,6 +467,7 @@ export const useArtifactManagement = (
           content: content,
           sessionId: artifact.session_id,
           messageId: artifact.message_id,
+          created_at: artifact.created_at, // Preserve created_at for dropdown display
           // Preserve database fields for form rendering (CRITICAL for form data population)
           schema: artifact.schema,
           ui_schema: artifact.ui_schema,
@@ -359,7 +480,15 @@ export const useArtifactManagement = (
       // This ensures that switching sessions shows ONLY artifacts for that session
       console.log(`📋 Loading ${formattedArtifacts.length} artifacts for session:`, sessionId);
       console.log(`📋 Previous artifact count: ${artifacts.length}`);
-      setArtifacts(formattedArtifacts);
+      console.log(`📋 Artifacts with default_values:`, formattedArtifacts.map(a => ({
+        id: a.id,
+        name: a.name,
+        hasDefaultValues: !!a.default_values,
+        defaultValuesCount: a.default_values ? Object.keys(a.default_values).length : 0
+      })));
+      
+      // Force React to detect state change by creating completely new array
+      setArtifacts([...formattedArtifacts]);
 
       // Return the artifacts so the caller can handle selection
       return formattedArtifacts;
@@ -368,7 +497,7 @@ export const useArtifactManagement = (
     }
   };
 
-  // Load RFP-associated artifacts when RFP context changes
+  // Load RFP-associated artifacts when RFP context changes (exported for manual calls)
   const loadRFPArtifacts = async (rfpId: number) => {
     try {
       console.log('📋 Loading RFP-associated artifacts for RFP:', rfpId);
@@ -454,7 +583,8 @@ export const useArtifactManagement = (
           type: frontendType,
           size: artifact.description || 'RFP Artifact',
           content: content || '',
-          sessionId: artifact.session_id || undefined
+          sessionId: artifact.session_id || undefined,
+          created_at: artifact.created_at // Preserve created_at for dropdown display
         };
       });
       

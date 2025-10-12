@@ -58,6 +58,7 @@ export interface Artifact {
   rfpId?: number;
   role?: 'buyer' | 'supplier' | 'system';
   status?: 'ready' | 'processing' | 'error' | string;
+  created_at?: string; // Timestamp for artifact creation (ISO 8601 format)
   // Form-specific fields (required for form data population)
   schema?: Record<string, unknown>;
   ui_schema?: Record<string, unknown>;

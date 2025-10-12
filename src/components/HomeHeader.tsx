@@ -48,8 +48,9 @@ interface HomeHeaderProps {
   onMainMenuSelect: (item: string) => void;
   
   // Artifact window props
-  artifactWindowOpen?: boolean;
-  onToggleArtifactWindow?: () => void;
+  artifactWindowOpen: boolean;
+  onToggleArtifactWindow: () => void;
+  artifactCount?: number; // Number of artifacts available for current RFP
 }
 
 const HomeHeader: React.FC<HomeHeaderProps> = ({
@@ -77,7 +78,8 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   onSwitchAgent,
   onMainMenuSelect,
   artifactWindowOpen,
-  onToggleArtifactWindow
+  onToggleArtifactWindow,
+  artifactCount = 0
 }) => {
   const isMobile = useIsMobile();
   
@@ -228,23 +230,46 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             gap: '8px',
             marginRight: '8px'
           }}>
-            {/* Artifact Window Toggle Button */}
-            {onToggleArtifactWindow && (
-              <IonButton
-                fill="clear"
-                size="small"
-                onClick={onToggleArtifactWindow}
-                title={artifactWindowOpen ? "Hide artifacts" : "Show artifacts"}
-                data-testid="artifact-window-toggle"
-                style={{
-                  '--padding-start': '6px',
-                  '--padding-end': '6px',
-                  '--color': artifactWindowOpen ? 'var(--ion-color-primary)' : 'var(--ion-color-medium)'
-                }}
-              >
-                <IonIcon icon={documentTextOutline} />
-              </IonButton>
-            )}
+            {/* Artifact Window Toggle Button - Always visible */}
+            <IonButton
+              fill="clear"
+              size="small"
+              onClick={onToggleArtifactWindow}
+              title={artifactWindowOpen ? "Hide artifacts" : "Show artifacts"}
+              data-testid="artifact-window-toggle"
+              style={{
+                '--padding-start': '6px',
+                '--padding-end': '6px',
+                '--color': artifactWindowOpen ? 'var(--ion-color-primary)' : 'var(--ion-color-medium)',
+                position: 'relative'
+              }}
+            >
+              <IonIcon icon={documentTextOutline} />
+              {/* Badge showing artifact count */}
+              {artifactCount > 0 && (
+                <span 
+                  style={{
+                    position: 'absolute',
+                    top: '-4px',
+                    right: '-4px',
+                    backgroundColor: 'var(--ion-color-primary)',
+                    color: 'white',
+                    borderRadius: '10px',
+                    padding: '2px 6px',
+                    fontSize: '10px',
+                    fontWeight: 'bold',
+                    minWidth: '18px',
+                    height: '18px',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                  }}
+                >
+                  {artifactCount > 99 ? '99+' : artifactCount}
+                </span>
+              )}
+            </IonButton>
             <AuthButtons />
           </div>
         </IonButtons>

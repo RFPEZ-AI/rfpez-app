@@ -144,7 +144,26 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
         data-testid="artifact-dropdown-popover"
       >
         <IonList style={{ minWidth: '400px', maxWidth: '600px', width: 'max-content' }}>
-          {artifacts.filter(a => a.id).map((artifact) => (
+          {(() => {
+            console.log('🔍 ARTIFACT DROPDOWN - Artifacts received:', {
+              total: artifacts.length,
+              artifacts: artifacts.map(a => ({
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                created_at: a.created_at,
+                hasCreatedAt: !!a.created_at
+              }))
+            });
+            
+            const filtered = artifacts.filter(a => a.id);
+            console.log('🔍 ARTIFACT DROPDOWN - After filter(a => a.id):', {
+              total: filtered.length,
+              artifacts: filtered.map(a => ({ id: a.id, name: a.name, created_at: a.created_at }))
+            });
+            
+            return filtered;
+          })().map((artifact) => (
             <IonItem
               key={artifact.id}
               button

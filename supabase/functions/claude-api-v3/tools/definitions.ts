@@ -32,10 +32,14 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'create_form_artifact',
-    description: 'Create a form artifact (questionnaire, bid form, etc.) and store it in the database',
+    description: 'Create a form artifact (questionnaire, bid form, etc.) and store it in the database. CRITICAL: Must be associated with an RFP. Either call create_and_set_rfp first, or use get_current_rfp to get the session\'s current RFP ID.',
     input_schema: {
       type: 'object',
       properties: {
+        rfp_id: {
+          type: 'number',
+          description: 'REQUIRED: RFP ID to associate this artifact with. Get this from create_and_set_rfp (returns rfp_id) or get_current_rfp tool. Forms MUST be linked to an RFP.'
+        },
         name: {
           type: 'string',
           description: 'Name of the form artifact'
@@ -66,15 +70,19 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           ]
         }
       },
-      required: ['name', 'description', 'content', 'artifactRole']
+      required: ['rfp_id', 'name', 'description', 'content', 'artifactRole']
     }
   },
   {
     name: 'create_document_artifact',
-    description: 'Create a document artifact (text document, RFP document, etc.) and store it in the database',
+    description: 'Create a document artifact (text document, RFP document, etc.) and store it in the database. CRITICAL: Must be associated with an RFP. Either call create_and_set_rfp first, or use get_current_rfp to get the session\'s current RFP ID.',
     input_schema: {
       type: 'object',
       properties: {
+        rfp_id: {
+          type: 'number',
+          description: 'REQUIRED: RFP ID to associate this artifact with. Get this from create_and_set_rfp (returns rfp_id) or get_current_rfp tool. Documents MUST be linked to an RFP.'
+        },
         name: {
           type: 'string',
           description: 'Name/title of the document artifact'
@@ -112,7 +120,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional tags for categorizing the document'
         }
       },
-      required: ['name', 'content', 'artifactRole']
+      required: ['rfp_id', 'name', 'content', 'artifactRole']
     }
   },
   {
@@ -341,8 +349,40 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
     }
   },
   {
+    name: 'get_current_rfp',
+    description: 'Get the current active RFP for the session. Use this to get the rfp_id needed for creating artifacts. Returns null if no RFP is set - in that case, you MUST call create_and_set_rfp first.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'Session ID to check for current RFP'
+        }
+      },
+      required: ['session_id']
+    }
+  },
+  {
+    name: 'get_form_schema',
+    description: 'Get the JSON schema for a form artifact to see what fields are available and their data types/constraints. ALWAYS call this before update_form_data to ensure you use the correct field names and enum values.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        artifact_id: {
+          type: 'string',
+          description: 'ID or name of the form artifact. Can be a UUID or form name.'
+        },
+        session_id: {
+          type: 'string',
+          description: 'Current session ID for context'
+        }
+      },
+      required: ['artifact_id', 'session_id']
+    }
+  },
+  {
     name: 'update_form_data',
-    description: 'Update the form data (default_values) for an existing form artifact. This populates the form with sample or real data while keeping the schema intact. Use this to fill forms with test data or update existing form values. Can accept either a UUID or form name.',
+    description: 'Update the form data (default_values) for an existing form artifact. This populates the form with sample or real data while keeping the schema intact. IMPORTANT: You MUST use the exact field names and enum values from the form schema. Call get_form_schema first to see the schema structure.',
     input_schema: {
       type: 'object',
       properties: {
@@ -356,7 +396,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         },
         form_data: {
           type: 'object',
-          description: 'Complete form data object with field names matching the form schema. This will replace the current default_values completely.'
+          description: 'Complete form data object with field names EXACTLY matching the form schema properties (from get_form_schema). For enum fields, use EXACT enum values from schema. This will replace the current default_values completely.'
         }
       },
       required: ['artifact_id', 'session_id', 'form_data']
@@ -524,7 +564,7 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
   },
   'design': {
     // RFP Design has access to all RFP creation tools and memory tools - REMOVED switch_agent to prevent self-switching loops
-    allowed: ['create_and_set_rfp', 'create_form_artifact', 'create_document_artifact', 'update_form_data', 'update_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
+    allowed: ['create_and_set_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
   },
   'support': {
     // Support agents don't need RFP creation tools but can create documents

@@ -55,12 +55,10 @@ export interface SystemPromptContext {
  * Based on the original monolithic implementation
  * Enhanced with agent switch context detection and auto-processing
  */
-export function buildSystemPrompt(context: SystemPromptContext, userMessage?: string, useInitialPromptAsSystem = false): string {
-  // Start with agent instructions, fallback to initial_prompt, then default
-  // If useInitialPromptAsSystem is true, use initial_prompt as the primary system prompt
-  let systemPrompt = useInitialPromptAsSystem && context.agent?.initial_prompt
-    ? context.agent.initial_prompt
-    : (context.agent?.instructions || context.agent?.initial_prompt || 'You are a helpful AI assistant.');
+export function buildSystemPrompt(context: SystemPromptContext, userMessage?: string, _useInitialPromptAsSystem = false): string {
+  // 🎯 ALWAYS use full instructions as system prompt (never use initial_prompt as system)
+  // The initial_prompt is only used in the USER MESSAGE to guide welcome generation
+  let systemPrompt = context.agent?.instructions || context.agent?.initial_prompt || 'You are a helpful AI assistant.';
   
   // Check for agent fallback information (attached to agent object or in context)
   const fallbackInfo = context.agentFallback || (context.agent as any)?._fallbackInfo;

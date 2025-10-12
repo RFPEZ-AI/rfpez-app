@@ -32,9 +32,10 @@ supabase functions list                           # Check versions
 
 # Database Operations
 supabase migration new feature_name         # Create new migration
-supabase db reset                          # Apply all migrations locally
+supabase migration up                      # Apply pending migrations to current DB
 supabase db push                           # Deploy schema to remote
 supabase migration list                    # Check sync status
+# ⚠️ AVOID: supabase db reset (wipes all data - use only for recovery)
 
 # Testing Commands
 npm test -- --watchAll=false              # Single test run
@@ -158,20 +159,38 @@ supabase functions deploy claude-api-v3  # Deploy to production
 supabase migration new add_new_feature
 # Edit the generated SQL file in supabase/migrations/
 
-# 2. Apply Migration Locally
-supabase db reset  # Apply all migrations to local DB
-# OR
-supabase migration up  # Apply latest migration
+# 2. Apply Migration to Current Database (PRESERVES DATA)
+supabase migration up  # Apply only pending migrations
+
+# 🚨 CRITICAL DATABASE RULE 🚨
+# ❌❌❌ NEVER EVER USE 'supabase db reset' ❌❌❌
+# This command WIPES ALL DATA and causes massive disruption!
+# - Destroys all test data and development state
+# - Requires complete data recreation
+# - Breaks active development workflows
+# - Should ONLY be used in emergency recovery (with explicit user approval)
+#
+# ✅ ALWAYS USE: supabase migration up
+# This applies migrations incrementally while preserving all existing data
 
 # 3. Test Changes Locally
 # - Run React app against local DB
 # - Execute test queries in local Studio (localhost:54323)
 # - Validate RLS policies and permissions
+# - Verify existing data is preserved and migrations work incrementally
 
 # 4. Deploy to Remote Only After Local Validation
 supabase db push  # Push schema changes to remote
 # OR
 supabase migration repair  # If needed to sync migration state
+
+# 💡 Migration Best Practices:
+# - Write idempotent migrations (use IF NOT EXISTS, IF EXISTS)
+# - Use DROP ... IF EXISTS before CREATE OR REPLACE for functions with signature changes
+# - Test migrations on copy of production data when possible
+# - Never modify existing migration files - create new ones
+# - Keep migrations small and focused on single changes
+# - Always include rollback instructions in migration comments
 ```
 
 #### **Local Configuration Management**
@@ -208,7 +227,7 @@ supabase functions deploy  # Deploy function changes
 #### **Local Testing Validation Checklist**
 Before deploying to remote, ensure:
 - ✅ Functions work locally with `supabase functions serve`
-- ✅ Database migrations apply cleanly with `supabase db reset`
+- ✅ Database migrations apply cleanly with `supabase migration up` (without data loss)
 - ✅ React app connects to local services without errors
 - ✅ RLS policies work correctly in local Studio
 - ✅ Edge Functions handle authentication properly

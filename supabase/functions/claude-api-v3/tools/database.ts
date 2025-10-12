@@ -58,6 +58,7 @@ interface SupabaseQuery {
 }
 
 interface FormArtifactData {
+  rfp_id: number; // REQUIRED: RFP ID to associate artifact with
   name: string;
   description?: string;
   content: Record<string, unknown>; // JSON object for form schema
@@ -286,9 +287,80 @@ function transformToJsonSchema(customForm: Record<string, unknown>): {
   };
 }
 
+// Get the current active RFP for a session
+export async function getCurrentRfp(supabase: SupabaseClient, sessionId: string) {
+  console.log('🔍 Getting current RFP for session:', sessionId);
+  
+  const { data: session, error: sessionError } = await supabase
+    .from('sessions')
+    .select('current_rfp_id')
+    .eq('id', sessionId)
+    .single() as { data: { current_rfp_id?: number } | null; error: Error | null };
+  
+  if (sessionError) {
+    console.error('Error fetching session:', sessionError);
+    throw new Error(`Failed to fetch session: ${sessionError.message}`);
+  }
+  
+  if (!session?.current_rfp_id) {
+    console.log('⚠️ No current RFP set for this session');
+    return {
+      success: true,
+      rfp_id: null,
+      message: 'No RFP is currently set for this session. You must call create_and_set_rfp first before creating artifacts.'
+    };
+  }
+  
+  // Fetch RFP details
+  const { data: rfp, error: rfpError } = await supabase
+    .from('rfps')
+    .select('id, name, description, status, created_at')
+    .eq('id', session.current_rfp_id)
+    .single() as { data: { id: number; name: string; description?: string; status: string; created_at: string } | null; error: Error | null };
+  
+  if (rfpError) {
+    console.error('Error fetching RFP:', rfpError);
+    throw new Error(`Failed to fetch RFP: ${rfpError.message}`);
+  }
+  
+  if (!rfp) {
+    throw new Error('RFP not found');
+  }
+  
+  console.log('✅ Found current RFP:', { id: rfp.id, name: rfp.name });
+  
+  return {
+    success: true,
+    rfp_id: rfp.id,
+    name: rfp.name,
+    description: rfp.description,
+    status: rfp.status,
+    created_at: rfp.created_at,
+    message: `Current RFP: ${rfp.name} (ID: ${rfp.id})`
+  };
+}
+
 // Create a form artifact in the database
 export async function createFormArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: FormArtifactData) {
-  const { name, description, content, artifactRole } = data;
+  const { name, description, content, artifactRole, rfp_id } = data;
+  
+  // ⚠️ CRITICAL: Validate RFP ID is provided
+  if (!rfp_id) {
+    throw new Error('❌ CRITICAL: rfp_id is required. You must either call create_and_set_rfp first (which returns rfp_id) or use get_current_rfp to get the session\'s current RFP ID. Forms cannot be created without an associated RFP.');
+  }
+  
+  // Validate RFP exists
+  const { data: rfp, error: rfpError } = await supabase
+    .from('rfps')
+    .select('id, name')
+    .eq('id', rfp_id)
+    .single() as { data: { id: number; name: string } | null; error: Error | null };
+  
+  if (rfpError || !rfp) {
+    throw new Error(`❌ Invalid RFP ID: ${rfp_id}. The specified RFP does not exist. Use get_current_rfp or create_and_set_rfp to get a valid RFP ID.`);
+  }
+  
+  console.log('✅ Validated RFP association:', { rfp_id, rfp_name: rfp.name });
   
   // Default to buyer_questionnaire if artifactRole is not provided
   const effectiveArtifactRole = artifactRole || 'buyer_questionnaire';
@@ -380,53 +452,42 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
   // Add explicit wait to ensure database commit completes
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  // ARTIFACT-RFP LINKING: Auto-link form artifacts to current RFP when session has one
+  // ARTIFACT-RFP LINKING: Link form artifact to the provided RFP
   try {
-    // Get the current RFP for this session
-    const { data: session } = await supabase
-      .from('sessions')
-      .select('current_rfp_id')
-      .eq('id', sessionId)
-      .single() as { data: { current_rfp_id?: number } | null };
+    console.log('🔗 Claude API V3: Linking form artifact to RFP:', {
+      artifactId: (artifact as unknown as { id: string }).id,
+      rfpId: rfp_id,
+      artifactRole: mappedRole
+    });
     
-    if (session?.current_rfp_id) {
-      console.log('🔗 Claude API V3: Auto-linking form artifact to current RFP:', {
-        artifactId: (artifact as unknown as { id: string }).id,
-        rfpId: session.current_rfp_id,
-        artifactRole: mappedRole
-      });
-      
-      // Map artifact role to valid rfp_artifacts role values
-      let rfpRole = 'supplier'; // Default
-      if (mappedRole?.includes('buyer') || mappedRole?.includes('questionnaire')) {
-        rfpRole = 'buyer';
-      } else if (mappedRole?.includes('supplier') || mappedRole?.includes('bid')) {
-        rfpRole = 'supplier';
-      } else if (mappedRole?.includes('evaluator')) {
-        rfpRole = 'evaluator';
-      }
-      
-      // Insert into rfp_artifacts junction table
-      const { error: linkError } = await supabase
-        .from('rfp_artifacts')
-        .insert({
-          rfp_id: session.current_rfp_id,
-          artifact_id: (artifact as unknown as { id: string }).id,
-          role: rfpRole
-        });
-      
-      if (linkError) {
-        console.error('⚠️ Claude API V3: Failed to link artifact to RFP:', linkError);
-        // Don't fail the main artifact creation, just log the linking error
-      } else {
-        console.log('✅ Claude API V3: Successfully linked artifact to RFP');
-      }
-    } else {
-      console.log('📝 Claude API V3: No current RFP for session, skipping artifact linking');
+    // Map artifact role to valid rfp_artifacts role values
+    let rfpRole = 'supplier'; // Default
+    if (mappedRole?.includes('buyer') || mappedRole?.includes('questionnaire')) {
+      rfpRole = 'buyer';
+    } else if (mappedRole?.includes('supplier') || mappedRole?.includes('bid')) {
+      rfpRole = 'supplier';
+    } else if (mappedRole?.includes('evaluator')) {
+      rfpRole = 'evaluator';
     }
+    
+    // Insert into rfp_artifacts junction table
+    const { error: linkError } = await supabase
+      .from('rfp_artifacts')
+      .insert({
+        rfp_id: rfp_id,
+        artifact_id: (artifact as unknown as { id: string }).id,
+        role: rfpRole
+      });
+    
+    if (linkError) {
+      console.error('⚠️ Claude API V3: Failed to link artifact to RFP:', linkError);
+      throw new Error(`Failed to link artifact to RFP: ${JSON.stringify(linkError)}`);
+    }
+    
+    console.log('✅ Claude API V3: Successfully linked artifact to RFP');
   } catch (linkingError) {
     console.error('⚠️ Claude API V3: Error during artifact linking:', linkingError);
-    // Don't fail the main artifact creation
+    throw linkingError;
   }
 
   // Verify the artifact was actually saved by querying it back
@@ -468,6 +529,7 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
 
 // Create a document artifact and store in the database
 export async function createDocumentArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: {
+  rfp_id: number; // REQUIRED: RFP ID to associate artifact with
   name: string;
   description?: string;
   content: string;
@@ -481,7 +543,25 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
     data: JSON.stringify(data, null, 2)
   });
   
-  const { name, description, content, content_type = 'markdown', artifactRole, tags = [] } = data;
+  const { rfp_id, name, description, content, content_type = 'markdown', artifactRole, tags = [] } = data;
+  
+  // ⚠️ CRITICAL: Validate RFP ID is provided
+  if (!rfp_id) {
+    throw new Error('❌ CRITICAL: rfp_id is required. You must either call create_and_set_rfp first (which returns rfp_id) or use get_current_rfp to get the session\'s current RFP ID. Documents cannot be created without an associated RFP.');
+  }
+  
+  // Validate RFP exists
+  const { data: rfp, error: rfpError } = await supabase
+    .from('rfps')
+    .select('id, name')
+    .eq('id', rfp_id)
+    .single() as { data: { id: number; name: string } | null; error: Error | null };
+  
+  if (rfpError || !rfp) {
+    throw new Error(`❌ Invalid RFP ID: ${rfp_id}. The specified RFP does not exist. Use get_current_rfp or create_and_set_rfp to get a valid RFP ID.`);
+  }
+  
+  console.log('✅ Validated RFP association:', { rfp_id, rfp_name: rfp.name });
   
   // Map artifact role to valid database value
   const mappedRole = mapArtifactRole(artifactRole);
@@ -557,6 +637,44 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
     throw error;
   }
 
+  console.log('✅ Document artifact successfully inserted into database:', (artifact as unknown as { id: string }).id);
+
+  // ARTIFACT-RFP LINKING: Link document artifact to the provided RFP
+  try {
+    console.log('🔗 Claude API V3: Linking document artifact to RFP:', {
+      artifactId: (artifact as unknown as { id: string }).id,
+      rfpId: rfp_id,
+      artifactRole: mappedRole
+    });
+    
+    // Map artifact role to valid rfp_artifacts role values
+    let rfpRole = 'buyer'; // Default for documents
+    if (mappedRole?.includes('supplier') || mappedRole?.includes('vendor')) {
+      rfpRole = 'supplier';
+    } else if (mappedRole?.includes('evaluator')) {
+      rfpRole = 'evaluator';
+    }
+    
+    // Insert into rfp_artifacts junction table
+    const { error: linkError } = await supabase
+      .from('rfp_artifacts')
+      .insert({
+        rfp_id: rfp_id,
+        artifact_id: (artifact as unknown as { id: string }).id,
+        role: rfpRole
+      });
+    
+    if (linkError) {
+      console.error('⚠️ Claude API V3: Failed to link document to RFP:', linkError);
+      throw new Error(`Failed to link document to RFP: ${JSON.stringify(linkError)}`);
+    }
+    
+    console.log('✅ Claude API V3: Successfully linked document to RFP');
+  } catch (linkingError) {
+    console.error('⚠️ Claude API V3: Error during document linking:', linkingError);
+    throw linkingError;
+  }
+
   return {
     success: true,
     artifact_id: (artifact as unknown as { id: string }).id,
@@ -574,7 +692,7 @@ export async function getConversationHistory(supabase: SupabaseClient, sessionId
       session_id,
       agent_id,
       user_id,
-      sender,
+      role,
       content,
       created_at,
       agents!inner (
@@ -816,7 +934,7 @@ export async function searchMessages(supabase: SupabaseClient, data: SearchData)
       session_id,
       agent_id,
       content,
-      sender,
+      role,
       created_at,
       sessions!inner (
         id,
@@ -1552,6 +1670,123 @@ export async function selectActiveArtifact(supabase: SupabaseClient, data: {
     };
   } catch (error) {
     console.error('❌ Exception selecting active artifact:', error);
+    throw error;
+  }
+}
+
+// Get form schema to see field names and types before updating
+export async function getFormSchema(supabase: SupabaseClient, _sessionId: string, _userId: string, data: {
+  artifact_id: string;
+  session_id: string;
+}) {
+  console.log('🔍 Getting form schema for:', data);
+  
+  const { artifact_id, session_id } = data;
+  
+  if (!artifact_id) {
+    throw new Error('Artifact ID is required for getting form schema');
+  }
+  
+  if (!session_id) {
+    throw new Error('Session ID is required for getting form schema');
+  }
+  
+  // Use same resolution logic as updateFormData
+  let resolvedArtifactId = artifact_id;
+  let existingArtifact: Record<string, unknown> | null = null;
+  
+  try {
+    // Try UUID first
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(artifact_id);
+    
+    if (isUUID) {
+      // @ts-ignore - Supabase client type compatibility
+      const { data, error } = await supabase
+        .from('artifacts')
+        .select('id, name, type, schema, ui_schema, default_values')
+        .eq('id', artifact_id)
+        .eq('type', 'form')
+        .single();
+      
+      if (!error && data) {
+        existingArtifact = data;
+        resolvedArtifactId = artifact_id;
+      }
+    }
+    
+    // Try by name in session
+    if (!existingArtifact) {
+      // @ts-ignore - Supabase client type compatibility
+      const { data, error } = await supabase
+        .from('artifacts')
+        .select('id, name, type, schema, ui_schema, default_values')
+        .eq('session_id', session_id)
+        .eq('type', 'form')
+        .eq('name', artifact_id)
+        .single();
+      
+      if (!error && data) {
+        existingArtifact = data as Record<string, unknown>;
+        resolvedArtifactId = (data as unknown as { id: string }).id;
+      } else {
+        // Try fuzzy matching
+        // @ts-ignore - Supabase client type compatibility
+        const { data: candidates, error: fuzzyError } = await supabase
+          .from('artifacts')
+          .select('id, name, type, schema, ui_schema, default_values')
+          .eq('session_id', session_id)
+          .eq('type', 'form')
+          .ilike('name', `%${artifact_id}%`);
+        
+        if (!fuzzyError && candidates && Array.isArray(candidates) && candidates.length > 0) {
+          existingArtifact = candidates[0] as Record<string, unknown>;
+          resolvedArtifactId = (existingArtifact as { id: string }).id;
+        }
+      }
+    }
+    
+    // Fallback to most recent form
+    if (!existingArtifact) {
+      // @ts-ignore - Supabase client type compatibility
+      const { data: currentArtifacts, error: currentError } = await supabase
+        .from('artifacts')
+        .select('id, name, type, schema, ui_schema, default_values')
+        .eq('session_id', session_id)
+        .eq('type', 'form')
+        .order('updated_at', { ascending: false })
+        .limit(1);
+      
+      if (!currentError && currentArtifacts && Array.isArray(currentArtifacts) && currentArtifacts.length > 0) {
+        existingArtifact = currentArtifacts[0] as Record<string, unknown>;
+        resolvedArtifactId = (existingArtifact as { id: string }).id;
+      }
+    }
+    
+    if (!existingArtifact) {
+      throw new Error(`No form artifact found matching: ${artifact_id}`);
+    }
+    
+    const schema = (existingArtifact as { schema?: Record<string, unknown> }).schema || {};
+    const ui_schema = (existingArtifact as { ui_schema?: Record<string, unknown> }).ui_schema || {};
+    const default_values = (existingArtifact as { default_values?: Record<string, unknown> }).default_values || {};
+    
+    console.log('✅ Retrieved form schema:', {
+      artifact_id: resolvedArtifactId,
+      name: (existingArtifact as { name: string }).name,
+      field_count: Object.keys((schema as { properties?: Record<string, unknown> }).properties || {}).length
+    });
+    
+    return {
+      artifact_id: resolvedArtifactId,
+      name: (existingArtifact as { name: string }).name,
+      schema,
+      ui_schema,
+      default_values,
+      field_names: Object.keys((schema as { properties?: Record<string, unknown> }).properties || {}),
+      message: `Form schema retrieved for: ${(existingArtifact as { name: string }).name}`
+    };
+  } catch (error) {
+    console.error('❌ Exception getting form schema:', error);
     throw error;
   }
 }

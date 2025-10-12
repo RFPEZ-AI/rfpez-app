@@ -50,7 +50,7 @@ import RFPPreviewModal from '../components/RFPPreviewModal';
 import AgentSelector from '../components/AgentSelector';
 
 const Home: React.FC = () => {
-  const { user, session, loading: supabaseLoading, userProfile } = useSupabase();
+  const { user, session, loading: supabaseLoading, userProfile, supabase } = useSupabase();
   const history = useHistory();
   
   // Setup debug monitoring
@@ -1191,7 +1191,7 @@ const Home: React.FC = () => {
   };
 
   // Handler for viewing bids - creates or reuses a single bid view artifact per RFP
-  const handleViewBids = () => {
+  const handleViewBids = async () => {
     if (!currentRfp) {
       console.warn('No current RFP selected');
       return;
@@ -1230,6 +1230,40 @@ const Home: React.FC = () => {
         rfpId: currentRfp.id,
         role: 'buyer'
       };
+      
+      // 🔥 FIX: Save artifact to database before selecting it
+      try {
+        const { data, error } = await supabase
+          .from('artifacts')
+          .insert({
+            id: bidViewArtifact.id,
+            session_id: currentSessionId,
+            name: bidViewArtifact.name,
+            type: 'bid_view',
+            artifact_role: 'bid_view',
+            content: bidViewArtifact.content,
+            metadata: {
+              rfp_id: currentRfp.id,
+              rfp_name: currentRfp.name
+            }
+          })
+          .select()
+          .single();
+        
+        if (error) {
+          // Artifact might already exist (code 23505 = unique violation)
+          if (error.code === '23505') {
+            console.log('ℹ️ Bid view artifact already exists in database:', bidViewId);
+          } else {
+            throw error;
+          }
+        } else {
+          console.log('✅ Bid view artifact saved to database:', bidViewId);
+        }
+      } catch (error) {
+        console.error('❌ Failed to save bid view artifact to database:', error);
+        // Continue anyway - the artifact might already exist or the error might be non-critical
+      }
       
       // Add artifact to state
       setArtifacts((prev: Artifact[]) => [...prev, bidViewArtifact]);

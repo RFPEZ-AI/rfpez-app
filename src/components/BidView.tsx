@@ -188,13 +188,25 @@ const BidView: React.FC<BidViewProps> = ({ currentRfpId, rfpName }) => {
 
         // Transform the data to include supplier name from response
         const transformedBids = bidsData.map((bidRow: any): Bid => {
-          // Extract supplier name from response.supplier_info
+          // Extract supplier name from response - try multiple possible field names
           let supplierName = 'Anonymous Supplier';
           if (bidRow.response && typeof bidRow.response === 'object') {
             const response = bidRow.response;
+            
+            // Try nested supplier_info first (new schema)
             const supplierInfo = response.supplier_info as Record<string, unknown> | undefined;
             if (supplierInfo && typeof supplierInfo.name === 'string') {
               supplierName = supplierInfo.name;
+            }
+            // Try direct fields in response (legacy/current schema)
+            else if (typeof response.supplier_company_name === 'string') {
+              supplierName = response.supplier_company_name;
+            }
+            else if (typeof response.supplier_name === 'string') {
+              supplierName = response.supplier_name;
+            }
+            else if (typeof response.company_name === 'string') {
+              supplierName = response.company_name;
             }
           }
           
