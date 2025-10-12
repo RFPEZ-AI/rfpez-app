@@ -72,8 +72,6 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
     
     // Handle nested object schemas (like budget_and_pricing, evaluation_criteria)
     if (type === 'object' && fieldSchema.properties) {
-      const requiredFields = Array.isArray(fieldSchema.required) ? fieldSchema.required : [];
-      
       return (
         <div key={fieldName} style={{ marginBottom: '24px' }}>
           <h3 style={{ margin: '16px 0 12px 0', fontSize: '1.1rem', fontWeight: '600' }}>
