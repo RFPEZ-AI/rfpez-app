@@ -2,8 +2,6 @@
 
 import React, { useRef, useEffect, useState, useMemo } from 'react';
 import { IonButton } from '@ionic/react';
-import Form from '@rjsf/core';
-import validator from '@rjsf/validator-ajv8';
 import { RJSFSchema, UiSchema } from '@rjsf/utils';
 import { Artifact } from '../../types/home';
 import CustomFormRenderer from './CustomFormRenderer';
@@ -187,23 +185,6 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
       } finally {
         setIsSaving(false);
       }
-    };
-
-    const handleFormChange = (formData: Record<string, unknown>) => {
-      setCurrentFormData(formData);
-    };
-
-    const handleError = (errors: Record<string, unknown>[]) => {
-      console.error('Form validation failed:', errors);
-      errors.forEach((error, index) => {
-        console.error(`Validation error ${index + 1}:`, {
-          property: error.property,
-          message: error.message,
-          schemaPath: error.schemaPath,
-          data: error.data
-        });
-      });
-      alert(`Form validation failed with ${errors.length} error(s). Please check the console for details.`);
     };
 
     // Use title from the form spec if available, fallback to artifact name

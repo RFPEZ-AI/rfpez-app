@@ -87,7 +87,6 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
           <div style={{ paddingLeft: '16px', borderLeft: '3px solid var(--ion-color-primary)' }}>
             {Object.keys(fieldSchema.properties).map(subFieldName => {
               const subFieldSchema = fieldSchema.properties[subFieldName];
-              const isRequired = requiredFields.includes(subFieldName);
               
               return renderField(subFieldName, {
                 ...subFieldSchema,

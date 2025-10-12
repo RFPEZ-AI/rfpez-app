@@ -1233,7 +1233,7 @@ const Home: React.FC = () => {
       
       // 🔥 FIX: Save artifact to database before selecting it
       try {
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('artifacts')
           .insert({
             id: bidViewArtifact.id,
