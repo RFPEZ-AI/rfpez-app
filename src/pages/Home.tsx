@@ -81,13 +81,14 @@ const Home: React.FC = () => {
     getGlobalRFPContext
   } = useGlobalRFPContext();
 
-  // CRITICAL FIX: Use ref to keep session ID synchronized and avoid stale closures
+  // CRITICAL FIX: Use refs to keep state synchronized and avoid stale closures
   const currentSessionIdRef = useRef<string | undefined>(currentSessionId);
+  const messagesRef = useRef<Message[]>([]);
   
   // Track if initial agent message has been loaded to prevent infinite loops
   const initialAgentLoadedRef = useRef<boolean>(false);
   
-  // Keep ref synchronized with state
+  // Keep currentSessionId ref synchronized with state
   useEffect(() => {
     currentSessionIdRef.current = currentSessionId;
     console.log('📌 Session ID ref updated:', currentSessionId);
@@ -105,6 +106,11 @@ const Home: React.FC = () => {
     deleteSession,
     clearUIState
   } = useSessionState(userId, isAuthenticated);
+  
+  // Keep messages ref synchronized with state (for closure-safe checks)
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   const {
     currentAgent,
@@ -804,14 +810,51 @@ const Home: React.FC = () => {
       // Only load agent - artifacts and messages are handled by handleSelectSession
       console.log('📥 Loading session agent for:', currentSessionId);
       loadSessionAgent(currentSessionId);
-      // Reset initial load flag when switching sessions
-      initialAgentLoadedRef.current = false;
-    } else if ((!currentSessionId || currentSessionId === null) && isAuthenticated && userId && !initialAgentLoadedRef.current) {
+      // CRITICAL FIX: Don't reset flag - it should only be set once on initial app load
+      // Resetting it here was causing default agent to load after session restoration
+      // initialAgentLoadedRef.current = false; // REMOVED - causes bug
+    } else if ((!currentSessionId || currentSessionId === null) && isAuthenticated && userId && !initialAgentLoadedRef.current && sessions.length === 0) {
+      // CRITICAL FIX: Only load default agent if NO sessions exist (not during restoration)
       // Only load once using ref to prevent infinite loop
-      console.log('✨ Loading default agent (no session)...');
+      console.log('🚨 DEFAULT AGENT CONDITION TRIGGERED - Diagnostic Info:', {
+        currentSessionId: currentSessionId,
+        isAuthenticated: isAuthenticated,
+        userId: userId,
+        initialAgentLoadedRefCurrent: initialAgentLoadedRef.current,
+        sessionsLength: sessions.length,
+        sessionsArray: sessions
+      });
+      console.log('✨ Loading default agent (no session AND no sessions to restore)...');
       initialAgentLoadedRef.current = true;
       loadDefaultAgentWithPrompt().then(initialMessage => {
         if (initialMessage) {
+          // CRITICAL FIX 1g: Use REFS instead of closure variables to avoid stale state
+          // Refs always have current values, closure variables are frozen at promise creation
+          const currentMessagesLength = messagesRef.current.length;
+          const currentSessionIdValue = currentSessionIdRef.current;
+          
+          console.log('🔍 Promise callback executing - checking CURRENT state via refs:', {
+            currentMessagesLength: currentMessagesLength,
+            currentSessionId: currentSessionIdValue,
+            closureSessionsLength: sessions.length,
+            closureCurrentSessionId: currentSessionId,
+            closureMessagesLength: messages.length,
+            note: 'Closure values may be stale! Using ref values for decision'
+          });
+          
+          // CRITICAL FIX 1g: Check REFS (current state) not closure variables
+          // If messages were already loaded from restoration, DON'T overwrite them
+          if (currentMessagesLength > 0 || currentSessionIdValue) {
+            console.log('⏭️ Skipping setMessages - session was restored while loading agent', {
+              reason: currentMessagesLength > 0 ? `messages already loaded (${currentMessagesLength})` : 
+                      'session ID present',
+              refValues: {
+                messagesLength: currentMessagesLength,
+                sessionId: currentSessionIdValue
+              }
+            });
+            return;
+          }
           console.log('✅ Default agent loaded, setting messages:', initialMessage.agentName);
           setMessages([initialMessage]);
         } else {
@@ -826,14 +869,14 @@ const Home: React.FC = () => {
       });
     } else {
       console.log('⏭️ Skipping agent load:', {
-        reason: !currentSessionId ? 'no session (expected)' :
+        reason: !currentSessionId ? `no session (sessions.length: ${sessions.length})` :
                 !isAuthenticated ? 'not authenticated' :
                 !userId ? 'no user ID' :
-                initialAgentLoadedRef.current ? 'already loaded' : 'unknown'
+                initialAgentLoadedRef.current ? 'already loaded' :
+                sessions.length > 0 ? 'sessions available for restoration' : 'unknown'
       });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentSessionId, userId, isAuthenticated]); // Removed currentAgent, loadSessionAgent, loadDefaultAgentWithPrompt to prevent infinite loop
+  }, [currentSessionId, userId, isAuthenticated]); // REMOVED sessions.length - causes re-run when sessions load
 
   const handleNewSession = async () => {
     console.log('🆕 LAZY SESSION CREATION: Starting new session WITHOUT database creation');
@@ -1583,6 +1626,9 @@ const Home: React.FC = () => {
         onDeleteAgent={handleDeleteAgent}
         onSwitchAgent={handleShowAgentSelector}
         onMainMenuSelect={handleMainMenuSelect}
+        artifactWindowOpen={artifactWindowState.isOpen}
+        onToggleArtifactWindow={artifactWindowState.toggleWindow}
+        artifactCount={artifacts.length}
       />
 
       <IonContent fullscreen scrollY={false} style={{ 

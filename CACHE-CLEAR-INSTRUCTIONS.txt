@@ -1,0 +1,46 @@
+================================================================================
+CRITICAL: BROWSER CACHE MUST BE CLEARED FOR FIX 1f TO TAKE EFFECT
+================================================================================
+
+The browser is using CACHED JAVASCRIPT CODE that still has the old bug!
+
+STEP 1: Stop Dev Server
+  - Go to Terminal: "Start Development Server (RFPEZ Main App)"
+  - Press Ctrl+C to stop
+
+STEP 2: Clear Browser Cache (CRITICAL!)
+  Option A (Chrome/Edge): 
+    - Press Ctrl+Shift+Delete
+    - Select "Cached images and files"
+    - Time range: "All time"
+    - Click "Clear data"
+  
+  Option B (Hard refresh):
+    - Press Ctrl+Shift+R multiple times
+  
+  Option C (Incognito/Private):
+    - Open new incognito window
+    - Navigate to localhost:3100
+
+STEP 3: Restart Dev Server
+  - Ctrl+Shift+P
+  - "Tasks: Run Task"
+  - "Start Development Server"
+  - Wait for "webpack compiled successfully"
+
+STEP 4: Test
+  - Navigate to session with 10 messages
+  - Hard refresh (Ctrl+R)
+  - Check console logs
+
+EXPECTED CONSOLE LOG:
+  âœ… Messages set to state, total: 10
+  í´ Promise callback executing - checking state: { messagesLength: 10, ... }
+  â­ï¸ Skipping setMessages - session was restored while loading agent
+  (Should NOT see: "âœ… Default agent loaded, setting messages")
+
+WHAT FIX 1f DOES:
+  Added check: if (messages.length > 0) return;
+  This prevents clearing messages that were already restored!
+
+================================================================================

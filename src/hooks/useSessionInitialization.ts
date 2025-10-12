@@ -77,7 +77,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       clearUIState();
       clearArtifacts();
       
-      // Show loading message immediately
+      // Show loading message immediately and keep it (don't replace with welcome prompt)
       setMessages([{
         id: 'agent-loading',
         content: '🤖 Activating Solutions agent...',
@@ -86,20 +86,21 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         agentName: 'System'
       }]);
       
-      loadDefaultAgentWithPrompt().then(initialMessage => {
-        if (initialMessage) {
-          setMessages([initialMessage]);
-        }
+      // Load the default agent silently (processes initial_prompt but don't show result)
+      loadDefaultAgentWithPrompt().then(() => {
+        console.log('✅ Default agent loaded, keeping activation message (not showing welcome_prompt)');
+        // Don't replace the activation message - it stays until user sends first message
       });
       return;
     }
     
     // Only load default agent if no current session exists and no messages
     // This prevents overriding active agent selections during routine auth state changes
-    if (!supabaseLoading && !currentSessionId && messages.length === 0) {
-      console.log('Loading default agent for initial app startup...');
+    // CRITICAL FIX: Also check if sessions are available - if yes, we're about to restore, so don't load default
+    if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length === 0) {
+      console.log('Loading default agent for initial app startup (no sessions available to restore)...');
       
-      // Show loading message immediately
+      // Show loading message immediately and keep it (don't replace with welcome prompt)
       setMessages([{
         id: 'agent-loading',
         content: '🤖 Activating Solutions agent...',
@@ -108,11 +109,13 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         agentName: 'System'
       }]);
       
-      loadDefaultAgentWithPrompt().then(initialMessage => {
-        if (initialMessage) {
-          setMessages([initialMessage]);
-        }
+      // Load the default agent silently (processes initial_prompt but don't show result)
+      loadDefaultAgentWithPrompt().then(() => {
+        console.log('✅ Default agent loaded, keeping activation message (not showing welcome_prompt)');
+        // Don't replace the activation message - it stays until user sends first message
       });
+    } else if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length > 0) {
+      console.log('🔄 Sessions available - skipping default agent load, waiting for session restoration...');
     }
     
     // Check if we have basic authentication (session and user) for loading sessions

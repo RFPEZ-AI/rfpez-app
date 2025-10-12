@@ -497,6 +497,18 @@ export class ToolExecutionService {
           });
         }
 
+        case 'get_current_rfp': {
+          const { getCurrentRfp } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await getCurrentRfp(this.supabase, input.session_id || sessionId!);
+        }
+
+        case 'get_form_schema': {
+          const { getFormSchema } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await getFormSchema(this.supabase, sessionId!, this.userId, input);
+        }
+
         case 'update_form_data': {
           const { updateFormData } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility

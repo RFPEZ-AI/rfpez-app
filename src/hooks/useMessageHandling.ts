@@ -498,7 +498,28 @@ export const useMessageHandling = (
           }
         }
         
-        // Create session if none exists or validation failed
+        // CRITICAL FIX: Don't auto-create session if we're in the middle of restoring one
+        // Check if session restoration is in progress by looking for database current session
+        if (!activeSessionId) {
+          console.log('❓ No current session - checking if restoration is in progress...');
+          
+          // Try to get the user's current session from database
+          try {
+            const dbCurrentSession = await DatabaseService.getUserCurrentSession();
+            if (dbCurrentSession) {
+              console.log('⏳ Session restoration detected - using database session:', dbCurrentSession);
+              activeSessionId = dbCurrentSession;
+              // Update state to reflect the restored session
+              setCurrentSessionId(dbCurrentSession);
+              setSelectedSessionId(dbCurrentSession);
+              console.log('✅ Session restored from database during message send');
+            }
+          } catch (error) {
+            console.warn('⚠️ Failed to check for database current session:', error);
+          }
+        }
+        
+        // Create session ONLY if none exists AND no database session found
         if (!activeSessionId) {
           console.log('No current session or validation failed, creating new one with RFP context:', currentRfp?.id);
           const newSessionId = await createNewSession(currentAgent, currentRfp?.id);
@@ -914,6 +935,23 @@ export const useMessageHandling = (
               console.log('⏰ UI timeout cleared - transitioning to continuation message');
             }
             
+            // Check if agent switched - use new agent's info for continuation message
+            let continuationAgentName = agentForResponse?.agent_name || 'AI Assistant';
+            if (claudeResponse?.metadata?.agent_switch_result?.new_agent) {
+              continuationAgentName = claudeResponse.metadata.agent_switch_result.new_agent.name;
+              console.log('🔄 Agent switch detected during continuation - using new agent:', continuationAgentName);
+              
+              // Update agentForResponse for subsequent streaming
+              const newAgent = claudeResponse.metadata.agent_switch_result.new_agent;
+              agentForResponse = {
+                agent_id: newAgent.id,
+                agent_name: newAgent.name,
+                agent_instructions: newAgent.instructions,
+                agent_initial_prompt: newAgent.initial_prompt,
+                agent_avatar_url: undefined
+              };
+            }
+            
             // Create new message for continuation
             const continuationMessageId = uuidv4();
             const continuationMessage: Message = {
@@ -921,14 +959,15 @@ export const useMessageHandling = (
               content: chunk,
               isUser: false,
               timestamp: new Date(),
-              agentName: agentForResponse?.agent_name || 'AI Assistant'
+              agentName: continuationAgentName
             };
             
             console.log('✨ Created continuation message:', {
               id: continuationMessageId,
               contentLength: chunk.length,
               contentPreview: chunk.substring(0, 100) + '...',
-              agentName: continuationMessage.agentName
+              agentName: continuationMessage.agentName,
+              agentSwitchDetected: !!claudeResponse?.metadata?.agent_switch_result?.new_agent
             });
             
             setMessages(prev => {
@@ -1139,22 +1178,36 @@ export const useMessageHandling = (
         
         // CRITICAL FIX: Refresh artifacts from database after Claude creates or updates artifacts
         // This ensures the artifact panel shows all newly created documents and updated forms
-        const hasArtifactModification = claudeResponse.metadata?.function_results?.some((fr: any) => 
-          ['create_form_artifact', 'create_document_artifact', 'generate_proposal_artifact', 'update_form_data', 'update_form_artifact'].includes(fr.function)
-        ) || claudeResponse.metadata?.buyer_questionnaire ||
+        console.log('🔍 Checking for artifact modifications:', {
+          hasFunctionResults: !!claudeResponse.metadata?.function_results,
+          functionResultsCount: claudeResponse.metadata?.function_results?.length || 0,
+          functions: claudeResponse.metadata?.function_results?.map((fr: any) => fr.function_name || fr.function) || [],
+          hasBuyerQuestionnaire: !!claudeResponse.metadata?.buyer_questionnaire,
+          hasCreateDocumentArtifact: !!claudeResponse.metadata?.create_document_artifact
+        });
+        
+        const hasArtifactModification = claudeResponse.metadata?.function_results?.some((fr: any) => {
+          const funcName = fr.function_name || fr.function; // Support both field names
+          return ['create_form_artifact', 'create_document_artifact', 'generate_proposal_artifact', 'update_form_data', 'update_form_artifact'].includes(funcName);
+        }) || claudeResponse.metadata?.buyer_questionnaire ||
            claudeResponse.metadata?.create_document_artifact;
+        
+        console.log('🔍 Artifact modification check result:', hasArtifactModification);
         
         if (currentSessionId && hasArtifactModification) {
           console.log('🔄 Refreshing artifacts from database after Claude response (includes document artifacts)');
           // Small delay to ensure database operations complete
           setTimeout(async () => {
             try {
+              console.log('⏰ Artifact reload timeout executing after 500ms');
               await loadSessionArtifacts(currentSessionId);
               console.log('✅ Artifacts refreshed from database');
             } catch (error) {
               console.error('❌ Failed to refresh artifacts:', error);
             }
           }, 500);
+        } else {
+          console.log('⏭️ Skipping artifact reload - no modifications detected');
         }
         
         // RE-ENABLED: Artifact reference timeout to show document cards in messages

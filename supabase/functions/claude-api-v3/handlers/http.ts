@@ -72,6 +72,7 @@ async function streamWithRecursiveTools(
   claudeService: ClaudeAPIService,
   toolService: ToolExecutionService,
   controller: ReadableStreamDefaultController<Uint8Array>,
+  supabase: unknown,
   sessionId?: string,
   agentId?: string,
   recursionDepth: number = 0
@@ -231,7 +232,7 @@ async function streamWithRecursiveTools(
         const { getToolDefinitions } = await import('../tools/definitions.ts');
         
         const newAgentContext = await loadAgentContext(
-          undefined, // supabase client will be handled internally
+          supabase, // Pass the supabase client from outer scope
           sessionId,
           newAgentData?.id as string
         );
@@ -264,6 +265,7 @@ async function streamWithRecursiveTools(
         ];
         
         // **RECURSIVE CALL FOR NEW AGENT** - Process context without welcome
+        // 🎯 CRITICAL: Pass the NEW agent's ID, not the old one
         const continuationResult = await streamWithRecursiveTools(
           continuationMessages,
           newTools,
@@ -271,8 +273,9 @@ async function streamWithRecursiveTools(
           claudeService,
           toolService,
           controller,
+          supabase,
           sessionId,
-          agentId,
+          newAgentData?.id as string, // Use new agent's ID for correct message attribution
           recursionDepth + 1
         );
         
@@ -337,6 +340,7 @@ async function streamWithRecursiveTools(
       claudeService,
       toolService,
       controller,
+      supabase,
       sessionId,
       agentId,
       recursionDepth + 1
@@ -416,7 +420,12 @@ function handleStreamingResponse(
         console.log('🔧 DEBUG: AgentContext role:', agentContext?.role, typeof agentContext?.role);
         console.log('🔧 DEBUG: AgentContext object:', { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role });
         
-        const tools = getToolDefinitions(agentContext?.role);
+        // 🚫 CRITICAL: Disable tools when processing initial_prompt to prevent unwanted session creation
+        // Initial prompts should ONLY generate welcome text, not execute database operations
+        const tools = processInitialPrompt ? [] : getToolDefinitions(agentContext?.role);
+        if (processInitialPrompt) {
+          console.log('🚫 Initial prompt processing - tools DISABLED to prevent auto-session creation');
+        }
         
         // Use recursive streaming to handle unlimited tool call chains
         const result = await streamWithRecursiveTools(
@@ -426,6 +435,7 @@ function handleStreamingResponse(
           claudeService,
           toolService,
           controller,
+          supabase,
           sessionId,
           agentId
         );
@@ -953,6 +963,7 @@ Do NOT wait for a new user message - generate your introduction and welcome mess
                     claudeService,
                     toolService,
                     controller,
+                    supabase,
                     actualSessionId,
                     newAgentData?.id as string
                   );
