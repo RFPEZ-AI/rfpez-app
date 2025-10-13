@@ -716,7 +716,7 @@ class ClaudeAPIProxyService {
                     // Tool errors from server-side execution
                     break;
 
-                  case 'message_complete':
+                  case 'message_complete': {
                     console.log('✅ First agent message complete before agent switch:', {
                       agent_id: eventData.agent_id,
                       content_length: eventData.content?.length || 0
@@ -732,6 +732,7 @@ class ClaudeAPIProxyService {
                     // Send completion signal to trigger message finalization
                     onChunk('', true, { ...finalMetadata, message_complete: true, agent_id: eventData.agent_id });
                     break;
+                  }
 
                   case 'message_start':
                     console.log('🆕 New agent message starting:', {
