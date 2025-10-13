@@ -652,7 +652,7 @@ export const useMessageHandling = (
         let isWaitingForToolCompletion = false;
         let uiTimeoutId: NodeJS.Timeout | null = null;
         
-        const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean) => {
+        const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean, metadata?: any) => {
           console.log(' STREAMING CHUNK RECEIVED:', {
             chunkLength: chunk.length,
             chunkPreview: chunk.length > 0 ? chunk.substring(0, 50) + '...' : '[empty]',
@@ -665,8 +665,75 @@ export const useMessageHandling = (
             currentMessageId: aiMessageId,
             toolProcessingMessageId,
             bufferLength: streamingBuffer.length,
+            metadata: metadata ? Object.keys(metadata) : undefined,
             timestamp: new Date().toISOString()
           });
+          
+          // 🎯 CRITICAL FIX: Handle message_complete event for agent switches
+          if (metadata?.message_complete && !isComplete) {
+            console.log('✅ Message completion signal received - finalizing current agent message:', {
+              agent_id: metadata.agent_id,
+              messageId: aiMessageId,
+              accumulatedLength: accumulatedContent.length
+            });
+            
+            // Flush any remaining buffer
+            if (streamingBuffer.length > 0) {
+              accumulatedContent += streamingBuffer;
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === aiMessageId 
+                    ? { ...msg, content: accumulatedContent }
+                    : msg
+                )
+              );
+              streamingBuffer = '';
+            }
+            
+            // Don't actually complete - wait for message_start
+            return;
+          }
+          
+          // 🎯 CRITICAL FIX: Handle message_start event for new agent
+          if (metadata?.message_start) {
+            console.log('🆕 New agent message starting:', {
+              agent_id: metadata.agent_id,
+              agent_name: metadata.agent_name,
+              previousMessageId: aiMessageId
+            });
+            
+            // Create new message for the new agent
+            const newAgentMessageId = uuidv4();
+            const newAgentMessage: Message = {
+              id: newAgentMessageId,
+              content: '',
+              isUser: false,
+              timestamp: new Date(),
+              agentName: metadata.agent_name || 'AI Assistant'
+            };
+            
+            setMessages(prev => [...prev, newAgentMessage]);
+            
+            // Switch to new message for further streaming
+            aiMessageId = newAgentMessageId;
+            accumulatedContent = '';
+            streamingBuffer = '';
+            lastUpdateTime = Date.now();
+            
+            // Update agent context
+            if (metadata.agent_id) {
+              agentForResponse = {
+                agent_id: metadata.agent_id,
+                agent_name: metadata.agent_name,
+                agent_instructions: '',
+                agent_initial_prompt: '',
+                agent_avatar_url: undefined
+              };
+            }
+            
+            console.log('🔄 Switched to new agent message ID:', aiMessageId);
+            return;
+          }
           
           // Handle tool invocation events
           if (toolEvent) {

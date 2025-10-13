@@ -716,6 +716,40 @@ class ClaudeAPIProxyService {
                     // Tool errors from server-side execution
                     break;
 
+                  case 'message_complete':
+                    console.log('✅ First agent message complete before agent switch:', {
+                      agent_id: eventData.agent_id,
+                      content_length: eventData.content?.length || 0
+                    });
+                    // Signal to UI that current message is complete
+                    // Flush any remaining content and prepare for new message
+                    const completeBatch = streamManager.getBatchedTokens(streamId, true);
+                    if (completeBatch && completeBatch.tokens.length > 0) {
+                      const combinedToken = completeBatch.tokens.join('');
+                      const latestMetadata = completeBatch.metadata[completeBatch.metadata.length - 1];
+                      onChunk(combinedToken, false, latestMetadata);
+                    }
+                    // Send completion signal to trigger message finalization
+                    onChunk('', true, { ...finalMetadata, message_complete: true, agent_id: eventData.agent_id });
+                    break;
+
+                  case 'message_start':
+                    console.log('🆕 New agent message starting:', {
+                      agent_id: eventData.agent_id,
+                      agent_name: eventData.agent_name
+                    });
+                    // Reset content accumulation for new message
+                    fullContent = '';
+                    finalMetadata.agent_id = eventData.agent_id;
+                    finalMetadata.agent_name = eventData.agent_name;
+                    // Signal to UI to create new message
+                    onChunk('', false, { 
+                      message_start: true, 
+                      agent_id: eventData.agent_id,
+                      agent_name: eventData.agent_name
+                    });
+                    break;
+
                   case 'fresh_response':
                     console.log('🔄 Fresh response received from tool execution:', {
                       content_length: eventData.content?.length || 0,

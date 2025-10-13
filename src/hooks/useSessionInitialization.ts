@@ -133,16 +133,23 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       isAuthenticated, 
       sessionsCount: sessions.length, 
       currentSessionId: currentSessionId,
-      isCreatingNewSession
+      isCreatingNewSession,
+      needsSessionRestore
     });
     
     // Skip auto-restoration if we're in the process of creating a new session
     if (isCreatingNewSession) {
-      console.log('Skipping session restoration - currently creating new session');
+      console.log('🚫 Skipping session restoration - currently creating new session');
       return;
     }
     
-    if (isAuthenticated && sessions.length > 0 && !currentSessionId && !isCreatingNewSession) {
+    // CRITICAL FIX: Only auto-restore if we have a valid needsSessionRestore signal from useHomeState
+    // If needsSessionRestore is null, it means either:
+    // 1. We already processed the restoration, OR
+    // 2. User explicitly created a new session and cleared it
+    // In either case, don't try to auto-restore from database
+    if (isAuthenticated && sessions.length > 0 && !currentSessionId && !isCreatingNewSession && needsSessionRestore) {
+      console.log('🔄 Auto-restoring session because needsSessionRestore is set:', needsSessionRestore);
       const restoreSession = async () => {
         try {
           // First try to restore from database (user's current session)
@@ -196,8 +203,9 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
   // CRITICAL FIX: Handle session restoration from useHomeState
   // This ensures that when useHomeState restores a session ID from the database,
   // we actually load the full session content (messages, agent, artifacts)
+  // BUT: Don't restore if we're creating a new session!
   useEffect(() => {
-    if (needsSessionRestore && sessions.length > 0) {
+    if (needsSessionRestore && sessions.length > 0 && !isCreatingNewSession) {
       console.log('🔄 Processing session restoration from useHomeState:', needsSessionRestore);
       const sessionToRestore = sessions.find(s => s.id === needsSessionRestore);
       if (sessionToRestore) {
@@ -210,8 +218,12 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         // Clear the flag anyway to prevent infinite loops
         setNeedsSessionRestore(null);
       }
+    } else if (needsSessionRestore && isCreatingNewSession) {
+      console.log('🚫 Skipping session restoration - user is creating a new session');
+      // Clear the restoration flag since we're not using it
+      setNeedsSessionRestore(null);
     }
-  }, [needsSessionRestore, sessions, handleSelectSession, setNeedsSessionRestore]);
+  }, [needsSessionRestore, sessions, handleSelectSession, setNeedsSessionRestore, isCreatingNewSession]);
 
   // Safety timeout to clear the new session creation flag
   useEffect(() => {

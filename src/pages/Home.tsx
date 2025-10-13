@@ -214,7 +214,16 @@ const Home: React.FC = () => {
 
   // Define handleSelectSession before useEffects that call it
   const handleSelectSession = useCallback(async (sessionId: string) => {
+    console.log('🔍 ========== SESSION SELECTION START ==========');
     console.log('Session selected:', sessionId);
+    console.log('📊 State before selection:', {
+      currentSessionId,
+      selectedSessionId,
+      refSessionId: currentSessionIdRef.current,
+      isCreatingNewSession,
+      messagesCount: messages.length
+    });
+    console.trace('Session selection triggered from:');
     
     // Clear the new session creation flag since we're now selecting a session
     setIsCreatingNewSession(false);
@@ -879,8 +888,17 @@ const Home: React.FC = () => {
   }, [currentSessionId, userId, isAuthenticated]); // REMOVED sessions.length - causes re-run when sessions load
 
   const handleNewSession = async () => {
+    console.log('🆕 ========== NEW SESSION CREATION START ==========');
     console.log('🆕 LAZY SESSION CREATION: Starting new session WITHOUT database creation');
     console.log('✨ Session will be created when user sends first message');
+    console.log('📊 State before new session:', {
+      currentSessionId,
+      selectedSessionId,
+      refSessionId: currentSessionIdRef.current,
+      messagesCount: messages.length,
+      isCreatingNewSession
+    });
+    
     setIsCreatingNewSession(true);
     setIsSessionLoading(true); // Trigger auto-focus on message input
     
@@ -893,22 +911,58 @@ const Home: React.FC = () => {
       // CRITICAL: Clear ref as well
       currentSessionIdRef.current = undefined;
       console.log('📌 Session ID ref cleared in handleNewSession');
+      console.log('📊 State after clearing:', {
+        currentSessionId: undefined,
+        selectedSessionId: undefined,
+        refSessionId: currentSessionIdRef.current,
+        messagesCount: 0
+      });
       
       // Reset artifact window state completely for new session
       artifactWindowState.resetForNewSession();
       artifactWindowState.saveLastSession(null);
       // Don't force-collapse session history - let user access session management naturally
       
+      // 🎯 CRITICAL FIX: Clear current session in database AND state to prevent auto-restore
+      if (isAuthenticated && userId) {
+        try {
+          await DatabaseService.setUserCurrentSession(null);
+          // Also clear the needsSessionRestore flag from useHomeState
+          setNeedsSessionRestore(null);
+          console.log('✅ Current session cleared in database AND state (prevents auto-restore)');
+        } catch (error) {
+          console.warn('⚠️ Failed to clear current session in database:', error);
+        }
+      }
+      
       // 🎯 LAZY SESSION CREATION: Only load agent and welcome message
       // Do NOT create database session yet - wait for first user message
+      
+      // Show activation message while loading agent
+      console.log('🎭 Showing agent activation message...');
+      setMessages([{
+        id: 'agent-loading',
+        content: '🤖 Activating Solutions agent...',
+        isUser: false,
+        timestamp: new Date(),
+        agentName: 'System'
+      }]);
+      
       console.log('🎭 Loading default agent welcome message (no session creation yet)');
       const initialMessage = await loadDefaultAgentWithPrompt();
       if (initialMessage) {
-        // Store welcome message in pending state instead of messages array
+        // Replace activation message with actual welcome message
         setPendingWelcomeMessage(initialMessage);
         setMessages([initialMessage]);
         console.log('✅ Pending welcome message stored - session will be created on first user message');
         console.log('👋 Welcome message from:', initialMessage.agentName);
+        console.log('📊 Final state after welcome message:', {
+          currentSessionId,
+          selectedSessionId,
+          refSessionId: currentSessionIdRef.current,
+          messagesCount: 1,
+          pendingWelcome: true
+        });
       }
       
     } catch (error) {
@@ -923,8 +977,16 @@ const Home: React.FC = () => {
       // Clear the flags after successfully setting up the new session
       setTimeout(() => {
         console.log('🏁 New session preparation complete, clearing flags');
+        console.log('📊 Final state check:', {
+          currentSessionId,
+          selectedSessionId,
+          refSessionId: currentSessionIdRef.current,
+          messagesCount: messages.length,
+          isCreatingNewSession: false
+        });
         setIsCreatingNewSession(false);
         setIsSessionLoading(false); // Reset auto-focus trigger
+        console.log('🆕 ========== NEW SESSION CREATION END ==========');
       }, 100); // Small delay to ensure all state updates are processed
     }
   };

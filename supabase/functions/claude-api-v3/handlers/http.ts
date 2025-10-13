@@ -226,6 +226,18 @@ async function streamWithRecursiveTools(
           context_preview: (contextMessage as string)?.substring(0, 100)
         });
         
+        // 🎯 CRITICAL FIX: Send completion event for first agent's message before starting new agent
+        console.log('✅ Completing first agent message before agent switch');
+        const messageCompleteEvent = {
+          type: 'message_complete',
+          agent_id: agentId,
+          content: fullContent,
+          timestamp: new Date().toISOString()
+        };
+        controller.enqueue(
+          new TextEncoder().encode(`data: ${JSON.stringify(messageCompleteEvent)}\n\n`)
+        );
+        
         // Get new agent context and tools - need to import necessary functions
         const { loadAgentContext } = await import('../utils/system-prompt.ts');
         const { buildSystemPrompt } = await import('../utils/system-prompt.ts');
@@ -256,6 +268,18 @@ async function streamWithRecursiveTools(
         
         const newTools = getToolDefinitions(newAgentData?.role as string);
         
+        // 🎯 CRITICAL FIX: Send new message start event for the new agent
+        console.log('🆕 Starting new message for new agent');
+        const newMessageStartEvent = {
+          type: 'message_start',
+          agent_id: newAgentData?.id,
+          agent_name: newAgentData?.name,
+          timestamp: new Date().toISOString()
+        };
+        controller.enqueue(
+          new TextEncoder().encode(`data: ${JSON.stringify(newMessageStartEvent)}\n\n`)
+        );
+        
         // Create continuation messages with context
         const continuationMessages = [
           {
@@ -279,29 +303,21 @@ async function streamWithRecursiveTools(
           recursionDepth + 1
         );
         
-        // Merge continuation results with proper transition handling
-        // AGENT SWITCH TRANSITION FIX: If original content ends abruptly, add transition text
-        let transitionContent = '';
-        if (fullContent.length > 0 && !fullContent.endsWith('.') && !fullContent.endsWith('!') && !fullContent.endsWith('?')) {
-          // Original content was truncated mid-sentence, provide smooth transition
-          transitionContent = '...\n\n*Connecting you with our RFP Design specialist for detailed technical assistance...*\n\n';
-          console.log('🔄 Adding transition text for truncated agent switch');
-        } else if (fullContent.length > 0) {
-          // Original content was complete, add normal separator
-          transitionContent = '\n\n';
-        }
-        
-        fullContent += transitionContent + continuationResult.fullContent;
-        toolsUsed.push(...continuationResult.toolsUsed.filter(tool => !toolsUsed.includes(tool)));
-        executedToolResults.push(...continuationResult.executedToolResults);
-        
-        console.log('✅ Agent continuation completed', {
+        // 🎯 CRITICAL FIX: Do NOT merge continuation content with original message
+        // Return results separately so they can be stored as different messages
+        console.log('✅ Agent continuation completed - returning separate message content', {
+          original_agent_id: agentId,
+          new_agent_id: newAgentData?.id,
           new_agent: newAgentData?.name,
+          original_content_length: fullContent.length,
           continuation_content_length: continuationResult.fullContent.length,
           tools_used: continuationResult.toolsUsed
         });
         
-        // Return early - no need for standard recursion since we handled the agent switch
+        // Return original content only - new agent's content is handled separately via streaming
+        toolsUsed.push(...continuationResult.toolsUsed.filter(tool => !toolsUsed.includes(tool)));
+        executedToolResults.push(...continuationResult.executedToolResults);
+        
         return { fullContent, toolsUsed, executedToolResults };
         
       } catch (continuationError) {

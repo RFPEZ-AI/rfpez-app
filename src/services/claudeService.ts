@@ -264,7 +264,7 @@ export class ClaudeService {
     } | null,
     abortSignal?: AbortSignal,
     stream = false,
-    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void,
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean, metadata?: any) => void,
     processInitialPrompt = false // New parameter for initial prompt processing
   ): Promise<ClaudeResponse> {
     // Use centralized Supabase client to avoid multiple instance warnings
@@ -476,6 +476,25 @@ export class ClaudeService {
                       });
                       
                       onChunk(content, false);
+                    } else if (eventData.type === 'message_complete') {
+                      console.log('✅ First agent message complete before agent switch');
+                      // Pass metadata to signal message completion
+                      onChunk('', false, false, undefined, false, {
+                        message_complete: true,
+                        agent_id: eventData.agent_id
+                      });
+                    } else if (eventData.type === 'message_start') {
+                      console.log('🆕 New agent message starting:', {
+                        agent_id: eventData.agent_id,
+                        agent_name: eventData.agent_name
+                      });
+                      // Reset content accumulation and pass metadata to create new message
+                      fullContent = '';
+                      onChunk('', false, false, undefined, false, {
+                        message_start: true,
+                        agent_id: eventData.agent_id,
+                        agent_name: eventData.agent_name
+                      });
                     } else if (eventData.type === 'tool_invocation') {
                       if (eventData.toolEvent?.type === 'tool_start') {
                         const toolName = eventData.toolEvent.toolName;
@@ -745,7 +764,7 @@ export class ClaudeService {
     } | null,
     abortSignal?: AbortSignal,
     stream = false,
-    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean, metadata?: any) => void
   ): Promise<ClaudeResponse> {
     // Initialize and clean up authentication state
     await this.initializeAuth();
@@ -1950,7 +1969,7 @@ Be helpful, accurate, and professional. When switching agents, make the transiti
       content?: string;
     } | null,
     abortSignal?: AbortSignal,
-    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent) => void
+    onChunk?: (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean, metadata?: any) => void
   ): Promise<ClaudeResponse> {
     return this.generateResponse(
       userMessage,

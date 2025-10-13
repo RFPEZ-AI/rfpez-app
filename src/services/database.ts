@@ -813,7 +813,7 @@ export class DatabaseService {
   }
 
   // Current session management for user profiles
-  static async setUserCurrentSession(sessionId: string): Promise<boolean> {
+  static async setUserCurrentSession(sessionId: string | null): Promise<boolean> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
