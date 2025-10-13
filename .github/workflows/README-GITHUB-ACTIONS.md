@@ -14,11 +14,29 @@ You need to set up the following GitHub repository secrets:
    - Example: `jxlutaztoukwbbgtoulc`
 
 2. **SUPABASE_ACCESS_TOKEN**
-   - Personal access token for Supabase CLI
+   - Personal access token for Supabase CLI authentication
    - Generate at: https://supabase.com/dashboard/account/tokens
    - Click "Generate new token"
    - Give it a descriptive name like "GitHub Actions Deploy"
    - Copy the token (you won't see it again!)
+   - **This is REQUIRED** - The CLI needs this to authenticate deployments
+
+### Edge Function Environment Variables
+
+The edge functions are automatically configured by Supabase with these environment variables when deployed:
+- `SUPABASE_URL` - Automatically set by Supabase
+- `SUPABASE_SERVICE_ROLE_KEY` - Automatically set by Supabase
+- `SUPABASE_ANON_KEY` - Automatically set by Supabase
+- `ANTHROPIC_API_KEY` or `CLAUDE_API_KEY` - **You must configure this manually**
+
+#### Setting Edge Function Environment Variables
+
+For the Claude API key (required for claude-api-v3 function):
+1. Go to: Supabase Dashboard → Edge Functions → Configuration
+2. Add secret: `ANTHROPIC_API_KEY` or `CLAUDE_API_KEY`
+3. Value: Your Claude API key from https://console.anthropic.com/
+
+**Note:** Supabase automatically provides `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `SUPABASE_ANON_KEY` to all edge functions. You only need to add the Claude API key manually.
 
 ### Setting up GitHub Secrets
 
@@ -26,11 +44,19 @@ You need to set up the following GitHub repository secrets:
 2. Navigate to: Settings → Secrets and variables → Actions
 3. Click "New repository secret"
 4. Add each secret:
-   - Name: `SUPABASE_PROJECT_REF`
-   - Value: `jxlutaztoukwbbgtoulc` (or your project ref)
+   - **Name**: `SUPABASE_PROJECT_REF`
+   - **Value**: `jxlutaztoukwbbgtoulc` (or your project ref)
    
-   - Name: `SUPABASE_ACCESS_TOKEN`
-   - Value: (paste your generated token)
+   - **Name**: `SUPABASE_ACCESS_TOKEN`
+   - **Value**: (paste your generated token from Supabase dashboard)
+
+**⚠️ CRITICAL**: Without these secrets, the deployment will fail with:
+```
+Access token not provided. Supply an access token by running supabase login 
+or setting the SUPABASE_ACCESS_TOKEN environment variable.
+```
+
+The workflow sets `SUPABASE_ACCESS_TOKEN` as an environment variable, which the Supabase CLI automatically uses for authentication.
 
 ## Workflow Details
 

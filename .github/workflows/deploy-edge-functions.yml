@@ -12,6 +12,11 @@ jobs:
   deploy:
     runs-on: ubuntu-latest
     
+    # Set environment variables for all steps
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+    
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
@@ -29,14 +34,12 @@ jobs:
       - name: Deploy claude-api-v3 function
         run: |
           supabase functions deploy claude-api-v3 \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
-            --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+            --project-ref $SUPABASE_PROJECT_REF
 
       - name: Deploy supabase-mcp-server function
         run: |
           supabase functions deploy supabase-mcp-server \
-            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
-            --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+            --project-ref $SUPABASE_PROJECT_REF
 
       - name: Deployment summary
         run: |
