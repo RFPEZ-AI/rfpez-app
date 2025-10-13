@@ -1,0 +1,46 @@
+name: Deploy Edge Functions
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'supabase/functions/**'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Deno
+        uses: denoland/setup-deno@v1
+        with:
+          deno-version: v1.x
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy claude-api-v3 function
+        run: |
+          supabase functions deploy claude-api-v3 \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
+            --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deploy supabase-mcp-server function
+        run: |
+          supabase functions deploy supabase-mcp-server \
+            --project-ref ${{ secrets.SUPABASE_PROJECT_REF }} \
+            --token ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Edge functions deployed successfully!"
+          echo "📦 Deployed functions:"
+          echo "  - claude-api-v3"
+          echo "  - supabase-mcp-server"
