@@ -368,7 +368,7 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
         {/* Hide duplicate action buttons - CustomFormRenderer has its own */}
         <div 
           className="form-submit-container"
-          data-testid="form-submit-area"
+          data-testid="form-submit-area-legacy"
           style={{ 
           padding: isPortrait ? '8px 0' : '12px 0',
           borderTop: '1px solid var(--ion-color-light)',
@@ -379,7 +379,7 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
           {false && onSave && (
             <IonButton
               className="form-save-button"
-              data-testid="form-save-button"
+              data-testid="form-save-button-legacy"
               data-form-action="save"
               expand="block"
               fill="outline"
@@ -401,7 +401,7 @@ const ArtifactFormRenderer: React.FC<ArtifactFormRendererProps> = ({
           {/* Submit Button */}
           <IonButton
             className="form-submit-button"
-            data-testid="form-submit"
+            data-testid="form-submit-legacy"
             data-form-action="submit"
             expand="block"
             size={isPortrait ? 'default' : 'default'}

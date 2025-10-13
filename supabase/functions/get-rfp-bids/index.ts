@@ -4,7 +4,7 @@ import * as postgres from 'https://deno.land/x/postgres@v0.17.0/mod.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-platform',
 };
 
 interface GetBidsRequest {

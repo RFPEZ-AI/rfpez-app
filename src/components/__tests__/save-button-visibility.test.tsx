@@ -2,7 +2,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React from 'react';
-import { render, screen } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ArtifactFormRenderer from '../artifacts/ArtifactFormRenderer';
 import { Artifact } from '../../types/home';
@@ -47,7 +47,7 @@ describe('Save Button Visibility Test', () => {
     })
   };
 
-  it('should show both Save Draft and Submit buttons when onSave prop is provided', () => {
+  it('should show both Save Draft and Submit buttons when onSave prop is provided', async () => {
     const mockOnSubmit = jest.fn();
     const mockOnSave = jest.fn();
 
@@ -59,18 +59,31 @@ describe('Save Button Visibility Test', () => {
       />
     );
 
+    // Wait for form to finish loading (component has 10ms delay before showing form)
+    await waitFor(() => {
+      expect(screen.queryByText('Loading form...')).not.toBeInTheDocument();
+    }, { timeout: 3000 });
+
+    // Wait for buttons to be rendered
+    await waitFor(() => {
+      expect(screen.getByTestId('form-submit')).toBeInTheDocument();
+    }, { timeout: 1000 });
+
     // Check that both buttons are present
-    expect(screen.getByTestId('form-save-button')).toBeInTheDocument();
-    expect(screen.getByTestId('form-submit')).toBeInTheDocument();
+    const saveButton = screen.getByTestId('form-save-button');
+    const submitButton = screen.getByTestId('form-submit');
     
-    // Check button text
-    expect(screen.getByText('💾 Save Draft')).toBeInTheDocument();
-    expect(screen.getByText('Submit Questionnaire')).toBeInTheDocument();
+    expect(saveButton).toBeInTheDocument();
+    expect(submitButton).toBeInTheDocument();
+    
+    // Check button text content
+    expect(saveButton).toHaveTextContent('💾 Save Draft');
+    expect(submitButton).toHaveTextContent('Submit Questionnaire');
     
     console.log('✅ Both Save Draft and Submit buttons are visible when onSave prop is provided');
   });
 
-  it('should only show Submit button when onSave prop is not provided', () => {
+  it('should only show Submit button when onSave prop is not provided', async () => {
     const mockOnSubmit = jest.fn();
 
     render(
@@ -81,13 +94,18 @@ describe('Save Button Visibility Test', () => {
       />
     );
 
+    // Wait for form to finish loading
+    await waitFor(() => {
+      expect(screen.queryByText('Loading form...')).not.toBeInTheDocument();
+    }, { timeout: 3000 });
+
     // Save button should not be present
     expect(screen.queryByTestId('form-save-button')).not.toBeInTheDocument();
-    expect(screen.queryByText('💾 Save Draft')).not.toBeInTheDocument();
     
     // Submit button should still be present
-    expect(screen.getByTestId('form-submit')).toBeInTheDocument();
-    expect(screen.getByText('Submit Questionnaire')).toBeInTheDocument();
+    const submitButton = screen.getByTestId('form-submit');
+    expect(submitButton).toBeInTheDocument();
+    expect(submitButton).toHaveTextContent('Submit Questionnaire');
     
     console.log('✅ Only Submit button visible when onSave prop is not provided');
   });

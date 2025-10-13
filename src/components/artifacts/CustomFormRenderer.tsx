@@ -308,21 +308,23 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
       }}>
         {onSave && (
           <IonButton
+            data-testid="form-save-button"
             expand="block"
             fill="outline"
             onClick={handleSave}
             disabled={isSaving}
             style={{ flex: 1 }}
           >
-            {isSaving ? 'Saving...' : 'Save Draft'}
+            {isSaving ? 'Saving...' : '💾 Save Draft'}
           </IonButton>
         )}
         <IonButton
+          data-testid="form-submit"
           expand="block"
           type="submit"
           style={{ flex: 1 }}
         >
-          Submit
+          Submit Questionnaire
         </IonButton>
       </div>
     </form>
