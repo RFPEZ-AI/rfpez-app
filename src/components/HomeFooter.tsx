@@ -8,15 +8,17 @@ import { RFPService } from '../services/rfpService';
 interface HomeFooterProps {
   currentRfp: RFP | null;
   onViewBids?: () => void;
-  onClearRfpContext?: () => void;
   onRfpChange?: (rfpId: number) => void; // Prop for handling RFP selection
+  bidCount?: number; // Number of bids for current RFP
+  debugUI?: React.ReactNode; // Debug UI component to render
 }
 
 const HomeFooter: React.FC<HomeFooterProps> = ({ 
   currentRfp, 
   onViewBids, 
-  onClearRfpContext, 
-  onRfpChange
+  onRfpChange,
+  bidCount = 0,
+  debugUI
 }) => {
   // Add styles to constrain the IonSelect height
   useEffect(() => {
@@ -139,41 +141,52 @@ const HomeFooter: React.FC<HomeFooterProps> = ({
       
       {/* Right side buttons */}
       <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-        {/* Show clear button when RFP is selected */}
-        {currentRfp && onClearRfpContext && (
-          <IonButton 
-            size="small" 
-            fill="clear" 
-            color="medium"
-            onClick={onClearRfpContext}
-            style={{ 
-              '--height': '28px',
-              '--padding-start': '4px',
-              '--padding-end': '4px',
-              fontSize: '12px'
-            }}
-            title="Clear current RFP (new sessions will have no RFP context)"
-          >
-            Clear
-          </IonButton>
-        )}
+        {/* Debug UI - positioned left of Bids button */}
+        {debugUI}
         
         {/* Show bids button when RFP is selected */}
         {currentRfp && onViewBids && (
-          <IonButton 
-            size="small" 
-            fill="outline" 
-            color="success"
-            onClick={onViewBids}
-            style={{ 
-              '--height': '28px',
-              '--padding-start': '8px',
-              '--padding-end': '8px',
-              fontSize: '12px'
-            }}
-          >
-            Bids
-          </IonButton>
+          <div style={{ position: 'relative' }}>
+            <IonButton 
+              size="small" 
+              fill="outline" 
+              color="success"
+              onClick={onViewBids}
+              style={{ 
+                '--height': '28px',
+                '--padding-start': '8px',
+                '--padding-end': '8px',
+                fontSize: '12px'
+              }}
+            >
+              Bids
+            </IonButton>
+            
+            {/* Badge showing bid count - similar to artifact count */}
+            {bidCount > 0 && (
+              <span 
+                style={{
+                  position: 'absolute',
+                  top: '-8px',
+                  right: '-8px',
+                  backgroundColor: '#2dd36f', // Green color for bids
+                  color: 'white',
+                  borderRadius: '10px',
+                  padding: '2px 6px',
+                  fontSize: '10px',
+                  fontWeight: 'bold',
+                  minWidth: '18px',
+                  height: '18px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                }}
+              >
+                {bidCount > 99 ? '99+' : bidCount}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </div>

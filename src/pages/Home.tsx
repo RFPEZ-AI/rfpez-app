@@ -6,6 +6,7 @@ import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
 import DatabaseService from '../services/database';
 import { ArtifactService } from '../services/artifactService';
+import { RFPService } from '../services/rfpService';
 import { Message, ArtifactReference, Artifact } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import { DocxExporter } from '../utils/docxExporter';
@@ -202,6 +203,29 @@ const Home: React.FC = () => {
   const [isCreatingNewSession, setIsCreatingNewSession] = useState(false);
   const [forceScrollToBottom, setForceScrollToBottom] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(false);
+  const [bidCount, setBidCount] = useState(0);
+
+  // Fetch bid count when currentRfp changes
+  useEffect(() => {
+    const fetchBidCount = async () => {
+      if (currentRfp?.id) {
+        console.log('🔢 Fetching bid count for RFP:', currentRfp.id, currentRfp.name);
+        try {
+          const bids = await RFPService.getBidsByRfp(currentRfp.id);
+          console.log('✅ Bid count fetched:', bids.length);
+          setBidCount(bids.length);
+        } catch (error) {
+          console.error('❌ Failed to fetch bid count:', error);
+          setBidCount(0);
+        }
+      } else {
+        console.log('ℹ️ No current RFP, setting bid count to 0');
+        setBidCount(0);
+      }
+    };
+
+    fetchBidCount();
+  }, [currentRfp]);
 
   const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling(setGlobalRFPContext);
 
@@ -1801,7 +1825,16 @@ const Home: React.FC = () => {
       <HomeFooter 
         currentRfp={currentRfp ?? null} 
         onViewBids={handleViewBids}
-        onClearRfpContext={() => clearGlobalRFPContext()}
+        bidCount={bidCount}
+        debugUI={
+          <ClickableDebugToggle 
+            className="debug-toggle"
+            style={{ 
+              height: '28px',
+              margin: 0
+            }}
+          />
+        }
         onRfpChange={async (rfpId: number) => {
           console.log('RFP selected from dropdown:', rfpId);
           await handleSetCurrentRfp(rfpId);
@@ -1815,17 +1848,6 @@ const Home: React.FC = () => {
               console.error('❌ Failed to update session RFP context:', error);
             }
           }
-        }}
-      />
-
-      {/* Debug toggle for development testing */}
-      <ClickableDebugToggle 
-        className="debug-toggle"
-        style={{ 
-          position: 'fixed', 
-          bottom: '10px', 
-          right: '10px', 
-          zIndex: 9999 
         }}
       />
 

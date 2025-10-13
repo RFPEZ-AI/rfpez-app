@@ -534,64 +534,15 @@ async function executeCreateSession(params: any, userId: string) {
     console.log('✅ MCP: Session set as current successfully');
   }
   
-  // CRITICAL FIX: Store the initial welcome message from the default agent
-  // This ensures the welcome message persists when the user refreshes
-  // BUT only if this is a new session (not reused) and has no messages yet
+  // 🎯 LAZY SESSION CREATION: No initial message storage on session creation
+  // Welcome messages are handled by React UI via pendingWelcomeMessage state
+  // This prevents empty sessions from accumulating in the database
+  // Messages are only stored when the user actually interacts with the agent
   if (!session.reused) {
-    console.log('🌟 MCP: Adding initial welcome message to new session:', session.id);
-    
-    try {
-      // Check if session already has messages (in case of race conditions)
-      const { data: existingMessages } = await supabase
-        .from('messages')
-        .select('id')
-        .eq('session_id', session.id)
-        .limit(1);
-      
-      if (!existingMessages || existingMessages.length === 0) {
-        // Get the default agent's initial prompt
-        const { data: defaultAgent, error: agentError } = await supabase
-          .from('agents')
-          .select('name, initial_prompt')
-          .eq('is_default', true)
-          .single();
-        
-        if (!agentError && defaultAgent?.initial_prompt) {
-          console.log('🤖 MCP: Found default agent:', defaultAgent.name);
-          
-          // Store the initial welcome message as a system message
-          const { error: messageError } = await supabase
-            .from('messages')
-            .insert({
-              session_id: session.id,
-              user_id: internalUserId,
-              content: defaultAgent.initial_prompt,
-              role: 'system',
-              message_order: 1,
-              metadata: {
-                agent_name: defaultAgent.name,
-                message_type: 'initial_welcome',
-                auto_generated: true
-              }
-            });
-          
-          if (messageError) {
-            console.error('⚠️ MCP: Failed to store initial welcome message:', messageError);
-          } else {
-            console.log('✅ MCP: Initial welcome message stored successfully');
-          }
-        } else {
-          console.warn('⚠️ MCP: Could not find default agent or initial prompt:', agentError);
-        }
-      } else {
-        console.log('🔄 MCP: Session already has messages, skipping welcome message');
-      }
-    } catch (welcomeError) {
-      console.error('⚠️ MCP: Error adding welcome message:', welcomeError);
-      // Don't fail session creation if welcome message fails
-    }
+    console.log('✅ MCP: New session created - welcome message handled by React UI');
+    console.log('� MCP: No database message storage on session creation (lazy pattern)');
   } else {
-    console.log('🔄 MCP: Reused session, skipping welcome message addition');
+    console.log('🔄 MCP: Reused existing session');
   }
   
   return {

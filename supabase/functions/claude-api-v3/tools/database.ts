@@ -862,54 +862,13 @@ export async function createSession(supabase: SupabaseClient, data: SessionData)
     console.log('✅ Successfully set new session as current session for user');
   }
 
-  // CRITICAL FIX: Store the initial welcome message from the default agent
-  // This ensures the welcome message persists when the user refreshes
-  console.log('🌟 V3: Adding initial welcome message to session:', sessionId);
-  
-  try {
-    // Get the default agent's initial prompt
-    const { data: defaultAgent, error: agentError } = await supabase
-      .from('agents')
-      .select('name, initial_prompt')
-      .eq('is_default', true)
-      .single();
-    
-    if (!agentError && defaultAgent) {
-      const agent = defaultAgent as unknown as { name: string; initial_prompt: string };
-      if (agent.initial_prompt) {
-        console.log('🤖 V3: Found default agent:', agent.name);
-        
-        // Store the initial welcome message as a system message
-        const { error: messageError } = await supabase
-          .from('messages')
-          .insert({
-            session_id: sessionId,
-            user_id: (userProfile as unknown as { id: string }).id, // Use internal user_profiles.id
-            content: agent.initial_prompt,
-            role: 'system',
-            message_order: 1,
-            metadata: {
-              agent_name: agent.name,
-              message_type: 'initial_welcome',
-              auto_generated: true
-            }
-          });
-      
-      if (messageError) {
-        console.error('⚠️ V3: Failed to store initial welcome message:', messageError);
-      } else {
-        console.log('✅ V3: Initial welcome message stored successfully');
-      }
-      } else {
-        console.warn('⚠️ V3: Could not find default agent or initial prompt:', agentError);
-      }
-    } else {
-      console.warn('⚠️ V3: Could not find default agent or initial prompt:', agentError);
-    }
-  } catch (welcomeError) {
-    console.error('⚠️ V3: Error adding welcome message:', welcomeError);
-    // Don't fail session creation if welcome message fails
-  }
+  // 🎯 LAZY SESSION CREATION: No initial message storage on session creation
+  // Welcome messages are handled by React UI via pendingWelcomeMessage state
+  // This prevents empty sessions from accumulating in the database
+  // Messages are only stored when the user actually interacts with the agent
+  console.log('✅ V3: Session created successfully - welcome message handled by React UI');
+  console.log('💡 V3: No database message storage on session creation (lazy pattern)');
+  console.log('🎯 V3: Session will receive messages only when user sends first message');
 
   const result = {
     success: true,
