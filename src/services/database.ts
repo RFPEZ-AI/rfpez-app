@@ -153,15 +153,21 @@ export class DatabaseService {
       return [];
     }
 
-    // Get active agent for each session
+    // Get active agent and message count for each session
     const sessionStats: SessionWithStats[] = await Promise.all(
       (sessions || []).map(async (session) => {
         // Get the active agent for this session
         const activeAgent = await AgentService.getSessionActiveAgent(session.id);
         
+        // Get actual message count
+        const { count: messageCount } = await supabase
+          .from('messages')
+          .select('*', { count: 'exact', head: true })
+          .eq('session_id', session.id);
+        
         return {
           ...session,
-          message_count: 0,
+          message_count: messageCount || 0,
           last_message: 'No messages yet',
           last_message_at: session.created_at,
           artifact_count: 0,
@@ -170,7 +176,23 @@ export class DatabaseService {
       })
     );
 
-    return sessionStats;
+    // Filter out empty sessions with initial_prompt-style titles
+    // These are sessions that were created but never used (no user messages)
+    const filteredSessions = sessionStats.filter(session => {
+      // Keep sessions that have messages
+      if (session.message_count > 0) return true;
+      
+      // Filter out sessions with initial_prompt-style titles (agent welcome messages)
+      const hasInitialPromptTitle = 
+        session.title.includes('You are the') && 
+        session.title.includes('agent welcoming');
+      
+      // Keep empty sessions with user-friendly titles like "Chat Session"
+      // But exclude empty sessions with initial_prompt titles
+      return !hasInitialPromptTitle;
+    });
+
+    return filteredSessions;
   }
 
   static async getSession(sessionId: string): Promise<Session | null> {

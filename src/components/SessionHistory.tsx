@@ -249,7 +249,9 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
                 <IonIcon icon={chatbubbleOutline} slot="start" />
                 <IonLabel>
                   <h3>{session.title}</h3>
-                  <p>{session.agent_name || 'No Agent'}</p>
+                  <p>
+                    {session.agent_name || 'No Agent'} • {new Date(session.timestamp).toLocaleString()}
+                  </p>
                 </IonLabel>
               </IonItem>
             ))}
