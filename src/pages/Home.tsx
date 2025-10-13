@@ -337,13 +337,17 @@ const Home: React.FC = () => {
       console.log('Selected artifact:', artifactToSelect);
     }
     
-    // If we have artifacts, ensure the window is properly shown
+    // If we have artifacts, ensure the window is shown (auto-show behavior)
     if (sessionArtifacts && sessionArtifacts.length > 0) {
       if (!artifactWindowState.isOpen) {
         artifactWindowState.openWindow();
       }
-      if (artifactWindowState.isCollapsed) {
-        artifactWindowState.expandWindow();
+    }
+    
+    // Auto-hide if no artifacts exist
+    if (!sessionArtifacts || sessionArtifacts.length === 0) {
+      if (artifactWindowState.isOpen) {
+        artifactWindowState.closeWindow();
       }
     }
   }, [
@@ -1190,8 +1194,7 @@ const Home: React.FC = () => {
       if (artifact) {
         selectArtifact(artifact.id);
         artifactWindowState.selectArtifact(artifact.id);
-        artifactWindowState.openWindow();
-        artifactWindowState.expandWindow();
+        artifactWindowState.openWindow(); // Auto-show when artifact selected
         console.log('✅ Selected artifact for display:', artifact.name);
         return true;
       }
@@ -1223,8 +1226,7 @@ const Home: React.FC = () => {
           if (artifactAfterReload) {
             selectArtifact(artifactAfterReload.id);
             artifactWindowState.selectArtifact(artifactAfterReload.id);
-            artifactWindowState.openWindow();
-            artifactWindowState.expandWindow();
+            artifactWindowState.openWindow(); // Auto-show when artifact selected
             console.log('✅ Found artifact after database reload:', artifactAfterReload.name);
             return;
           }
@@ -1346,8 +1348,7 @@ const Home: React.FC = () => {
       // Select artifact directly using the artifact management functions
       selectArtifact(bidViewArtifact.id);
       artifactWindowState.selectArtifact(bidViewArtifact.id);
-      artifactWindowState.openWindow();
-      artifactWindowState.expandWindow();
+      artifactWindowState.openWindow(); // Auto-show when artifact selected
       console.log('Selected bid view artifact for display:', bidViewArtifact.name);
     }, 100);
   };
@@ -1765,9 +1766,7 @@ const Home: React.FC = () => {
             toolInvocations={toolInvocations}
             // New artifact window state props
             artifactWindowOpen={artifactWindowState.isOpen}
-            artifactWindowCollapsed={artifactWindowState.isCollapsed}
             onToggleArtifactWindow={artifactWindowState.toggleWindow}
-            onToggleArtifactCollapse={artifactWindowState.toggleCollapse}
             forceSessionHistoryCollapsed={forceSessionHistoryCollapsed}
             forceScrollToBottom={forceScrollToBottom}
             isSessionLoading={isSessionLoading}

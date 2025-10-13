@@ -230,29 +230,49 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             gap: '8px',
             marginRight: '8px'
           }}>
-            {/* Artifact Window Toggle Button - Always visible */}
+            {/* Artifact Window Toggle Button - 3 States: Hidden-Empty, Hidden-HasArtifacts, Shown */}
             <IonButton
               fill="clear"
               size="small"
               onClick={onToggleArtifactWindow}
-              title={artifactWindowOpen ? "Hide artifacts" : "Show artifacts"}
+              title={
+                artifactWindowOpen 
+                  ? "Hide artifacts" 
+                  : artifactCount > 0 
+                    ? `Show ${artifactCount} artifact${artifactCount > 1 ? 's' : ''}` 
+                    : "No artifacts"
+              }
               data-testid="artifact-window-toggle"
               style={{
                 '--padding-start': '6px',
-                '--padding-end': '6px',
-                '--color': artifactWindowOpen ? 'var(--ion-color-primary)' : 'var(--ion-color-medium)',
-                position: 'relative'
+                '--padding-end': '12px',
+                '--padding-top': '8px',
+                '--padding-bottom': '8px',
+                // 3 visual states:
+                // 1. Hidden + no artifacts = light gray (disabled look)
+                // 2. Hidden + has artifacts = primary color (attention-grabbing)
+                // 3. Shown = primary color (active)
+                '--color': artifactWindowOpen 
+                  ? 'var(--ion-color-primary)' 
+                  : artifactCount > 0 
+                    ? 'var(--ion-color-primary)' 
+                    : 'var(--ion-color-light)',
+                opacity: !artifactWindowOpen && artifactCount === 0 ? 0.5 : 1,
+                position: 'relative',
+                cursor: artifactCount === 0 && !artifactWindowOpen ? 'default' : 'pointer',
+                overflow: 'visible'
               }}
+              disabled={artifactCount === 0 && !artifactWindowOpen} // Disable when hidden and no artifacts
             >
               <IonIcon icon={documentTextOutline} />
-              {/* Badge showing artifact count */}
+              {/* Badge showing artifact count - only when there are artifacts */}
               {artifactCount > 0 && (
                 <span 
                   style={{
                     position: 'absolute',
-                    top: '-4px',
-                    right: '-4px',
-                    backgroundColor: 'var(--ion-color-primary)',
+                    top: '-8px',
+                    right: '-8px',
+                    backgroundColor: artifactWindowOpen ? '#2dd36f' : '#ffc409', // Green when open, Orange when hidden
                     color: 'white',
                     borderRadius: '10px',
                     padding: '2px 6px',
@@ -263,13 +283,20 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
-                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)'
+                    boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
+                    animation: !artifactWindowOpen ? 'pulse 2s infinite' : 'none'
                   }}
                 >
                   {artifactCount > 99 ? '99+' : artifactCount}
                 </span>
               )}
             </IonButton>
+            <style>{`
+              @keyframes pulse {
+                0%, 100% { transform: scale(1); opacity: 1; }
+                50% { transform: scale(1.1); opacity: 0.8; }
+              }
+            `}</style>
             <AuthButtons />
           </div>
         </IonButtons>

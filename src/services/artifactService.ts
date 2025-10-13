@@ -409,7 +409,6 @@ export class ArtifactService {
         selectArtifact(artifact.id);
         artifactWindowState.selectArtifact(artifact.id);
         artifactWindowState.openWindow();
-        artifactWindowState.expandWindow();
         console.log('✅ Selected artifact for display:', artifact.name);
         return true;
       }
@@ -442,7 +441,6 @@ export class ArtifactService {
             selectArtifact(artifactAfterReload.id);
             artifactWindowState.selectArtifact(artifactAfterReload.id);
             artifactWindowState.openWindow();
-            artifactWindowState.expandWindow();
             console.log('✅ Found artifact after database reload:', artifactAfterReload.name);
             return;
           }

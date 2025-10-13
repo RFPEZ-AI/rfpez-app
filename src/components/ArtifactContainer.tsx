@@ -3,10 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon } from '@ionic/react';
 import { 
-  chevronBackOutline, 
-  chevronForwardOutline, 
-  expandOutline, 
-  chevronUpOutline 
+  expandOutline
 } from 'ionicons/icons';
 import { SingletonArtifactWindowProps } from '../types/home';
 import { useArtifactTypeDetection } from '../hooks/useArtifactTypeDetection';
@@ -23,21 +20,14 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   onDownload, 
   onFormSubmit,
   onFormSave,
-  isCollapsed: externalCollapsed,
-  onToggleCollapse: externalToggleCollapse,
   currentRfpId,
   onArtifactSelect
 }) => {
   // State management
   const [isPortrait, setIsPortrait] = useState<boolean>(window.innerHeight > window.innerWidth);
-  const [internalCollapsed, setInternalCollapsed] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [portraitHeight, setPortraitHeight] = useState<number>(40);
   const [isDragging, setIsDragging] = useState<boolean>(false);
-
-  // Use external collapsed state if provided, otherwise use internal state
-  const collapsed = externalCollapsed !== undefined ? externalCollapsed : internalCollapsed;
-  const toggleCollapse = externalToggleCollapse || (() => setInternalCollapsed(!internalCollapsed));
 
   // Type detection
   const typeDetection = useArtifactTypeDetection(artifact);
@@ -88,19 +78,13 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
     }
   }, [isDragging]);
 
-  // Reset portrait height when collapsed changes
-  React.useEffect(() => {
-    if (collapsed) {
-      setPortraitHeight(60);
-    }
-  }, [collapsed]);
-
   const renderArtifactContent = () => {
     if (!artifact) return null;
 
     if (typeDetection.isBuyerQuestionnaire && onFormSubmit) {
       return (
         <ArtifactFormRenderer
+          key={artifact.id} // Force re-mount when artifact changes
           artifact={artifact}
           onSubmit={(formData) => onFormSubmit(artifact, formData)}
           onSave={onFormSave}
@@ -110,9 +94,13 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
     }
     
     if (typeDetection.isBidView) {
+      // Use artifact's rfpId as fallback if currentRfpId is not set
+      const effectiveRfpId = currentRfpId ?? artifact.rfpId ?? null;
+      
       return (
         <ArtifactBidRenderer
-          currentRfpId={currentRfpId ?? null}
+          key={artifact.id} // Force re-mount when artifact changes
+          currentRfpId={effectiveRfpId}
           rfpName={artifact.content || artifact.name}
         />
       );
@@ -121,6 +109,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
     if (typeDetection.isTextArtifact) {
       return (
         <ArtifactTextRenderer
+          key={artifact.id} // Force re-mount when artifact changes
           artifact={artifact}
           isPortrait={isPortrait}
         />
@@ -129,6 +118,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
 
     return (
       <ArtifactDefaultRenderer
+        key={artifact.id} // Force re-mount when artifact changes
         artifact={artifact}
         onDownload={onDownload}
       />
@@ -175,20 +165,15 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
     bottom: isPortrait ? 0 : 'auto',
     right: isPortrait ? 0 : 'auto',
     left: isPortrait ? 0 : 'auto',
-    height: isPortrait 
-      ? (collapsed ? '60px' : `${portraitHeight}vh`) 
-      : '100%',
-    width: isPortrait ? '100%' : (collapsed ? '40px' : '400px'),
+    height: isPortrait ? `${portraitHeight}vh` : '100%',
+    width: isPortrait ? '100%' : '400px',
     backgroundColor: '#f8f9fa',
     borderTop: isPortrait ? '1px solid #ddd' : 'none',
     borderLeft: !isPortrait ? '1px solid #ddd' : 'none',
     zIndex: 1000,
     display: 'flex',
     flexDirection: 'column',
-    overflow: 'hidden',
-    transition: isPortrait 
-      ? 'height 0.3s ease-in-out' 
-      : 'width 0.3s ease-in-out'
+    overflow: 'hidden'
   };
 
   return (
@@ -197,100 +182,74 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
         className="artifact-window"
         data-testid="artifact-window"
         data-artifact-type={artifact.type}
-        data-collapsed={collapsed}
         data-portrait={isPortrait}
         style={windowStyle}
       >
-        {/* Header */}
+        {/* Header - Always visible, no collapse button */}
         <div 
           className="artifact-header"
           style={{
             padding: '8px',
-            borderBottom: !collapsed ? '1px solid #ddd' : 'none',
+            borderBottom: '1px solid #ddd',
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
             backgroundColor: '#fff',
             minHeight: '44px',
-            cursor: isPortrait && !collapsed ? 'ns-resize' : 'default'
+            cursor: isPortrait ? 'ns-resize' : 'default'
           }}
-          onMouseDown={isPortrait && !collapsed ? handleDragStart : undefined}
-          onTouchStart={isPortrait && !collapsed ? handleDragStart : undefined}
+          onMouseDown={isPortrait ? handleDragStart : undefined}
+          onTouchStart={isPortrait ? handleDragStart : undefined}
         >
-          <IonButton
-            fill="clear"
-            size="small"
-            onClick={toggleCollapse}
-            data-testid="artifact-toggle"
-            style={{ 
-              marginRight: collapsed ? '0' : '8px',
-              flexShrink: 0,
-              transform: collapsed 
-                ? (isPortrait ? 'rotate(180deg)' : 'rotate(-90deg)') 
-                : (isPortrait ? 'rotate(0deg)' : 'rotate(90deg)')
-            }}
-          >
-            <IonIcon 
-              icon={isPortrait ? chevronUpOutline : (collapsed ? chevronBackOutline : chevronForwardOutline)} 
-              style={{ fontSize: '16px' }} 
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <IonButton
+              fill="clear"
+              size="small"
+              onClick={() => setIsFullScreen(true)}
+              data-testid="fullscreen-button"
+              style={{ flexShrink: 0, backgroundColor: '#e0f7fa', border: '1px solid #00bcd4' }}
+            >
+              <IonIcon icon={expandOutline} style={{ fontSize: '16px', color: '#00796b' }} />
+            </IonButton>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
+            <ArtifactDropdown
+              artifacts={artifacts.map(a => ({
+                id: a.id,
+                name: a.name,
+                type: a.type,
+                description: a.size || '', // Use size as description fallback
+                created_at: new Date().toISOString() // Fallback for missing created_at
+              }))}
+              selectedArtifact={artifact ? {
+                id: artifact.id,
+                name: artifact.name,
+                type: artifact.type,
+                description: artifact.size || '',
+                created_at: new Date().toISOString()
+              } : null}
+              onSelectArtifact={(dropdownArtifact) => {
+                const fullArtifact = artifacts.find(a => a.id === dropdownArtifact.id);
+                if (fullArtifact && onArtifactSelect) {
+                  onArtifactSelect(fullArtifact);
+                }
+              }}
+              loading={false}
             />
-          </IonButton>
-          
-          {!collapsed && (
-            <>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <IonButton
-                  fill="clear"
-                  size="small"
-                  onClick={() => setIsFullScreen(true)}
-                  data-testid="fullscreen-button"
-                  style={{ flexShrink: 0, backgroundColor: '#e0f7fa', border: '1px solid #00bcd4' }}
-                >
-                  <IonIcon icon={expandOutline} style={{ fontSize: '16px', color: '#00796b' }} />
-                </IonButton>
-              </div>
-              <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
-                <ArtifactDropdown
-                  artifacts={artifacts.map(a => ({
-                    id: a.id,
-                    name: a.name,
-                    type: a.type,
-                    description: a.size || '', // Use size as description fallback
-                    created_at: new Date().toISOString() // Fallback for missing created_at
-                  }))}
-                  selectedArtifact={artifact ? {
-                    id: artifact.id,
-                    name: artifact.name,
-                    type: artifact.type,
-                    description: artifact.size || '',
-                    created_at: new Date().toISOString()
-                  } : null}
-                  onSelectArtifact={(dropdownArtifact) => {
-                    const fullArtifact = artifacts.find(a => a.id === dropdownArtifact.id);
-                    if (fullArtifact && onArtifactSelect) {
-                      onArtifactSelect(fullArtifact);
-                    }
-                  }}
-                  loading={false}
-                />
-              </div>
-            </>
-          )}
+          </div>
         </div>
 
-        {/* Content */}
-        {!collapsed && (
-          <div 
-            className="artifact-content"
-            style={{
-              flex: 1,
-              overflow: 'auto',
-              backgroundColor: '#fff'
-            }}
-          >
-            {renderArtifactContent()}
-          </div>
-        )}
+        {/* Content - Always visible */}
+        <div 
+          className="artifact-content"
+          style={{
+            flex: 1,
+            overflow: 'auto',
+            backgroundColor: '#fff'
+          }}
+        >
+          {renderArtifactContent()}
+        </div>
       </div>
 
       {/* Fullscreen Modal */}

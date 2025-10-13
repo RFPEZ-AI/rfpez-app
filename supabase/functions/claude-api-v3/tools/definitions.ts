@@ -563,8 +563,8 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
     blocked: ['create_and_set_rfp']
   },
   'design': {
-    // RFP Design has access to all RFP creation tools and memory tools - REMOVED switch_agent to prevent self-switching loops
-    allowed: ['create_and_set_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
+    // RFP Design has access to all RFP creation tools, bid management tools, and memory tools - REMOVED switch_agent to prevent self-switching loops
+    allowed: ['create_and_set_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
   },
   'support': {
     // Support agents don't need RFP creation tools but can create documents

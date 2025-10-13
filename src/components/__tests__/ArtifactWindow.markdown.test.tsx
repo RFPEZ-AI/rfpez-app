@@ -29,9 +29,7 @@ describe('ArtifactWindow Enhanced Markdown Rendering', () => {
     artifact: createDocumentArtifact(''),
     onDownload: jest.fn(),
     onFormSubmit: jest.fn(),
-    currentRfpId: 123,
-    isCollapsed: false,
-    onToggleCollapse: jest.fn()
+    currentRfpId: 123
   };
 
   beforeEach(() => {

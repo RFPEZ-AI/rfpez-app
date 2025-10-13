@@ -39,9 +39,7 @@ interface HomeContentProps {
   
   // New props for artifact window state and responsive behavior
   artifactWindowOpen?: boolean;
-  artifactWindowCollapsed?: boolean;
   onToggleArtifactWindow?: () => void;
-  onToggleArtifactCollapse?: () => void;
   forceSessionHistoryCollapsed?: boolean;
   onSessionHistoryToggle?: (expanded: boolean) => void;
   
@@ -76,9 +74,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
   currentAgent,
   onCancelRequest,
   artifactWindowOpen = false,
-  artifactWindowCollapsed = true,
   onToggleArtifactWindow, // eslint-disable-line @typescript-eslint/no-unused-vars
-  onToggleArtifactCollapse,
   forceSessionHistoryCollapsed = false,
   onSessionHistoryToggle,
   // Tool transparency props
@@ -180,8 +176,6 @@ const HomeContent: React.FC<HomeContentProps> = ({
             onFormSubmit={onFormSubmit}
             onFormSave={onFormSave}
             currentRfpId={currentRfpId}
-            isCollapsed={artifactWindowCollapsed}
-            onToggleCollapse={onToggleArtifactCollapse}
             onArtifactSelect={(artifact) => {
               if (onArtifactSelect) {
                 // Convert Artifact to ArtifactReference

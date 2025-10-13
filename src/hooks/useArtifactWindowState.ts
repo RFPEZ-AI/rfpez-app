@@ -8,7 +8,6 @@ const SELECTED_ARTIFACT_KEY = 'rfpez_selected_artifact';
 
 export interface ArtifactWindowState {
   isOpen: boolean;
-  isCollapsed: boolean;
   selectedArtifactId: string | null;
 }
 
@@ -16,9 +15,6 @@ export interface ArtifactWindowActions {
   openWindow: () => void;
   closeWindow: () => void;
   toggleWindow: () => void;
-  collapseWindow: () => void;
-  expandWindow: () => void;
-  toggleCollapse: () => void;
   selectArtifact: (artifactId: string | null) => void;
   saveLastSession: (sessionId: string | null) => void;
   getLastSession: () => string | null;
@@ -33,7 +29,6 @@ export type UseArtifactWindowStateReturn = ArtifactWindowState & ArtifactWindowA
 export const useArtifactWindowState = (): UseArtifactWindowStateReturn => {
   const [state, setState] = useState<ArtifactWindowState>({
     isOpen: false, // Start closed by default
-    isCollapsed: false,
     selectedArtifactId: null
   });
 
@@ -48,18 +43,6 @@ export const useArtifactWindowState = (): UseArtifactWindowStateReturn => {
 
   const toggleWindow = useCallback(() => {
     setState(prev => ({ ...prev, isOpen: !prev.isOpen }));
-  }, []);
-
-  const collapseWindow = useCallback(() => {
-    setState(prev => ({ ...prev, isCollapsed: true }));
-  }, []);
-
-  const expandWindow = useCallback(() => {
-    setState(prev => ({ ...prev, isCollapsed: false }));
-  }, []);
-
-  const toggleCollapse = useCallback(() => {
-    setState(prev => ({ ...prev, isCollapsed: !prev.isCollapsed }));
   }, []);
 
   // Artifact selection
@@ -99,8 +82,7 @@ export const useArtifactWindowState = (): UseArtifactWindowStateReturn => {
     if (artifactId) {
       setState(prev => ({ 
         ...prev, 
-        isOpen: true, 
-        isCollapsed: false,
+        isOpen: true,
         selectedArtifactId: artifactId 
       }));
       localStorage.setItem(SELECTED_ARTIFACT_KEY, artifactId);
@@ -110,7 +92,6 @@ export const useArtifactWindowState = (): UseArtifactWindowStateReturn => {
   const resetForNewSession = useCallback(() => {
     setState({
       isOpen: false, // Start closed for new sessions
-      isCollapsed: false,
       selectedArtifactId: null
     });
     localStorage.removeItem(SELECTED_ARTIFACT_KEY);
@@ -121,9 +102,6 @@ export const useArtifactWindowState = (): UseArtifactWindowStateReturn => {
     openWindow,
     closeWindow,
     toggleWindow,
-    collapseWindow,
-    expandWindow,
-    toggleCollapse,
     selectArtifact,
     saveLastSession,
     getLastSession,

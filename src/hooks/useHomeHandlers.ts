@@ -96,10 +96,8 @@ interface UseHomeHandlersParams {
   // Artifact window state
   artifactWindowState: {
     isOpen: boolean;
-    isCollapsed: boolean;
     selectArtifact: (artifactId: string | null) => void;
     openWindow: () => void;
-    expandWindow: () => void;
     closeWindow: () => void;
     saveLastSession: (sessionId: string) => void;
     saveSessionArtifact: (sessionId: string, artifactId: string | null) => void;
@@ -276,9 +274,6 @@ export const useHomeHandlers = (params: UseHomeHandlersParams) => {
     if (sessionArtifacts && sessionArtifacts.length > 0) {
       if (!artifactWindowState.isOpen) {
         artifactWindowState.openWindow();
-      }
-      if (artifactWindowState.isCollapsed) {
-        artifactWindowState.expandWindow();
       }
     }
   }, [
@@ -528,7 +523,6 @@ export const useHomeHandlers = (params: UseHomeHandlersParams) => {
         selectArtifact(artifact.id);
         artifactWindowState.selectArtifact(artifact.id);
         artifactWindowState.openWindow();
-        artifactWindowState.expandWindow();
         console.log('✅ Selected artifact for display:', artifact.name);
         return true;
       }
@@ -561,7 +555,6 @@ export const useHomeHandlers = (params: UseHomeHandlersParams) => {
             selectArtifact(artifactAfterReload.id);
             artifactWindowState.selectArtifact(artifactAfterReload.id);
             artifactWindowState.openWindow();
-            artifactWindowState.expandWindow();
             console.log('✅ Found artifact after database reload:', artifactAfterReload.name);
             return;
           }
@@ -650,7 +643,6 @@ export const useHomeHandlers = (params: UseHomeHandlersParams) => {
       selectArtifact(bidViewArtifact.id);
       artifactWindowState.selectArtifact(bidViewArtifact.id);
       artifactWindowState.openWindow();
-      artifactWindowState.expandWindow();
       console.log('Selected bid view artifact for display:', bidViewArtifact.name);
     }, 100);
   };

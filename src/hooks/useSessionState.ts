@@ -141,8 +141,6 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     console.log('Clearing UI state for logout');
     setMessages([]);
     setSessions([]);
-    setPendingWelcomeMessage(null);
-    console.log('✨ Pending welcome message cleared on logout');
   }, []); // No dependencies - setMessages and setSessions are stable
 
   return {

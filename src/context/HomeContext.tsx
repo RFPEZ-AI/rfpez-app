@@ -59,7 +59,6 @@ interface HomeContextType {
   
   // Artifact window state
   artifactWindowOpen: boolean;
-  artifactWindowCollapsed: boolean;
   
   // Event handlers
   onSendMessage: (content: string) => Promise<void>;
@@ -96,7 +95,6 @@ interface HomeContextType {
   
   // Artifact window handlers
   onToggleArtifactWindow: () => void;
-  onToggleArtifactCollapse: () => void;
   onSessionHistoryToggle: (expanded: boolean) => void;
   
   // File handling
