@@ -56,13 +56,11 @@ jobs:
           
           # Construct the database connection URL for Supabase pooler with connection pooling mode
           # Using transaction pooling mode which is required for migrations
-          # Build username from literal 'postgres.' and project ref to avoid GitHub masking
-          PROJECT_REF="${{ env.SUPABASE_PROJECT_REF }}"
-          DB_USERNAME="postgres.${PROJECT_REF}"
-          DB_URL="postgresql://${DB_USERNAME}:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
+          # Note: Project ref is hardcoded to avoid GitHub secret masking (it's not sensitive - visible in URLs)
+          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
           
           echo "Connecting via pooler (transaction mode)..."
-          echo "Username: ${DB_USERNAME}"
+          echo "Project: jxlutaztoukwbbgtoulc"
           
           # Deploy using database URL
           supabase db push --db-url "${DB_URL}" --include-all
