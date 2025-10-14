@@ -55,10 +55,11 @@ jobs:
           PASSWORD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${{ env.SUPABASE_DB_PASSWORD }}', safe=''))")
           
           # Construct the database connection URL
-          # Using direct database connection (not pooler) for migrations
-          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@db.jxlutaztoukwbbgtoulc.supabase.co:5432/postgres"
+          # Using IPv4 pooler (port 6543) instead of direct connection to avoid IPv6 issues
+          # Format: pooler-v4.region.pooler.supabase.com
+          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
           
-          echo "Connecting to: db.jxlutaztoukwbbgtoulc.supabase.co:5432"
+          echo "Connecting via IPv4 pooler: aws-0-us-east-1.pooler.supabase.com:6543"
           
           # Deploy using database URL
           supabase db push --db-url "$DB_URL" --include-all
