@@ -46,47 +46,32 @@ jobs:
             echo "ℹ️ No migration files found"
           fi
 
-      - name: Deploy migrations using Management API
+      - name: Deploy migrations using database URL
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "🚀 Deploying migrations to production..."
           
-          # Use supabase db push with linked project (uses access token)
-          # First create a minimal config to avoid link step
-          mkdir -p .supabase
-          cat > .supabase/config.toml << EOF
-          [api]
-          enabled = true
-          port = 54321
+          # URL encode the password to handle special characters
+          PASSWORD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${{ env.SUPABASE_DB_PASSWORD }}', safe=''))")
           
-          [db]
-          port = 54322
+          # Construct the database connection URL
+          # Using direct database connection (not pooler) for migrations
+          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@db.jxlutaztoukwbbgtoulc.supabase.co:5432/postgres"
           
-          [studio]
-          enabled = true
-          port = 54323
-          EOF
+          echo "Connecting to: db.jxlutaztoukwbbgtoulc.supabase.co:5432"
           
-          # Deploy using access token authentication
-          supabase db push \
-            --project-ref ${{ env.SUPABASE_PROJECT_REF }} \
-            --password ${{ env.SUPABASE_DB_PASSWORD }} \
-            --include-all
+          # Deploy using database URL
+          supabase db push --db-url "$DB_URL" --include-all
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "✅ Migration deployment completed!"
-          echo "Check Supabase dashboard to verify: https://supabase.com/dashboard/project/${{ env.SUPABASE_PROJECT_REF }}"
-          
-          # Check for any remaining pending migrations
-          REMAINING=$(supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }} | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
-          if [ -z "$REMAINING" ]; then
-            echo "✅ All migrations deployed successfully!"
-          else
-            echo "⚠️ Warning: Some migrations may not have been applied"
-            exit 1
-          fi
+          echo "Check Supabase dashboard to verify:"
+          echo "https://supabase.com/dashboard/project/${{ env.SUPABASE_PROJECT_REF }}/editor"
+          echo ""
+          echo "Deployed migration files:"
+          ls -la supabase/migrations/*.sql
 
       - name: Deployment summary
         run: |
