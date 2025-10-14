@@ -398,12 +398,32 @@ Navigate to `/mcp-test` in your running application.
 
 ## 📊 Available Scripts
 
+### Development Commands
 - `npm start` - Start development server
 - `npm test` - Run test suite
 - `npm run build` - Build for production
 - `npm run mcp:test` - Test MCP functionality
 - `npm run claude-api:test` - Test Claude API functionality
 - `npm run claude-api:deploy` - Deploy Claude API function
+
+### Agent Management Tools
+- `node scripts/md-to-sql-migration.js "Agent Instructions/[Agent].md"` - Convert agent markdown to SQL migration
+  - Parses agent instruction markdown files
+  - Generates timestamped SQL migration files
+  - Handles complex content with proper escaping
+  - See `scripts/README-md-to-sql-migration.md` for detailed usage
+
+**Example: Update RFP Design Agent**
+```bash
+# Generate migration from markdown
+node scripts/md-to-sql-migration.js "Agent Instructions/RFP Design Agent.md"
+
+# Apply to local database
+supabase migration up
+
+# Test locally, then deploy
+supabase db push
+```
 
 ## 🔐 Authentication & Security
 

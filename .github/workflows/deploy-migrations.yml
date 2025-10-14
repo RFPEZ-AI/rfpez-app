@@ -1,0 +1,101 @@
+name: Deploy Database Migrations
+
+on:
+  push:
+    branches:
+      - master
+    paths:
+      - 'supabase/migrations/**'
+      - 'Agent Instructions/**'
+  workflow_dispatch: # Allow manual trigger
+
+jobs:
+  deploy-migrations:
+    runs-on: ubuntu-latest
+    
+    # Secrets configured in GitHub repository settings (Settings → Secrets → Actions)
+    # See .github/workflows/SETUP-CHECKLIST.md for configuration instructions
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0  # Fetch all history for proper migration detection
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Link to Supabase project
+        run: |
+          supabase link --project-ref $SUPABASE_PROJECT_REF
+
+      - name: Check migration status
+        id: check_migrations
+        run: |
+          echo "Checking pending migrations..."
+          supabase migration list
+          
+          # Check if there are pending migrations
+          PENDING=$(supabase migration list | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
+          if [ -z "$PENDING" ]; then
+            echo "has_pending=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No pending migrations to deploy"
+          else
+            echo "has_pending=true" >> $GITHUB_OUTPUT
+            echo "✅ Pending migrations detected"
+          fi
+
+      - name: Deploy migrations to remote database
+        if: steps.check_migrations.outputs.has_pending == 'true'
+        run: |
+          echo "🚀 Deploying migrations to production..."
+          supabase db push --password $SUPABASE_DB_PASSWORD
+
+      - name: Verify deployment
+        if: steps.check_migrations.outputs.has_pending == 'true'
+        run: |
+          echo "✅ Verifying migration deployment..."
+          supabase migration list
+          
+          # Check for any remaining pending migrations
+          REMAINING=$(supabase migration list | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
+          if [ -z "$REMAINING" ]; then
+            echo "✅ All migrations deployed successfully!"
+          else
+            echo "⚠️ Warning: Some migrations may not have been applied"
+            exit 1
+          fi
+
+      - name: Deployment summary
+        run: |
+          echo "📊 Deployment Summary"
+          echo "===================="
+          if [ "${{ steps.check_migrations.outputs.has_pending }}" == "true" ]; then
+            echo "✅ Database migrations deployed successfully!"
+            echo "🔄 Migration status synchronized"
+          else
+            echo "ℹ️ No migrations to deploy (database already up to date)"
+          fi
+          echo ""
+          echo "🌐 Project: $SUPABASE_PROJECT_REF"
+          echo "📅 Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+      - name: Notify on failure
+        if: failure()
+        run: |
+          echo "❌ Migration deployment failed!"
+          echo "Please check the logs above for details."
+          echo ""
+          echo "Common issues:"
+          echo "  - Migration conflicts (already applied)"
+          echo "  - Database connection issues"
+          echo "  - Invalid SQL syntax"
+          echo "  - Permission issues"
+          echo ""
+          echo "Manual recovery: Run 'supabase migration repair' if needed"
