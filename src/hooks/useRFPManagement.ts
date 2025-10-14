@@ -112,6 +112,13 @@ export const useRFPManagement = (
   
   const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP, setAsGlobal = false) => {
     console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId, 'rfpData provided:', !!rfpData, 'setAsGlobal:', setAsGlobal);
+    console.log('🎯 Current state before change:', {
+      currentRfpId,
+      currentRfpName: currentRfp?.name,
+      sessionRfpId,
+      globalRfpId: globalCurrentRfpId
+    });
+    
     try {
       let rfp: RFP | null = null;
       
@@ -133,11 +140,19 @@ export const useRFPManagement = (
           // Set as global RFP context
           await setGlobalRFPContext(rfpId, rfp);
           console.log('🌐 Global RFP context set:', rfp.name, rfpId);
+          console.log('🌐 New global state should be:', {
+            globalCurrentRfpId: rfpId,
+            globalCurrentRfpName: rfp.name
+          });
         } else {
           // Set as session-specific RFP context
           setSessionRfpId(rfpId);
           setSessionRfp(rfp);
           console.log('📍 Session RFP context set:', rfp.name, rfpId);
+          console.log('📍 New session state should be:', {
+            sessionRfpId: rfpId,
+            sessionRfpName: rfp.name
+          });
         }
 
         // Update session context if we have an active session

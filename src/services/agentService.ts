@@ -43,7 +43,8 @@ export class AgentService {
   }
 
   /**
-   * Get agents available to user (filters based on authentication and account setup)
+   * Get agents available to user (returns ALL agents, UI handles greying out locked ones)
+   * Note: Filtering is now handled in the UI layer to show locked agents in greyed-out state
    */
   static async getAvailableAgents(hasProperAccountSetup = false, isAuthenticated = false): Promise<Agent[]> {
     console.log('AgentService.getAvailableAgents called with hasProperAccountSetup:', hasProperAccountSetup, 'isAuthenticated:', isAuthenticated);
@@ -59,36 +60,14 @@ export class AgentService {
       return [];
     }
 
-    let availableAgents = data || [];
+    const availableAgents = data || [];
 
-    // If user is not authenticated, they can see default agents AND free agents
-    if (!isAuthenticated) {
-      availableAgents = availableAgents.filter(agent => agent.is_default || agent.is_free);
-      console.log('Non-authenticated user - showing default and free agents:', availableAgents);
-      return availableAgents;
-    }
-
-    // For authenticated users, include:
-    // 1. Default agents (available to all)
-    // 2. Free agents (available to authenticated users without billing)
-    // 3. Restricted agents only if user has proper account setup
-    availableAgents = availableAgents.filter(agent => {
-      // Always include default agent
-      if (agent.is_default) return true;
-      
-      // Include free agents for authenticated users
-      if (agent.is_free) return true;
-      
-      // Include non-restricted, non-free agents for all authenticated users
-      if (!agent.is_restricted && !agent.is_free) return true;
-      
-      // Include restricted agents only if user has proper account setup
-      if (agent.is_restricted && hasProperAccountSetup) return true;
-      
-      return false;
-    });
-
-    console.log('Available agents filtered:', availableAgents);
+    // ✅ Return ALL agents regardless of authentication status
+    // The UI layer (AgentSelector.tsx) will handle:
+    // 1. Showing accessible agents normally
+    // 2. Showing locked agents in greyed-out state with lock icon
+    // 3. Preventing selection of locked agents with helpful messages
+    console.log('Returning all active agents for display:', availableAgents.map(a => a.name));
     return availableAgents;
   }
 

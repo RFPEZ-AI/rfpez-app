@@ -99,9 +99,18 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
     let accessMessage = '';
 
     if (!isAuthenticated) {
-      // Non-authenticated users can access default agents AND free agents
-      canAccess = agent.is_default || agent.is_free;
-      accessMessage = 'Please sign in to access more agents and features.';
+      // ✅ Anonymous users can ONLY access:
+      // 1. Default agent (auto-assigned)
+      // 2. Support agents (for help without login)
+      const isSupport = agent.name?.toLowerCase().includes('support') || 
+                       agent.name?.toLowerCase().includes('help') ||
+                       agent.role === 'support' ||
+                       (agent.description && agent.description.toLowerCase().includes('support'));
+      
+      canAccess = (agent.is_default === true) || (isSupport === true);
+      accessMessage = isSupport 
+        ? '' // Support agent is allowed
+        : 'Please sign in to access this agent. The Support agent is available without login if you need help.';
     } else {
       // Authenticated users can access:
       // 1. Default agents (always available)
@@ -233,9 +242,19 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                     
                     // Determine if user can access this agent
                     let canAccess = false;
+                    let isLocked = false; // New: Track if agent is locked for this user
+                    
                     if (!isAuthenticated) {
-                      // Non-authenticated users can access default agents AND free agents
-                      canAccess = agent.is_default || agent.is_free;
+                      // ✅ Anonymous users can ONLY access:
+                      // 1. Default agent (auto-assigned)
+                      // 2. Support agents (for help without login)
+                      const isSupport = agent.name?.toLowerCase().includes('support') || 
+                                       agent.name?.toLowerCase().includes('help') ||
+                                       agent.role === 'support' ||
+                                       (agent.description && agent.description.toLowerCase().includes('support'));
+                      
+                      canAccess = (agent.is_default === true) || (isSupport === true);
+                      isLocked = !canAccess; // Lock all other agents
                     } else {
                       // Authenticated users can access:
                       // 1. Default agents, 2. Free agents, 3. Non-restricted non-free agents
@@ -243,17 +262,19 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                       canAccess = agent.is_default || agent.is_free || 
                                 (!agent.is_restricted && !agent.is_free) ||
                                 (agent.is_restricted && hasProperAccountSetup);
+                      
+                      // Lock restricted agents without proper account setup
+                      isLocked = agent.is_restricted && !hasProperAccountSetup;
                     }
-                    
-                    // Access control logic correctly implemented above
                     
                     return (
                       <IonCol size="12" sizeMd="6" sizeLg="4" key={agent.id}>
                         <IonCard 
-                          className={`agent-card ${isCurrentAgent ? 'current-agent' : ''} ${!canAccess ? 'disabled-agent' : ''}`}
+                          className={`agent-card ${isCurrentAgent ? 'current-agent' : ''} ${isLocked ? 'locked-agent' : ''}`}
                           button={true}
                           onClick={() => handleAgentSelect(agent)}
-                          disabled={isSwitching}
+                          disabled={isSwitching || isLocked}
+                          style={isLocked ? { opacity: 0.5, cursor: 'not-allowed' } : {}}
                         >
                           <IonCardHeader>
                             <div className="agent-card-header">
@@ -267,11 +288,20 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                                 isPremium={agent.is_restricted}
                               />
                               <IonCardTitle className="agent-name">
-                                <span className="agent-name-text">
+                                <span className="agent-name-text" style={isLocked ? { color: '#999' } : {}}>
                                   {agent.name}
                                   <span className="agent-suffix"> Agent</span>
+                                  {/* Show lock icon prominently for locked agents */}
+                                  {isLocked && (
+                                    <IonIcon 
+                                      icon={lockClosedOutline} 
+                                      color="medium" 
+                                      style={{ fontSize: '20px', marginLeft: '8px', verticalAlign: 'middle' }}
+                                      title={!isAuthenticated ? 'Sign in to access this agent' : 'Requires billing setup'}
+                                    />
+                                  )}
                                 </span>
-                                {agent.is_default && (
+                                {!isLocked && agent.is_default && (
                                   <IonIcon 
                                     icon={starOutline} 
                                     color="warning" 
@@ -279,7 +309,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                                     title="Default Agent"
                                   />
                                 )}
-                                {agent.is_free && (
+                                {!isLocked && agent.is_free && (
                                   <IonIcon 
                                     icon={giftOutline} 
                                     color="success" 
@@ -287,7 +317,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                                     title="Free Agent - Available to authenticated users"
                                   />
                                 )}
-                                {agent.is_restricted && (
+                                {!isLocked && agent.is_restricted && canAccess && (
                                   <IonIcon 
                                     icon={lockClosedOutline} 
                                     color="medium" 
@@ -295,7 +325,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                                     title="Premium Agent - Requires billing setup"
                                   />
                                 )}
-                                {isCurrentAgent && (
+                                {isCurrentAgent && !isLocked && (
                                   <IonIcon 
                                     icon={checkmarkCircle} 
                                     color="success" 
@@ -306,22 +336,33 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                             </div>
                           </IonCardHeader>
                           <IonCardContent>
-                            <IonText color="medium" className="agent-description">
+                            <IonText color={isLocked ? 'medium' : 'dark'} className="agent-description">
                               {agent.description}
                             </IonText>
-                            <div className="agent-initial-prompt">
-                              <IonIcon icon={chatbubbleOutline} color="primary" />
-                              <IonText color="dark">
-                                <small>&quot;{agent.initial_prompt}&quot;</small>
-                              </IonText>
-                            </div>
-                            {!canAccess && (
-                              <div className="access-notice">
+                            {!isLocked && (
+                              <div className="agent-initial-prompt">
+                                <IonIcon icon={chatbubbleOutline} color="primary" />
+                                <IonText color="dark">
+                                  <small>&quot;{agent.initial_prompt}&quot;</small>
+                                </IonText>
+                              </div>
+                            )}
+                            {isLocked && (
+                              <div className="access-notice" style={{ 
+                                marginTop: '12px', 
+                                padding: '8px 12px', 
+                                backgroundColor: 'rgba(0,0,0,0.05)', 
+                                borderRadius: '8px',
+                                borderLeft: '3px solid var(--ion-color-medium)'
+                              }}>
                                 <IonText color="medium">
-                                  <small>
-                                    {!isAuthenticated ? 'Requires account setup - Sign in to access' : 
-                                     agent.is_restricted ? 'Requires account setup and billing' : 
-                                     'Access restricted'}
+                                  <small style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                                    <IonIcon icon={lockClosedOutline} />
+                                    <span>
+                                      {!isAuthenticated ? 'Sign in to access this agent' : 
+                                       agent.is_restricted ? 'Requires billing setup' : 
+                                       'Access restricted'}
+                                    </span>
                                   </small>
                                 </IonText>
                               </div>

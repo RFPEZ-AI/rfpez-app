@@ -1482,7 +1482,7 @@ export class ClaudeAPIFunctionHandler {
       timestamp: new Date().toISOString()
     });
     
-    // Handle anonymous users - they can switch agents but with limited functionality
+    // Handle anonymous users - limited agent access
     if (userId === 'anonymous') {
       // Verify agent exists by ID only
       const agent = await AgentService.getAgentById(agent_id);
@@ -1490,26 +1490,26 @@ export class ClaudeAPIFunctionHandler {
         throw new Error(`Agent not found with ID: ${agent_id}`);
       }
       
-      // For anonymous users, we only allow switching to free/unrestricted agents
-      // This is especially important for support scenarios
-      if (agent.is_restricted && !agent.is_free) {
-        // Allow access to support-type agents even if restricted
-        const isSupport = agent.name.toLowerCase().includes('support') || 
-                         agent.name.toLowerCase().includes('help') ||
-                         (agent.description && agent.description.toLowerCase().includes('support'));
-        if (!isSupport) {
-          throw new Error('Anonymous users can only access free or support agents');
-        }
+      // ✅ ALLOW ACCESS TO SUPPORT AGENT FOR ANONYMOUS USERS
+      // Support agents should be accessible without authentication for help
+      const isSupport = agent.name.toLowerCase().includes('support') || 
+                       agent.name.toLowerCase().includes('help') ||
+                       agent.role === 'support' ||
+                       (agent.description && agent.description.toLowerCase().includes('support'));
+      
+      if (!isSupport) {
+        // ❌ AUTHENTICATION REQUIRED FOR NON-SUPPORT AGENTS
+        // Anonymous users must log in to access agents other than default and support
+        throw new Error(`Authentication required to access ${agent.name} agent. Please log in to continue.`);
       }
       
-      console.log('Anonymous agent switch:', {
+      // Allow anonymous users to access support agent
+      console.log('✅ Anonymous user granted access to support agent:', {
         agent_id: agent.id,
         agent_name: agent.name,
-        is_free: agent.is_free,
-        is_restricted: agent.is_restricted
+        agent_role: agent.role
       });
       
-      // For anonymous users, return success without session management
       return {
         success: true,
         session_id: session_id || 'anonymous-session',
@@ -1517,15 +1517,15 @@ export class ClaudeAPIFunctionHandler {
         new_agent: {
           id: agent.id,
           name: agent.name,
-          role: agent.role, // Add role for edge function
+          role: agent.role,
           instructions: agent.initial_prompt,
           initial_prompt: agent.initial_prompt
         },
         switch_reason: reason,
         message: `Successfully switched to ${agent.name} agent (anonymous session). The ${agent.name} will now respond.`,
         user_type: 'anonymous',
-        stop_processing: false, // Allow the new agent to respond immediately
-        trigger_continuation: true, // 🔥 ENABLE AUTOMATIC AGENT RESPONSE
+        stop_processing: false,
+        trigger_continuation: true,
         context_message: `The user has been switched to you from another agent. Context: ${reason || 'User requested assistance'}. Please review the conversation context and respond appropriately based on your role as ${agent.name}.`
       };
     }

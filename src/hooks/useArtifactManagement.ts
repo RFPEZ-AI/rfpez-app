@@ -169,8 +169,14 @@ export const useArtifactManagement = (
   };
 
   // Load RFP-associated artifacts when RFP context changes
+  // Use currentRfp?.id as dependency to ensure effect runs when RFP ID changes
   useEffect(() => {
     console.log('=== RFP CONTEXT CHANGED - LOADING ARTIFACTS ===');
+    console.log('🔍 Current RFP State:', {
+      hasRfp: !!currentRfp,
+      rfpId: currentRfp?.id,
+      rfpName: currentRfp?.name
+    });
     
     if (currentRfp && currentRfp.id) {
       console.log('Loading artifacts for RFP:', currentRfp.id, currentRfp.name);
@@ -178,8 +184,15 @@ export const useArtifactManagement = (
       // Load RFP artifacts directly in the effect
       const loadArtifacts = async () => {
         try {
-          console.log('📋 Loading RFP-associated artifacts for RFP:', currentRfp.id);
+          console.log('📋 Loading RFP-associated artifacts for RFP:', currentRfp.id, currentRfp.name);
+          console.log('📋 RFP details:', {
+            id: currentRfp.id,
+            name: currentRfp.name,
+            title: (currentRfp as unknown as { title?: string }).title
+          });
+          
           const artifactsData = await DatabaseService.getRFPArtifacts(parseInt(currentRfp.id.toString()));
+          console.log('📋 Database returned', artifactsData.length, 'artifacts for RFP', currentRfp.id);
           
           const formattedArtifacts: Artifact[] = (artifactsData as DatabaseArtifact[]).map(artifact => {
             let content: string | undefined;
@@ -287,6 +300,7 @@ export const useArtifactManagement = (
       
     } else {
       // No current RFP, only keep Claude-generated artifacts
+      console.log('ℹ️ No RFP context set, keeping existing artifacts (Claude-generated only)');
       setArtifacts(prev => {
         const claudeArtifacts = prev.filter(artifact => 
           artifact.id.includes('claude-artifact')
@@ -295,7 +309,7 @@ export const useArtifactManagement = (
         return claudeArtifacts;
       });
     }
-  }, [currentRfp]); // Only depend on currentRfp
+  }, [currentRfp?.id]); // FIXED: Track currentRfp.id specifically to ensure effect runs on RFP change
 
   // Load form artifacts from database when user or authentication changes
   // DISABLED for session isolation - artifacts should only be session-specific

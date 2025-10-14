@@ -1836,8 +1836,17 @@ const Home: React.FC = () => {
           />
         }
         onRfpChange={async (rfpId: number) => {
-          console.log('RFP selected from dropdown:', rfpId);
-          await handleSetCurrentRfp(rfpId);
+          console.log('🔄 RFP selected from dropdown:', rfpId);
+          console.log('🔄 Current RFP before change:', {
+            currentRfpId,
+            currentRfpName: currentRfp?.name,
+            rfpIdType: typeof currentRfpId,
+            selectedIdType: typeof rfpId
+          });
+          
+          // CRITICAL FIX: Set as GLOBAL context to ensure artifacts reload properly
+          // This ensures the RFP change is detected by useArtifactManagement
+          await handleSetCurrentRfp(rfpId, undefined, true);
           
           // Update the current session's RFP context
           if (currentSessionId) {
@@ -1848,6 +1857,11 @@ const Home: React.FC = () => {
               console.error('❌ Failed to update session RFP context:', error);
             }
           }
+          
+          console.log('🔄 RFP change completed, new state:', {
+            currentRfpId,
+            currentRfpName: currentRfp?.name
+          });
         }}
       />
 
