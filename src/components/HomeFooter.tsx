@@ -67,6 +67,14 @@ const HomeFooter: React.FC<HomeFooterProps> = ({
     loadAllRfps();
   }, []);
 
+  // 🔧 FIX: When currentRfp changes and it's not in the dropdown list, add it
+  useEffect(() => {
+    if (currentRfp && !allRfps.find(rfp => rfp.id === currentRfp.id)) {
+      console.log('🔧 Adding new RFP to dropdown list:', currentRfp.name);
+      setAllRfps(prev => [...prev, currentRfp]);
+    }
+  }, [currentRfp, allRfps]);
+
   const handleRfpSelection = (selectedRfpId: string) => {
     if (selectedRfpId && onRfpChange) {
       onRfpChange(parseInt(selectedRfpId));

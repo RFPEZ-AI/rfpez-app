@@ -9,6 +9,7 @@ export interface ToolInvocationEvent {
   error?: string;
   timestamp: string;
   duration?: number;
+  agentId?: string; // 🎯 CRITICAL: Track which agent executed this tool
 }
 
 export interface StreamingResponse {

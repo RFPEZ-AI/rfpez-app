@@ -309,14 +309,14 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
             </IonCard>
           )}
           
-          {/* Tool Execution Display */}
-          {(toolInvocations.length > 0 || isToolExecutionActive) && (
+          {/* 🔧 DISABLED: Standalone Tool Execution Display - Tools now shown in individual messages */}
+          {/* {(toolInvocations.length > 0 || isToolExecutionActive) && (
             <ToolExecutionDisplay
               toolInvocations={toolInvocations}
               isActive={isToolExecutionActive}
               className="ion-margin-vertical"
             />
-          )}
+          )} */}
           
           <div ref={messagesEndRef} />
           

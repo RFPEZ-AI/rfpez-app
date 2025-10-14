@@ -75,7 +75,7 @@ async function streamWithRecursiveTools(
   supabase: unknown,
   sessionId?: string,
   agentId?: string,
-  recursionDepth: number = 0
+  recursionDepth = 0
 ): Promise<{ fullContent: string; toolsUsed: string[]; executedToolResults: unknown[] }> {
   const MAX_RECURSION_DEPTH = 5;
   let fullContent = '';
@@ -129,20 +129,21 @@ async function streamWithRecursiveTools(
         }
         
       } else if (chunkData.type === 'tool_use' && chunkData.name) {
-        console.log(`🔧 Tool use detected at depth ${recursionDepth}:`, chunkData.name);
+        console.log(`🔧 Tool use detected at depth ${recursionDepth}:`, chunkData.name, 'for agent:', agentId);
         if (!toolsUsed.includes(chunkData.name as string)) {
           toolsUsed.push(chunkData.name as string);
         }
         
         pendingToolCalls.push(chunkData);
         
-        // Send tool invocation start event
+        // Send tool invocation start event WITH AGENT ID
         const toolEvent = {
           type: 'tool_invocation',
           toolEvent: {
             type: 'tool_start',
             toolName: chunkData.name,
             parameters: chunkData.input,
+            agentId: agentId, // 🎯 CRITICAL: Track which agent executed this tool
             timestamp: new Date().toISOString()
           }
         };
@@ -175,13 +176,14 @@ async function streamWithRecursiveTools(
           result: result
         });
         
-        // Send tool completion event
+        // Send tool completion event WITH AGENT ID
         const toolCompleteEvent = {
           type: 'tool_invocation',
           toolEvent: {
             type: 'tool_complete',
             toolName: toolCall.name,
             result: result,
+            agentId: agentId, // 🎯 CRITICAL: Track which agent executed this tool
             timestamp: new Date().toISOString()
           }
         };
