@@ -1,7 +1,7 @@
 -- Update Solutions Agent Instructions
 -- Generated on 2025-10-14T02:19:30.792Z
 -- Source: Agent Instructions/Solutions.md
--- Workflow trigger: Testing supabase link with access token
+-- Workflow trigger: Testing supabase link with password
 
 -- Update Solutions agent
 UPDATE agents 
