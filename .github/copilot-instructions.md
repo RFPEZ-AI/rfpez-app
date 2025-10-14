@@ -235,8 +235,34 @@ Before deploying to remote, ensure:
 - ✅ MCP integration works with local endpoints
 
 #### **Local-to-Remote Deployment Workflow** 🚀
-**Complete deployment process to push all local changes to remote Supabase:**
 
+**🎯 PREFERRED: Automated via GitHub Actions**
+Simply commit and push your changes - GitHub Actions handles deployment automatically:
+
+```bash
+# For database migrations:
+git add supabase/migrations/*.sql
+git commit -m "Add new migration"
+git push origin master
+# → .github/workflows/deploy-migrations.yml deploys via Management API
+
+# For edge functions:
+git add supabase/functions/**/*
+git commit -m "Update edge function"
+git push origin master
+# → .github/workflows/deploy-edge-functions.yml deploys functions
+
+# For agent instructions:
+node scripts/md-to-sql-migration.js "Agent Instructions/AgentName.md"
+git add supabase/migrations/*.sql
+git commit -m "Update agent instructions"
+git push origin master
+# → Automatically deployed as a migration
+```
+
+**📖 See `.github/workflows/` for workflow configurations and `FINAL-SOLUTION-MANAGEMENT-API.md` for technical details.**
+
+**🛠️ Manual Deployment (if needed):**
 ```bash
 # STEP 1: Verify Local Development Complete
 # Ensure all local testing validation checklist items are complete ✅
@@ -260,8 +286,9 @@ supabase functions deploy supabase-mcp-server       # MCP protocol server
 # supabase functions deploy debug-claude   # Debug utilities
 
 # STEP 5: Update Agent Instructions (if modified)
-# Use direct SQL to update agent instructions in remote database:
-# UPDATE agents SET instructions = 'new_instructions' WHERE name = 'Agent Name';
+# Use CLI tool to generate migration:
+node scripts/md-to-sql-migration.js "Agent Instructions/AgentName.md"
+# Then commit and push (or manually deploy with supabase db push)
 
 # STEP 6: Verify Deployment Success
 supabase migration list    # Confirm all migrations now show in Remote column
@@ -269,40 +296,58 @@ supabase functions list    # Verify function versions updated with recent timest
 
 
 **🎯 Agent Instructions Deployment Pattern:**
+
+**✅ RECOMMENDED: Automated CLI Tool Approach**
 ```bash
 # When agent instructions are updated in Agent Instructions/*.md files:
 
-# 1. Get Agent UUIDs (run this query first):
-SELECT id, name FROM agents WHERE name IN ('Solutions', 'RFP Design', 'Support');
-# Copy the UUID for the agent you're updating
+# 1. Use CLI tool to generate migration (handles all escaping automatically)
+node scripts/md-to-sql-migration.js "Agent Instructions/RFP Design Agent.md"
 
-# 2. Read local agent instruction files
-# Note: Handle single quotes by doubling them ('') in SQL strings
-# Or use $$ delimiter for complex text
+# 2. Review generated migration in supabase/migrations/
+# Example: supabase/migrations/20251014020920_update_rfp_design_agent.sql
 
-# 3. Update remote database with proper SQL escaping:
-UPDATE agents 
-SET instructions = $$FULL_AGENT_INSTRUCTIONS_HERE$$,
-    updated_at = NOW()
-WHERE id = 'paste-uuid-from-step-1-here';
+# 3. Commit and push - GitHub Actions deploys automatically
+git add supabase/migrations/*.sql
+git commit -m "Update RFP Design Agent instructions"
+git push origin master
 
-# 4. Verify updates with:
+# 4. Monitor deployment at: https://github.com/markesphere/rfpez-app/actions
+
+# 5. Verify updates with:
 SELECT name, 
        LENGTH(instructions) as instruction_length,
        LEFT(instructions, 100) as preview, 
        updated_at 
 FROM agents 
-WHERE name IN ('Solutions', 'RFP Design', 'Support')
+WHERE name = 'RFP Design'
 ORDER BY updated_at DESC;
+```
 
-# 5. Test agent functionality after update
+**🛠️ Manual SQL Approach (Legacy/Fallback):**
+```bash
+# When you need to update directly via SQL:
+
+# 1. Get Agent UUIDs (run this query first):
+SELECT id, name FROM agents WHERE name IN ('Solutions', 'RFP Design', 'Support');
+# Copy the UUID for the agent you're updating
+
+# 2. Update remote database with proper SQL escaping:
+UPDATE agents 
+SET instructions = $$FULL_AGENT_INSTRUCTIONS_HERE$$,
+    updated_at = NOW()
+WHERE id = 'paste-uuid-from-step-1-here';
+
+# 3. Test agent functionality after update
 # Switch to updated agent in app and verify behavior
 ```
 
-**💡 SQL String Handling Tips:**
-- Use `$$content$$` delimiters for multi-line text with quotes
-- Escape single quotes by doubling them: `'Don''t do this'`
-- Always verify character encoding for special characters
+**💡 CLI Tool Benefits:**
+- Automatically handles SQL escaping and special characters
+- Generates timestamped migrations following project conventions
+- Integrates with GitHub Actions for automated deployment
+- Maintains deployment history and rollback capability
+- No need to manually escape quotes or handle encoding
 
 **🚨 Critical Deployment Rules:**
 - **Always test locally first** - Never deploy untested code to remote
@@ -664,8 +709,43 @@ export default Component;
 - Current agent displayed in `AgentIndicator` component
 
 ### Deployment Workflow
-**Complete local-to-remote deployment process:**
-1. **Pre-deployment Quality Checks**: Run linting (`npm run lint`), unit tests (`npm test -- --watchAll=false`), and edge function tests.  Note use --watchAll=false to avoid hanging process
+
+#### **🚀 Automated Deployment via GitHub Actions (PREFERRED)**
+**All deployments now happen automatically when pushing to master:**
+
+1. **Database Migrations**: Automatically deployed via `.github/workflows/deploy-migrations.yml`
+   - Uses Supabase Management API (`supabase link` + `supabase db push`)
+   - Triggered on push to `supabase/migrations/**/*.sql` files
+   - No database credentials needed - uses `SUPABASE_ACCESS_TOKEN` secret
+   - Avoids IPv6 issues, password encoding, and connection string complexity
+
+2. **Edge Functions**: Automatically deployed via `.github/workflows/deploy-edge-functions.yml`
+   - Deploys `claude-api-v3` and `supabase-mcp-server`
+   - Triggered on push to `supabase/functions/**/*` files
+   - Uses project password authentication
+
+3. **Agent Instructions**: Use CLI tool to generate migrations
+   ```bash
+   # Convert agent markdown to SQL migration
+   node scripts/md-to-sql-migration.js "Agent Instructions/RFP Design Agent.md"
+   
+   # Review generated migration in supabase/migrations/
+   # Commit and push - GitHub Actions will deploy automatically
+   git add supabase/migrations/*.sql
+   git commit -m "Update agent instructions"
+   git push origin master
+   ```
+
+**✅ GitHub Actions Workflow Status:**
+- Monitor deployments: https://github.com/markesphere/rfpez-app/actions
+- Migrations deploy via Management API (no direct DB connection)
+- Edge functions deploy via CLI with password auth
+- All secrets managed in GitHub repository settings
+
+#### **🛠️ Manual Deployment (Fallback/Local Testing)**
+**Use when testing locally or GitHub Actions unavailable:**
+
+1. **Pre-deployment Quality Checks**: Run linting (`npm run lint`), unit tests (`npm test -- --watchAll=false`), and edge function tests
 2. **Clean Up**: Remove temporary files, debug artifacts, and development-only content
 3. **Database Deployment**: Push migrations (`supabase db push`), update agent instructions if modified
 4. **Edge Function Deployment**: Deploy functions (`supabase functions deploy claude-api-v3`, `supabase functions deploy supabase-mcp-server`)
@@ -683,6 +763,10 @@ export default Component;
 - `DOCUMENTATION/AGENTS.md` - Agent system documentation
 - `DOCUMENTATION/DEPLOYMENT-GUIDE.md` - Comprehensive deployment procedures from local to remote
 - `DOCUMENTATION/DEPLOYMENT-QUICK-REFERENCE.md` - Quick deployment commands and troubleshooting fixes
+- `FINAL-SOLUTION-MANAGEMENT-API.md` - GitHub Actions deployment using Management API (automated CI/CD)
+- `scripts/md-to-sql-migration.js` - CLI tool to convert agent markdown to SQL migrations
+- `.github/workflows/deploy-migrations.yml` - Automated migration deployment workflow
+- `.github/workflows/deploy-edge-functions.yml` - Automated edge function deployment workflow
 - `supabase/functions/supabase-mcp-server/index.ts` - MCP protocol implementation
 - `supabase/functions/claude-api-v3/index.ts` - HTTP REST API for Claude integration (V3)
 
