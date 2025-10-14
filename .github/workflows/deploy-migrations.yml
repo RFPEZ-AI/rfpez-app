@@ -48,13 +48,13 @@ jobs:
       - name: Deploy migrations
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
-          echo "Ì∫Ä Deploying migrations to production..."
+          echo "Deploying migrations to production..."
           echo "Using complete database URL from secrets (recommended by Supabase docs)..."
           
           # Deploy using complete database URL
           supabase db push --db-url "${{ env.SUPABASE_DB_URL }}" --include-all
           
-          echo "‚úÖ Migrations deployed successfully!"
+          echo "Migrations deployed successfully!"
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
@@ -67,16 +67,16 @@ jobs:
 
       - name: Deployment summary
         run: |
-          echo "Ì≥ä Deployment Summary"
+          echo "Deployment Summary"
           echo "===================="
           if [ "${{ steps.check_migrations.outputs.has_pending }}" == "true" ]; then
-            echo "‚úÖ Database migrations deployed successfully!"
-            echo "Ì¥Ñ Migration status synchronized"
+            echo "Database migrations deployed successfully!"
+            echo "Migration status synchronized"
           else
-            echo "‚ÑπÔ∏è No migrations to deploy (database already up to date)"
+            echo "No migrations to deploy (database already up to date)"
           fi
           echo ""
-          echo "Ì≥Ö Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
       - name: Notify on failure
         if: failure()
