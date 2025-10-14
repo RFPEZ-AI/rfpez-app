@@ -49,9 +49,9 @@ jobs:
       - name: Link to Supabase project
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
-          echo "� Linking to Supabase project..."
-          # Link using access token (bypasses database password requirement)
-          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          echo "🔗 Linking to Supabase project..."
+          # Link with password (same as edge functions workflow)
+          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }} --password ${{ env.SUPABASE_DB_PASSWORD }}
           echo "✅ Successfully linked to project"
 
       - name: Deploy migrations
@@ -59,7 +59,7 @@ jobs:
         run: |
           echo "🚀 Deploying migrations to production..."
           
-          # Deploy using linked project
+          # Deploy using linked project with db push
           supabase db push --linked --include-all
           
           echo "✅ Migrations deployed successfully!"
