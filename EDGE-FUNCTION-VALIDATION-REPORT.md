@@ -29,12 +29,14 @@
 - **Version:** 12  
 - **Status:** ACTIVE ✅
 - **Last Updated:** 2025-10-12 22:17:50 UTC
-- **Purpose:** MCP (Model Context Protocol) server for Claude Desktop integration
+- **Purpose:** Reserved for future administrative agent functionality (not used by production agents)
 - **Test Result:** ✅ DEPLOYED AND SECURED
   - Function is active and responding
   - Requires authenticated user token (correct behavior)
-  - Used by Claude Desktop via MCP protocol, not direct HTTP calls
+  - Provides generic database operations for admin use
   - Authentication working as designed
+  - **Note:** Production agents use specialized tools from claude-api-v3 instead
+  - **Documentation:** See `DOCUMENTATION/MCP-SERVER-ADMIN.md` for details
 
 ---
 
