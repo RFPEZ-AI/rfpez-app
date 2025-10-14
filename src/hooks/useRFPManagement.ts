@@ -5,13 +5,26 @@ import { RFP } from '../types/rfp';
 import { RFPFormValues } from '../components/RFPEditModal';
 import { RFPService } from '../services/rfpService';
 import DatabaseService from '../services/database';
+import { generateRFPContextChangePrompt, shouldSendRFPContextChangePrompt } from '../utils/agentNotifications';
+
+export interface RFPManagementOptions {
+  currentSessionId?: string;
+  globalCurrentRfpId?: number | null;
+  globalCurrentRfp?: RFP | null;
+  setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>;
+  clearGlobalRFPContext?: () => void;
+  onRfpContextChanged?: (prompt: string) => void; // Callback to send notification to agent
+  hasMessagesInCurrentSession?: boolean; // Track if current session has messages
+}
 
 export const useRFPManagement = (
   currentSessionId?: string,
   globalCurrentRfpId?: number | null,
   globalCurrentRfp?: RFP | null,
   setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>,
-  clearGlobalRFPContext?: () => void
+  clearGlobalRFPContext?: () => void,
+  onRfpContextChanged?: (prompt: string) => void,
+  hasMessagesInCurrentSession?: boolean
 ) => {
   const [rfps, setRFPs] = useState<RFP[]>([]);
   const [showRFPMenu, setShowRFPMenu] = useState(false);
@@ -110,14 +123,17 @@ export const useRFPManagement = (
   const handleCancelRFP = () => setShowRFPModal(false);
   const handleClosePreview = () => setShowRFPPreviewModal(false);
   
-  const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP, setAsGlobal = false) => {
-    console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId, 'rfpData provided:', !!rfpData, 'setAsGlobal:', setAsGlobal);
+  const handleSetCurrentRfp = async (rfpId: number, rfpData?: RFP, setAsGlobal = false, isUserInitiated = false) => {
+    console.log('🎯 DEBUG: handleSetCurrentRfp called with rfpId:', rfpId, 'rfpData provided:', !!rfpData, 'setAsGlobal:', setAsGlobal, 'isUserInitiated:', isUserInitiated);
     console.log('🎯 Current state before change:', {
       currentRfpId,
       currentRfpName: currentRfp?.name,
       sessionRfpId,
       globalRfpId: globalCurrentRfpId
     });
+    
+    // Store previous RFP for notification
+    const previousRfp = currentRfp;
     
     try {
       let rfp: RFP | null = null;
@@ -177,6 +193,13 @@ export const useRFPManagement = (
           } catch (error) {
             console.warn('⚠️ Failed to save RFP context to session:', error);
           }
+        }
+
+        // Notify agent about RFP context change
+        if (onRfpContextChanged && shouldSendRFPContextChangePrompt(hasMessagesInCurrentSession || false, isUserInitiated)) {
+          const notificationPrompt = generateRFPContextChangePrompt(rfp, previousRfp || null, hasMessagesInCurrentSession || false);
+          console.log('📢 Sending RFP context change notification to agent');
+          onRfpContextChanged(notificationPrompt);
         }
       } else {
         console.log('❌ DEBUG: RFP not found for id:', rfpId, '- RFPService.getById returned null/undefined');

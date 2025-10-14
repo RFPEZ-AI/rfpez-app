@@ -653,7 +653,7 @@ export const useMessageHandling = (
         let uiTimeoutId: NodeJS.Timeout | null = null;
         
         const onStreamingChunk = (chunk: string, isComplete: boolean, toolProcessing?: boolean, toolEvent?: ToolInvocationEvent, forceToolCompletion?: boolean, metadata?: any) => {
-          console.log(' STREAMING CHUNK RECEIVED:', {
+          console.log('🌊 STREAMING CHUNK RECEIVED:', {
             chunkLength: chunk.length,
             chunkPreview: chunk.length > 0 ? chunk.substring(0, 50) + '...' : '[empty]',
             isComplete,
@@ -666,19 +666,25 @@ export const useMessageHandling = (
             toolProcessingMessageId,
             bufferLength: streamingBuffer.length,
             metadata: metadata ? Object.keys(metadata) : undefined,
+            metadataFull: metadata, // 🔍 DEBUG: Log full metadata to see structure
             timestamp: new Date().toISOString()
           });
           
           // 🎯 CRITICAL FIX: Handle message_complete event for agent switches
           if (metadata?.message_complete && !isComplete) {
-            console.log('✅ Message completion signal received - finalizing current agent message:', {
+            console.log('✅✅✅ MESSAGE_COMPLETE EVENT RECEIVED ✅✅✅');
+            console.log('📋 Message completion details:', {
               agent_id: metadata.agent_id,
               messageId: aiMessageId,
-              accumulatedLength: accumulatedContent.length
+              accumulatedLength: accumulatedContent.length,
+              accumulatedPreview: accumulatedContent.substring(0, 100) + '...',
+              bufferLength: streamingBuffer.length,
+              bufferPreview: streamingBuffer.substring(0, 100) + '...'
             });
             
             // Flush any remaining buffer
             if (streamingBuffer.length > 0) {
+              console.log('🔧 Flushing remaining buffer to message before completion');
               accumulatedContent += streamingBuffer;
               setMessages(prev => 
                 prev.map(msg => 
@@ -688,19 +694,33 @@ export const useMessageHandling = (
                 )
               );
               streamingBuffer = '';
+              console.log('✅ Buffer flushed, final content length:', accumulatedContent.length);
             }
             
+            console.log('⏸️ Message complete - waiting for message_start event');
             // Don't actually complete - wait for message_start
             return;
           }
           
           // 🎯 CRITICAL FIX: Handle message_start event for new agent
           if (metadata?.message_start) {
-            console.log('🆕 New agent message starting:', {
+            console.log('🆕🆕🆕 MESSAGE_START EVENT RECEIVED 🆕🆕🆕');
+            console.log('📋 New agent message details:', {
               agent_id: metadata.agent_id,
               agent_name: metadata.agent_name,
-              previousMessageId: aiMessageId
+              previousMessageId: aiMessageId,
+              previousAgentName: agentForResponse?.agent_name,
+              currentChunkLength: chunk.length,
+              currentChunkPreview: chunk.substring(0, 100) + '...',
+              accumulatedContentLength: accumulatedContent.length,
+              bufferLength: streamingBuffer.length
             });
+            
+            // 🚨 CRITICAL CHECK: Verify no content is in the chunk with message_start
+            if (chunk.length > 0) {
+              console.warn('⚠️⚠️⚠️ WARNING: Content received with message_start event! This should be empty!');
+              console.warn('Content that came with message_start:', chunk.substring(0, 200));
+            }
             
             // Create new message for the new agent
             const newAgentMessageId = uuidv4();
@@ -712,9 +732,16 @@ export const useMessageHandling = (
               agentName: metadata.agent_name || 'AI Assistant'
             };
             
+            console.log('📝 Creating new message:', {
+              id: newAgentMessageId,
+              agentName: newAgentMessage.agentName,
+              contentLength: 0
+            });
+            
             setMessages(prev => [...prev, newAgentMessage]);
             
             // Switch to new message for further streaming
+            const oldMessageId = aiMessageId;
             aiMessageId = newAgentMessageId;
             accumulatedContent = '';
             streamingBuffer = '';
@@ -731,7 +758,16 @@ export const useMessageHandling = (
               };
             }
             
-            console.log('🔄 Switched to new agent message ID:', aiMessageId);
+            console.log('🔄 Agent context switched:', {
+              oldMessageId,
+              newMessageId: aiMessageId,
+              oldAgent: agentForResponse?.agent_name,
+              newAgent: metadata.agent_name,
+              accumulatedReset: accumulatedContent.length === 0,
+              bufferReset: streamingBuffer.length === 0
+            });
+            
+            console.log('✅ message_start handling complete - ready for new agent content');
             return;
           }
           
@@ -880,9 +916,16 @@ export const useMessageHandling = (
               // When tools are executed, Claude sends a continuation response, so we must not mark complete yet
               if (!isWaitingForToolCompletion) {
                 streamingCompleted = true;
-                console.log('✅ Streaming phase complete for message:', aiMessageId);
+                console.log('✅✅✅ STREAMING PHASE COMPLETE ✅✅✅');
+                console.log('📊 Final streaming state:', {
+                  messageId: aiMessageId,
+                  agentName: agentForResponse?.agent_name,
+                  accumulatedLength: accumulatedContent.length,
+                  bufferLength: streamingBuffer.length,
+                  finalContentPreview: accumulatedContent.substring(0, 150) + '...'
+                });
               } else {
-                console.log('🔧 Streaming segment complete, but waiting for tool completion continuation');
+                console.log('⏸️ Streaming segment complete, but waiting for tool completion continuation');
               }
               
               // CRITICAL FIX: Always clear timeout and tool processing state on completion
@@ -1008,6 +1051,34 @@ export const useMessageHandling = (
               continuationAgentName = claudeResponse.metadata.agent_switch_result.new_agent.name;
               console.log('🔄 Agent switch detected during continuation - using new agent:', continuationAgentName);
               
+              // 🔧 FIX: Save current tool invocations to the previous agent's message before switching
+              const currentTools = [...toolInvocations];
+              if (currentTools.length > 0) {
+                console.log('🔧 Attaching', currentTools.length, 'tool invocations to previous agent message');
+                setMessages(prev => {
+                  const updated = [...prev];
+                  // Find the last non-user message (previous agent's message)
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (!updated[i].isUser && updated[i].id !== toolProcessingMessageId) {
+                      updated[i] = {
+                        ...updated[i],
+                        metadata: {
+                          ...updated[i].metadata,
+                          toolInvocations: currentTools
+                        }
+                      };
+                      console.log('🔧 Attached tools to message:', updated[i].id, updated[i].agentName);
+                      break;
+                    }
+                  }
+                  return updated;
+                });
+                
+                // Clear tool invocations for new agent
+                setToolInvocations([]);
+                console.log('🔧 Cleared tool invocations buffer for new agent');
+              }
+              
               // Update agentForResponse for subsequent streaming
               const newAgent = claudeResponse.metadata.agent_switch_result.new_agent;
               agentForResponse = {
@@ -1074,6 +1145,12 @@ export const useMessageHandling = (
             chunk.length > 0; // Allow whitespace characters - they are part of text formatting!
           
           if (isValidTextChunk) {
+            console.log('➕ Adding chunk to buffer:', {
+              chunkLength: chunk.length,
+              chunkPreview: chunk.substring(0, 50) + '...',
+              messageId: aiMessageId,
+              currentAgentName: agentForResponse?.agent_name
+            });
             streamingBuffer += chunk;
           } else if (chunk && chunk.trim()) {
             console.log('🔧 FILTERING OUT NON-TEXT CHUNK:', {
@@ -1089,22 +1166,14 @@ export const useMessageHandling = (
           
           const now = Date.now();
           
-          console.log('🔧 STREAMING BUFFER UPDATE:', {
-            chunkLength: chunk.length,
-            chunkPreview: chunk.substring(0, 30),
-            bufferLength: streamingBuffer.length,
-            bufferPreview: streamingBuffer.substring(0, 50) + '...',
-            messageId: aiMessageId,
-            isValidTextChunk,
-            willUpdate: now - lastUpdateTime >= updateInterval || streamingBuffer.length > 150
-          });
-          
           // Update UI periodically or when buffer gets large
           if (now - lastUpdateTime >= updateInterval || streamingBuffer.length > 150) {
-            console.log('🔧 UPDATING UI MESSAGE with buffer:', {
+            console.log('�️ UPDATING UI MESSAGE with buffer:', {
               messageId: aiMessageId,
-              bufferContent: streamingBuffer,
-              bufferLength: streamingBuffer.length
+              agentName: agentForResponse?.agent_name,
+              bufferLength: streamingBuffer.length,
+              bufferPreview: streamingBuffer.substring(0, 100) + '...',
+              accumulatedBefore: accumulatedContent.length
             });
             
             // STREAMING FIX: Add buffer to accumulated content before updating UI
@@ -1119,8 +1188,9 @@ export const useMessageHandling = (
               
               // Find the updated message to log its content
               const updatedMessage = updated.find(msg => msg.id === aiMessageId);
-              console.log('🔧 UI MESSAGE UPDATED:', {
+              console.log('✅ UI MESSAGE UPDATED:', {
                 messageId: aiMessageId,
+                agentName: updatedMessage?.agentName,
                 accumulatedLength: accumulatedContent.length,
                 newContentLength: updatedMessage?.content.length,
                 newContentPreview: updatedMessage?.content.substring(0, 100) + '...'
@@ -1373,6 +1443,33 @@ export const useMessageHandling = (
           try {
             console.log('Saving AI response to session:', activeSessionId);
             console.log('🔍 DEBUG: artifactRefs being passed to database:', artifactRefs);
+            
+            // 🔧 FIX: Attach tool invocations to metadata before saving
+            const currentTools = [...toolInvocations];
+            const metadataWithTools = {
+              ...claudeResponse.metadata,
+              ...(currentTools.length > 0 ? { toolInvocations: currentTools } : {})
+            };
+            
+            if (currentTools.length > 0) {
+              console.log('🔧 Attaching', currentTools.length, 'tool invocations to message metadata before database save');
+              
+              // Also update the UI message immediately with tools
+              setMessages(prev => 
+                prev.map(msg => 
+                  msg.id === aiMessageId 
+                    ? { 
+                        ...msg, 
+                        metadata: {
+                          ...msg.metadata,
+                          toolInvocations: currentTools
+                        }
+                      }
+                    : msg
+                )
+              );
+            }
+            
             const savedAiMessage = await DatabaseService.addMessage(
               activeSessionId, 
               userId, 
@@ -1381,7 +1478,7 @@ export const useMessageHandling = (
               agentForResponse?.agent_id || 'unknown',
               agentForResponse?.agent_name || 'AI Assistant',
               {},
-              claudeResponse.metadata,
+              metadataWithTools, // Use metadata with tools attached
               artifactRefs // Pass the artifact references
             );
             console.log('AI message saved:', savedAiMessage);

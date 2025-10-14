@@ -856,6 +856,13 @@ The project includes comprehensive browser automation through MCP (Model Context
 ```
 
 #### **Message Testing Optimization**
+**⚠️ CRITICAL: Message Submission Requirements**
+After filling in message text with `mcp_browser_form_input_fill`, you MUST either:
+1. **Press Enter key**: `mcp_browser_press_key({ key: 'Enter' })` (RECOMMENDED - faster)
+2. **Click submit button**: Find and click the submit button element
+
+**Without one of these actions, the message will NOT be sent!**
+
 **Example Code Pattern (for reference only):**
 ```javascript
 // FAST MESSAGE SENDING - Always use this pattern (example)
@@ -870,7 +877,7 @@ The project includes comprehensive browser automation through MCP (Model Context
 //   await mcp_browser_click({ index: textareaIndex });
 //   await mcp_browser_form_input_fill({ index: textareaIndex, value: message });
 //   
-//   // 4. Submit with Enter key (faster than finding button)
+//   // 4. ⚡ CRITICAL: Submit with Enter key (faster than finding button)
 //   await mcp_browser_press_key({ key: 'Enter' });
 //   
 //   // 5. Take screenshot for verification
@@ -1009,7 +1016,10 @@ Key UI elements are decorated with `data-testid` attributes for reliable MCP bro
 // ✅ Reliable approach - works across UI changes (examples)
 // await mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
 // await mcp_browser_form_input_fill({ selector: '[data-testid="message-input"]', value: 'test message' });
-// await mcp_browser_press_key({ key: 'Enter' }); // Submit message
+// 
+// ⚡ CRITICAL: Always submit the message with Enter key or click submit button!
+// await mcp_browser_press_key({ key: 'Enter' }); // REQUIRED - Submit message
+// 
 // await mcp_browser_click({ selector: '[data-testid="agent-selector"]' }); // Switch agent
 
 // ❌ Avoid index-based targeting when possible (brittle)
@@ -1042,7 +1052,8 @@ Key UI elements are decorated with `data-testid` attributes for reliable MCP bro
 //   selector: '[data-testid="message-input"]', 
 //   value: 'Create a new RFP for LED lighting procurement' 
 // });
-// mcp_browser_press_key({ key: 'Enter' });
+// ⚡ CRITICAL: Must press Enter or click submit button to actually send the message!
+// mcp_browser_press_key({ key: 'Enter' }); // This step is REQUIRED
 
 // Verify state changes
 // const footer = mcp_browser_get_text({ selector: '[data-testid="current-rfp-display"]' });
@@ -1062,7 +1073,7 @@ Key UI elements are decorated with `data-testid` attributes for reliable MCP bro
 - Use `test-utils.tsx` render wrapper for component tests
 - MCP tests in separate automation project for integration testing integrated into the debug page
 - VS Code tasks available for automated test execution and MCP validation
-- When sending message prompts using the mcp browser tools, add the enter key to submit the message
+- **⚡ CRITICAL**: When sending message prompts using MCP browser tools, you MUST press Enter key (`mcp_browser_press_key({ key: 'Enter' })`) or click the submit button after filling the message input - the message will NOT be sent otherwise!
 - Test identifiers follow kebab-case naming: `data-testid="element-name-action"`
 
 ## Memory MCP Best Practices

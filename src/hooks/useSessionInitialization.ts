@@ -77,7 +77,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       clearUIState();
       clearArtifacts();
       
-      // Show loading message immediately and keep it (don't replace with welcome prompt)
+      // Show loading message immediately
       setMessages([{
         id: 'agent-loading',
         content: '🤖 Activating Solutions agent...',
@@ -86,10 +86,14 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         agentName: 'System'
       }]);
       
-      // Load the default agent silently (processes initial_prompt but don't show result)
-      loadDefaultAgentWithPrompt().then(() => {
-        console.log('✅ Default agent loaded, keeping activation message (not showing welcome_prompt)');
-        // Don't replace the activation message - it stays until user sends first message
+      // Load the default agent and replace loading message with welcome
+      loadDefaultAgentWithPrompt().then((welcomeMessage) => {
+        if (welcomeMessage) {
+          console.log('✅ Default agent loaded, showing welcome message');
+          setMessages([welcomeMessage]);
+        } else {
+          console.log('⚠️ No welcome message returned, keeping activation message');
+        }
       });
       return;
     }
@@ -100,7 +104,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length === 0) {
       console.log('Loading default agent for initial app startup (no sessions available to restore)...');
       
-      // Show loading message immediately and keep it (don't replace with welcome prompt)
+      // Show loading message immediately
       setMessages([{
         id: 'agent-loading',
         content: '🤖 Activating Solutions agent...',
@@ -109,10 +113,14 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         agentName: 'System'
       }]);
       
-      // Load the default agent silently (processes initial_prompt but don't show result)
-      loadDefaultAgentWithPrompt().then(() => {
-        console.log('✅ Default agent loaded, keeping activation message (not showing welcome_prompt)');
-        // Don't replace the activation message - it stays until user sends first message
+      // Load the default agent and replace loading message with welcome
+      loadDefaultAgentWithPrompt().then((welcomeMessage) => {
+        if (welcomeMessage) {
+          console.log('✅ Default agent loaded, showing welcome message');
+          setMessages([welcomeMessage]);
+        } else {
+          console.log('⚠️ No welcome message returned, keeping activation message');
+        }
       });
     } else if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length > 0) {
       console.log('🔄 Sessions available - skipping default agent load, waiting for session restoration...');

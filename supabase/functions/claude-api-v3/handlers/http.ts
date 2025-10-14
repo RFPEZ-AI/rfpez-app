@@ -266,7 +266,7 @@ async function streamWithRecursiveTools(
           `Instead, IMMEDIATELY process the context and take appropriate actions based on your role. ` +
           `The user has already been greeted by the previous agent.`;
         
-        const newTools = getToolDefinitions(newAgentData?.role as string);
+        const newTools = getToolDefinitions(newAgentContext.role, newAgentContext.access);
         
         // 🎯 CRITICAL FIX: Send new message start event for the new agent
         console.log('🆕 Starting new message for new agent');
@@ -434,11 +434,11 @@ function handleStreamingResponse(
         // 🔍 DEBUG: Log agent role before getting tools - USE agentContext not agent from request
         console.log('🔧 DEBUG: Request agent role:', agent?.role, typeof agent?.role);
         console.log('🔧 DEBUG: AgentContext role:', agentContext?.role, typeof agentContext?.role);
-        console.log('🔧 DEBUG: AgentContext object:', { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role });
+        console.log('🔧 DEBUG: AgentContext object:', { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role, access: agentContext?.access });
         
         // 🚫 CRITICAL: Disable tools when processing initial_prompt to prevent unwanted session creation
         // Initial prompts should ONLY generate welcome text, not execute database operations
-        const tools = processInitialPrompt ? [] : getToolDefinitions(agentContext?.role);
+        const tools = processInitialPrompt ? [] : getToolDefinitions(agentContext?.role, agentContext?.access);
         if (processInitialPrompt) {
           console.log('🚫 Initial prompt processing - tools DISABLED to prevent auto-session creation');
         }
@@ -753,9 +753,9 @@ Generate the ${authStatus} user welcome message now.`;
     console.log(`🧩 NON-STREAMING: Request agent object:`, agent);
     console.log(`🧩 NON-STREAMING: Request agent role:`, agent?.role);
     console.log(`🧩 NON-STREAMING: AgentContext role:`, agentContext?.role);
-    console.log(`🧩 NON-STREAMING: AgentContext object:`, { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role });
+    console.log(`🧩 NON-STREAMING: AgentContext object:`, { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role, access: agentContext?.access });
     
-    const tools = getToolDefinitions(agentContext?.role);
+    const tools = getToolDefinitions(agentContext?.role, agentContext?.access);
     
     // Send request to Claude API
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -917,7 +917,7 @@ Generate the ${authStatus} user welcome message now.`;
               sessionId: sessionId
             });
             
-            const newTools = getToolDefinitions(newAgentData?.role as string);
+            const newTools = getToolDefinitions(newAgentContext.role, newAgentContext.access);
             
             // 🎯 Build enhanced system prompt that includes agent instructions + initial_prompt
             const enhancedSystemPrompt = hasInitialPrompt
@@ -1181,9 +1181,9 @@ export async function handleStreamingRequest(request: Request): Promise<Response
           const claudeService = new ClaudeAPIService();
           const _toolService = new ToolExecutionService(supabase, userId, undefined);
           
-          // 🔍 DEBUG: Log agent role for this streaming handler too
-          console.log('🔧 DEBUG: STREAMING REQUEST - AgentContext role:', agentContext?.role);
-          const tools = getToolDefinitions(agentContext?.role);
+          // 🔍 DEBUG: Log agent role and access for this streaming handler too
+          console.log('🔧 DEBUG: STREAMING REQUEST - AgentContext role:', agentContext?.role, 'access:', agentContext?.access);
+          const tools = getToolDefinitions(agentContext?.role, agentContext?.access);
           
           // Stream response from Claude
           await claudeService.streamMessage(messages, tools, (chunk) => {

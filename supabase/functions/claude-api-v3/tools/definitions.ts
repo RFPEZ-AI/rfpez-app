@@ -573,11 +573,28 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
 };
 
 // Get tool definitions for Claude API, filtered by agent role
-export function getToolDefinitions(agentRole?: string): ClaudeToolDefinition[] {
-  console.log(`🔍 getToolDefinitions called with agentRole: '${agentRole}'`);
+export function getToolDefinitions(agentRole?: string, allowedTools?: string[]): ClaudeToolDefinition[] {
+  console.log(`🔍 getToolDefinitions called with agentRole: '${agentRole}', allowedTools:`, allowedTools);
+  
+  // NEW: Database-driven tool access control (preferred method)
+  if (allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0) {
+    console.log(`� Using database-driven tool access control (${allowedTools.length} allowed tools)`);
+    
+    const filteredTools = TOOL_DEFINITIONS.filter(tool => {
+      const allowed = allowedTools.includes(tool.name);
+      console.log(`🧪 Tool '${tool.name}': ${allowed ? '✅ ALLOWED' : '❌ BLOCKED'} (database access list)`);
+      return allowed;
+    });
+    
+    console.log(`🔧 Filtered tools from database access list: [${filteredTools.map(t => t.name).join(', ')}]`);
+    console.log(`📊 Tool count: ${filteredTools.length} out of ${TOOL_DEFINITIONS.length} total tools`);
+    return filteredTools;
+  }
+  
+  // FALLBACK: Legacy role-based restrictions (for backward compatibility)
+  console.log(`⚠️ Using legacy role-based restrictions (no database access list found)`);
   console.log(`🔍 Type of agentRole: ${typeof agentRole}`);
   console.log(`🔍 ROLE_TOOL_RESTRICTIONS keys:`, Object.keys(ROLE_TOOL_RESTRICTIONS));
-  console.log(`🔍 Looking for restrictions for role '${agentRole}':`, ROLE_TOOL_RESTRICTIONS[agentRole || '']);
   
   if (!agentRole) {
     console.log(`⚠️ No agent role provided, returning ALL ${TOOL_DEFINITIONS.length} tools`);
@@ -595,9 +612,9 @@ export function getToolDefinitions(agentRole?: string): ClaudeToolDefinition[] {
   const filteredTools = TOOL_DEFINITIONS.filter(tool => {
     console.log(`🧪 FILTERING TOOL: ${tool.name} for role ${agentRole}`);
     
-    // 🚨 ABSOLUTE BLOCK: Never allow switch_agent for design role - THIS IS THE MAIN FIX
+    // 🚨 ABSOLUTE BLOCK: Never allow switch_agent for design role
     if (agentRole === 'design' && tool.name === 'switch_agent') {
-      console.log(`🚨 ABSOLUTE BLOCK: Preventing switch_agent for design role - this should work!`);
+      console.log(`🚨 ABSOLUTE BLOCK: Preventing switch_agent for design role`);
       return false;
     }
     

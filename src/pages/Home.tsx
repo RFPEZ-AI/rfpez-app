@@ -133,6 +133,27 @@ const Home: React.FC = () => {
     handleShowAgentSelector
   } = useAgentManagement(currentSessionId);
 
+  // Callback to handle RFP context change notifications to the agent
+  const handleRfpContextChanged = useCallback((prompt: string) => {
+    console.log('📢 RFP context changed, sending notification to agent:', prompt);
+    
+    // Add system message to notify the agent about the RFP context change
+    setMessages((prev: Message[]) => [
+      ...prev,
+      {
+        id: `rfp-context-${Date.now()}`,
+        content: prompt,
+        isUser: false,
+        timestamp: new Date(),
+        agentName: currentAgent?.agent_name || 'System',
+        metadata: {
+          isSystemNotification: true,
+          rfpContextChange: true
+        }
+      }
+    ]);
+  }, [currentAgent, setMessages]);
+
   const {
     rfps,
     showRFPMenu,
@@ -158,7 +179,9 @@ const Home: React.FC = () => {
     globalCurrentRfpId ?? null,
     globalCurrentRfp ?? null,
     setGlobalRFPContext,
-    clearGlobalRFPContext
+    clearGlobalRFPContext,
+    handleRfpContextChanged,
+    messages.length > 0 // Has messages in current session
   );
 
   const {
@@ -412,6 +435,48 @@ const Home: React.FC = () => {
     artifactWindowState
   });
 
+  // Monitor authentication state changes to trigger anonymous intent handoff
+  // Use refs outside the useEffect to persist across renders
+  // Initialize to undefined so we can detect the first real state
+  const prevAuthStateRef = useRef<boolean | undefined>(undefined);
+  const authHandoffPendingRef = useRef<boolean>(false);
+  
+  useEffect(() => {
+    // Only proceed if we have a current session and not loading
+    if (supabaseLoading || !currentSessionId || !currentAgent) {
+      return;
+    }
+    
+    // Detect transition from anonymous to authenticated
+    // On first render, prevAuthStateRef.current is undefined
+    const wasAnonymous = prevAuthStateRef.current === false; // Explicitly was anonymous before
+    const isNowAuthenticated = isAuthenticated === true;
+    
+    console.log('🔍 Auth State Monitoring:', {
+      prevAuth: prevAuthStateRef.current,
+      currentAuth: isAuthenticated,
+      wasAnonymous,
+      isNowAuthenticated,
+      sessionId: currentSessionId,
+      messageCount: messages.length
+    });
+    
+    // Set flag when auth state changes - onSendMessage will handle the actual prompt
+    if (wasAnonymous && isNowAuthenticated && !authHandoffPendingRef.current && messages.length > 0) {
+      console.log('🔄 AUTH STATE CHANGE DETECTED: Anonymous → Authenticated');
+      console.log('📝 Setting flag for anonymous intent check on next message send');
+      console.log('Current session:', currentSessionId);
+      console.log('Current agent:', currentAgent.agent_name);
+      console.log('Messages in session:', messages.length);
+      
+      // Set flag - will be checked in onSendMessage
+      authHandoffPendingRef.current = true;
+    }
+    
+    // Update previous state
+    prevAuthStateRef.current = isAuthenticated;
+  }, [isAuthenticated, supabaseLoading, currentSessionId, currentAgent, messages.length]);
+
   // Listen for RFP refresh messages from Claude functions and enhanced client updates
   useEffect(() => {
     const handleRfpRefreshMessage = async (event: MessageEvent) => {
@@ -464,7 +529,8 @@ const Home: React.FC = () => {
                   });
                   
                   // Call handleSetCurrentRfp with direct RFP data to avoid database timing issues
-                  await handleSetCurrentRfp(event.data.payload.rfp_id, event.data.payload.rfp_data);
+                  // FIX Issue 3: Set setAsGlobal=true so footer and agent selector update from edge function
+                  await handleSetCurrentRfp(event.data.payload.rfp_id, event.data.payload.rfp_data, true);
                   
                   // Update session context if we have an active session
                   if (currentSessionId) {
@@ -479,7 +545,8 @@ const Home: React.FC = () => {
                   }
                 } else {
                   console.log(`🔧 HOME MESSAGE DEBUG: No rfp_data in payload, calling handleSetCurrentRfp with ID: ${event.data.payload.rfp_id}`);
-                  await handleSetCurrentRfp(event.data.payload.rfp_id);
+                  // FIX Issue 3: Set setAsGlobal=true so footer and agent selector update from edge function
+                  await handleSetCurrentRfp(event.data.payload.rfp_id, undefined, true);
                 }
                 
                 const duration = Date.now() - startTime;
@@ -1033,6 +1100,14 @@ const Home: React.FC = () => {
   };
 
   const onSendMessage = async (content: string) => {
+    // Check if auth handoff should inject anonymous intent check
+    if (authHandoffPendingRef.current) {
+      console.log('🔄 Auth handoff pending - injecting anonymous intent check');
+      authHandoffPendingRef.current = false;
+      // Prepend the auto-prompt to user's message
+      content = `Check for stored anonymous intent. ${content}`;
+    }
+    
     // CRITICAL FIX: Use ref for immediate access to current session ID, avoiding stale closures
     const refSessionId = currentSessionIdRef.current;
     
@@ -1846,7 +1921,8 @@ const Home: React.FC = () => {
           
           // CRITICAL FIX: Set as GLOBAL context to ensure artifacts reload properly
           // This ensures the RFP change is detected by useArtifactManagement
-          await handleSetCurrentRfp(rfpId, undefined, true);
+          // Mark as user-initiated to trigger agent notification
+          await handleSetCurrentRfp(rfpId, undefined, true, true);
           
           // Update the current session's RFP context
           if (currentSessionId) {

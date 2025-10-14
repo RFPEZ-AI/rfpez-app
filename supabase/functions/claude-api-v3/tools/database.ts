@@ -1158,24 +1158,22 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
   if (isAnonymousUser) {
     const agentObj = agent as unknown as Agent;
     const agentIsRestricted = agentObj.is_restricted;
-    const agentIsFree = agentObj.is_free;
     
     console.log('🔐 Anonymous user agent access validation:', {
       agentName: agentObj.name,
       is_restricted: agentIsRestricted,
-      is_free: agentIsFree,
-      canAccess: !agentIsRestricted || agentIsFree
+      canAccess: !agentIsRestricted
     });
     
-    // Anonymous users can only access agents that are:
-    // 1. NOT restricted (is_restricted = false), OR
-    // 2. Free agents (is_free = true, even if restricted)
-    if (agentIsRestricted && !agentIsFree) {
+    // Anonymous users can ONLY access non-restricted agents
+    // Restricted agents require authentication, regardless of is_free setting
+    // This ensures premium features are locked behind sign-up/login
+    if (agentIsRestricted) {
       console.log('🚫 ACCESS DENIED: Anonymous user trying to access restricted agent:', agentObj.name);
-      throw new Error(`Access denied: The ${agentObj.name} agent requires an account to use. Please sign up or log in to access specialized agents and advanced features. Anonymous users can use the Solutions agent and other free agents.`);
+      throw new Error(`Access denied: The ${agentObj.name} agent requires an account to use. Please sign up or log in to access specialized agents like RFP Design, advanced features, and save your work. Anonymous users can use the Solutions agent for basic assistance.`);
     }
     
-    console.log('✅ Access granted: Anonymous user can access agent:', agentObj.name);
+    console.log('✅ Access granted: Anonymous user can access non-restricted agent:', agentObj.name);
   } else {
     console.log('✅ Authenticated user - full agent access granted');
   }

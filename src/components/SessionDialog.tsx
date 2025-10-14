@@ -19,6 +19,7 @@ interface Message {
   agentName?: string; // Agent name for assistant messages
   artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
   isToolProcessing?: boolean; // True if this is a tool processing indicator message
+  metadata?: Record<string, unknown>; // Additional metadata including tool invocations
 }
 
 interface SessionDialogProps {
@@ -250,6 +251,21 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                     ))}
                   </div>
                 )}
+                
+                {/* Tool invocations from message metadata */}
+                {(() => {
+                  if (!message.isUser && message.metadata?.toolInvocations && Array.isArray(message.metadata.toolInvocations) && message.metadata.toolInvocations.length > 0) {
+                    return (
+                      <div style={{ marginTop: '8px' }}>
+                        <ToolExecutionDisplay
+                          toolInvocations={message.metadata.toolInvocations as ToolInvocationEvent[]}
+                          isActive={false}
+                        />
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
                 
                 <div style={{ 
                   fontSize: '0.8em', 

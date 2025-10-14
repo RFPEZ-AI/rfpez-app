@@ -271,7 +271,7 @@ What type of product or service are you looking to procure? I'll generate a tail
   '/assets/avatars/rfp-designer.svg',
   1,
   FALSE, -- Not the default agent
-  FALSE, -- Not restricted - available to authenticated users
+  TRUE,  -- Restricted - requires authentication (anonymous users blocked)
   TRUE,  -- Free agent - available to authenticated users without billing
   'design' -- Role for the agent
 ),

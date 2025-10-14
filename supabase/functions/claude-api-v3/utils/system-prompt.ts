@@ -19,6 +19,7 @@ export interface Agent {
   instructions: string;
   initial_prompt?: string;
   role?: string;
+  access?: string[]; // Array of allowed tool names for this agent
 }
 
 export interface UserProfile {
@@ -352,7 +353,7 @@ async function loadDefaultAgent(supabase: any, reason: string, originalError?: a
   try {
     const { data: defaultAgent, error: defaultError } = await (supabase as any)
       .from('agents')
-      .select('id, name, instructions, initial_prompt, role')
+      .select('id, name, instructions, initial_prompt, role, access')
       .eq('name', 'Solutions')
       .eq('is_active', true)
       .single();
@@ -424,7 +425,7 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
         supabase,
         () => (supabase as any)
           .from('agents')
-          .select('id, name, instructions, initial_prompt, role')
+          .select('id, name, instructions, initial_prompt, role, access')
           .eq('id', agentId)
           .eq('is_active', true)
           .single()
@@ -456,7 +457,8 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
               name,
               instructions,
               initial_prompt,
-              role
+              role,
+              access
             )
           `)
           .eq('session_id', sessionId)

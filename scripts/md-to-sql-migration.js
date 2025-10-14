@@ -70,6 +70,22 @@ function parseAgentMarkdown(content) {
     metadata.initial_prompt = promptMatch[1].trim();
   }
   
+  // Extract Allowed Tools (new feature)
+  const toolsMatch = content.match(/##\s*Allowed Tools:\s*\n([\s\S]+?)(?=\n##)/);
+  if (toolsMatch) {
+    // Parse bullet list of tools
+    const toolsList = toolsMatch[1].trim();
+    const tools = toolsList
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.startsWith('- '))
+      .map(line => line.substring(2).trim());
+    
+    if (tools.length > 0) {
+      metadata.allowed_tools = tools;
+    }
+  }
+  
   // Full content as instructions
   metadata.instructions = content;
   
@@ -115,6 +131,12 @@ function generateMigration(metadata, agentName) {
   
   if (metadata.avatar_url) {
     updateFields.push(`  avatar_url = '${metadata.avatar_url}'`);
+  }
+  
+  if (metadata.allowed_tools && metadata.allowed_tools.length > 0) {
+    // Store as PostgreSQL array
+    const toolsArray = `ARRAY[${metadata.allowed_tools.map(t => `'${t}'`).join(', ')}]`;
+    updateFields.push(`  access = ${toolsArray}::text[]`);
   }
   
   updateFields.push(`  updated_at = NOW()`);
@@ -198,6 +220,10 @@ function main() {
   log(`   Description length: ${metadata.description?.length || 0} chars`);
   log(`   Initial prompt length: ${metadata.initial_prompt?.length || 0} chars`);
   log(`   Instructions length: ${metadata.instructions?.length || 0} chars`);
+  log(`   Allowed tools: ${metadata.allowed_tools?.length || 0} tools`);
+  if (metadata.allowed_tools) {
+    metadata.allowed_tools.forEach(tool => log(`      - ${tool}`, 'blue'));
+  }
   
   // Generate migration SQL
   log('\n🔨 Generating SQL migration...', 'blue');
