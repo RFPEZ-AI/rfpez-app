@@ -141,12 +141,28 @@ echo "   Supabase API: $(curl -s http://127.0.0.1:54321/health >/dev/null && ech
 echo "   Supabase Studio: http://127.0.0.1:54323"
 echo "   PostgreSQL: $(is_port_in_use 54322 && echo '✅ Running' || echo '❌ Not running')"
 
+# Start Development Server in background
+echo ""
+echo "🚀 Starting Development Server..."
+if is_port_in_use 3100; then
+    echo "⚠️  Port 3100 already in use - Development Server may already be running"
+else
+    echo "📦 Starting React development server on port 3100..."
+    npm start >/dev/null 2>&1 &
+    DEV_SERVER_PID=$!
+    echo "✅ Development Server started (PID: $DEV_SERVER_PID)"
+    
+    # Wait a moment for server to initialize
+    sleep 3
+    wait_for_service "http://localhost:3100" "Development Server"
+fi
+
 # Show next steps
 echo ""
 echo "🎯 Next Steps:"
-echo "   1. VS Code tasks should auto-start:"
+echo "   1. VS Code tasks auto-started:"
 echo "      • Tests (Watch Mode) - already running"
-echo "      • Development Server - use Ctrl+Shift+P → 'Start Development Server'"
+echo "      • Development Server - running on port 3100"
 echo "   2. Open browser to: http://localhost:3100"
 echo "   3. Supabase Studio: http://localhost:54323"
 echo ""

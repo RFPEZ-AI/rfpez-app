@@ -49,3 +49,5 @@ temp/
 .fake
 nul
 database/backups/
+package-lock.json
+**/node_modules/
