@@ -34,7 +34,7 @@ Environment variables in GitHub Actions need to be referenced with the proper sy
 # AFTER (correct)
 - name: Link to Supabase project
   run: |
-    supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+    supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }} --password ${{ env.SUPABASE_DB_PASSWORD }}
 
 - name: Deploy claude-api-v3 function
   run: |
@@ -100,15 +100,28 @@ jobs:
 
 ### Before Fix
 ```bash
+supabase link --project-ref 
+# Missing value! Command fails with: "flag needs an argument"
+
 supabase functions deploy claude-api-v3 --project-ref 
 # Missing value! Command fails with: "flag needs an argument"
 ```
 
 ### After Fix
 ```bash
+supabase link --project-ref jxlutaztoukwbbgtoulc --password [password]
+# Both values properly substituted! Command succeeds
+
 supabase functions deploy claude-api-v3 --project-ref jxlutaztoukwbbgtoulc
 # Value properly substituted! Command succeeds
 ```
+
+### Critical: The `supabase link` Command
+The `supabase link` command requires **both** flags:
+- `--project-ref`: Your Supabase project reference ID
+- `--password`: Your database password
+
+Without these, the CLI cannot authenticate and link to your project.
 
 ## Verification Checklist
 

@@ -33,7 +33,7 @@ jobs:
 
       - name: Link to Supabase project
         run: |
-          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }} --password ${{ env.SUPABASE_DB_PASSWORD }}
 
       - name: Check migration status
         id: check_migrations
