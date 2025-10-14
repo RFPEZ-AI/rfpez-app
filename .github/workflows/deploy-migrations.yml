@@ -17,13 +17,9 @@ jobs:
     # SUPABASE_DB_URL format: postgresql://postgres.[project-ref]:[password]@aws-0-us-east-1.pooler.supabase.com:5432/postgres
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
-      # NOTE: SUPABASE_DB_URL must use POOLER connection for GitHub Actions (IPv4 compatibility)
-      # CORRECT format: postgresql://postgres.jxlutaztoukwbbgtoulc:ENCODED_PASSWORD@aws-0-us-east-1.pooler.supabase.com:5432/postgres
-      # - Must use SESSION mode (port 5432, NOT 6543) for DDL/migration support
-      # - Username format: postgres.PROJECT_REF (note the dot!)
-      # - Password must be URL-encoded if it contains special characters (@, #, $, etc.)
-      # See GITHUB-ACTIONS-POOLER-FIX.md for complete instructions
+      # NOTE: We use 'supabase link' + 'supabase db push' instead of --db-url
+      # This approach uses the Supabase Management API and avoids IPv6 connectivity issues
+      # Only SUPABASE_ACCESS_TOKEN is required (no database password needed)
 
     steps:
       - name: Checkout code
@@ -51,18 +47,22 @@ jobs:
             echo "ℹ️ No migration files found"
           fi
 
+      - name: Link to Supabase project
+        if: success() && steps.check_migrations.outputs.has_pending == 'true'
+        run: |
+          echo "Linking to Supabase project..."
+          supabase link --project-ref jxlutaztoukwbbgtoulc
+          echo "Project linked successfully!"
+
       - name: Deploy migrations
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Note: Using Supavisor pooler connection (session mode) for GitHub Actions IPv4 compatibility"
+          echo "Using supabase db push (via Management API - no direct DB connection needed)"
           
-          # GitHub Actions doesn't support IPv6, so we must use the pooler connection
-          # Session mode (port 5432) supports DDL operations required for migrations
-          # The SUPABASE_DB_URL secret should use pooler format:
-          # postgresql://postgres.PROJECT_REF:PASSWORD@aws-0-us-east-1.pooler.supabase.com:5432/postgres
-          
-          supabase db push --db-url "${{ env.SUPABASE_DB_URL }}" --include-all
+          # supabase db push uses the Management API when linked to a project
+          # This avoids IPv6 connectivity issues entirely
+          supabase db push --include-all
           
           echo "Migrations deployed successfully!"
 
