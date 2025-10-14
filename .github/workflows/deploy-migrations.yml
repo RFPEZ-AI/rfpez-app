@@ -46,24 +46,23 @@ jobs:
             echo "ℹ️ No migration files found"
           fi
 
-      - name: Deploy migrations using database URL
+      - name: Link to Supabase project
+        if: steps.check_migrations.outputs.has_pending == 'true'
+        run: |
+          echo "� Linking to Supabase project..."
+          # Link using access token (bypasses database password requirement)
+          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          echo "✅ Successfully linked to project"
+
+      - name: Deploy migrations
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "🚀 Deploying migrations to production..."
           
-          # URL encode the password to handle special characters
-          PASSWORD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${{ env.SUPABASE_DB_PASSWORD }}', safe=''))")
+          # Deploy using linked project
+          supabase db push --linked --include-all
           
-          # Construct the database connection URL for Supabase pooler with connection pooling mode
-          # Using transaction pooling mode which is required for migrations
-          # Note: Project ref is hardcoded to avoid GitHub secret masking (it's not sensitive - visible in URLs)
-          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
-          
-          echo "Connecting via pooler (transaction mode)..."
-          echo "Project: jxlutaztoukwbbgtoulc"
-          
-          # Deploy using database URL
-          supabase db push --db-url "${DB_URL}" --include-all
+          echo "✅ Migrations deployed successfully!"
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
