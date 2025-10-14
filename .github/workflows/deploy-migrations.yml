@@ -33,16 +33,17 @@ jobs:
 
       - name: Link to Supabase project
         run: |
-          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }} --password ${{ env.SUPABASE_DB_PASSWORD }}
+          echo "Linking to Supabase project..."
+          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
 
       - name: Check migration status
         id: check_migrations
         run: |
           echo "Checking pending migrations..."
-          supabase migration list
+          supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }}
           
           # Check if there are pending migrations
-          PENDING=$(supabase migration list | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
+          PENDING=$(supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }} | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
           if [ -z "$PENDING" ]; then
             echo "has_pending=false" >> $GITHUB_OUTPUT
             echo "ℹ️ No pending migrations to deploy"
@@ -55,16 +56,16 @@ jobs:
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "🚀 Deploying migrations to production..."
-          supabase db push --password ${{ env.SUPABASE_DB_PASSWORD }}
+          supabase db push --project-ref ${{ env.SUPABASE_PROJECT_REF }} --password ${{ env.SUPABASE_DB_PASSWORD }}
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "✅ Verifying migration deployment..."
-          supabase migration list
+          supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }}
           
           # Check for any remaining pending migrations
-          REMAINING=$(supabase migration list | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
+          REMAINING=$(supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }} | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
           if [ -z "$REMAINING" ]; then
             echo "✅ All migrations deployed successfully!"
           else
