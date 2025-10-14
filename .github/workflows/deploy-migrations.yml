@@ -54,12 +54,11 @@ jobs:
           # URL encode the password to handle special characters
           PASSWORD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${{ env.SUPABASE_DB_PASSWORD }}', safe=''))")
           
-          # Construct the database connection URL
-          # Using IPv4 pooler (port 6543) instead of direct connection to avoid IPv6 issues
-          # Format: pooler-v4.region.pooler.supabase.com
-          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:6543/postgres"
+          # Construct the database connection URL for Supabase pooler
+          # Pooler format: postgres:[password]@[region].pooler.supabase.com:6543/postgres?options=project%3D[project-ref]
+          DB_URL="postgresql://postgres:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:6543/postgres?options=project%3Djxlutaztoukwbbgtoulc"
           
-          echo "Connecting via IPv4 pooler: aws-0-us-east-1.pooler.supabase.com:6543"
+          echo "Connecting via pooler with project routing..."
           
           # Deploy using database URL
           supabase db push --db-url "$DB_URL" --include-all
