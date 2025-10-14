@@ -1,7 +1,7 @@
 -- Update Solutions Agent Instructions
 -- Generated on 2025-10-14T02:19:30.792Z
 -- Source: Agent Instructions/Solutions.md
--- Workflow trigger: Testing SUPABASE_DB_URL secret approach
+-- Workflow trigger: Testing with corrected SUPABASE_DB_URL format
 
 -- Update Solutions agent
 UPDATE agents 
