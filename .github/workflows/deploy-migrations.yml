@@ -54,14 +54,14 @@ jobs:
           # URL encode the password to handle special characters
           PASSWORD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${{ env.SUPABASE_DB_PASSWORD }}', safe=''))")
           
-          # Construct the database connection URL for Supabase pooler
-          # Pooler format: postgres:[password]@[region].pooler.supabase.com:6543/postgres?options=project%3D[project-ref]
-          DB_URL="postgresql://postgres:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:6543/postgres?options=project%3Djxlutaztoukwbbgtoulc"
+          # Construct the database connection URL for Supabase pooler with connection pooling mode
+          # Using transaction pooling mode which is required for migrations
+          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
           
-          echo "Connecting via pooler with project routing..."
+          echo "Connecting via pooler (transaction mode)..."
           
           # Deploy using database URL
-          supabase db push --db-url "$DB_URL" --include-all
+          supabase db push --db-url "${DB_URL}" --include-all
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
