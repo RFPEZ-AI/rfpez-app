@@ -33,7 +33,7 @@ jobs:
 
       - name: Link to Supabase project
         run: |
-          supabase link --project-ref $SUPABASE_PROJECT_REF
+          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
 
       - name: Check migration status
         id: check_migrations
@@ -55,7 +55,7 @@ jobs:
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "🚀 Deploying migrations to production..."
-          supabase db push --password $SUPABASE_DB_PASSWORD
+          supabase db push --password ${{ env.SUPABASE_DB_PASSWORD }}
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
@@ -83,7 +83,7 @@ jobs:
             echo "ℹ️ No migrations to deploy (database already up to date)"
           fi
           echo ""
-          echo "🌐 Project: $SUPABASE_PROJECT_REF"
+          echo "🌐 Project: ${{ env.SUPABASE_PROJECT_REF }}"
           echo "📅 Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
       - name: Notify on failure
