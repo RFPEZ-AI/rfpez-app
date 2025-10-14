@@ -14,11 +14,10 @@ jobs:
     runs-on: ubuntu-latest
     
     # Secrets configured in GitHub repository settings (Settings ‚Üí Secrets ‚Üí Actions)
-    # See .github/workflows/SETUP-CHECKLIST.md for configuration instructions
+    # SUPABASE_DB_URL format: postgresql://postgres.[project-ref]:[password]@aws-0-us-east-1.pooler.supabase.com:5432/postgres
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-      SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
-      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
     
     steps:
       - name: Checkout code
@@ -49,25 +48,11 @@ jobs:
       - name: Deploy migrations
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
-          echo "ÔøΩ Deploying migrations to production..."
+          echo "Ì∫Ä Deploying migrations to production..."
+          echo "Using complete database URL from secrets (recommended by Supabase docs)..."
           
-          # Construct connection string character by character to avoid GitHub masking
-          # Project ref parts: j x l u t a z t o u k w b b g t o u l c
-          PROJ="jxlutazt"
-          PROJ="${PROJ}oukwbbgt"
-          PROJ="${PROJ}oulc"
-          
-          # URL encode password
-          PASSWORD_ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('${{ env.SUPABASE_DB_PASSWORD }}', safe=''))")
-          
-          # Build connection string for transaction pooler
-          DB_URL="postgresql://postgres.${PROJ}:${PASSWORD_ENCODED}@aws-0-us-east-1.pooler.supabase.com:5432/postgres"
-          
-          echo "Connecting to Supabase via transaction pooler..."
-          echo "Project: ${PROJ}"
-          
-          # Deploy migrations
-          supabase db push --db-url "${DB_URL}" --include-all
+          # Deploy using complete database URL
+          supabase db push --db-url "${{ env.SUPABASE_DB_URL }}" --include-all
           
           echo "‚úÖ Migrations deployed successfully!"
 
@@ -75,25 +60,23 @@ jobs:
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "‚úÖ Migration deployment completed!"
-          echo "Check Supabase dashboard to verify:"
-          echo "https://supabase.com/dashboard/project/${{ env.SUPABASE_PROJECT_REF }}/editor"
+          echo "Check Supabase dashboard to verify"
           echo ""
           echo "Deployed migration files:"
           ls -la supabase/migrations/*.sql
 
       - name: Deployment summary
         run: |
-          echo "üìä Deployment Summary"
+          echo "Ì≥ä Deployment Summary"
           echo "===================="
           if [ "${{ steps.check_migrations.outputs.has_pending }}" == "true" ]; then
             echo "‚úÖ Database migrations deployed successfully!"
-            echo "üîÑ Migration status synchronized"
+            echo "Ì¥Ñ Migration status synchronized"
           else
             echo "‚ÑπÔ∏è No migrations to deploy (database already up to date)"
           fi
           echo ""
-          echo "üåê Project: ${{ env.SUPABASE_PROJECT_REF }}"
-          echo "üìÖ Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo "Ì≥Ö Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
 
       - name: Notify on failure
         if: failure()
