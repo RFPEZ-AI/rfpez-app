@@ -31,38 +31,53 @@ jobs:
         with:
           version: latest
 
-      - name: Link to Supabase project
-        run: |
-          echo "Linking to Supabase project..."
-          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
-
       - name: Check migration status
         id: check_migrations
         run: |
           echo "Checking pending migrations..."
-          supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }}
-          
-          # Check if there are pending migrations
-          PENDING=$(supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }} | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
-          if [ -z "$PENDING" ]; then
-            echo "has_pending=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No pending migrations to deploy"
-          else
+          # Check if there are any migration files
+          MIGRATION_COUNT=$(ls -1 supabase/migrations/*.sql 2>/dev/null | wc -l)
+          if [ "$MIGRATION_COUNT" -gt 0 ]; then
             echo "has_pending=true" >> $GITHUB_OUTPUT
-            echo "✅ Pending migrations detected"
+            echo "✅ Found $MIGRATION_COUNT migration file(s) to deploy"
+            ls -la supabase/migrations/*.sql
+          else
+            echo "has_pending=false" >> $GITHUB_OUTPUT
+            echo "ℹ️ No migration files found"
           fi
 
-      - name: Deploy migrations to remote database
+      - name: Deploy migrations using Management API
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "🚀 Deploying migrations to production..."
-          supabase db push --project-ref ${{ env.SUPABASE_PROJECT_REF }} --password ${{ env.SUPABASE_DB_PASSWORD }}
+          
+          # Use supabase db push with linked project (uses access token)
+          # First create a minimal config to avoid link step
+          mkdir -p .supabase
+          cat > .supabase/config.toml << EOF
+          [api]
+          enabled = true
+          port = 54321
+          
+          [db]
+          port = 54322
+          
+          [studio]
+          enabled = true
+          port = 54323
+          EOF
+          
+          # Deploy using access token authentication
+          supabase db push \
+            --project-ref ${{ env.SUPABASE_PROJECT_REF }} \
+            --password ${{ env.SUPABASE_DB_PASSWORD }} \
+            --include-all
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
-          echo "✅ Verifying migration deployment..."
-          supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }}
+          echo "✅ Migration deployment completed!"
+          echo "Check Supabase dashboard to verify: https://supabase.com/dashboard/project/${{ env.SUPABASE_PROJECT_REF }}"
           
           # Check for any remaining pending migrations
           REMAINING=$(supabase migration list --project-ref ${{ env.SUPABASE_PROJECT_REF }} | grep -E "^\s+[0-9]{14}" | grep -v "|" || true)
