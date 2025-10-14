@@ -26,12 +26,19 @@ postgresql://postgres:PASSWORD@db.jxlutaztoukwbbgtoulc.supabase.co:5432/postgres
 
 ## How to Get the Correct Connection String
 
-### Option 1: Supabase Dashboard
+### Option 1: Supabase Dashboard (New UI - 2025)
+1. Go to your project: https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc
+2. **Click the "Connect" button** at the top of the page (near the project name)
+3. In the connection modal, look for the connection string section
+4. **IMPORTANT**: Make sure "Use connection pooling" is **UNCHECKED** (we need direct connection)
+5. Copy the connection string that looks like: `postgresql://postgres:[YOUR-PASSWORD]@db.jxlutaztoukwbbgtoulc.supabase.co:5432/postgres`
+6. Replace `[YOUR-PASSWORD]` with your actual database password
+
+### Option 1B: Alternative Location (Settings Page)
 1. Go to: https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc/settings/database
-2. Scroll to "Connection string" section
-3. Select "URI" tab
-4. **Copy the connection string that starts with `postgresql://postgres:` (NOT `postgres.projectref:`)**
-5. Replace `[YOUR-PASSWORD]` with your actual database password
+2. Look for "Connection Info" or "Database Settings" section
+3. Find the **host** value: `db.jxlutaztoukwbbgtoulc.supabase.co`
+4. Construct manually (see Option 2 below)
 
 ### Option 2: Manual Construction
 Format: `postgresql://postgres:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres`
