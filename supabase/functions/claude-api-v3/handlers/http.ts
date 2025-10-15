@@ -136,6 +136,9 @@ async function streamWithRecursiveTools(
         
         pendingToolCalls.push(chunkData);
         
+        // 📊 Track tool invocation start
+        toolService.addToolInvocation('tool_start', chunkData.name as string, agentId, chunkData.input as Record<string, unknown>);
+        
         // Send tool invocation start event WITH AGENT ID
         const toolEvent = {
           type: 'tool_invocation',
@@ -175,6 +178,9 @@ async function streamWithRecursiveTools(
           function_name: toolCall.name,
           result: result
         });
+        
+        // 📊 Track tool invocation completion
+        toolService.addToolInvocation('tool_complete', toolCall.name, agentId, undefined, result);
         
         // Send tool completion event WITH AGENT ID
         const toolCompleteEvent = {
@@ -428,7 +434,7 @@ function handleStreamingResponse(
           userProfile: userProfile || undefined,
           sessionId: sessionId,
           isAnonymous: !userProfile
-        }, userMessageText, processInitialPrompt);
+        }, userMessageText);
         console.log('🎯 STREAMING: System prompt built:', systemPrompt ? 'Yes' : 'No');
         console.log('🎭 STREAMING: Using initial_prompt as system:', processInitialPrompt);
         console.log('🔄 STREAMING: Agent switch context detection:', userMessageText?.includes('User context from previous agent:') || false);
@@ -580,7 +586,14 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       willProcess: !!(processInitialPrompt && agentContext?.initial_prompt)
     });
     
-    if (processInitialPrompt && agentContext?.initial_prompt) {
+    if (processInitialPrompt) {
+      if (!agentContext || !agentContext.initial_prompt) {
+        // 🚨 CRITICAL: Never return raw instructions to client. Return a clear error instead.
+        return new Response(
+          JSON.stringify({ error: 'Agent context or initial_prompt missing. Cannot generate welcome message.' }),
+          { status: 400, headers: corsHeaders }
+        );
+      }
       console.log('🎭 Processing initial_prompt through Claude for agent:', agentContext.name);
       console.log('🎭 Initial prompt preview:', agentContext.initial_prompt.substring(0, 100) + '...');
       
@@ -600,15 +613,12 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       }
       
       // Create a clear, directive meta-prompt with explicit auth information
+      // 🔥 CRITICAL: Do NOT include initial_prompt in user message - it's already in system prompt
       effectiveUserMessage = `You must generate a welcome message right now. Do not ask for more information.
 
 ${authContext}
 
-Follow these instructions exactly to create the welcome message:
-
-${agentContext.initial_prompt}
-
-Generate the ${authStatus} user welcome message now.`;
+Based on your role as ${agentContext?.name || 'the active agent'}, generate an appropriate ${authStatus} user welcome message now. Use your instructions to guide the welcome message content.`;
       
       // Clear conversation history for welcome prompts
       effectiveConversationHistory = [];
@@ -629,22 +639,24 @@ Generate the ${authStatus} user welcome message now.`;
       sessionId: sessionId,
       isAnonymous: !loadedUserProfile,
       memoryContext: memoryContext || undefined
-    }, undefined, false); // Always use normal instructions as system prompt
+    }, undefined); // Always use normal instructions as system prompt
     console.log('🎯 POST REQUEST: System prompt built:', systemPrompt ? 'Yes' : 'No');
     console.log('🎭 POST REQUEST: Processing initial prompt:', processInitialPrompt);
     
     // Convert ClaudeService format to messages format
     let processedMessages: unknown[] = [];
     
-    if (messages && Array.isArray(messages)) {
+    // 🚨 CRITICAL: When processInitialPrompt is true, ALWAYS use effectiveUserMessage (never raw prompt)
+    if (processInitialPrompt) {
+      processedMessages = [
+        ...effectiveConversationHistory,
+        { role: 'user', content: effectiveUserMessage }
+      ];
+    } else if (messages && Array.isArray(messages)) {
       // Direct messages format (legacy)
       processedMessages = messages;
     } else if (effectiveUserMessage) {
-      // 🐛 DEBUG: Log what user message is being sent
-      console.log('🐛 DEBUG effectiveUserMessage:', effectiveUserMessage.substring(0, 200) + '...');
-      console.log('🐛 DEBUG processInitialPrompt flag:', processInitialPrompt);
-      
-      // ClaudeService format - convert to messages (use effective values for initial prompt processing)
+      // ClaudeService format - convert to messages
       processedMessages = [
         ...effectiveConversationHistory,
         { role: 'user', content: effectiveUserMessage }
@@ -921,14 +933,15 @@ Generate the ${authStatus} user welcome message now.`;
             
             const newTools = getToolDefinitions(newAgentContext.role, newAgentContext.access);
             
-            // 🎯 Build enhanced system prompt that includes agent instructions + initial_prompt
-            const enhancedSystemPrompt = hasInitialPrompt
-              ? `${newSystemPrompt}\n\n---\n\n🎯 AGENT ACTIVATION INSTRUCTIONS:\n${newAgentData.initial_prompt}\n\n---\n\nYou are now the active agent for this conversation. The user has been handed off to you from another agent. 
+            // 🎯 Use system prompt with agent's instructions (initial_prompt already in system)
+            // 🔥 CRITICAL: Do NOT expose initial_prompt in messages - it contains internal instructions
+            const enhancedSystemPrompt = `${newSystemPrompt}\n\n---\n\n🎯 AGENT ACTIVATION:\nYou are now the active agent for this conversation. The user has been handed off to you from another agent. 
 
-CRITICAL: You must respond immediately with a welcome message to the user. The conversation above shows the context, but you should now introduce yourself as the new agent and offer assistance. If your activation instructions above tell you to search memory or perform other actions, do so FIRST, then use the memory context to personalize your welcome message.
+CRITICAL: You must respond immediately with a welcome message to the user. The conversation above shows the context, but you should now introduce yourself as the new agent and offer assistance based on your role as ${newAgentData?.name}.
 
-Do NOT wait for a new user message - generate your introduction and welcome message right now based on the conversation context above.`
-              : newSystemPrompt;
+Follow your instructions to determine what actions to take (search memory, create RFP, etc.) and then generate your personalized welcome message.
+
+Do NOT wait for a new user message - generate your introduction and welcome message right now based on the conversation context above.`;
             
             console.log('🤖 Triggering new agent response:', {
               agent_name: newAgentData?.name,

@@ -13,6 +13,7 @@ export interface Message {
   artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
   metadata?: Record<string, unknown>; // Additional metadata for the message
   isToolProcessing?: boolean; // True if this is a tool processing indicator message
+  hidden?: boolean; // True if this message should not be displayed in the UI
 }
 
 export interface ArtifactReference {

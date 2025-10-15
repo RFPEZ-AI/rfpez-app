@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { IonButton, IonIcon, IonList, IonItem, IonLabel, IonCard, IonCardHeader, IonCardTitle, IonCardContent, IonSpinner, IonChip, IonModal, IonHeader, IonToolbar, IonTitle, IonContent, IonButtons } from '@ionic/react';
-import { eyeOutline, closeOutline, documentTextOutline, personOutline, cashOutline } from 'ionicons/icons';
+import { eyeOutline, closeOutline, documentTextOutline, personOutline, cashOutline, refreshOutline } from 'ionicons/icons';
 import { supabase } from '../supabaseClient';
 
 // Utility function to extract total cost from bid response
@@ -146,87 +146,126 @@ const BidView: React.FC<BidViewProps> = ({ currentRfpId, rfpName }) => {
   const [error, setError] = useState<string | null>(null);
   const [selectedBid, setSelectedBid] = useState<Bid | null>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  useEffect(() => {
-    const loadBids = async () => {
-      if (!currentRfpId) {
-        setError('No RFP selected');
-        setLoading(false);
+  const loadBids = async () => {
+    if (!currentRfpId) {
+      setError('No RFP selected');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setError(null);
+      
+      console.log('Loading bids for RFP ID:', currentRfpId);
+
+      // Use edge function to bypass PostgREST RLS issues
+      const { data: functionResponse, error: bidsError } = await supabase.functions.invoke('get-rfp-bids', {
+        body: { rfp_id: currentRfpId }
+      });
+
+      if (bidsError) {
+        console.error('Error calling get-rfp-bids function:', bidsError);
+        throw new Error(`Failed to load bids: ${bidsError.message}`);
+      }
+
+      if (functionResponse?.error) {
+        console.error('Error from get-rfp-bids function:', functionResponse.error);
+        throw new Error(`Failed to load bids: ${functionResponse.error}`);
+      }
+
+      const bidsData = functionResponse?.bids || [];
+
+      console.log('🔍 BidView - Raw bids data from edge function:', {
+        count: bidsData.length,
+        rfp_id: currentRfpId,
+        bids: bidsData.map((b: any) => ({ id: b.id, created_at: b.created_at, has_response: !!b.response }))
+      });
+
+      if (!bidsData || bidsData.length === 0) {
+        console.log('⚠️ No bids found for RFP:', currentRfpId);
+        setBids([]);
         return;
       }
 
-      try {
-        setLoading(true);
-        setError(null);
-        
-        console.log('Loading bids for RFP ID:', currentRfpId);
+      // Extract supplier info from response data instead of using supplier_id
+      // (supplier_id column has caching issues)
 
-        // Use edge function to bypass PostgREST RLS issues
-        const { data: functionResponse, error: bidsError } = await supabase.functions.invoke('get-rfp-bids', {
-          body: { rfp_id: currentRfpId }
-        });
-
-        if (bidsError) {
-          console.error('Error calling get-rfp-bids function:', bidsError);
-          throw new Error(`Failed to load bids: ${bidsError.message}`);
-        }
-
-        if (functionResponse?.error) {
-          console.error('Error from get-rfp-bids function:', functionResponse.error);
-          throw new Error(`Failed to load bids: ${functionResponse.error}`);
-        }
-
-        const bidsData = functionResponse?.bids || [];
-
-        if (!bidsData || bidsData.length === 0) {
-          setBids([]);
-          return;
-        }
-
-        // Extract supplier info from response data instead of using supplier_id
-        // (supplier_id column has caching issues)
-
-        // Transform the data to include supplier name from response
-        const transformedBids = bidsData.map((bidRow: any): Bid => {
-          // Extract supplier name from response - try multiple possible field names
-          let supplierName = 'Anonymous Supplier';
-          if (bidRow.response && typeof bidRow.response === 'object') {
-            const response = bidRow.response;
-            
-            // Try nested supplier_info first (new schema)
-            const supplierInfo = response.supplier_info as Record<string, unknown> | undefined;
-            if (supplierInfo && typeof supplierInfo.name === 'string') {
-              supplierName = supplierInfo.name;
-            }
-            // Try direct fields in response (legacy/current schema)
-            else if (typeof response.supplier_company_name === 'string') {
-              supplierName = response.supplier_company_name;
-            }
-            else if (typeof response.supplier_name === 'string') {
-              supplierName = response.supplier_name;
-            }
-            else if (typeof response.company_name === 'string') {
-              supplierName = response.company_name;
-            }
-          }
+      // Transform the data to include supplier name from response
+      const transformedBids = bidsData.map((bidRow: any): Bid => {
+        // Extract supplier name from response - try multiple possible field names
+        let supplierName = 'Anonymous Supplier';
+        if (bidRow.response && typeof bidRow.response === 'object') {
+          const response = bidRow.response;
           
-          return {
-            ...bidRow, // Include all original fields
-            supplier_name: supplierName
-          };
-        });
+          // Try nested supplier_info first (new schema)
+          const supplierInfo = response.supplier_info as Record<string, unknown> | undefined;
+          if (supplierInfo && typeof supplierInfo.name === 'string') {
+            supplierName = supplierInfo.name;
+          }
+          // Try direct fields in response (legacy/current schema)
+          else if (typeof response.supplier_company_name === 'string') {
+            supplierName = response.supplier_company_name;
+          }
+          else if (typeof response.supplier_name === 'string') {
+            supplierName = response.supplier_name;
+          }
+          else if (typeof response.company_name === 'string') {
+            supplierName = response.company_name;
+          }
+        }
+        
+        return {
+          ...bidRow, // Include all original fields
+          supplier_name: supplierName
+        };
+      });
 
-        console.log('Loaded bids successfully:', transformedBids.length);
-        setBids(transformedBids);
-      } catch (err) {
-        console.error('Error loading bids:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load bids');
-      } finally {
-        setLoading(false);
-      }
-    };
+      console.log('Loaded bids successfully:', transformedBids.length);
+      setBids(transformedBids);
+    } catch (err) {
+      console.error('Error loading bids:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load bids');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  // Manual refresh handler
+  const handleRefresh = async () => {
+    setRefreshing(true);
+    await loadBids();
+    setRefreshing(false);
+  };
+
+  useEffect(() => {
     loadBids();
+
+    // Set up Supabase realtime subscription for bid changes
+    const channel = supabase
+      .channel(`bids-${currentRfpId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'bids',
+          filter: `rfp_id=eq.${currentRfpId}`
+        },
+        (payload) => {
+          console.log('🔔 Bid change detected:', payload);
+          // Reload bids when any change occurs
+          loadBids();
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscription on unmount or when currentRfpId changes
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [currentRfpId]);
 
   const handleBidClick = (bid: Bid) => {
@@ -315,15 +354,35 @@ const BidView: React.FC<BidViewProps> = ({ currentRfpId, rfpName }) => {
         backgroundColor: 'var(--ion-color-light)',
         flexShrink: 0
       }}>
-        <h2 style={{ 
-          margin: '0 0 8px 0', 
-          color: 'var(--ion-color-primary)',
-          fontSize: '20px',
-          fontWeight: 'bold'
-        }}>
-          <IonIcon icon={documentTextOutline} style={{ marginRight: '8px' }} />
-          Bids for: {rfpName || `RFP #${currentRfpId}`}
-        </h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+          <h2 style={{ 
+            margin: 0, 
+            color: 'var(--ion-color-primary)',
+            fontSize: '20px',
+            fontWeight: 'bold'
+          }}>
+            <IonIcon icon={documentTextOutline} style={{ marginRight: '8px' }} />
+            Bids for: {rfpName || `RFP #${currentRfpId}`}
+          </h2>
+          <IonButton 
+            size="small" 
+            fill="outline"
+            onClick={handleRefresh}
+            disabled={refreshing || loading}
+          >
+            {refreshing ? (
+              <>
+                <IonSpinner name="crescent" style={{ width: '16px', height: '16px', marginRight: '4px' }} />
+                Refreshing...
+              </>
+            ) : (
+              <>
+                <IonIcon slot="start" icon={refreshOutline} />
+                Refresh
+              </>
+            )}
+          </IonButton>
+        </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
           <IonChip color="primary">
             <IonIcon icon={documentTextOutline} />

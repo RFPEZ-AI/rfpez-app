@@ -228,8 +228,9 @@ const Home: React.FC = () => {
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [bidCount, setBidCount] = useState(0);
 
-  // Fetch bid count when currentRfp changes
+  // Fetch bid count and subscribe to real-time bid changes for currentRfp
   useEffect(() => {
+    let channel: any = null;
     const fetchBidCount = async () => {
       if (currentRfp?.id) {
         console.log('🔢 Fetching bid count for RFP:', currentRfp.id, currentRfp.name);
@@ -248,7 +249,34 @@ const Home: React.FC = () => {
     };
 
     fetchBidCount();
-  }, [currentRfp]);
+
+    // Set up Supabase realtime subscription for bid changes
+    if (currentRfp?.id && supabase) {
+      channel = supabase
+        .channel(`bids-count-${currentRfp.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'bids',
+            filter: `rfp_id=eq.${currentRfp.id}`
+          },
+          (payload: any) => {
+            console.log('🔔 Bid count change detected:', payload);
+            fetchBidCount();
+          }
+        )
+        .subscribe();
+    }
+
+    // Cleanup subscription on unmount or when currentRfp changes
+    return () => {
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [currentRfp, supabase]);
 
   const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling(setGlobalRFPContext);
 
@@ -1161,7 +1189,29 @@ const Home: React.FC = () => {
             currentSessionIdRef.current = newSessionId;
             console.log('📌 Session ID ref updated:', newSessionId);
             
-            // Clear pending welcome message since session is now created
+            // CRITICAL FIX: Save the pending welcome message to the database before clearing it
+            if (pendingWelcomeMessage && userId) {
+              console.log('💾 Saving pending welcome message to database for session:', newSessionId);
+              try {
+                await DatabaseService.addMessage(
+                  newSessionId,
+                  userId,
+                  pendingWelcomeMessage.content,
+                  'assistant',
+                  currentAgent?.agent_id,
+                  pendingWelcomeMessage.agentName || currentAgent?.agent_name || 'Assistant',
+                  undefined, // metadata
+                  undefined, // aiMetadata
+                  undefined, // artifactRefs
+                  true // hidden
+                );
+                console.log('✅ Welcome message saved to database');
+              } catch (error) {
+                console.error('❌ Failed to save welcome message to database:', error);
+              }
+            }
+            
+            // Clear pending welcome message since session is now created and saved
             setPendingWelcomeMessage(null);
             console.log('✨ Pending welcome message cleared - session now active');
             

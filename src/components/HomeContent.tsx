@@ -78,8 +78,6 @@ const HomeContent: React.FC<HomeContentProps> = ({
   forceSessionHistoryCollapsed = false,
   onSessionHistoryToggle,
   // Tool transparency props
-  toolInvocations = [],
-  isToolExecutionActive = false,
   // Session loading props
   forceScrollToBottom = false,
   isSessionLoading = false
@@ -154,8 +152,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
             onArtifactSelect={onArtifactSelect}
             currentAgent={currentAgent}
             onCancelRequest={onCancelRequest}
-            toolInvocations={toolInvocations}
-            isToolExecutionActive={isToolExecutionActive}
+            // toolInvocations and isToolExecutionActive removed (no longer in SessionDialog)
             forceScrollToBottom={forceScrollToBottom}
             isSessionLoading={isSessionLoading}
           />

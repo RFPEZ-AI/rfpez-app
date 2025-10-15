@@ -329,16 +329,17 @@ export class DatabaseService {
 
   // Message operations
   static async addMessage(
-    sessionId: string, 
-    supabaseUserId: string,
-    content: string, 
-    role: 'user' | 'assistant' | 'system',
-    agentId?: string,
-    agentName?: string,
-    metadata?: Record<string, unknown>,
-    aiMetadata?: Record<string, unknown>,
-    artifactRefs?: ArtifactReference[]
-  ): Promise<Message | null> {
+      sessionId: string, 
+      supabaseUserId: string,
+      content: string, 
+      role: 'user' | 'assistant' | 'system',
+      agentId?: string,
+      agentName?: string,
+      metadata?: Record<string, unknown>,
+      aiMetadata?: Record<string, unknown>,
+      artifactRefs?: ArtifactReference[],
+      hidden?: boolean
+    ): Promise<Message | null> {
     console.log('DatabaseService.addMessage called with:', {
       sessionId,
       supabaseUserId,
@@ -391,7 +392,8 @@ export class DatabaseService {
           ...(metadata || {}),
           artifactRefs: artifactRefs || []
         },
-        ai_metadata: aiMetadata || {}
+        ai_metadata: aiMetadata || {},
+        hidden: hidden === true ? true : false
       })
       .select()
       .single();

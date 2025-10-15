@@ -180,6 +180,8 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
 
     // Handle number fields
     if (type === 'number' || type === 'integer') {
+      // Use text input with inputmode for better decimal support across browsers
+      // This allows decimal points and proper keyboard on mobile
       return (
         <IonItem key={fieldName} style={{ marginBottom: '12px' }}>
           <IonLabel position="stacked">
@@ -188,10 +190,18 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
             {description && <p style={{ fontSize: '0.85em', color: '#666', marginTop: '4px' }}>{description}</p>}
           </IonLabel>
           <IonInput
-            type="number"
+            type="text"
+            inputmode="decimal"
             value={value as number || ''}
             placeholder={`Enter ${title}`}
-            onIonChange={(e) => handleFieldChange(fieldName, parseFloat(e.detail.value as string))}
+            onIonChange={(e) => {
+              const val = e.detail.value as string;
+              // Allow partial input like "123." for typing convenience
+              if (val === '' || val === '-' || val.match(/^-?\d*\.?\d*$/)) {
+                const numVal = parseFloat(val);
+                handleFieldChange(fieldName, isNaN(numVal) ? val : numVal);
+              }
+            }}
           />
         </IonItem>
       );

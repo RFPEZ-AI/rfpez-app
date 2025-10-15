@@ -723,16 +723,8 @@ export class ClaudeService {
     } catch (error) {
       console.error('❌ Error processing initial prompt:', error);
       console.error('❌ Error details:', JSON.stringify(error, null, 2));
-      
-      // Check if this is a session expiration error
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      if (errorMessage.includes('SESSION_EXPIRED') || errorMessage.includes('AUTHENTICATION_REQUIRED')) {
-        // Return a clear message to the user about session expiration
-        return `⚠️ **Session Expired**\n\nYour session has expired. Please **logout and login again** to continue using EZRFP.APP.\n\nThis usually happens when your authentication token becomes invalid. A fresh login will restore full functionality.`;
-      }
-      
-      // Fallback to static initial prompt for other errors
-      return agent.initial_prompt || `Hello! I'm ${agent.name}. How can I assist you today?`;
+      // Never fall back to static initial_prompt. Always show error to user.
+      throw error;
     }
   }
 

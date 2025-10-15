@@ -20,6 +20,7 @@ interface Message {
   artifactRefs?: ArtifactReference[]; // References to artifacts mentioned in this message
   isToolProcessing?: boolean; // True if this is a tool processing indicator message
   metadata?: Record<string, unknown>; // Additional metadata including tool invocations
+  hidden?: boolean; // True if this message should not be displayed in the UI
 }
 
 interface SessionDialogProps {
@@ -32,8 +33,8 @@ interface SessionDialogProps {
   currentAgent?: { agent_name: string } | null; // Current agent for dynamic thinking message
   onCancelRequest?: () => void; // Function to cancel the current request
   // Tool execution props
-  toolInvocations?: ToolInvocationEvent[];
-  isToolExecutionActive?: boolean;
+  // toolInvocations?: ToolInvocationEvent[];
+  // isToolExecutionActive?: boolean;
   // Session loading props
   forceScrollToBottom?: boolean; // Force scroll to bottom when session is loaded
   isSessionLoading?: boolean; // Force focus on input when session is loading/refreshing
@@ -49,8 +50,6 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   currentAgent,
   onCancelRequest,
   // Tool execution props
-  toolInvocations = [],
-  isToolExecutionActive = false,
   // Session loading props
   forceScrollToBottom = false,
   isSessionLoading = false
@@ -153,7 +152,7 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
           scrollBehavior: 'smooth'
         }}
       >
-        {messages.map((message) => (
+  {messages.filter((message) => !message.hidden).map((message) => (
             <IonCard 
               key={message.id}
               style={{

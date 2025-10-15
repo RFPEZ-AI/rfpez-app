@@ -294,12 +294,44 @@ export class ToolExecutionService {
   private supabase: unknown;
   private userId: string;
   private userMessage?: string;
+  private toolInvocations: Array<{
+    type: 'tool_start' | 'tool_complete';
+    toolName: string;
+    parameters?: Record<string, unknown>;
+    result?: unknown;
+    agentId?: string;
+    timestamp: string;
+  }> = [];
 
   // @ts-ignore - Supabase client type compatibility
   constructor(supabase: unknown, userId: string, userMessage?: string) {
     this.supabase = supabase;
     this.userId = userId;
     this.userMessage = userMessage;
+  }
+
+  // Add tool invocation to tracking
+  addToolInvocation(type: 'tool_start' | 'tool_complete', toolName: string, agentId?: string, parameters?: Record<string, unknown>, result?: unknown) {
+    this.toolInvocations.push({
+      type,
+      toolName,
+      parameters,
+      result,
+      agentId,
+      timestamp: new Date().toISOString()
+    });
+    console.log(`📊 Tracked ${type} for ${toolName}. Total tracked: ${this.toolInvocations.length}`);
+  }
+
+  // Get all tracked tool invocations
+  getToolInvocations() {
+    return this.toolInvocations;
+  }
+
+  // Clear tool invocations (useful for new message contexts)
+  clearToolInvocations() {
+    console.log(`🧹 Clearing ${this.toolInvocations.length} tracked tool invocations`);
+    this.toolInvocations = [];
   }
 
   // Execute a tool call and return the result
@@ -378,13 +410,31 @@ export class ToolExecutionService {
             };
           }
           
+          // 🎯 INJECT TOOL INVOCATIONS into metadata for AI assistant messages
+          const inputData = input as Record<string, unknown>;
+          const existingMetadata = (inputData.metadata as Record<string, unknown>) || {};
+          
+          // Only inject tool invocations for assistant messages
+          if (inputData.sender === 'assistant' && this.toolInvocations.length > 0) {
+            console.log(`📊 Injecting ${this.toolInvocations.length} tool invocations into message metadata`);
+            existingMetadata.toolInvocations = this.toolInvocations;
+            inputData.metadata = existingMetadata;
+          }
+          
           const { storeMessage } = await import('../tools/database.ts');
           // @ts-ignore - Database function type compatibility
-          return await storeMessage(this.supabase, {
-            ...input,
+          const result = await storeMessage(this.supabase, {
+            ...inputData,
             userId: this.userId,
             sessionId: sessionId
           });
+          
+          // Clear tool invocations after storing to prepare for next message
+          if (inputData.sender === 'assistant') {
+            this.clearToolInvocations();
+          }
+          
+          return result;
         }
 
         case 'search_messages': {

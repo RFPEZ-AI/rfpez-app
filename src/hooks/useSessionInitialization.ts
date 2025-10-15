@@ -123,7 +123,16 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         }
       });
     } else if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length > 0) {
-      console.log('🔄 Sessions available - skipping default agent load, waiting for session restoration...');
+      console.log('🔄 Sessions available - showing activation message while waiting for session restoration...');
+      
+      // Show loading message immediately while session restoration is in progress
+      setMessages([{
+        id: 'agent-loading',
+        content: '🤖 Activating Solutions agent...',
+        isUser: false,
+        timestamp: new Date(),
+        agentName: 'System'
+      }]);
     }
     
     // Check if we have basic authentication (session and user) for loading sessions

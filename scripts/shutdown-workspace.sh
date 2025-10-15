@@ -42,6 +42,37 @@ safe_kill "npm.*start:api" "NPM API Server"
 # Stop Jest test runners
 safe_kill "jest.*--watch" "Jest Test Runners"
 
+# Backup Supabase database before shutdown
+echo "💾 Creating Supabase database backup..."
+if command -v docker >/dev/null 2>&1; then
+    # Create backup directory if it doesn't exist
+    mkdir -p database/backups
+    
+    # Check if Supabase database container is running
+    if docker ps --filter name=supabase_db_rfpez-app-local --format "{{.Names}}" | grep -q supabase_db_rfpez-app-local; then
+        BACKUP_FILE="database/backups/local-supabase-backup-$(date +%Y%m%d-%H%M%S).sql"
+        echo "📁 Backing up to: $BACKUP_FILE"
+        
+        docker exec supabase_db_rfpez-app-local pg_dump -U postgres postgres --clean --if-exists --create > "$BACKUP_FILE" 2>/dev/null
+        
+        if [ $? -eq 0 ] && [ -s "$BACKUP_FILE" ]; then
+            BACKUP_SIZE=$(du -h "$BACKUP_FILE" | cut -f1)
+            echo "✅ Backup completed successfully ($BACKUP_SIZE)"
+            
+            # Keep only last 5 backups
+            echo "🧹 Cleaning up old backups (keeping last 5)..."
+            ls -t database/backups/local-supabase-backup-*.sql 2>/dev/null | tail -n +6 | xargs -r rm
+        else
+            echo "⚠️  Backup failed or empty - continuing with shutdown"
+            rm -f "$BACKUP_FILE" 2>/dev/null
+        fi
+    else
+        echo "⏸️  Supabase database container not running - skipping backup"
+    fi
+else
+    echo "⚠️  Docker not found - skipping backup"
+fi
+
 # Stop Supabase local stack
 echo "🛑 Stopping Supabase local stack..."
 if command -v supabase >/dev/null 2>&1; then

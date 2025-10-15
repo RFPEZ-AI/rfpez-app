@@ -2261,6 +2261,62 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
     const deliveryDate = formData.delivery_date || formData.deliveryDate || formData.delivery;
     const companyName = formData.company_name || formData.companyName || formData.supplier_name;
 
+    // Create or update a "Bids" artifact to trigger bid view refresh
+    try {
+      // Get RFP name for artifact
+      const { data: rfpData } = await supabase
+        .from('rfps')
+        .select('name')
+        .eq('id', data.rfp_id)
+        .single();
+      
+      const rfpName = rfpData && typeof rfpData === 'object' && 'name' in rfpData 
+        ? String(rfpData.name) 
+        : 'RFP';
+
+      // Check if a bid view artifact already exists for this session and RFP
+      const { data: existingArtifacts } = await supabase
+        .from('artifacts')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('type', 'bid_view')
+        .eq('rfp_id', data.rfp_id)
+        .limit(1);
+
+      if (existingArtifacts && Array.isArray(existingArtifacts) && existingArtifacts.length > 0) {
+        // Update existing artifact's updated_at to trigger refresh
+        const firstArtifact = existingArtifacts[0] as Record<string, unknown>;
+        const artifactId = firstArtifact.id;
+        await supabase
+          .from('artifacts')
+          .update({ updated_at: new Date().toISOString() })
+          .eq('id', artifactId);
+        
+        console.log('✅ Updated existing bid view artifact:', artifactId);
+      } else {
+        // Create new bid view artifact
+        const { error: artifactError } = await supabase
+          .from('artifacts')
+          .insert({
+            name: `Bids for ${rfpName}`,
+            type: 'bid_view',
+            content: rfpName,
+            session_id: sessionId,
+            user_id: userId,
+            rfp_id: data.rfp_id,
+            size: '0 KB',
+            mime_type: 'application/x-bid-view'
+          });
+
+        if (!artifactError) {
+          console.log('✅ Created new bid view artifact for RFP:', data.rfp_id);
+        }
+      }
+    } catch (artifactError) {
+      console.warn('⚠️ Failed to create/update bid view artifact:', artifactError);
+      // Don't fail the bid submission if artifact creation fails
+    }
+
     return {
       success: true,
       submission_id: submissionId,

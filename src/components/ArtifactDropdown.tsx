@@ -142,8 +142,21 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
         side="bottom"
         alignment="start"
         data-testid="artifact-dropdown-popover"
+        style={{
+          '--width': 'auto',
+          '--min-width': 'min(600px, 90vw)',
+          '--max-width': 'min(800px, 95vw)'
+        }}
       >
-        <IonList style={{ minWidth: '400px', maxWidth: '600px', width: 'max-content' }}>
+        <IonList style={{ 
+          minWidth: 'min(600px, 90vw)', 
+          maxWidth: 'min(800px, 95vw)', 
+          width: 'max-content',
+          maxHeight: '70vh',
+          overflowY: 'auto',
+          margin: 0,
+          padding: 0
+        }}>
           {(() => {
             console.log('🔍 ARTIFACT DROPDOWN - Artifacts received:', {
               total: artifacts.length,
@@ -179,7 +192,8 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
                 alignItems: 'center', 
                 gap: '12px',
                 width: '100%',
-                minWidth: '350px'
+                minWidth: 'min(500px, 85vw)',
+                padding: '8px 0'
               }}>
                 <IonIcon 
                   icon={getTypeIcon(artifact.type)} 
