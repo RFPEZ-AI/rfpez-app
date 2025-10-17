@@ -31,8 +31,8 @@ DROP POLICY IF EXISTS "user_profiles_insert_optimized" ON public.user_profiles;
 DROP POLICY IF EXISTS "user_profiles_select_optimized" ON public.user_profiles;
 DROP POLICY IF EXISTS "user_profiles_update_optimized" ON public.user_profiles;
 
-CREATE POLICY "Users can read own profile" ON public.user_profiles 
-  FOR SELECT USING (supabase_user_id = auth.uid());
+-- CREATE POLICY "Users can read own profile" ON public.user_profiles 
+--   FOR SELECT USING (supabase_user_id = auth.uid());
 CREATE POLICY "Users can insert own profile" ON public.user_profiles 
   FOR INSERT WITH CHECK (supabase_user_id = auth.uid());
 CREATE POLICY "Users can update own profile" ON public.user_profiles 
@@ -41,6 +41,7 @@ CREATE POLICY "Users can delete own profile" ON public.user_profiles
   FOR DELETE USING (supabase_user_id = auth.uid());
 
 -- 5. set_user_current_session function
+DROP FUNCTION IF EXISTS set_user_current_session(UUID, UUID);
 CREATE OR REPLACE FUNCTION set_user_current_session(
   user_uuid UUID,
   session_uuid UUID

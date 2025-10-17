@@ -92,55 +92,56 @@ function parseAgentMarkdown(content) {
   return metadata;
 }
 
-function escapeSQL(text) {
-  // Use dollar-quoted strings for PostgreSQL to handle complex content
-  // Find a delimiter that doesn't exist in the text
-  let delimiter = 'agent_content';
+// Generate a unique dollar-quoting delimiter that does not appear in any field
+function getUniqueDelimiter(fields, base) {
+  let delimiter = base;
   let counter = 1;
-  
-  while (text.includes(`$${delimiter}$`)) {
-    delimiter = `agent_content${counter}`;
+  const allText = fields.filter(Boolean).join('');
+  while (allText.includes(`$${delimiter}$`)) {
+    delimiter = `${base}${counter}`;
     counter++;
   }
-  
+  return delimiter;
+}
+
+function escapeSQL(text, delimiter) {
   return `$${delimiter}$${text}$${delimiter}$`;
 }
+
 
 function generateMigration(metadata, agentName) {
   // Generate timestamp in Supabase format: YYYYMMDDHHmmss (14 digits, no separators)
   const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
   const agentSlug = agentName.toLowerCase().replace(/\s+/g, '_');
-  
+  // Unique delimiter: agent name + timestamp, sanitized
+  const baseDelimiter = `${agentSlug}_${timestamp}`.replace(/[^a-zA-Z0-9_]/g, '');
+  const delimiter = getUniqueDelimiter([
+    metadata.instructions,
+    metadata.initial_prompt,
+    metadata.description
+  ], baseDelimiter);
   const updateFields = [];
-  
   if (metadata.instructions) {
-    updateFields.push(`  instructions = ${escapeSQL(metadata.instructions)}`);
+    updateFields.push(`  instructions = ${escapeSQL(metadata.instructions, delimiter)}`);
   }
-  
   if (metadata.initial_prompt) {
-    updateFields.push(`  initial_prompt = ${escapeSQL(metadata.initial_prompt)}`);
+    updateFields.push(`  initial_prompt = ${escapeSQL(metadata.initial_prompt, delimiter)}`);
   }
-  
   if (metadata.description) {
-    updateFields.push(`  description = ${escapeSQL(metadata.description)}`);
+    updateFields.push(`  description = ${escapeSQL(metadata.description, delimiter)}`);
   }
-  
   if (metadata.role) {
     updateFields.push(`  role = '${metadata.role}'`);
   }
-  
   if (metadata.avatar_url) {
     updateFields.push(`  avatar_url = '${metadata.avatar_url}'`);
   }
-  
   if (metadata.allowed_tools && metadata.allowed_tools.length > 0) {
     // Store as PostgreSQL array
     const toolsArray = `ARRAY[${metadata.allowed_tools.map(t => `'${t}'`).join(', ')}]`;
     updateFields.push(`  access = ${toolsArray}::text[]`);
   }
-  
   updateFields.push(`  updated_at = NOW()`);
-  
   const sql = `-- Update ${metadata.name} Agent Instructions
 -- Generated on ${new Date().toISOString()}
 -- Source: Agent Instructions/${agentName}.md
@@ -162,7 +163,6 @@ SELECT
 FROM agents 
 WHERE id = '${metadata.id}';
 `;
-  
   return { sql, timestamp, agentSlug };
 }
 

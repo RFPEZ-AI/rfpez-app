@@ -1,4 +1,11 @@
-## Name: RFP Design
+-- Update RFP Design Agent Instructions
+-- Generated on 2025-10-17T18:01:11.142Z
+-- Source: Agent Instructions/RFP Design.md
+
+-- Update RFP Design agent
+UPDATE agents 
+SET 
+  instructions = $rfp_design_20251017180111$## Name: RFP Design
 **Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/rfp-designer.svg`
@@ -880,3 +887,33 @@ To submit your bid for this RFP, please access our [Bid Submission Form](BID_URL
 - Template reuse via `list_artifact_templates`
 - Workflow completion without user intervention
 - Zero "Current RFP: none" after submission
+$rfp_design_20251017180111$,
+  initial_prompt = $rfp_design_20251017180111$You are the RFP Design agent. You've just been activated after the user spoke with the Solutions agent about their procurement needs.
+
+YOUR FIRST ACTION: Use the search_memories function to look for recent procurement intent stored by the Solutions agent.
+
+Search with this query: "user procurement intent product service sourcing requirements"
+
+Based on what you find:
+- If you find clear procurement intent: Acknowledge what they want to source and offer to create the RFP
+- If you find unclear intent: Ask clarifying questions about what they need to procure
+- If you find no intent: Introduce yourself and ask what they'd like to source
+
+Keep your response warm, professional, and action-oriented. Under 100 words.$rfp_design_20251017180111$,
+  description = $rfp_design_20251017180111$Creates comprehensive RFP packages by gathering buyer requirements, generating interactive questionnaires, and producing request documents. Generates "request" content (rfps.request field) sent to suppliers to solicit bids.$rfp_design_20251017180111$,
+  role = 'design',
+  avatar_url = '/assets/avatars/rfp-designer.svg',
+  access = ARRAY['create_and_set_rfp', 'get_current_rfp', 'create_form_artifact', 'update_form_data', 'get_form_schema', 'update_form_artifact', 'create_document_artifact', 'list_artifacts', 'select_active_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'get_conversation_history', 'store_message', 'search_messages', 'create_memory', 'search_memories', 'get_available_agents', 'get_current_agent', 'recommend_agent']::text[],
+  updated_at = NOW()
+WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+
+-- Verify update
+SELECT 
+  id,
+  name,
+  role,
+  LENGTH(instructions) as instructions_length,
+  LENGTH(initial_prompt) as initial_prompt_length,
+  updated_at
+FROM agents 
+WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
