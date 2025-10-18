@@ -1,0 +1,6 @@
+version: '3.8'
+services:
+  rest:
+    environment:
+      # Ensure PostgREST validates the JWT 'aud' claim from GoTrue (authenticated)
+      PGRST_JWT_AUD: "authenticated"
