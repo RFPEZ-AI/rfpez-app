@@ -2586,15 +2586,31 @@ export async function createMemory(
     const userProfileId = userProfile.id;
     console.log('✅ Found user_profile.id:', userProfileId, 'for supabase_user_id:', userId);
 
+    // Get the user's account_id from account_users
+    const { data: accountUser, error: accountError } = await supabase
+      .from('account_users')
+      .select('account_id')
+      .eq('user_id', userProfileId)
+      .single();
+
+    if (accountError || !accountUser) {
+      console.error('❌ Error finding account for user:', accountError);
+      throw new Error(`Account not found for user_id: ${userProfileId}`);
+    }
+
+    // @ts-ignore - We know accountUser has an account_id property
+    const accountId = accountUser.account_id;
+    console.log('✅ Found account_id:', accountId, 'for user_profile.id:', userProfileId);
+
     // Generate placeholder embedding (will be replaced with real embeddings later)
     const embedding = generatePlaceholderEmbedding();
 
-    // Insert memory record using user_profiles.id (not supabase auth user id)
+    // Insert memory record using account-based schema
     const { data: memory, error: memoryError } = await supabase
-      .from('agent_memories')
+      .from('account_memories')
       .insert({
-        user_id: userProfileId, // Use user_profiles.id, not supabase auth id
-        agent_id: agentId,
+        account_id: accountId,     // Account-based: shared across account users
+        user_id: userProfileId,    // Track which user created the memory
         session_id: sessionId,
         content: params.content,
         memory_type: params.memory_type,
@@ -2666,6 +2682,37 @@ export async function searchMemories(
   console.log('🔍 Searching memories:', { ...params, userId, agentId });
 
   try {
+    // Get user_profiles.id from supabase auth user id
+    const { data: userProfile, error: profileError } = await supabase
+      .from('user_profiles')
+      .select('id')
+      .eq('supabase_user_id', userId)
+      .single();
+
+    if (profileError || !userProfile) {
+      console.error('❌ Error finding user profile:', profileError);
+      throw new Error(`User profile not found for supabase_user_id: ${userId}`);
+    }
+
+    // @ts-ignore - We know userProfile has an id property
+    const userProfileId = userProfile.id;
+
+    // Get the user's account_id from account_users
+    const { data: accountUser, error: accountError } = await supabase
+      .from('account_users')
+      .select('account_id')
+      .eq('user_id', userProfileId)
+      .single();
+
+    if (accountError || !accountUser) {
+      console.error('❌ Error finding account for user:', accountError);
+      throw new Error(`Account not found for user_id: ${userProfileId}`);
+    }
+
+    // @ts-ignore - We know accountUser has an account_id property
+    const accountId = accountUser.account_id;
+    console.log('✅ Searching memories for account_id:', accountId);
+
     // Parse memory types from comma-separated string
     const memoryTypes = params.memory_types 
       ? params.memory_types.split(',').map(t => t.trim())
@@ -2676,7 +2723,7 @@ export async function searchMemories(
     // Generate placeholder embedding for query (will be replaced with real embeddings later)
     const queryEmbedding = generatePlaceholderEmbedding();
 
-    // Call database search function
+    // Call database search function with account-based parameters
     const rpcClient = supabase as unknown as { 
       rpc: (name: string, params: Record<string, unknown>) => Promise<{ 
         data: Array<{
@@ -2691,13 +2738,13 @@ export async function searchMemories(
       }> 
     };
 
-    const { data: memories, error } = await rpcClient.rpc('search_agent_memories', {
-      query_user_id: userId,
-      query_agent_id: agentId,
-      query_embedding: queryEmbedding,
-      memory_type_filter: memoryTypes || [],
-      match_threshold: 0.5, // Lower threshold since using placeholder embeddings
-      match_count: limit
+    const { data: memories, error } = await rpcClient.rpc('search_account_memories', {
+      p_account_id: accountId,
+      p_user_id: userProfileId,
+      p_query_embedding: queryEmbedding,
+      p_memory_types: memoryTypes || null,
+      p_limit: limit,
+      p_similarity_threshold: 0.5 // Lower threshold since using placeholder embeddings
     });
 
     if (error) {

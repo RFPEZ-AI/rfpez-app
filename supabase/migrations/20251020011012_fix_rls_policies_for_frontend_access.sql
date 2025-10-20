@@ -85,9 +85,6 @@ DROP POLICY IF EXISTS select_artifacts ON public.artifacts;
 
 CREATE POLICY select_artifacts ON public.artifacts FOR SELECT
 USING (
-  -- Public artifacts visible to everyone
-  is_public = TRUE
-  OR
   -- Authenticated users can see artifacts in their accounts
   (
     auth.uid() IS NOT NULL

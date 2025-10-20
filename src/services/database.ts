@@ -377,12 +377,28 @@ export class DatabaseService {
     const nextOrder = (count || 0) + 1;
     console.log('Next message order:', nextOrder);
 
+    // Get the session's account_id
+    console.log('Getting session account_id...');
+    const { data: sessionData, error: sessionError } = await supabase
+      .from('sessions')
+      .select('account_id')
+      .eq('id', sessionId)
+      .single();
+
+    console.log('Session data:', { sessionData, sessionError });
+
+    if (sessionError || !sessionData?.account_id) {
+      console.error('Session not found or missing account_id:', sessionId);
+      return null;
+    }
+
     console.log('Attempting to insert message into database...');
     const { data, error } = await supabase
       .from('messages')
       .insert({
         session_id: sessionId,
         user_id: userProfile.id,
+        account_id: sessionData.account_id,
         content,
         role,
         message_order: nextOrder,

@@ -1502,8 +1502,8 @@ export const useMessageHandling = (
             // 2. This message doesn't already have tools attached
             const shouldAttachTools = currentAgentTools.length > 0 && !alreadyHasTools;
             
+            // Build user-facing metadata (not AI response metadata)
             const metadataWithTools = {
-              ...claudeResponse.metadata,
               ...(shouldAttachTools ? { toolInvocations: currentAgentTools } : {})
             };
             
@@ -1541,8 +1541,8 @@ export const useMessageHandling = (
               'assistant',
               agentForResponse?.agent_id || 'unknown',
               agentForResponse?.agent_name || 'AI Assistant',
-              {},
-              metadataWithTools, // Use metadata with tools attached
+              metadataWithTools, // Use metadata with tools attached (correct parameter position)
+              claudeResponse.metadata, // AI metadata from Claude response
               artifactRefs // Pass the artifact references
             );
             console.log('AI message saved:', savedAiMessage);

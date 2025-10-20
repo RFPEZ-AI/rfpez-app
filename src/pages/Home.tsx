@@ -227,6 +227,7 @@ const Home: React.FC = () => {
   const [forceScrollToBottom, setForceScrollToBottom] = useState(false);
   const [isSessionLoading, setIsSessionLoading] = useState(false);
   const [bidCount, setBidCount] = useState(0);
+  const [rfpArtifactCount, setRfpArtifactCount] = useState(0);
 
   // Fetch bid count and subscribe to real-time bid changes for currentRfp
   useEffect(() => {
@@ -265,6 +266,57 @@ const Home: React.FC = () => {
           (payload: any) => {
             console.log('🔔 Bid count change detected:', payload);
             fetchBidCount();
+          }
+        )
+        .subscribe();
+    }
+
+    // Cleanup subscription on unmount or when currentRfp changes
+    return () => {
+      if (channel && supabase) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [currentRfp, supabase]);
+
+  // Fetch artifact count for current RFP and subscribe to real-time changes
+  useEffect(() => {
+    let channel: any = null;
+    const fetchRfpArtifactCount = async () => {
+      if (currentRfp?.id) {
+        console.log('📄 Fetching artifact count for RFP:', currentRfp.id, currentRfp.name);
+        try {
+          const rfpArtifacts = await DatabaseService.getRFPArtifacts(parseInt(currentRfp.id.toString()));
+          const count = Array.isArray(rfpArtifacts) ? rfpArtifacts.length : 0;
+          console.log('✅ RFP artifact count fetched:', count);
+          setRfpArtifactCount(count);
+        } catch (error) {
+          console.error('❌ Failed to fetch RFP artifact count:', error);
+          setRfpArtifactCount(0);
+        }
+      } else {
+        console.log('ℹ️ No current RFP, setting artifact count to 0');
+        setRfpArtifactCount(0);
+      }
+    };
+
+    fetchRfpArtifactCount();
+
+    // Set up Supabase realtime subscription for rfp_artifacts changes
+    if (currentRfp?.id && supabase) {
+      channel = supabase
+        .channel(`rfp-artifacts-count-${currentRfp.id}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'rfp_artifacts',
+            filter: `rfp_id=eq.${currentRfp.id}`
+          },
+          (payload: any) => {
+            console.log('🔔 RFP artifact count change detected:', payload);
+            fetchRfpArtifactCount();
           }
         )
         .subscribe();
@@ -1874,7 +1926,7 @@ const Home: React.FC = () => {
         onMainMenuSelect={handleMainMenuSelect}
         artifactWindowOpen={artifactWindowState.isOpen}
         onToggleArtifactWindow={artifactWindowState.toggleWindow}
-        artifactCount={artifacts.length}
+        artifactCount={rfpArtifactCount}
       />
 
       <IonContent fullscreen scrollY={false} style={{ 
