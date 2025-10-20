@@ -10,10 +10,33 @@ echo "============================================="
 # Ensure we're in the correct directory
 cd "$(dirname "$0")"
 
-# Set test environment variables
+## Set test environment variables (prefer local Supabase when available)
 export CLAUDE_API_KEY="test-api-key"
-export SUPABASE_URL="https://test.supabase.co"
-export SUPABASE_SERVICE_ROLE_KEY="test-service-role-key"
+
+# Prefer local Supabase (127.0.0.1:54321) for tests to avoid DNS resolution against test.supabase.co
+if [ -z "${SUPABASE_URL}" ]; then
+	export SUPABASE_URL="http://127.0.0.1:54321"
+fi
+
+# Try to read service role key from repo supabase/.env if not already set
+if [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
+	if [ -f "../.env" ]; then
+		# Look for DATABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY
+		SERVICE_KEY=$(grep -E "^(DATABASE_SERVICE_ROLE_KEY|SUPABASE_SERVICE_ROLE_KEY)=" ../.env | head -n1 | cut -d'=' -f2- | tr -d '"' | tr -d "\r") || true
+		if [ -n "$SERVICE_KEY" ]; then
+			export SUPABASE_SERVICE_ROLE_KEY="$SERVICE_KEY"
+		else
+			export SUPABASE_SERVICE_ROLE_KEY="test-service-role-key"
+		fi
+	else
+		export SUPABASE_SERVICE_ROLE_KEY="test-service-role-key"
+	fi
+fi
+
+# Ensure ANTHROPIC_API_KEY is set for tests (use test value if not provided)
+if [ -z "${ANTHROPIC_API_KEY}" ] && [ -z "${CLAUDE_API_KEY}" ]; then
+	export ANTHROPIC_API_KEY="test-api-key"
+fi
 
 # Run tests with Deno (ignoring resource leaks in test environment)
 echo "📋 Running all tests..."

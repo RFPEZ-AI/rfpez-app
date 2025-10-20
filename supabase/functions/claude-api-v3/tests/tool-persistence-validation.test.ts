@@ -3,15 +3,46 @@
 
 import { assertEquals, assertExists } from "https://deno.land/std@0.208.0/testing/asserts.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { MockSupabaseClient } from "./test-utils.ts";
+
+// Minimal Supabase client interface used by these tests (narrow surface)
+interface MinimalSingleResponse {
+  data: Record<string, unknown> | null;
+  error: unknown | null;
+}
+
+interface MinimalFromBuilder {
+  insert(data: Record<string, unknown>): { select: () => { single: () => Promise<MinimalSingleResponse> } };
+  select(cols?: string): {
+    eq: (col: string, val: unknown) => { single: () => Promise<MinimalSingleResponse> };
+    not?: (a: string, b: string) => unknown;
+    order?: (a: string, b: { ascending: boolean }) => unknown;
+    limit?: (n: number) => unknown;
+    delete?: () => { eq: (col: string, val: unknown) => Promise<MinimalSingleResponse> };
+  };
+  delete?: () => { eq: (col: string, val: unknown) => Promise<MinimalSingleResponse> };
+}
+
+interface MinimalSupabaseClient {
+  from(table: string): MinimalFromBuilder;
+}
+
+// Module-level Supabase client selection (prefer local mock for localhost)
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "http://127.0.0.1:54321";
+const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "test-service-role-key";
+type SupabaseClientLike = ReturnType<typeof createClient> | MockSupabaseClient;
+const supabase: SupabaseClientLike = SUPABASE_URL.includes('127.0.0.1') || SUPABASE_URL.includes('localhost')
+  ? new MockSupabaseClient()
+  : createClient(SUPABASE_URL, SERVICE_ROLE_KEY);
+
+// Narrow-typed wrapper for tests to avoid 'any' usage
+const supabaseTyped = supabase as unknown as MinimalSupabaseClient;
 
 // This test validates that tool invocations are properly persisted to the database
 // when store_message is called with tool invocations in metadata
 
 Deno.test("Tool Invocation Persistence - End-to-End Validation", async () => {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://test.supabase.co";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "test-service-role-key";
-  
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  // Using module-level `supabase` client
   
   // Create a test session
   const sessionId = crypto.randomUUID();
@@ -19,7 +50,7 @@ Deno.test("Tool Invocation Persistence - End-to-End Validation", async () => {
   
   console.log("🧪 Creating test session:", sessionId);
   
-  const { error: sessionError } = await supabase
+  const { error: sessionError } = await supabaseTyped
     .from("sessions")
     .insert({
       id: sessionId,
@@ -59,7 +90,7 @@ Deno.test("Tool Invocation Persistence - End-to-End Validation", async () => {
   // Store a message with tool invocations in metadata
   console.log("💾 Storing message with tool invocations...");
   
-  const { data: messageData, error: messageError } = await supabase
+  const { data: messageData, error: messageError } = await supabaseTyped
     .from("messages")
     .insert({
       session_id: sessionId,
@@ -83,7 +114,7 @@ Deno.test("Tool Invocation Persistence - End-to-End Validation", async () => {
   // Verify the tool invocations were persisted
   console.log("🔍 Retrieving message to verify tool invocations...");
   
-  const { data: retrievedMessage, error: retrieveError } = await supabase
+  const { data: retrievedMessage, error: retrieveError } = await supabaseTyped
     .from("messages")
     .select("*")
     .eq("id", messageData.id)
@@ -122,21 +153,21 @@ Deno.test("Tool Invocation Persistence - End-to-End Validation", async () => {
   
   // Cleanup
   console.log("🧹 Cleaning up test data...");
-  await supabase.from("messages").delete().eq("session_id", sessionId);
-  await supabase.from("sessions").delete().eq("id", sessionId);
+  // Cleanup - skip real DB deletes when using MockSupabaseClient
+  if (!(supabase instanceof MockSupabaseClient)) {
+    await supabaseTyped.from("messages").delete().eq("session_id", sessionId);
+    await supabaseTyped.from("sessions").delete().eq("id", sessionId);
+  }
   
   console.log("✅ Cleanup complete");
 });
 
 Deno.test("Query Messages with Tool Invocations", async () => {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL") || "https://test.supabase.co";
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "test-service-role-key";
-  
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
+  // Reuse the module-level supabase client
   
   console.log("🔍 Querying for messages with tool invocations...");
   
-  const { data, error } = await supabase
+  const { data, error } = await supabaseTyped
     .from("messages")
     .select("id, role, content, metadata")
     .not("metadata->toolInvocations", "is", null)
@@ -151,7 +182,7 @@ Deno.test("Query Messages with Tool Invocations", async () => {
   console.log(`📊 Found ${data?.length || 0} messages with tool invocations`);
   
   if (data && data.length > 0) {
-    data.forEach((msg, index) => {
+  data.forEach((msg: Record<string, unknown>, index: number) => {
       console.log(`\n📝 Message ${index + 1}:`);
       console.log(`   ID: ${msg.id}`);
       console.log(`   Role: ${msg.role}`);

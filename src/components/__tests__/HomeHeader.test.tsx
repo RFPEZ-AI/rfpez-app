@@ -83,6 +83,8 @@ describe('HomeHeader', () => {
     onShareRFP: jest.fn(),
     onSetCurrentRfp: jest.fn(),
     onClearCurrentRfp: jest.fn(),
+    artifactWindowOpen: false,
+    onToggleArtifactWindow: jest.fn(),
     agents: [],
     showAgentsMenu: false,
     setShowAgentsMenu: jest.fn(),

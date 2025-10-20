@@ -1071,6 +1071,14 @@ class StreamManager {
   private memoryPressureTimer?: NodeJS.Timeout;
 
   constructor() {
+    // Make test runs deterministic and fast
+    if (process.env.NODE_ENV === 'test') {
+      this.retryConfig = { ...this.retryConfig, baseDelay: 10, maxDelay: 50 };
+      // Make batching flush faster during tests but preserve minFlushSize so unit tests
+      // that assert on minimum batch behavior continue to pass.
+      this.batchConfig = { ...this.batchConfig, flushIntervalMs: 20 };
+    }
+
     this.startHealthMonitoring();
     this.startGarbageCollection();
     this.startMemoryManagement();
@@ -1118,9 +1126,13 @@ class StreamManager {
     console.log(`🔗 Created new pooled connection: ${streamId} (pool size: ${this.connectionPool.size})`);
     
     // Auto-cleanup after timeout
-    setTimeout(() => {
+    const autoCleanupTimer = setTimeout(() => {
       this.abortStream(streamId);
     }, this.poolConfig.connectionTimeout);
+    // Prevent timers from keeping Node process alive in tests
+    if (typeof (autoCleanupTimer as any).unref === 'function') {
+      try { (autoCleanupTimer as any).unref(); } catch (e) { /* ignore */ }
+    }
     
     return controller;
   }
@@ -1344,12 +1356,18 @@ class StreamManager {
     this.healthCheckTimer = setInterval(() => {
       this.performHealthCheck();
     }, this.poolConfig.healthCheckInterval);
+    if (this.healthCheckTimer && typeof (this.healthCheckTimer as any).unref === 'function') {
+      try { (this.healthCheckTimer as any).unref(); } catch (e) { /* ignore */ }
+    }
   }
 
   private startGarbageCollection(): void {
     this.gcTimer = setInterval(() => {
       this.performGarbageCollection();
     }, this.poolConfig.gcInterval);
+    if (this.gcTimer && typeof (this.gcTimer as any).unref === 'function') {
+      try { (this.gcTimer as any).unref(); } catch (e) { /* ignore */ }
+    }
   }
 
   private performHealthCheck(): void {
@@ -1793,6 +1811,10 @@ class StreamManager {
       this.flushBatch(streamId, true);
       this.batchTimers.delete(streamId);
     }, this.batchConfig.flushIntervalMs);
+
+    if (typeof (timer as any).unref === 'function') {
+      try { (timer as any).unref(); } catch (e) { /* ignore */ }
+    }
 
     this.batchTimers.set(streamId, timer);
   }

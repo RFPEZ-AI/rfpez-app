@@ -217,6 +217,28 @@ Deno.test("Claude API Streaming Test Suite", async (t) => {
 class MockToolSupabaseClient {
   private responses: Map<string, unknown> = new Map();
 
+  constructor() {
+    // Set up default test fixtures for common queries
+    this.setupDefaultFixtures();
+  }
+
+  setupDefaultFixtures() {
+    // Default user profile for test-user-id
+    this.responses.set('user_profiles', {
+      id: 'test-profile-uuid',
+      email: 'test@example.com',
+      supabase_user_id: 'test-user-id'
+    });
+    
+    // Default session for test-session-id
+    this.responses.set('sessions', {
+      id: 'test-session-uuid',
+      user_id: 'test-profile-uuid',
+      title: 'Test Session',
+      created_at: new Date().toISOString()
+    });
+  }
+
   setResponse(key: string, response: unknown) {
     this.responses.set(key, response);
   }
@@ -228,6 +250,16 @@ class MockToolSupabaseClient {
           single: () => Promise.resolve({
             data: { id: 'test-id', ...data },
             error: null
+          })
+        })
+      }),
+      update: (data: Record<string, unknown>) => ({
+        eq: (_column: string, _value: unknown) => ({
+          select: () => ({
+            single: () => Promise.resolve({
+              data: { ...data },
+              error: null
+            })
           })
         })
       }),

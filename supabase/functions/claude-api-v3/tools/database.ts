@@ -2108,16 +2108,75 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
     if (!data.artifact_id && (data.supplier_name || data.bid_price || data.delivery_days)) {
       console.log('💾 Direct bid submission without artifact (simplified path)');
       
-      // Get agent_id from session (default to 1 if not found)
+      // Get agent_id and account_id from session
       const { data: sessionData } = await supabase
         .from('sessions')
-        .select('agent_id')
+        .select('agent_id, account_id')
         .eq('id', sessionId)
         .single();
       
       const agentId = (sessionData && typeof sessionData === 'object' && 'agent_id' in sessionData) 
         ? (sessionData.agent_id as number) 
         : 1;
+      
+      const accountId = (sessionData && typeof sessionData === 'object' && 'account_id' in sessionData) 
+        ? (sessionData.account_id as string)
+        : null;
+
+      // If no account_id in session, try to get it from the RFP
+      let finalAccountId = accountId;
+      if (!finalAccountId) {
+        const { data: rfpData } = await supabase
+          .from('rfps')
+          .select('account_id')
+          .eq('id', data.rfp_id)
+          .single();
+        
+        if (rfpData && typeof rfpData === 'object' && 'account_id' in rfpData) {
+          finalAccountId = rfpData.account_id as string;
+          console.log('📋 Using RFP account_id:', finalAccountId);
+        }
+      }
+
+      // AUTO-CREATE OR FIND SUPPLIER PROFILE
+      let supplierId = data.supplier_id;
+      
+      if (!supplierId && data.supplier_name) {
+        console.log('🔍 Checking for existing supplier:', data.supplier_name);
+        
+        // Check if supplier already exists
+        const { data: existingSupplier } = await supabase
+          .from('supplier_profiles')
+          .select('id')
+          .eq('name', data.supplier_name)
+          .single();
+        
+        if (existingSupplier && typeof existingSupplier === 'object' && 'id' in existingSupplier) {
+          supplierId = existingSupplier.id as number;
+          console.log('✅ Found existing supplier:', { supplierId });
+        } else {
+          // Create new supplier profile
+          console.log('➕ Creating new supplier profile:', data.supplier_name);
+          const { data: newSupplier, error: supplierError } = await supabase
+            .from('supplier_profiles')
+            .insert({
+              name: data.supplier_name,
+              description: `Auto-created supplier profile for ${data.supplier_name}`
+            })
+            .select('id')
+            .single();
+          
+          if (supplierError) {
+            console.error('❌ Error creating supplier profile:', supplierError);
+            throw new Error(`Failed to create supplier profile: ${String(supplierError)}`);
+          }
+          
+          if (newSupplier && typeof newSupplier === 'object' && 'id' in newSupplier) {
+            supplierId = newSupplier.id as number;
+            console.log('✅ Created new supplier:', { supplierId });
+          }
+        }
+      }
 
       // Build response JSONB with bid details
       const response: Record<string, unknown> = {
@@ -2135,8 +2194,12 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
         .insert({
           rfp_id: data.rfp_id,
           agent_id: agentId,
-          supplier_id: data.supplier_id || null,
-          response: response
+          supplier_id: supplierId || null,
+          account_id: finalAccountId,
+          response: response,
+          bid_amount: data.bid_price || null,
+          status: 'submitted',
+          submitted_at: new Date().toISOString()
         })
         .select('id')
         .single();

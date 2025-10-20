@@ -36,14 +36,33 @@ wait_for_service() {
 # Function to check if port is in use
 is_port_in_use() {
     local port="$1"
+    # Return 0 if port is in use (listening), non-zero otherwise
+    # Try multiple strategies so this works on Linux, macOS, and Git Bash on Windows
     if command_exists lsof; then
-        lsof -ti:$port >/dev/null 2>&1
-    elif command_exists netstat; then
-        netstat -an | grep -q ":$port.*LISTEN"
-    else
-        # Fallback: try to connect
-        timeout 1 bash -c "</dev/tcp/localhost/$port" >/dev/null 2>&1
+        lsof -iTCP:${port} -sTCP:LISTEN -t >/dev/null 2>&1 && return 0 || return 1
     fi
+
+    if command_exists ss; then
+        ss -ltn 2>/dev/null | awk '{print $4}' | grep -E ":${port}$|:${port}:" >/dev/null 2>&1 && return 0 || true
+    fi
+
+    if command_exists netstat; then
+        # netstat output varies by platform (LISTEN vs LISTENING)
+        if netstat -an 2>/dev/null | grep -E "(:|\s)${port}\b" | grep -E "LISTEN|LISTENING" >/dev/null 2>&1; then
+            return 0
+        fi
+    fi
+
+    if command_exists nc; then
+        nc -z localhost ${port} >/dev/null 2>&1 && return 0 || return 1
+    fi
+
+    # Fallback to /dev/tcp if available (bash built-in on some systems)
+    if [ -e /dev/tcp/localhost/${port} ] 2>/dev/null; then
+        (echo >/dev/tcp/localhost/${port}) >/dev/null 2>&1 && return 0 || return 1
+    fi
+
+    return 1
 }
 
 # Check prerequisites
@@ -82,22 +101,94 @@ else
     echo "📦 Starting fresh Supabase instance..."
 fi
 
+### Helpers for container diagnostics
+container_health() {
+    local name="$1"
+    # Return: "running", "exited", "unknown" or health status if available
+    if ! docker ps -a --format '{{.Names}}' | grep -q "${name}"; then
+        echo "missing"
+        return
+    fi
+    local status
+    status=$(docker inspect --format '{{.State.Status}}' "${name}" 2>/dev/null || echo "unknown")
+    # If container has health info, prefer that
+    local health
+    health=$(docker inspect --format '{{json .State.Health}}' "${name}" 2>/dev/null || true)
+    if [ -n "${health}" ] && [ "${health}" != "null" ]; then
+        # extract status field (works even if Health is JSON or empty)
+        echo "$(echo ${health} | sed -n 's/.*\"Status\":\s*\"\([a-zA-Z0-9_-]*\)\".*/\1/p' )"
+        return
+    fi
+    echo "${status}"
+}
+
+start_supabase_with_retries() {
+    local max_attempts=3
+    local attempt=1
+    while [ $attempt -le $max_attempts ]; do
+        echo "📦 Starting Supabase (attempt $attempt/$max_attempts)..."
+        # Use --debug on the last attempt to provide more troubleshooting info
+        if [ $attempt -eq $max_attempts ]; then
+            supabase start --debug
+        else
+            supabase start
+        fi
+
+        if [ $? -eq 0 ]; then
+            echo "✅ Supabase local stack start command finished (attempt $attempt)"
+            return 0
+        fi
+
+        echo "⚠️  supabase start failed on attempt $attempt"
+        attempt=$((attempt + 1))
+        sleep 3
+    done
+    return 1
+}
+
 supabase start
 if [ $? -eq 0 ]; then
     echo "✅ Supabase local stack started successfully"
     wait_for_service "http://127.0.0.1:54321/health" "Supabase API"
 else
-    echo "❌ Failed to start Supabase. Checking for conflicts..."
-    
-    # Try to fix container conflicts
-    echo "🔧 Attempting to fix container conflicts..."
-    docker ps -a --filter name=supabase --format '{{.Names}}' | grep rfpez-app-local | xargs -r docker rm -f
-    echo "🔄 Retrying Supabase start..."
-    supabase start
-    
-    if [ $? -ne 0 ]; then
-        echo "❌ Failed to start Supabase after cleanup. Please check Docker status."
-        exit 1
+    echo "❌ Failed to start Supabase. Performing diagnostics..."
+    echo "🔧 Gathering Supabase-related containers and statuses..."
+    docker ps -a --filter name=supabase --format '{{.Names}}' | while read -r cname; do
+        cname_trim=$(echo "$cname" | tr -d '\r')
+        status=$(container_health "$cname_trim")
+        echo "   - $cname_trim : $status"
+        if [ "$status" = "unhealthy" ] || [ "$status" = "starting" ]; then
+            echo "     → Last 200 log lines for $cname_trim:"
+            docker logs --tail 200 "$cname_trim" 2>&1 | sed 's/^/       /'
+        fi
+    done
+
+    echo "🔧 Attempting graceful stop of Supabase and retrying start..."
+    supabase stop || echo "   supabase stop reported an issue; continuing with cleanup"
+    sleep 2
+
+    # Retry start with helper (includes a --debug on final attempt)
+    if start_supabase_with_retries; then
+        echo "✅ Supabase started after retry"
+        wait_for_service "http://127.0.0.1:54321/health" "Supabase API"
+    else
+        echo "❌ Failed to start Supabase after retries. Attempting targeted cleanup of unhealthy containers..."
+        # Only remove containers that belong to this project and show as unhealthy/exited
+        docker ps -a --filter name=supabase --format '{{.Names}}' | while read -r cname; do
+            cname_trim=$(echo "$cname" | tr -d '\r')
+            status=$(container_health "$cname_trim")
+            if [ "$status" = "unhealthy" ] || [ "$status" = "exited" ] || [ "$status" = "missing" ]; then
+                echo "   Removing container: $cname_trim (status: $status)"
+                docker rm -f "$cname_trim" || echo "     Failed to remove $cname_trim"
+            fi
+        done
+
+        echo "🔄 Final attempt to start Supabase (with --debug)..."
+        supabase start --debug
+        if [ $? -ne 0 ]; then
+            echo "❌ Final start attempt failed. Please inspect Docker daemon and run 'supabase start --debug' manually for full logs."
+            exit 1
+        fi
     fi
 fi
 
@@ -124,22 +215,44 @@ echo "   - Test Runner: Use 'Run Tests (Watch Mode)' task"
 
 # Verify edge functions are ready
 echo "🔧 Verifying edge functions..."
-if curl -s -X POST "http://127.0.0.1:54321/functions/v1/claude-api-v3" \
-   -H "Content-Type: application/json" \
-   -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" \
-   -d '{"userMessage": "startup test", "sessionId": "startup-test"}' \
-   --max-time 10 >/dev/null 2>&1; then
-    echo "✅ Edge functions are responding"
+# Try to POST a lightweight startup payload to the Claude function and report status
+EDGE_TEST_URL="http://127.0.0.1:54321/functions/v1/claude-api-v3"
+EDGE_TEST_BODY='{"userMessage":"startup test","sessionId":"startup-test"}'
+EDGE_HTTP_STATUS=0
+
+if command_exists curl; then
+    EDGE_HTTP_STATUS=$(curl -s -o /dev/null -w "%{http_code}" -X POST "$EDGE_TEST_URL" \
+        -H "Content-Type: application/json" \
+        -d "$EDGE_TEST_BODY" --max-time 8 || echo 000)
+    if [ "$EDGE_HTTP_STATUS" != "000" ] && [ "$EDGE_HTTP_STATUS" -ge 200 ] && [ "$EDGE_HTTP_STATUS" -lt 500 ]; then
+        echo "✅ Edge function endpoint responded (HTTP $EDGE_HTTP_STATUS)"
+    else
+        echo "⚠️  Edge function endpoint returned HTTP $EDGE_HTTP_STATUS (may need init or env vars)"
+    fi
 else
-    echo "⚠️  Edge functions may need time to initialize"
+    echo "⚠️  curl not available to check edge functions; please verify manually: $EDGE_TEST_URL"
 fi
 
 # Show current status
 echo ""
 echo "📊 Startup Status Summary:"
-echo "   Supabase API: $(curl -s http://127.0.0.1:54321/health >/dev/null && echo '✅ Running' || echo '❌ Not responding')"
+if command_exists curl; then
+    if curl -s http://127.0.0.1:54321/health >/dev/null 2>&1; then
+        echo "   Supabase API: ✅ Running"
+    else
+        echo "   Supabase API: ❌ Not responding"
+    fi
+else
+    echo "   Supabase API: (curl not available to check)"
+fi
+
 echo "   Supabase Studio: http://127.0.0.1:54323"
-echo "   PostgreSQL: $(is_port_in_use 54322 && echo '✅ Running' || echo '❌ Not running')"
+
+if is_port_in_use 54322; then
+    echo "   PostgreSQL: ✅ Running"
+else
+    echo "   PostgreSQL: ❌ Not running"
+fi
 
 # Show next steps
 echo ""

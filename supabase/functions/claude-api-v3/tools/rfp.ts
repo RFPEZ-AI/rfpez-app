@@ -7,6 +7,7 @@ import { RFPFormData, SessionContext, ToolResult } from '../types.ts'
 // Interface for Supabase client operations
 interface SupabaseClient {
   from: (table: string) => SupabaseQueryBuilder;
+  rpc: (fn: string, params?: Record<string, unknown>) => SupabaseQueryBuilder;
   auth: {
     getUser: () => Promise<{ data: { user: Record<string, unknown> } | null; error: unknown }>;
   };
@@ -49,55 +50,62 @@ export async function createAndSetRfpWithClient(authenticatedSupabase: SupabaseC
       throw new Error(`Generic RFP name "${parameters.name}" is not allowed. Please provide a descriptive name like "Industrial Use Alcohol RFP" or "Floor Tiles RFP".`);
     }
     
-    // Build RFP data using actual database schema
-    const rfpData = {
-      name: parameters.name.trim(),
-      description: parameters.description || null,
-      specification: parameters.specification || null,
-      due_date: parameters.due_date || null,
-      status: 'draft',
-      created_at: new Date().toISOString(),
-      is_template: false,
-      is_public: false,
-      completion_percentage: 0
-    };
+    // Get the user's UUID from the authenticated session
+    const { data: userData, error: userError } = await authenticatedSupabase.auth.getUser();
     
-    console.log('📝 Inserting RFP with authenticated client:', rfpData);
+    if (userError || !userData || !userData.user) {
+      console.error('❌ Failed to get authenticated user:', userError);
+      throw new Error('Authentication required to create RFP');
+    }
     
-    // Insert RFP into database using authenticated client
-    const { data: newRfp, error: insertError } = await authenticatedSupabase
-      .from('rfps')
-      .insert([rfpData])
-      .select()
+    const userId = (userData.user as Record<string, unknown>).id as string;
+    console.log('📝 Creating RFP via SECURITY DEFINER function for user:', userId);
+    
+    // Use the SECURITY DEFINER RPC function to create RFP (bypasses RLS)
+    const rpcResult = await authenticatedSupabase
+      .rpc('create_rfp_for_user', {
+        p_user_uuid: userId,
+        p_name: parameters.name.trim(),
+        p_description: parameters.description || null,
+        p_specification: parameters.specification || null,
+        p_due_date: parameters.due_date || null,
+        p_session_id: sessionContext?.sessionId || null
+      })
       .single();
     
-    if (insertError) {
-      console.error('❌ RFP creation error:', insertError);
-      const errorMessage = (insertError as { message?: string }).message || 'Unknown error';
+    const { data: rfpResultData, error: rpcError } = rpcResult as { 
+      data: {
+        rfp_id: number;
+        rfp_name: string;
+        rfp_description: string;
+        rfp_created_at: string;
+        success: boolean;
+        message: string;
+      } | null;
+      error: unknown;
+    };
+    
+    if (rpcError) {
+      console.error('❌ RFP creation error:', rpcError);
+      const errorMessage = (rpcError as { message?: string }).message || 'Unknown error';
       throw new Error(`Failed to create RFP: ${errorMessage}`);
     }
     
-    console.log('✅ RFP created successfully:', newRfp);
-    
-    // Type cast newRfp for safe property access
-    const rfpRecord = newRfp as Record<string, unknown>;
-    
-    // Update session to set current RFP if sessionId is provided
-    if (sessionContext?.sessionId) {
-      console.log('🔗 Setting current RFP in session:', sessionContext.sessionId);
-      
-      const { error: updateError } = await authenticatedSupabase
-        .from('sessions')
-        .update({ current_rfp_id: rfpRecord.id })
-        .eq('id', sessionContext.sessionId);
-      
-      if (updateError) {
-        console.warn('⚠️ Failed to set current RFP in session:', updateError);
-        // Don't fail the whole operation for this
-      } else {
-        console.log('✅ Current RFP set in session');
-      }
+    if (!rfpResultData || !rfpResultData.success) {
+      const errorMsg = rfpResultData?.message || 'Unknown error';
+      console.error('❌ RFP creation failed:', errorMsg);
+      throw new Error(`Failed to create RFP: ${errorMsg}`);
     }
+    
+    console.log('✅ RFP created successfully:', rfpResultData);
+    
+    // Build the response object
+    const rfpRecord = {
+      id: rfpResultData.rfp_id,
+      name: rfpResultData.rfp_name,
+      description: rfpResultData.rfp_description,
+      created_at: rfpResultData.rfp_created_at
+    };
     
     // Return success response with client callbacks
     return {

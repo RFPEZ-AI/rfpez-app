@@ -155,11 +155,9 @@ export const useMessageHandling = (
                 context_message: agentSwitchResult.context_message
               });
               
-              // If this was an agent switch with continuation, the edge function should handle the continuation
-              // We just need to update the UI state
-              if (agentSwitchResult.success) {
-                console.log('🔄 Agent switch successful, UI should update automatically via edge function continuation');
-              }
+              // Store agent switch flag for later UI update
+              // Will be handled after message processing completes
+              (refs as any).agentSwitchDetected = true; // eslint-disable-line @typescript-eslint/no-explicit-any
             }
             
             if (funcObj.function === 'create_form_artifact' && (result.artifact_id || result.template_schema)) {
@@ -508,6 +506,7 @@ export const useMessageHandling = (
             const dbCurrentSession = await DatabaseService.getUserCurrentSession();
             if (dbCurrentSession) {
               console.log('⏳ Session restoration detected - using database session:', dbCurrentSession);
+              // getUserCurrentSession now returns just the ID string
               activeSessionId = dbCurrentSession;
               // Update state to reflect the restored session
               setCurrentSessionId(dbCurrentSession);
@@ -1357,6 +1356,25 @@ export const useMessageHandling = (
           }, 500);
         } else {
           console.log('⏭️ Skipping artifact reload - no modifications detected');
+        }
+        
+        // 🔄 AGENT SWITCH DETECTION: Check if agent was switched during this response
+        const hasAgentSwitch = claudeResponse.metadata?.function_results?.some((fr: any) => {
+          const funcName = fr.function_name || fr.function;
+          return funcName === 'switch_agent' && fr.result?.success;
+        });
+        
+        if (hasAgentSwitch && currentSessionId) {
+          console.log('🔄 Agent switch detected in response, reloading session agent to update UI');
+          setTimeout(async () => {
+            try {
+              console.log('⏰ Agent reload timeout executing after 500ms');
+              await loadSessionAgent(currentSessionId);
+              console.log('✅ Session agent reloaded after switch');
+            } catch (error) {
+              console.error('❌ Failed to reload session agent:', error);
+            }
+          }, 500); // Small delay to ensure database writes are committed
         }
         
         // RE-ENABLED: Artifact reference timeout to show document cards in messages

@@ -867,7 +867,13 @@ export class DatabaseService {
       console.error('Error getting current session:', error);
       return null;
     }
-    return data;
+    
+    // RPC returns array of session objects, extract just the ID from first result
+    if (data && Array.isArray(data) && data.length > 0 && data[0].id) {
+      return data[0].id;
+    }
+    
+    return null;
   }
 
   // File storage operations (for artifacts)

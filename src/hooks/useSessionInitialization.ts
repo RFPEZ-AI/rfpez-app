@@ -292,7 +292,10 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     
     const pollForStateChanges = async () => {
       // Only poll when we have an active session but no current RFP
-      if (currentSessionId && !currentRfpId && session) {
+      // Validate that currentSessionId is a valid UUID (not empty string or undefined)
+      const isValidUUID = currentSessionId && currentSessionId.length === 36 && currentSessionId.includes('-');
+      
+      if (isValidUUID && !currentRfpId && session) {
         try {
           console.log('🔄 MCP UI REFRESH: Polling for state changes - session:', currentSessionId);
           
@@ -304,7 +307,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
           }
           
           // Check for new artifacts if current RFP exists but artifact list is empty
-          if (currentRfpId && artifacts.length === 0) {
+          if (currentRfpId && artifacts.length === 0 && currentSessionId) {
             console.log('🔄 MCP UI REFRESH: Checking for missing artifacts for RFP:', currentRfpId);
             // Import dynamically to avoid circular dependencies
             const { DatabaseService: ArtifactDB } = await import('../services/database');
@@ -333,7 +336,9 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     };
     
     // Start polling every 3 seconds when session is active
-    if (currentSessionId && session) {
+    // Validate UUID before starting poll
+    const isValidUUID = currentSessionId && currentSessionId.length === 36 && currentSessionId.includes('-');
+    if (isValidUUID && session) {
       pollInterval = setInterval(pollForStateChanges, 3000);
       console.log('🔄 MCP UI REFRESH: Started state polling for session:', currentSessionId);
     }

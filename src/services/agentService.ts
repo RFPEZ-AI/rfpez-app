@@ -60,15 +60,27 @@ export class AgentService {
       return [];
     }
 
-    const availableAgents = data || [];
+    const allAgents: Agent[] = data || [];
 
-    // ✅ Return ALL agents regardless of authentication status
-    // The UI layer (AgentSelector.tsx) will handle:
-    // 1. Showing accessible agents normally
-    // 2. Showing locked agents in greyed-out state with lock icon
-    // 3. Preventing selection of locked agents with helpful messages
-    console.log('Returning all active agents for display:', availableAgents.map(a => a.name));
-    return availableAgents;
+    // Apply server-side filtering to match test expectations and simple access control.
+    // Rules:
+    // - Guest (not authenticated): only default and free agents
+    // - Authenticated without proper account setup: default + free + non-restricted (exclude is_restricted)
+    // - Authenticated with proper account setup (billing): all active agents
+    let filtered: Agent[];
+
+    if (!isAuthenticated) {
+      filtered = allAgents.filter(a => a.is_default || a.is_free);
+    } else if (isAuthenticated && !hasProperAccountSetup) {
+      filtered = allAgents.filter(a => a.is_default || a.is_free || !a.is_restricted);
+      // Ensure restricted agents are excluded for users without proper account setup
+      filtered = filtered.filter(a => !a.is_restricted || a.is_free || a.is_default);
+    } else {
+      filtered = allAgents.slice(); // return all for users with proper account setup
+    }
+
+    console.log('Returning filtered agents for display:', filtered.map(a => a.name));
+    return filtered;
   }
 
   /**

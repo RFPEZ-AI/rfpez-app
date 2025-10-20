@@ -384,7 +384,7 @@ export class ToolExecutionService {
 
         case 'get_conversation_history': {
           // Use sessionId from input or parameter, but validate it's not empty
-          const targetSessionId = (input.sessionId as string) || sessionId;
+          const targetSessionId = (input.sessionId as string) || (input.session_id as string) || sessionId;
           if (!targetSessionId || (typeof targetSessionId === 'string' && targetSessionId.trim() === '')) {
             console.error('❌ GET_CONVERSATION_HISTORY ERROR: session_id is required and cannot be empty');
             return {
@@ -399,9 +399,19 @@ export class ToolExecutionService {
           return await getConversationHistory(this.supabase, targetSessionId);
         }
 
+        case 'create_session': {
+          const { createSession } = await import('../tools/database.ts');
+          // @ts-ignore - Database function type compatibility
+          return await createSession(this.supabase, {
+            ...input,
+            userId: this.userId
+          });
+        }
+
         case 'store_message': {
-          // Validate session_id for store_message
-          if (!sessionId || sessionId.trim() === '') {
+          // Use sessionId from input or parameter
+          const targetSessionId = (input.sessionId as string) || (input.session_id as string) || sessionId;
+          if (!targetSessionId || (typeof targetSessionId === 'string' && targetSessionId.trim() === '')) {
             console.error('❌ STORE_MESSAGE ERROR: session_id is required and cannot be empty');
             return {
               success: false,
@@ -426,7 +436,7 @@ export class ToolExecutionService {
           const result = await storeMessage(this.supabase, {
             ...inputData,
             userId: this.userId,
-            sessionId: sessionId
+            sessionId: targetSessionId
           });
           
           // Clear tool invocations after storing to prepare for next message

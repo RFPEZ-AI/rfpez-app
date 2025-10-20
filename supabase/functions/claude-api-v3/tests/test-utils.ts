@@ -8,6 +8,7 @@ import { enableTestMode, disableTestMode as _disableTestMode } from "../auth/aut
 export class MockSupabaseClient {
   private mockData: Map<string, unknown> = new Map();
   private mockError: Error | null = null;
+  private insertedRecords: Map<string, Map<string, unknown>> = new Map();
 
   constructor() {
     this.reset();
@@ -16,6 +17,7 @@ export class MockSupabaseClient {
   reset() {
     this.mockData.clear();
     this.mockError = null;
+    this.insertedRecords.clear();
   }
 
   setMockError(error: Error) {
@@ -27,25 +29,55 @@ export class MockSupabaseClient {
   }
 
   from(table: string) {
+    const createQueryBuilder = (recordId?: string) => ({
+      eq: (column: string, value: unknown) => {
+        // When querying by ID, retrieve the inserted record
+        if (column === 'id' && typeof value === 'string') {
+          const tableRecords = this.insertedRecords.get(table);
+          const record = tableRecords?.get(value);
+          return {
+            ...createQueryBuilder(value as string),
+            single: () => this.mockError ? 
+              Promise.reject(this.mockError) : 
+              Promise.resolve({ data: record || this.mockData.get(table), error: null })
+          };
+        }
+        return createQueryBuilder(recordId);
+      },
+      not: (_column: string, _operator: string, _value: unknown) => createQueryBuilder(recordId),
+      limit: (_count: number) => createQueryBuilder(recordId),
+      order: (_column: string, _options?: Record<string, unknown>) => createQueryBuilder(recordId),
+      single: () => this.mockError ? 
+        Promise.reject(this.mockError) : 
+        Promise.resolve({ data: this.mockData.get(table), error: null }),
+      then: (resolve: (value: unknown) => unknown) => {
+        const result = this.mockError ? 
+          { data: null, error: this.mockError } : 
+          { data: this.mockData.get(table), error: null };
+        return Promise.resolve(result).then(resolve);
+      }
+    });
+
     return {
-      select: (_columns?: string) => ({
-        eq: (_column: string, _value: unknown) => ({
-          single: () => this.mockError ? 
-            Promise.reject(this.mockError) : 
-            Promise.resolve({ data: this.mockData.get(table), error: null })
-        }),
-        limit: (_count: number) => ({
-          data: this.mockError ? null : this.mockData.get(table),
-          error: this.mockError
-        })
-      }),
-      insert: (data: Record<string, unknown>) => ({
-        select: () => ({
-          single: () => this.mockError ?
-            Promise.reject(this.mockError) :
-            Promise.resolve({ data: { id: 'mock-id', ...data }, error: null })
-        })
-      }),
+      select: (_columns?: string) => createQueryBuilder(),
+      insert: (data: Record<string, unknown>) => {
+        const recordId = (data.id as string) || 'mock-id';
+        const record = { id: recordId, ...data };
+        
+        // Store the inserted record for later retrieval
+        if (!this.insertedRecords.has(table)) {
+          this.insertedRecords.set(table, new Map());
+        }
+        this.insertedRecords.get(table)!.set(recordId, record);
+        
+        return {
+          select: () => ({
+            single: () => this.mockError ?
+              Promise.reject(this.mockError) :
+              Promise.resolve({ data: record, error: null })
+          })
+        };
+      },
       update: (data: Record<string, unknown>) => ({
         eq: (_column: string, _value: unknown) => ({
           select: () => ({
@@ -167,9 +199,16 @@ let globalMockFetch: MockFetch | null = null;
 
 export function setupTestEnvironment() {
   // Set required environment variables for testing
-  Deno.env.set('CLAUDE_API_KEY', 'test-api-key');
-  Deno.env.set('SUPABASE_URL', 'https://test.supabase.co');
-  Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key');
+  if (!Deno.env.get('CLAUDE_API_KEY')) {
+    Deno.env.set('CLAUDE_API_KEY', 'test-api-key');
+  }
+  // Prefer local Supabase in dev environment
+  if (!Deno.env.get('SUPABASE_URL')) {
+    Deno.env.set('SUPABASE_URL', 'http://127.0.0.1:54321');
+  }
+  if (!Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+    Deno.env.set('SUPABASE_SERVICE_ROLE_KEY', 'test-service-role-key');
+  }
   
   // Set up global fetch mock to handle Supabase auth calls
   if (!globalMockFetch) {
