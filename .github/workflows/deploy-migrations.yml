@@ -62,7 +62,9 @@ jobs:
           
           # supabase db push uses the Management API when linked to a project
           # This avoids IPv6 connectivity issues entirely
-          supabase db push --include-all
+          # --include-all: Push all pending migrations
+          # SUPABASE_DB_PUSH_AUTO_CONFIRM=1: Auto-confirm without keyboard prompt
+          SUPABASE_DB_PUSH_AUTO_CONFIRM=1 supabase db push --include-all
           
           echo "Migrations deployed successfully!"
 

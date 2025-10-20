@@ -22,9 +22,13 @@ CREATE TABLE IF NOT EXISTS public.account_users (
     PRIMARY KEY (account_id, user_id)
 );
 
+-- Add account_id column to rfps if doesn't exist (from 20251017115900)
+ALTER TABLE IF EXISTS public.rfps ADD COLUMN IF NOT EXISTS account_id uuid REFERENCES public.accounts(id);
+
 -- Add indices for performance
 CREATE INDEX IF NOT EXISTS idx_account_users_account_id ON public.account_users(account_id);
 CREATE INDEX IF NOT EXISTS idx_account_users_user_id ON public.account_users(user_id);
+CREATE INDEX IF NOT EXISTS idx_rfps_account_id ON public.rfps(account_id);
 
 -- Grant basic permissions
 GRANT SELECT ON public.accounts TO authenticated, anon;
