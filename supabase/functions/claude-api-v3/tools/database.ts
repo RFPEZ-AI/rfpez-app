@@ -2141,18 +2141,32 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
         ? (sessionData.account_id as string)
         : null;
 
-      // If no account_id in session, try to get it from the RFP
+      // Get account_id using the new helper function
       let finalAccountId = accountId;
       if (!finalAccountId) {
-        const { data: rfpData } = await supabase
-          .from('rfps')
-          .select('account_id')
-          .eq('id', data.rfp_id)
-          .single();
+        // Try getting from get_user_account_id() function
+        const rpcClient = supabase as unknown as { 
+          rpc: (name: string, params?: Record<string, unknown>) => Promise<{ data: string | null; error: unknown }> 
+        };
+        const { data: userAccountId, error: accountError } = await rpcClient.rpc('get_user_account_id');
         
-        if (rfpData && typeof rfpData === 'object' && 'account_id' in rfpData) {
-          finalAccountId = rfpData.account_id as string;
-          console.log('📋 Using RFP account_id:', finalAccountId);
+        if (!accountError && userAccountId) {
+          finalAccountId = userAccountId;
+          console.log('👤 Using user account_id from get_user_account_id():', finalAccountId);
+        } else if (!accountError) {
+          // If get_user_account_id() returns null, try RFP account_id as fallback
+          const { data: rfpData } = await supabase
+            .from('rfps')
+            .select('account_id')
+            .eq('id', data.rfp_id)
+            .single();
+          
+          if (rfpData && typeof rfpData === 'object' && 'account_id' in rfpData) {
+            finalAccountId = rfpData.account_id as string;
+            console.log('📋 Using RFP account_id:', finalAccountId);
+          }
+        } else {
+          console.warn('⚠️ Error calling get_user_account_id():', accountError);
         }
       }
 
