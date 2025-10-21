@@ -5,7 +5,7 @@
 CREATE OR REPLACE FUNCTION public.search_account_memories(
   p_account_id uuid,
   p_user_id uuid,
-  p_query_embedding vector,
+  p_query_embedding extensions.vector,
   p_memory_types text[] DEFAULT NULL,
   p_limit integer DEFAULT 10,
   p_similarity_threshold double precision DEFAULT 0.7

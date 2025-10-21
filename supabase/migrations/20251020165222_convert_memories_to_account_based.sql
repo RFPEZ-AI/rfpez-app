@@ -4,6 +4,9 @@
 -- Memories are organizational assets shared within an account, not agent-specific
 -- ============================================================================
 
+-- Enable vector extension (required for embedding operations)
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Step 1: Drop existing RLS policies that depend on old structure
 DROP POLICY IF EXISTS "Users can view their own agent memories" ON public.agent_memories;
 DROP POLICY IF EXISTS "Users can insert their own agent memories" ON public.agent_memories;
@@ -105,7 +108,7 @@ CREATE POLICY "Account users can delete account memories"
 CREATE OR REPLACE FUNCTION search_agent_memories(
   p_account_id UUID,
   p_user_id UUID,
-  p_query_embedding vector(384),
+  p_query_embedding extensions.vector(384),
   p_memory_types TEXT[] DEFAULT NULL,
   p_limit INTEGER DEFAULT 10,
   p_similarity_threshold FLOAT DEFAULT 0.7

@@ -126,7 +126,7 @@ CREATE POLICY "Users can delete account memories"
 CREATE OR REPLACE FUNCTION search_account_memories(
   p_account_id UUID,
   p_user_id UUID,
-  p_query_embedding vector(384),
+  p_query_embedding extensions.vector(384),
   p_memory_types TEXT[] DEFAULT NULL,
   p_limit INTEGER DEFAULT 10,
   p_similarity_threshold FLOAT DEFAULT 0.7

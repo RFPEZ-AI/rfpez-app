@@ -5,12 +5,12 @@
 
 -- Add the embedding column for vector similarity search
 ALTER TABLE public.account_memories 
-  ADD COLUMN IF NOT EXISTS embedding vector(384);
+  ADD COLUMN IF NOT EXISTS embedding extensions.vector(384);
 
 -- Create index for vector similarity search using HNSW algorithm
 CREATE INDEX IF NOT EXISTS idx_account_memories_embedding 
   ON public.account_memories 
-  USING hnsw (embedding vector_cosine_ops);
+  USING hnsw (embedding extensions.vector_cosine_ops);
 
 -- Add comment
 COMMENT ON COLUMN public.account_memories.embedding IS 'Vector embedding for semantic similarity search (384 dimensions from gte-small model)';
