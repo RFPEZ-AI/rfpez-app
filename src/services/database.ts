@@ -895,11 +895,13 @@ export class DatabaseService {
       return null;
     }
     
-    // RPC returns array of session objects, extract just the ID from first result
-    if (data && Array.isArray(data) && data.length > 0 && data[0].id) {
-      return data[0].id;
+    // RPC returns a single UUID string, not an array
+    if (data && typeof data === 'string') {
+      console.log('✅ getUserCurrentSession returning session ID:', data);
+      return data;
     }
     
+    console.log('ℹ️ getUserCurrentSession: No current session found');
     return null;
   }
 

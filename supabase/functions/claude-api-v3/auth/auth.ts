@@ -53,8 +53,22 @@ export function getAuthenticatedSupabaseClient(request: Request) {
   
   if (token === anonymousKey) {
     console.log('🔓 Anonymous token detected, using service role client');
+    console.log('🔑 Service role key length:', supabaseServiceKey?.length);
+    console.log('🔑 Service role key preview:', supabaseServiceKey?.substring(0, 30) + '...');
+    
     // Create service role client for anonymous users
-    const supabase = createClient(supabaseUrl, supabaseServiceKey);
+    // CRITICAL: Service role key must be used as the auth token to bypass RLS
+    const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+      auth: {
+        persistSession: false,
+        autoRefreshToken: false
+      },
+      global: {
+        headers: {
+          'Authorization': `Bearer ${supabaseServiceKey}`
+        }
+      }
+    });
     return supabase;
   }
   

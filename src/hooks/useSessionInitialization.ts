@@ -63,8 +63,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     loadUserSessions,
     loadDefaultAgentWithPrompt,
     handleSelectSession,
-    handleSetCurrentRfp,
-    artifactWindowState
+    handleSetCurrentRfp
   } = params;
 
   // Load user sessions on mount if authenticated
@@ -101,11 +100,13 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     // Only load default agent if no current session exists and no messages
     // This prevents overriding active agent selections during routine auth state changes
     // CRITICAL FIX: Check needsSessionRestore state:
-    //   - undefined = still checking database (don't load default yet)
+    //   - undefined = still checking database (don't load default yet - WAIT!)
     //   - null = checked, no session found (OK to load default)
     //   - string = session to restore (don't load default)
-    if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length === 0 && needsSessionRestore === null) {
+    // ALSO CHECK: Only load default if user is authenticated (otherwise wait for auth check to complete)
+    if (isAuthenticated && !supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length === 0 && needsSessionRestore === null) {
       console.log('Loading default agent for initial app startup (no sessions available to restore)...');
+      console.log('🔍 Condition check: isAuthenticated:', isAuthenticated, 'needsSessionRestore:', needsSessionRestore, 'sessions.length:', sessions.length);
       
       // Show loading message immediately
       setMessages([{
@@ -127,11 +128,14 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       });
     } else if (!supabaseLoading && !currentSessionId && messages.length === 0 && (sessions.length > 0 || needsSessionRestore)) {
       console.log('🔄 Sessions available or session restoration pending - waiting for restoration...');
-      console.log('🔍 needsSessionRestore state:', needsSessionRestore);
+      console.log('🔍 needsSessionRestore state:', needsSessionRestore, 'sessions.length:', sessions.length);
       
       // Don't show any loading message - let the session restoration handle it
       // This prevents the "Activating Solutions agent..." message from appearing
       // when we're about to restore an existing session
+    } else if (!supabaseLoading && !currentSessionId && messages.length === 0 && needsSessionRestore === undefined) {
+      console.log('⏳ Waiting for session restoration check to complete (needsSessionRestore is undefined)...');
+      // Don't load default agent yet - we're still checking the database
     }
     
     // Check if we have basic authentication (session and user) for loading sessions
@@ -143,84 +147,18 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     }
   }, [isAuthenticated, supabaseLoading, user, userProfile, needsSessionRestore]);
 
-  // Separate useEffect to handle session restoration after sessions are loaded
-  useEffect(() => {
-    console.log('Session restoration check:', { 
-      isAuthenticated, 
-      sessionsCount: sessions.length, 
-      currentSessionId: currentSessionId,
-      isCreatingNewSession,
-      needsSessionRestore
-    });
-    
-    // Skip auto-restoration if we're in the process of creating a new session
-    if (isCreatingNewSession) {
-      console.log('🚫 Skipping session restoration - currently creating new session');
-      return;
-    }
-    
-    // CRITICAL FIX: Only auto-restore if we have a valid needsSessionRestore signal from useHomeState
-    // If needsSessionRestore is null, it means either:
-    // 1. We already processed the restoration, OR
-    // 2. User explicitly created a new session and cleared it
-    // In either case, don't try to auto-restore from database
-    if (isAuthenticated && sessions.length > 0 && !currentSessionId && !isCreatingNewSession && needsSessionRestore) {
-      console.log('🔄 Auto-restoring session because needsSessionRestore is set:', needsSessionRestore);
-      const restoreSession = async () => {
-        try {
-          // First try to restore from database (user's current session)
-          const dbCurrentSessionId = await DatabaseService.getUserCurrentSession();
-          console.log('Database current session ID:', dbCurrentSessionId);
-          
-          if (dbCurrentSessionId) {
-            const dbSession = sessions.find(s => s.id === dbCurrentSessionId);
-            if (dbSession) {
-              console.log('Restoring session from database:', dbCurrentSessionId);
-              handleSelectSession(dbCurrentSessionId);
-              return;
-            } else {
-              console.log('Database session not found in current sessions list');
-            }
-          }
-          
-          // Fallback to localStorage if database doesn't have a current session
-          const lastSessionId = artifactWindowState.getLastSession();
-          console.log('Attempting to restore last session from localStorage:', lastSessionId);
-          
-          if (lastSessionId) {
-            const session = sessions.find(s => s.id === lastSessionId);
-            if (session) {
-              console.log('Restoring last session from localStorage:', lastSessionId);
-              handleSelectSession(lastSessionId);
-            } else {
-              console.log('LocalStorage session not found in current sessions list');
-            }
-          } else {
-            console.log('No last session found in localStorage');
-          }
-        } catch (error) {
-          console.error('Error during session restoration:', error);
-          // Fallback to localStorage on error
-          const lastSessionId = artifactWindowState.getLastSession();
-          if (lastSessionId) {
-            const session = sessions.find(s => s.id === lastSessionId);
-            if (session) {
-              console.log('Fallback: Restoring last session from localStorage:', lastSessionId);
-              handleSelectSession(lastSessionId);
-            }
-          }
-        }
-      };
-      
-      restoreSession();
-    }
-  }, [sessions, isAuthenticated, currentSessionId, isCreatingNewSession, handleSelectSession, artifactWindowState]);
-
   // CRITICAL FIX: Handle session restoration from useHomeState
   // This ensures that when useHomeState restores a session ID from the database,
   // we actually load the full session content (messages, agent, artifacts)
   // BUT: Don't restore if we're creating a new session!
   useEffect(() => {
+    console.log('🔍 Session restoration effect triggered:', {
+      needsSessionRestore,
+      sessionsLength: sessions.length,
+      isCreatingNewSession,
+      hasSessionToRestore: needsSessionRestore && sessions.length > 0 && !isCreatingNewSession
+    });
+    
     if (needsSessionRestore && sessions.length > 0 && !isCreatingNewSession) {
       console.log('🔄 Processing session restoration from useHomeState:', needsSessionRestore);
       const sessionToRestore = sessions.find(s => s.id === needsSessionRestore);
@@ -231,6 +169,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         setNeedsSessionRestore(null);
       } else {
         console.warn('⚠️ Session to restore not found in sessions list:', needsSessionRestore);
+        console.warn('Available sessions:', sessions.map(s => s.id));
         // Clear the flag anyway to prevent infinite loops
         setNeedsSessionRestore(null);
       }

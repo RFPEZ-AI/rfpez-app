@@ -1496,21 +1496,63 @@ const Home: React.FC = () => {
         role: 'buyer'
       };
       
-      // 🔥 FIX: Save artifact to database before selecting it
+      // 🔥 FIX: Save artifact to database FIRST before adding to state or selecting
       try {
+        // Get current user's account_id via user_accounts junction table
+        const { data: { user } } = await supabase.auth.getUser();
+        if (!user) {
+          console.error('❌ No authenticated user - cannot create artifact');
+          return;
+        }
+
+        // First get the user_profile.id
+        const { data: profileData, error: profileError } = await supabase
+          .from('user_profiles')
+          .select('id')
+          .eq('supabase_user_id', user.id)
+          .single();
+        
+        if (profileError || !profileData) {
+          console.error('❌ No user profile found:', profileError);
+          return;
+        }
+
+        // Then get the account_id from user_accounts
+        const { data: accountData, error: accountError } = await supabase
+          .from('user_accounts')
+          .select('account_id')
+          .eq('user_profile_id', profileData.id)
+          .limit(1)
+          .single();
+        
+        if (accountError || !accountData) {
+          console.error('❌ No account found for user:', accountError);
+          return;
+        }
+
+        const accountId = accountData.account_id;
+        if (!accountId) {
+          console.error('❌ No account_id found for user - cannot create artifact');
+          return; // Exit early if no account
+        }
+
         const { error } = await supabase
           .from('artifacts')
           .insert({
             id: bidViewArtifact.id,
             session_id: currentSessionId,
+            account_id: accountId,
             name: bidViewArtifact.name,
-            type: 'bid_view',
-            artifact_role: 'bid_view',
-            content: bidViewArtifact.content,
+            type: 'other', // Use 'other' since 'bid_view' is not in the type check
+            artifact_role: 'request_document', // Use valid role - request_document fits for viewing bids
+            processed_content: currentRfp.name,
             metadata: {
               rfp_id: currentRfp.id,
-              rfp_name: currentRfp.name
-            }
+              rfp_name: currentRfp.name,
+              view_type: 'bid_view'
+            },
+            status: 'active',
+            processing_status: 'completed'
           })
           .select()
           .single();
@@ -1519,39 +1561,39 @@ const Home: React.FC = () => {
           // Artifact might already exist (code 23505 = unique violation)
           if (error.code === '23505') {
             console.log('ℹ️ Bid view artifact already exists in database:', bidViewId);
+            // Continue - artifact exists, we can use it
           } else {
-            throw error;
+            console.error('❌ Failed to save bid view artifact to database:', error);
+            return; // Exit early if database save fails
           }
         } else {
           console.log('✅ Bid view artifact saved to database:', bidViewId);
         }
       } catch (error) {
-        console.error('❌ Failed to save bid view artifact to database:', error);
-        // Continue anyway - the artifact might already exist or the error might be non-critical
+        console.error('❌ Exception saving bid view artifact to database:', error);
+        return; // Exit early on exception
       }
       
-      // Add artifact to state
+      // Add artifact to state AFTER database save succeeds
       setArtifacts((prev: Artifact[]) => [...prev, bidViewArtifact]);
     }
 
-    // Select the artifact after a brief delay to ensure state is updated
-    setTimeout(() => {
-      const artifactRef: ArtifactReference = {
-        artifactId: bidViewArtifact.id,
-        artifactName: bidViewArtifact.name,
-        artifactType: 'bid_view',
-        isCreated: true,
-        displayText: `View bids for ${currentRfp.name}`
-      };
-      
-      console.log('Attempting to select artifact:', artifactRef.artifactId);
-      
-      // Select artifact directly using the artifact management functions
-      selectArtifact(bidViewArtifact.id);
-      artifactWindowState.selectArtifact(bidViewArtifact.id);
-      artifactWindowState.openWindow(); // Auto-show when artifact selected
-      console.log('Selected bid view artifact for display:', bidViewArtifact.name);
-    }, 100);
+    // Select the artifact - no need for delay since database insert is complete
+    const artifactRef: ArtifactReference = {
+      artifactId: bidViewArtifact.id,
+      artifactName: bidViewArtifact.name,
+      artifactType: 'bid_view',
+      isCreated: true,
+      displayText: `View bids for ${currentRfp.name}`
+    };
+    
+    console.log('Selecting artifact (database record exists):', artifactRef.artifactId);
+    
+    // Select artifact directly using the artifact management functions
+    selectArtifact(bidViewArtifact.id);
+    artifactWindowState.selectArtifact(bidViewArtifact.id);
+    artifactWindowState.openWindow(); // Auto-show when artifact selected
+    console.log('Selected bid view artifact for display:', bidViewArtifact.name);
   };
 
   // Form save handler (draft save without submission)
