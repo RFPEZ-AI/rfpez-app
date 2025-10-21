@@ -101,12 +101,15 @@ const ToolExecutionDisplay: React.FC<ToolExecutionDisplayProps> = ({
     return null;
   };
 
-  if (!isActive && toolInvocations.length === 0) {
+  // Show ALL tool invocations (no filtering)
+  const filteredToolInvocations = toolInvocations;
+
+  if (!isActive && filteredToolInvocations.length === 0) {
     return null;
   }
 
   // Group tools by name and get latest status for each
-  const toolSummary = toolInvocations.reduce((acc: Record<string, ToolInvocationEvent>, tool) => {
+  const toolSummary = filteredToolInvocations.reduce((acc: Record<string, ToolInvocationEvent>, tool) => {
     if (!acc[tool.toolName] || new Date(tool.timestamp) > new Date(acc[tool.toolName].timestamp)) {
       acc[tool.toolName] = tool;
     }

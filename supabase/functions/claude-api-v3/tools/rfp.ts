@@ -26,10 +26,14 @@ interface SupabaseQueryBuilder {
   then: (callback: (result: { data: unknown; error: unknown }) => unknown) => Promise<unknown>;
 }
 
-const supabase = createClient(
-  Deno.env.get('DATABASE_URL') || Deno.env.get('SUPABASE_URL')!,
-  Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-)
+const supabaseUrl = Deno.env.get('DATABASE_URL') || Deno.env.get('SUPABASE_URL');
+const supabaseKey = Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+
+if (!supabaseUrl || !supabaseKey) {
+  throw new Error('Missing required Supabase environment variables');
+}
+
+const supabase = createClient(supabaseUrl, supabaseKey)
 
 // Version that accepts an authenticated Supabase client
 export async function createAndSetRfpWithClient(authenticatedSupabase: SupabaseClient, parameters: RFPFormData, sessionContext?: SessionContext): Promise<ToolResult> {

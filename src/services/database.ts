@@ -26,10 +26,13 @@ export class DatabaseService {
   static async createSession(supabaseUserId: string, title: string, description?: string, currentRfpId?: number): Promise<Session | null> {
     console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description, currentRfpId });
     
-    // First get the user profile to get the internal ID
+    // Get the user profile and their account_id via user_accounts junction table
     const { data: userProfile, error: profileError } = await supabase
       .from('user_profiles')
-      .select('id')
+      .select(`
+        id,
+        user_accounts!inner(account_id)
+      `)
       .eq('supabase_user_id', supabaseUserId)
       .single();
 
@@ -40,9 +43,17 @@ export class DatabaseService {
       return null;
     }
 
-    console.log('Attempting to insert session into database...');
+    // Extract account_id from user_accounts junction table
+    const accountId = (userProfile.user_accounts as any)?.[0]?.account_id;
+    if (!accountId) {
+      console.error('No account found for user profile:', userProfile.id);
+      return null;
+    }
+
+    console.log('Attempting to insert session into database with account_id:', accountId);
     const sessionData: Omit<Session, 'id' | 'created_at' | 'updated_at' | 'is_archived'> = {
       user_id: userProfile.id, // Use the user_profiles.id (internal UUID)
+      account_id: accountId,   // ✅ CRITICAL FIX: Include account_id from user_accounts
       title,
       description
     };

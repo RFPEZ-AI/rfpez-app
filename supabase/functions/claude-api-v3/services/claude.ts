@@ -37,7 +37,10 @@ export class ClaudeAPIService {
   private baseUrl = 'https://api.anthropic.com/v1/messages';
 
   constructor() {
-    this.apiKey = config.anthropicApiKey!;
+    if (!config.anthropicApiKey) {
+      throw new Error('ANTHROPIC_API_KEY is required');
+    }
+    this.apiKey = config.anthropicApiKey;
   }
 
   // Send message to Claude API with tool definitions
@@ -151,6 +154,7 @@ export class ClaudeAPIService {
     const activeToolCall: Record<string, unknown> = {}; // Track current tool call being built
 
     try {
+      // eslint-disable-next-line no-constant-condition
       while (true) {
         const { done, value } = await reader.read();
         
@@ -290,7 +294,6 @@ export class ClaudeAPIService {
 
 // Tool execution service
 export class ToolExecutionService {
-  // @ts-ignore - Supabase client type compatibility
   private supabase: unknown;
   private userId: string;
   private userMessage?: string;
@@ -303,7 +306,6 @@ export class ToolExecutionService {
     timestamp: string;
   }> = [];
 
-  // @ts-ignore - Supabase client type compatibility
   constructor(supabase: unknown, userId: string, userMessage?: string) {
     this.supabase = supabase;
     this.userId = userId;
@@ -354,7 +356,7 @@ export class ToolExecutionService {
           }
           
           const { createFormArtifact } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await createFormArtifact(this.supabase, sessionId, this.userId, input);
         }
 
@@ -376,7 +378,7 @@ export class ToolExecutionService {
           }
           
           const { createDocumentArtifact } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           const result = await createDocumentArtifact(this.supabase, sessionId, this.userId, input);
           console.log('🎯 CREATE_DOCUMENT_ARTIFACT RESULT:', JSON.stringify(result, null, 2));
           return result;
@@ -395,13 +397,13 @@ export class ToolExecutionService {
           }
           
           const { getConversationHistory } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await getConversationHistory(this.supabase, targetSessionId);
         }
 
         case 'create_session': {
           const { createSession } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await createSession(this.supabase, {
             ...input,
             userId: this.userId
@@ -432,7 +434,7 @@ export class ToolExecutionService {
           }
           
           const { storeMessage } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           const result = await storeMessage(this.supabase, {
             ...inputData,
             userId: this.userId,
@@ -449,7 +451,7 @@ export class ToolExecutionService {
 
         case 'search_messages': {
           const { searchMessages } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await searchMessages(this.supabase, {
             ...input,
             userId: this.userId
@@ -458,13 +460,13 @@ export class ToolExecutionService {
 
         case 'get_available_agents': {
           const { getAvailableAgents } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await getAvailableAgents(this.supabase, input);
         }
 
         case 'get_current_agent': {
           const { getCurrentAgent } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await getCurrentAgent(this.supabase, {
             ...input,
             session_id: sessionId || ''
@@ -473,7 +475,7 @@ export class ToolExecutionService {
 
         case 'debug_agent_switch': {
           const { debugAgentSwitch } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await debugAgentSwitch(this.supabase, this.userId, input);
         }
 
@@ -497,7 +499,7 @@ export class ToolExecutionService {
           }
           
           const { switchAgent } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await switchAgent(this.supabase, this.userId, {
             ...input,
             session_id: sessionId
@@ -506,7 +508,7 @@ export class ToolExecutionService {
 
         case 'recommend_agent': {
           const { recommendAgent } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await recommendAgent(this.supabase, input);
         }
 
@@ -522,7 +524,7 @@ export class ToolExecutionService {
           }
           
           const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
-          // @ts-ignore - RFP function type compatibility
+          // @ts-expect-error - RFP function type compatibility
           const toolResult = await createAndSetRfpWithClient(this.supabase, input, { 
             sessionId: sessionId
           });
@@ -532,7 +534,7 @@ export class ToolExecutionService {
 
         case 'list_artifacts': {
           const { listArtifacts } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await listArtifacts(this.supabase, {
             ...input,
             userId: this.userId
@@ -541,7 +543,7 @@ export class ToolExecutionService {
 
         case 'get_current_artifact_id': {
           const { getCurrentArtifactId } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await getCurrentArtifactId(this.supabase, {
             ...input,
             sessionId: sessionId || ''
@@ -550,7 +552,7 @@ export class ToolExecutionService {
 
         case 'select_active_artifact': {
           const { selectActiveArtifact } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await selectActiveArtifact(this.supabase, {
             ...input,
             sessionId: sessionId || ''
@@ -559,43 +561,55 @@ export class ToolExecutionService {
 
         case 'get_current_rfp': {
           const { getCurrentRfp } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
-          return await getCurrentRfp(this.supabase, input.session_id || sessionId!);
+          // @ts-expect-error - Database function type compatibility
+          return await getCurrentRfp(this.supabase, input.session_id || sessionId || '');
         }
 
         case 'get_form_schema': {
+          if (!sessionId) {
+            return { success: false, error: 'Session ID is required' };
+          }
           const { getFormSchema } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
-          return await getFormSchema(this.supabase, sessionId!, this.userId, input);
+          // @ts-expect-error - Database function type compatibility
+          return await getFormSchema(this.supabase, sessionId, this.userId, input);
         }
 
         case 'update_form_data': {
+          if (!sessionId) {
+            return { success: false, error: 'Session ID is required' };
+          }
           const { updateFormData } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
-          return await updateFormData(this.supabase, sessionId!, this.userId, input);
+          // @ts-expect-error - Database function type compatibility
+          return await updateFormData(this.supabase, sessionId, this.userId, input);
         }
 
         case 'update_form_artifact': {
+          if (!sessionId) {
+            return { success: false, error: 'Session ID is required' };
+          }
           const { updateFormArtifact } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
-          return await updateFormArtifact(this.supabase, sessionId!, this.userId, input);
+          // @ts-expect-error - Database function type compatibility
+          return await updateFormArtifact(this.supabase, sessionId, this.userId, input);
         }
 
         case 'submit_bid': {
+          if (!sessionId) {
+            return { success: false, error: 'Session ID is required' };
+          }
           const { submitBid } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
-          return await submitBid(this.supabase, sessionId!, this.userId, input);
+          // @ts-expect-error - Database function type compatibility
+          return await submitBid(this.supabase, sessionId, this.userId, input);
         }
 
         case 'get_rfp_bids': {
           const { getRfpBids } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await getRfpBids(this.supabase, input);
         }
 
         case 'update_bid_status': {
           const { updateBidStatus } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
+          // @ts-expect-error - Database function type compatibility
           return await updateBidStatus(this.supabase, input);
         }
 
@@ -611,9 +625,8 @@ export class ToolExecutionService {
           }
 
           const { createMemory } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
           return await createMemory(
-            // @ts-ignore - Supabase client type compatibility
+            // @ts-expect-error - Supabase client type is unknown but compatible
             this.supabase,
             input,
             this.userId,
@@ -634,9 +647,8 @@ export class ToolExecutionService {
           }
 
           const { searchMemories } = await import('../tools/database.ts');
-          // @ts-ignore - Database function type compatibility
           return await searchMemories(
-            // @ts-ignore - Supabase client type compatibility
+            // @ts-expect-error - Supabase client type is unknown but compatible
             this.supabase,
             input,
             this.userId,

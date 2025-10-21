@@ -86,6 +86,10 @@ const AuthButtons: React.FC = () => {
         } else {
           setAuthError(error.message);
         }
+      } else {
+        // OAuth initiated successfully - close modal and redirect to provider
+        console.log('OAuth initiated, closing modal');
+        setShowAuthModal(false);
       }
     } catch (error) {
       console.error('OAuth error:', error);

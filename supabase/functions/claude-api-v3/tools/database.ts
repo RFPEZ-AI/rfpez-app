@@ -362,6 +362,20 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
   
   console.log('✅ Validated RFP association:', { rfp_id, rfp_name: rfp.name });
   
+  // ✅ CRITICAL FIX: Get account_id from session (artifacts table requires it)
+  const { data: sessionData, error: sessionError } = await supabase
+    .from('sessions')
+    .select('account_id')
+    .eq('id', sessionId)
+    .single() as { data: { account_id: string } | null; error: Error | null };
+  
+  if (sessionError || !sessionData?.account_id) {
+    throw new Error(`❌ Could not get account_id from session ${sessionId}. Session may not exist or lacks account association.`);
+  }
+  
+  const accountId = sessionData.account_id;
+  console.log('✅ Retrieved account_id from session:', accountId);
+  
   // Default to buyer_questionnaire if artifactRole is not provided
   const effectiveArtifactRole = artifactRole || 'buyer_questionnaire';
   
@@ -374,7 +388,7 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
   // Generate a unique ID for the artifact (artifacts table uses text ID)
   const artifactId = crypto.randomUUID();
   
-  console.log('Creating form artifact:', { artifactId, name, description, artifactRole: effectiveArtifactRole, mappedRole, sessionId, userId });
+  console.log('Creating form artifact:', { artifactId, name, description, artifactRole: effectiveArtifactRole, mappedRole, sessionId, userId, accountId });
   
   // Parse the content to extract schema components
   let schema: Record<string, unknown> = {};
@@ -427,6 +441,7 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
       id: artifactId, // Provide the required ID field
       session_id: sessionId,
       user_id: userId,
+      account_id: accountId, // ✅ CRITICAL FIX: Include account_id from session
       name: name,
       description: description,
       artifact_role: mappedRole,
@@ -563,6 +578,20 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
   
   console.log('✅ Validated RFP association:', { rfp_id, rfp_name: rfp.name });
   
+  // ✅ CRITICAL FIX: Get account_id from session (artifacts table requires it)
+  const { data: sessionData, error: sessionError } = await supabase
+    .from('sessions')
+    .select('account_id')
+    .eq('id', sessionId)
+    .single() as { data: { account_id: string } | null; error: Error | null };
+  
+  if (sessionError || !sessionData?.account_id) {
+    throw new Error(`❌ Could not get account_id from session ${sessionId}. Session may not exist or lacks account association.`);
+  }
+  
+  const accountId = sessionData.account_id;
+  console.log('✅ Retrieved account_id from session:', accountId);
+  
   // Map artifact role to valid database value
   const mappedRole = mapArtifactRole(artifactRole);
   if (!mappedRole) {
@@ -572,7 +601,7 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
   // Generate a unique ID for the artifact (artifacts table uses text ID)
   const artifactId = `doc_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
   
-  console.log('Creating document artifact:', { artifactId, name, description, artifactRole, mappedRole, sessionId, userId });
+  console.log('Creating document artifact:', { artifactId, name, description, artifactRole, mappedRole, sessionId, userId, accountId });
   
   // Validate content_type
   const validContentTypes = ['markdown', 'plain', 'html'];
@@ -584,6 +613,7 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
     id: artifactId, // Provide the required ID field
     session_id: sessionId,
     user_id: userId,
+    account_id: accountId, // ✅ CRITICAL FIX: Include account_id from session
     name: name,
     description: description,
     artifact_role: mappedRole,
@@ -1240,7 +1270,7 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
     .eq('is_active', true);
 
   // Activate new agent for this session
-  const { data: _sessionAgent, error: insertError } = await supabase
+  const { error: insertError } = await supabase
     .from('session_agents')
     .insert({
       session_id,
@@ -1357,7 +1387,7 @@ export async function fetchConversationHistory(supabase: SupabaseClient, session
 
 // Recommend agent for a topic
 export async function recommendAgent(supabase: SupabaseClient, data: { topic: string; conversation_context?: string }) {
-  const { topic, conversation_context: _conversation_context } = data;
+  const { topic } = data;
   
   console.log('Recommending agent for topic:', topic);
   
@@ -1657,7 +1687,7 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(artifact_id);
     
     if (isUUID) {
-      // @ts-ignore - Supabase client type compatibility
+      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, schema, ui_schema, default_values')
@@ -1673,7 +1703,7 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
     
     // Try by name in session
     if (!existingArtifact) {
-      // @ts-ignore - Supabase client type compatibility
+      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, schema, ui_schema, default_values')
@@ -1687,7 +1717,7 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
         resolvedArtifactId = (data as unknown as { id: string }).id;
       } else {
         // Try fuzzy matching
-        // @ts-ignore - Supabase client type compatibility
+        // @ts-expect-error - Supabase client type compatibility
         const { data: candidates, error: fuzzyError } = await supabase
           .from('artifacts')
           .select('id, name, type, schema, ui_schema, default_values')
@@ -1704,7 +1734,7 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
     
     // Fallback to most recent form
     if (!existingArtifact) {
-      // @ts-ignore - Supabase client type compatibility
+      // @ts-expect-error - Supabase client type compatibility
       const { data: currentArtifacts, error: currentError } = await supabase
         .from('artifacts')
         .select('id, name, type, schema, ui_schema, default_values')
@@ -1782,7 +1812,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     
     if (isUUID) {
       console.log('🔍 Searching by UUID:', artifact_id);
-      // @ts-ignore - Supabase client type compatibility
+      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1801,7 +1831,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
       console.log('🔍 Searching by name in session:', { name: artifact_id, session_id });
       
       // Try exact name match first
-      // @ts-ignore - Supabase client type compatibility
+      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1817,7 +1847,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
       } else {
         // Try fuzzy name matching (case-insensitive, partial matches)
         console.log('🔍 Trying fuzzy name matching...');
-        // @ts-ignore - Supabase client type compatibility
+        // @ts-expect-error - Supabase client type compatibility
         const { data: candidates, error: fuzzyError } = await supabase
           .from('artifacts')
           .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1840,7 +1870,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     // If still not found, get the currently active artifact as fallback
     if (!existingArtifact) {
       console.log('🔍 Trying to get currently active form artifact...');
-      // @ts-ignore - Supabase client type compatibility
+      // @ts-expect-error - Supabase client type compatibility
       const { data: currentArtifacts, error: currentError } = await supabase
         .from('artifacts')
         .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1873,7 +1903,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     });
     
     // Get current auth context for debugging
-    // @ts-ignore - Supabase client type compatibility
+    // @ts-expect-error - Supabase client type compatibility
     const { data: { user }, error: authError } = await supabase.auth.getUser();
     console.log('🔐 Auth context:', { 
       authError, 
@@ -1883,7 +1913,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     });
     
     // Update the default_values field with the new form data using the resolved artifact ID
-    // @ts-ignore - Supabase client type compatibility
+    // @ts-expect-error - Supabase client type compatibility
     const { data: updatedData, error: updateError } = await supabase
       .from('artifacts')
       .update({
@@ -1936,7 +1966,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     
     // FINAL VERIFICATION: Re-read the artifact to ensure data persistence
     console.log('🔍 Final verification: re-reading artifact to confirm persistence...');
-    // @ts-ignore - Supabase client type compatibility
+    // @ts-expect-error - Supabase client type compatibility
     const { data: verificationData, error: verificationError } = await supabase
       .from('artifacts')
       .select('id, name, default_values, updated_at')
@@ -2027,7 +2057,7 @@ export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: s
   
   try {
     // Get the existing artifact to validate schema compatibility
-    // @ts-ignore - Supabase client type compatibility
+    // @ts-expect-error - Supabase client type compatibility
     const { data: existingArtifact, error: checkError } = await supabase
       .from('artifacts')
       .select('*')
@@ -2039,7 +2069,7 @@ export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: s
     }
     
     // Update the artifact in database
-    // @ts-ignore - Supabase client type compatibility
+    // @ts-expect-error - Supabase client type compatibility
     const { data: updatedArtifact, error: updateError } = await supabase
       .from('artifacts')
       .update({
@@ -2287,7 +2317,7 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
     console.log('✅ Bid submitted successfully:', { submissionId });
 
     // Get the created bid ID from the submission metadata
-    const { data: submissionData, error: _submissionError } = await supabase
+    const { data: submissionData } = await supabase
       .from('artifact_submissions')
       .select('metadata')
       .eq('id', submissionId)
@@ -2423,13 +2453,13 @@ export async function getRfpBids(supabase: SupabaseClient, data: {
 
   try {
     // Debug: Log which database we're querying
-    // @ts-ignore - accessing private property for debugging
+    // @ts-expect-error - accessing private property for debugging
     const clientUrl = String(supabase['supabaseUrl'] || 'unknown');
     console.log('🔍 Supabase client connected to:', clientUrl);
     
     // 🚨 TEMPORARY TEST: Import service role client to test RLS hypothesis
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.45.0');
-    // @ts-ignore - Deno env access
+    // @ts-expect-error - Deno env access
     const testClient = createClient(
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''
@@ -2502,7 +2532,7 @@ export async function updateBidStatus(supabase: SupabaseClient, data: {
 
   try {
     const rpcClient = supabase as unknown as { rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: unknown; error: unknown }> };
-    const { data: _result, error } = await rpcClient.rpc('update_bid_status', {
+    const { error } = await rpcClient.rpc('update_bid_status', {
       bid_id_param: data.bid_id,
       new_status: data.status,
       status_reason_param: data.status_reason || null,
@@ -2582,7 +2612,7 @@ export async function createMemory(
       throw new Error(`User profile not found for supabase_user_id: ${userId}`);
     }
 
-    // @ts-ignore - We know userProfile has an id property
+    // @ts-expect-error - We know userProfile has an id property
     const userProfileId = userProfile.id;
     console.log('✅ Found user_profile.id:', userProfileId, 'for supabase_user_id:', userId);
 
@@ -2598,7 +2628,7 @@ export async function createMemory(
       throw new Error(`Account not found for user_id: ${userProfileId}`);
     }
 
-    // @ts-ignore - We know accountUser has an account_id property
+    // @ts-expect-error - We know accountUser has an account_id property
     const accountId = accountUser.account_id;
     console.log('✅ Found account_id:', accountId, 'for user_profile.id:', userProfileId);
 
@@ -2694,7 +2724,7 @@ export async function searchMemories(
       throw new Error(`User profile not found for supabase_user_id: ${userId}`);
     }
 
-    // @ts-ignore - We know userProfile has an id property
+    // @ts-expect-error - We know userProfile has an id property
     const userProfileId = userProfile.id;
 
     // Get the user's account_id from account_users
@@ -2709,7 +2739,7 @@ export async function searchMemories(
       throw new Error(`Account not found for user_id: ${userProfileId}`);
     }
 
-    // @ts-ignore - We know accountUser has an account_id property
+    // @ts-expect-error - We know accountUser has an account_id property
     const accountId = accountUser.account_id;
     console.log('✅ Searching memories for account_id:', accountId);
 

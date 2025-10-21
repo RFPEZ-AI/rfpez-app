@@ -20,6 +20,7 @@ export interface UserProfile {
 export interface Session {
   id: string; // UUID
   user_id: string; // UUID
+  account_id: string; // UUID - Account this session belongs to (required)
   title: string;
   description?: string;
   created_at: string;

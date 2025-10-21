@@ -253,7 +253,24 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                 
                 {/* Tool invocations from message metadata */}
                 {(() => {
+                  // Debug logging for tool invocations
+                  if (!message.isUser) {
+                    const toolInvocations = message.metadata?.toolInvocations;
+                    console.log('🔍 Message metadata check:', {
+                      messageId: message.id,
+                      agentName: message.agentName,
+                      hasMetadata: !!message.metadata,
+                      hasToolInvocations: !!toolInvocations,
+                      isArray: Array.isArray(toolInvocations),
+                      toolCount: Array.isArray(toolInvocations) ? toolInvocations.length : 0,
+                      toolNames: Array.isArray(toolInvocations) 
+                        ? toolInvocations.map((t: any) => t.toolName).join(', ')
+                        : 'N/A'
+                    });
+                  }
+                  
                   if (!message.isUser && message.metadata?.toolInvocations && Array.isArray(message.metadata.toolInvocations) && message.metadata.toolInvocations.length > 0) {
+                    console.log('✅ Rendering ToolExecutionDisplay for message:', message.id, 'with', message.metadata.toolInvocations.length, 'tools');
                     return (
                       <div style={{ marginTop: '8px' }}>
                         <ToolExecutionDisplay

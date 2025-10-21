@@ -728,13 +728,15 @@ export const useMessageHandling = (
               content: '',
               isUser: false,
               timestamp: new Date(),
-              agentName: metadata.agent_name || 'AI Assistant'
+              agentName: metadata.agent_name || 'AI Assistant',
+              hidden: true // ✅ FIX: Hide empty agent switch messages (will unhide when content arrives)
             };
             
             console.log('📝 Creating new message:', {
               id: newAgentMessageId,
               agentName: newAgentMessage.agentName,
-              contentLength: 0
+              contentLength: 0,
+              hidden: true
             });
             
             setMessages(prev => [...prev, newAgentMessage]);
