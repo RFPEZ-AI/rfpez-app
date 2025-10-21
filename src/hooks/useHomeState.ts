@@ -7,7 +7,8 @@ export const useHomeState = (userId?: string, isAuthenticated?: boolean) => {
   const [isLoading, setIsLoading] = useState(false);
   const [selectedSessionId, setSelectedSessionId] = useState<string>();
   const [currentSessionId, setCurrentSessionId] = useState<string>();
-  const [needsSessionRestore, setNeedsSessionRestore] = useState<string | null>(null);
+  // Tri-state: undefined = not checked yet, null = checked but no session, 'session-id' = session to restore
+  const [needsSessionRestore, setNeedsSessionRestore] = useState<string | null | undefined>(undefined);
 
   // CRITICAL FIX: Restore current session from database on app load
   // This ensures the user stays in their current session after page refresh
@@ -25,9 +26,13 @@ export const useHomeState = (userId?: string, isAuthenticated?: boolean) => {
             setNeedsSessionRestore(sessionId);
           } else {
             console.log('ℹ️ No current session found in database');
+            // Set to null to indicate we checked but found nothing
+            setNeedsSessionRestore(null);
           }
         } catch (error) {
           console.error('❌ Failed to restore current session:', error);
+          // Set to null on error so we don't block loading default agent
+          setNeedsSessionRestore(null);
         }
       }
     };

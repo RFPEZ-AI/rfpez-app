@@ -1687,7 +1687,6 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
     const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(artifact_id);
     
     if (isUUID) {
-      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, schema, ui_schema, default_values')
@@ -1703,7 +1702,6 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
     
     // Try by name in session
     if (!existingArtifact) {
-      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, schema, ui_schema, default_values')
@@ -1717,7 +1715,6 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
         resolvedArtifactId = (data as unknown as { id: string }).id;
       } else {
         // Try fuzzy matching
-        // @ts-expect-error - Supabase client type compatibility
         const { data: candidates, error: fuzzyError } = await supabase
           .from('artifacts')
           .select('id, name, type, schema, ui_schema, default_values')
@@ -1734,8 +1731,7 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
     
     // Fallback to most recent form
     if (!existingArtifact) {
-      // @ts-expect-error - Supabase client type compatibility
-      const { data: currentArtifacts, error: currentError } = await supabase
+      const { data: currentArtifacts, error: currentError} = await supabase
         .from('artifacts')
         .select('id, name, type, schema, ui_schema, default_values')
         .eq('session_id', session_id)
@@ -1812,7 +1808,6 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     
     if (isUUID) {
       console.log('🔍 Searching by UUID:', artifact_id);
-      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1831,7 +1826,6 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
       console.log('🔍 Searching by name in session:', { name: artifact_id, session_id });
       
       // Try exact name match first
-      // @ts-expect-error - Supabase client type compatibility
       const { data, error } = await supabase
         .from('artifacts')
         .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1847,7 +1841,6 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
       } else {
         // Try fuzzy name matching (case-insensitive, partial matches)
         console.log('🔍 Trying fuzzy name matching...');
-        // @ts-expect-error - Supabase client type compatibility
         const { data: candidates, error: fuzzyError } = await supabase
           .from('artifacts')
           .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1870,7 +1863,6 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     // If still not found, get the currently active artifact as fallback
     if (!existingArtifact) {
       console.log('🔍 Trying to get currently active form artifact...');
-      // @ts-expect-error - Supabase client type compatibility
       const { data: currentArtifacts, error: currentError } = await supabase
         .from('artifacts')
         .select('id, name, type, artifact_role, schema, user_id, session_id')
@@ -1903,8 +1895,8 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     });
     
     // Get current auth context for debugging
-    // @ts-expect-error - Supabase client type compatibility
-    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    const { data, error: authError } = await supabase.auth.getUser();
+    const user = data?.user;
     console.log('🔐 Auth context:', { 
       authError, 
       user_id: user?.id,
@@ -1913,7 +1905,6 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     });
     
     // Update the default_values field with the new form data using the resolved artifact ID
-    // @ts-expect-error - Supabase client type compatibility
     const { data: updatedData, error: updateError } = await supabase
       .from('artifacts')
       .update({
@@ -1966,7 +1957,6 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
     
     // FINAL VERIFICATION: Re-read the artifact to ensure data persistence
     console.log('🔍 Final verification: re-reading artifact to confirm persistence...');
-    // @ts-expect-error - Supabase client type compatibility
     const { data: verificationData, error: verificationError } = await supabase
       .from('artifacts')
       .select('id, name, default_values, updated_at')
@@ -2057,7 +2047,6 @@ export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: s
   
   try {
     // Get the existing artifact to validate schema compatibility
-    // @ts-expect-error - Supabase client type compatibility
     const { data: existingArtifact, error: checkError } = await supabase
       .from('artifacts')
       .select('*')
@@ -2069,7 +2058,6 @@ export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: s
     }
     
     // Update the artifact in database
-    // @ts-expect-error - Supabase client type compatibility
     const { data: updatedArtifact, error: updateError } = await supabase
       .from('artifacts')
       .update({
@@ -2174,12 +2162,20 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
       if (!supplierId && data.supplier_name) {
         console.log('🔍 Checking for existing supplier:', data.supplier_name);
         
-        // Check if supplier already exists
-        const { data: existingSupplier } = await supabase
+        // Check if supplier already exists (use limit(1) to avoid single() error when no match)
+        const { data: existingSuppliers, error: lookupError } = await supabase
           .from('supplier_profiles')
           .select('id')
           .eq('name', data.supplier_name)
-          .single();
+          .limit(1);
+        
+        if (lookupError) {
+          console.error('❌ Error looking up supplier:', lookupError);
+          throw new Error(`Failed to lookup supplier: ${String(lookupError)}`);
+        }
+        
+        const existingSupplierArray = existingSuppliers as unknown as Array<{ id: number }> | null;
+        const existingSupplier = existingSupplierArray && existingSupplierArray.length > 0 ? existingSupplierArray[0] : null;
         
         if (existingSupplier && typeof existingSupplier === 'object' && 'id' in existingSupplier) {
           supplierId = existingSupplier.id as number;
@@ -2201,11 +2197,24 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
             throw new Error(`Failed to create supplier profile: ${String(supplierError)}`);
           }
           
-          if (newSupplier && typeof newSupplier === 'object' && 'id' in newSupplier) {
-            supplierId = newSupplier.id as number;
-            console.log('✅ Created new supplier:', { supplierId });
+          if (!newSupplier || typeof newSupplier !== 'object' || !('id' in newSupplier)) {
+            console.error('❌ Supplier creation returned no data');
+            throw new Error('Supplier profile was not created (no ID returned)');
           }
+          
+          supplierId = newSupplier.id as number;
+          console.log('✅ Created new supplier:', { supplierId, supplierData: newSupplier });
         }
+      }
+      
+      // CRITICAL VALIDATION: Ensure we have a supplier_id before inserting bid
+      if (!supplierId) {
+        console.error('❌ No supplier_id available for bid submission', { 
+          hasSupplierName: !!data.supplier_name,
+          hasDirectSupplierId: !!data.supplier_id,
+          finalSupplierId: supplierId
+        });
+        throw new Error('Cannot submit bid without a valid supplier. Please provide either supplier_name or supplier_id.');
       }
 
       // Build response JSONB with bid details
@@ -2459,7 +2468,6 @@ export async function getRfpBids(supabase: SupabaseClient, data: {
     
     // 🚨 TEMPORARY TEST: Import service role client to test RLS hypothesis
     const { createClient } = await import('https://esm.sh/@supabase/supabase-js@2.45.0');
-    // @ts-expect-error - Deno env access
     const testClient = createClient(
       Deno.env.get('SUPABASE_URL') || '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || ''

@@ -17,7 +17,7 @@ interface UseSessionInitializationParams {
   messages: Message[];
   currentRfpId: number | null | undefined;
   artifacts: Artifact[];
-  needsSessionRestore: string | null;
+  needsSessionRestore: string | null | undefined; // Tri-state: undefined = not checked, null = no session, string = session ID
   
   setMessages: (messages: Message[]) => void;
   setArtifacts: (artifacts: Artifact[]) => void;
@@ -100,8 +100,11 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     
     // Only load default agent if no current session exists and no messages
     // This prevents overriding active agent selections during routine auth state changes
-    // CRITICAL FIX: Also check if sessions are available - if yes, we're about to restore, so don't load default
-    if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length === 0) {
+    // CRITICAL FIX: Check needsSessionRestore state:
+    //   - undefined = still checking database (don't load default yet)
+    //   - null = checked, no session found (OK to load default)
+    //   - string = session to restore (don't load default)
+    if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length === 0 && needsSessionRestore === null) {
       console.log('Loading default agent for initial app startup (no sessions available to restore)...');
       
       // Show loading message immediately
@@ -122,17 +125,13 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
           console.log('⚠️ No welcome message returned, keeping activation message');
         }
       });
-    } else if (!supabaseLoading && !currentSessionId && messages.length === 0 && sessions.length > 0) {
-      console.log('🔄 Sessions available - showing activation message while waiting for session restoration...');
+    } else if (!supabaseLoading && !currentSessionId && messages.length === 0 && (sessions.length > 0 || needsSessionRestore)) {
+      console.log('🔄 Sessions available or session restoration pending - waiting for restoration...');
+      console.log('🔍 needsSessionRestore state:', needsSessionRestore);
       
-      // Show loading message immediately while session restoration is in progress
-      setMessages([{
-        id: 'agent-loading',
-        content: '🤖 Activating Solutions agent...',
-        isUser: false,
-        timestamp: new Date(),
-        agentName: 'System'
-      }]);
+      // Don't show any loading message - let the session restoration handle it
+      // This prevents the "Activating Solutions agent..." message from appearing
+      // when we're about to restore an existing session
     }
     
     // Check if we have basic authentication (session and user) for loading sessions
@@ -142,7 +141,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
         loadUserSessions();
       }
     }
-  }, [isAuthenticated, supabaseLoading, user, userProfile]);
+  }, [isAuthenticated, supabaseLoading, user, userProfile, needsSessionRestore]);
 
   // Separate useEffect to handle session restoration after sessions are loaded
   useEffect(() => {
