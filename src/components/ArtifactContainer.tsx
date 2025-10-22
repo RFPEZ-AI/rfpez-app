@@ -23,8 +23,18 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   currentRfpId,
   onArtifactSelect
 }) => {
-  // State management
-  const [isPortrait, setIsPortrait] = useState<boolean>(window.innerHeight > window.innerWidth);
+  // State management - Use aspect ratio with threshold for reliable orientation detection
+  const [isPortrait, setIsPortrait] = useState<boolean>(() => {
+    const aspectRatio = window.innerWidth / window.innerHeight;
+    const mediaQuery = window.matchMedia('(orientation: portrait)').matches;
+    
+    // Use aspect ratio as primary, media query as secondary
+    // Aspect ratio < 1 is definitely portrait
+    // If aspect ratio is close to 1 (0.9-1.1), use media query
+    if (aspectRatio < 0.9) return true;   // Clearly portrait
+    if (aspectRatio > 1.1) return false;  // Clearly landscape
+    return mediaQuery;  // Use media query for edge cases
+  });
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [portraitHeight, setPortraitHeight] = useState<number>(40);
   const [isDragging, setIsDragging] = useState<boolean>(false);
@@ -35,11 +45,26 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   // Listen for window resize to update aspect ratio detection
   useEffect(() => {
     const handleResize = () => {
-      setIsPortrait(window.innerHeight > window.innerWidth);
+      const aspectRatio = window.innerWidth / window.innerHeight;
+      const mediaQuery = window.matchMedia('(orientation: portrait)').matches;
+      
+      // Use aspect ratio thresholds to avoid false positives from zoom/DevTools
+      if (aspectRatio < 0.9) {
+        setIsPortrait(true);   // Clearly portrait
+      } else if (aspectRatio > 1.1) {
+        setIsPortrait(false);  // Clearly landscape
+      } else {
+        setIsPortrait(mediaQuery);  // Use media query for edge cases
+      }
     };
 
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    window.addEventListener('orientationchange', handleResize);
+    
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      window.removeEventListener('orientationchange', handleResize);
+    };
   }, []);
 
   // Handle drag to resize in portrait mode

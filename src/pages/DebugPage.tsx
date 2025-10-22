@@ -28,6 +28,7 @@ import AuthDebugger from '../components/AuthDebugger';
 import RoleManagement from '../components/RoleManagement';
 import MCPTestComponent from '../components/MCPTestComponent';
 import { SimpleRateLimitStatus } from '../components/RateLimitStatus';
+import ViewportDiagnostics from '../components/ViewportDiagnostics';
 import { useSupabase } from '../context/SupabaseContext';
 import { RoleService } from '../services/roleService';
 import { testClaudeMCPAvailability, MCPTestResult } from '../utils/mcpTestUtils';
@@ -157,6 +158,9 @@ const DebugPage: React.FC = () => {
         </IonToolbar>
       </IonHeader>
       <IonContent className="ion-padding">
+        {/* Viewport Diagnostics - Remote Testing Support */}
+        <ViewportDiagnostics />
+        
         {/* Phase 1 Test Button - Edge Function Integration */}
         <Phase1TestButton />
         
