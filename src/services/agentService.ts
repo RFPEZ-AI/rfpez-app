@@ -307,28 +307,12 @@ export class AgentService {
     if (agents.length > 1) {
       console.warn('Multiple agents found with same ID during setSessionAgent:', agentId);
     }
-    
-    // Get the user profile to get the internal ID
-    const { data: userProfiles, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('supabase_user_id', supabaseUserId);
-
-    if (profileError || !userProfiles || userProfiles.length === 0) {
-      console.error('User profile not found for Supabase user ID:', supabaseUserId);
-      return false;
-    }
-    
-    const userProfile = userProfiles[0];
-    if (userProfiles.length > 1) {
-      console.warn('Multiple user profiles found for Supabase user ID:', supabaseUserId);
-    }
 
     const { data, error } = await supabase
       .rpc('switch_session_agent', { 
         session_uuid: sessionId, 
         new_agent_uuid: agentId, 
-        user_uuid: userProfile.id 
+        user_uuid: supabaseUserId  // ✅ Direct auth.users.id usage
       });
 
     if (error) {

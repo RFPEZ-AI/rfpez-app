@@ -341,6 +341,9 @@ export class ToolExecutionService {
     const { name, input } = toolCall;
     
     console.log(`Executing tool: ${name}`, input);
+    
+    // Track tool start
+    this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
 
     try {
       switch (name) {
@@ -491,19 +494,23 @@ export class ToolExecutionService {
           // Validate session_id - must be valid UUID, not empty string
           if (!sessionId || sessionId.trim() === '') {
             console.error('❌ SWITCH_AGENT ERROR: session_id is required and cannot be empty');
-            return {
+            const errorResult = {
               success: false,
               error: 'Session ID is required for agent switching',
               message: 'Cannot switch agents without a valid session. Please start a new session.'
             };
+            this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, errorResult);
+            return errorResult;
           }
           
           const { switchAgent } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
-          return await switchAgent(this.supabase, this.userId, {
+          const switchResult = await switchAgent(this.supabase, this.userId, {
             ...input,
             session_id: sessionId
           }, this.userMessage);
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, switchResult);
+          return switchResult;
         }
 
         case 'recommend_agent': {
@@ -617,15 +624,17 @@ export class ToolExecutionService {
           // Validate required parameters
           if (!sessionId || !agentId) {
             console.error('❌ CREATE_MEMORY ERROR: sessionId and agentId are required');
-            return {
+            const errorResult = {
               success: false,
               error: 'Session ID and Agent ID are required for memory creation',
               message: 'Cannot create memories without valid session and agent context.'
             };
+            this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, errorResult);
+            return errorResult;
           }
 
           const { createMemory } = await import('../tools/database.ts');
-          return await createMemory(
+          const memoryResult = await createMemory(
             // @ts-expect-error - Supabase client type is unknown but compatible
             this.supabase,
             input,
@@ -633,6 +642,8 @@ export class ToolExecutionService {
             agentId,
             sessionId
           );
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, memoryResult);
+          return memoryResult;
         }
 
         case 'search_memories': {
@@ -656,19 +667,24 @@ export class ToolExecutionService {
           );
         }
 
-        default:
+        default: {
           console.log(`Unknown tool: ${name}`);
-          return {
+          const unknownResult = {
             success: false,
             error: `Unknown tool: ${name}`
           };
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, unknownResult);
+          return unknownResult;
+        }
       }
     } catch (error) {
       console.error(`Error executing tool ${name}:`, error);
-      return {
+      const errorResult = {
         success: false,
         error: error instanceof Error ? error.message : 'Tool execution failed'
       };
+      this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, errorResult);
+      return errorResult;
     }
   }
 

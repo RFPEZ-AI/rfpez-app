@@ -75,6 +75,7 @@ async function streamWithRecursiveTools(
   supabase: unknown,
   sessionId?: string,
   agentId?: string,
+  userId?: string,
   recursionDepth = 0
 ): Promise<{ fullContent: string; toolsUsed: string[]; executedToolResults: unknown[] }> {
   const MAX_RECURSION_DEPTH = 5;
@@ -234,12 +235,41 @@ async function streamWithRecursiveTools(
           context_preview: (contextMessage as string)?.substring(0, 100)
         });
         
+        // 🎯 SAVE ORIGINAL AGENT'S MESSAGE WITH TOOL INVOCATIONS
+        // Before switching agents, save the original agent's message with tool invocations
+        // This ensures the Solutions agent's work (create_memory, switch_agent) is recorded
+        console.log('💾 Saving original agent message with tool invocations before agent switch');
+        const originalAgentToolInvocations = toolService.getToolInvocations();
+        console.log(`📊 Original agent has ${originalAgentToolInvocations.length} tool invocations to save`);
+        
+        if (originalAgentToolInvocations.length > 0 && userId && sessionId) {
+          const { storeMessage } = await import('../tools/database.ts');
+          const originalAgentMessageResult = await storeMessage(supabase as SupabaseClient, {
+            sessionId: sessionId,
+            userId: userId,
+            sender: 'assistant',
+            content: fullContent || '✓ Agent handoff initiated', // Show something if no text content
+            agentId: agentId,
+            metadata: {
+              toolInvocations: originalAgentToolInvocations,
+              agent_switch: true,
+              switched_to: newAgentData?.name
+            }
+          });
+          
+          if (originalAgentMessageResult.success) {
+            console.log('✅ Original agent message saved with tool invocations:', originalAgentMessageResult.message_id);
+          } else {
+            console.error('❌ Failed to save original agent message');
+          }
+        }
+        
         // 🎯 CRITICAL FIX: Send completion event for first agent's message before starting new agent
         console.log('✅ Completing first agent message before agent switch');
         const messageCompleteEvent = {
           type: 'message_complete',
           agent_id: agentId,
-          content: fullContent,
+          content: fullContent || '✓ Agent handoff initiated',
           timestamp: new Date().toISOString()
         };
         controller.enqueue(
@@ -308,6 +338,7 @@ async function streamWithRecursiveTools(
           supabase,
           sessionId,
           newAgentData?.id as string, // Use new agent's ID for correct message attribution
+          userId, // Pass userId for message saving
           recursionDepth + 1
         );
         
@@ -367,6 +398,7 @@ async function streamWithRecursiveTools(
       supabase,
       sessionId,
       agentId,
+      userId, // Pass userId for message saving
       recursionDepth + 1
     );
     
@@ -461,7 +493,8 @@ function handleStreamingResponse(
           controller,
           supabase,
           sessionId,
-          agentId
+          agentId,
+          userId // Pass userId for message saving
         );
         
         const { fullContent, toolsUsed, executedToolResults } = result;
@@ -996,7 +1029,8 @@ Do NOT wait for a new user message - generate your introduction and welcome mess
                     controller,
                     supabase,
                     actualSessionId,
-                    newAgentData?.id as string
+                    newAgentData?.id as string,
+                    userId // Pass userId for message saving
                   );
                   
                   // 3. Send completion event

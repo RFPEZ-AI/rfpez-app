@@ -26,34 +26,27 @@ export class DatabaseService {
   static async createSession(supabaseUserId: string, title: string, description?: string, currentRfpId?: number): Promise<Session | null> {
     console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description, currentRfpId });
     
-    // Get the user profile and their account_id via user_accounts junction table
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select(`
-        id,
-        user_accounts!inner(account_id)
-      `)
-      .eq('supabase_user_id', supabaseUserId)
+    // Get the user's account_id from account_users table
+    // supabaseUserId is auth.users.id - sessions.user_id now directly references auth.users
+    const { data: accountUser, error: accountError } = await supabase
+      .from('account_users')
+      .select('account_id')
+      .eq('user_id', supabaseUserId)
       .single();
 
-    console.log('User profile lookup:', { userProfile, profileError });
+    console.log('Account lookup:', { accountUser, accountError });
 
-    if (profileError || !userProfile) {
-      console.error('User profile not found for Supabase user ID:', supabaseUserId);
+    if (accountError || !accountUser) {
+      console.error('Account not found for auth user ID:', supabaseUserId);
       return null;
     }
 
-    // Extract account_id from user_accounts junction table
-    const accountId = (userProfile.user_accounts as any)?.[0]?.account_id;
-    if (!accountId) {
-      console.error('No account found for user profile:', userProfile.id);
-      return null;
-    }
-
+    const accountId = accountUser.account_id;
     console.log('Attempting to insert session into database with account_id:', accountId);
+    
     const sessionData: Omit<Session, 'id' | 'created_at' | 'updated_at' | 'is_archived'> = {
-      user_id: userProfile.id, // Use the user_profiles.id (internal UUID)
-      account_id: accountId,   // ✅ CRITICAL FIX: Include account_id from user_accounts
+      user_id: supabaseUserId, // Now directly uses auth.users.id (FK updated)
+      account_id: accountId,    // Required field after schema update
       title,
       description
     };
@@ -127,22 +120,8 @@ export class DatabaseService {
   static async getUserSessions(supabaseUserId: string): Promise<SessionWithStats[]> {
     console.log('DatabaseService.getUserSessions called for supabaseUserId:', supabaseUserId);
     
-    // First get the user profile to get the internal ID
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('supabase_user_id', supabaseUserId)
-      .single();
-
-    console.log('User profile lookup:', { userProfile, profileError });
-
-    if (profileError || !userProfile) {
-      console.error('User profile not found for Supabase user ID:', supabaseUserId);
-      return [];
-    }
-
-    console.log('Fetching sessions directly from sessions table...');
-    // Use direct query instead of RPC for now to debug
+    console.log('Fetching sessions directly from sessions table using Supabase user ID...');
+    // Sessions table stores Supabase auth user ID directly, not the user_profiles internal ID
     const { data: sessions, error } = await supabase
       .from('sessions')
       .select(`
@@ -154,7 +133,7 @@ export class DatabaseService {
         updated_at,
         is_archived
       `)
-      .eq('user_id', userProfile.id)
+      .eq('user_id', supabaseUserId)
       .order('updated_at', { ascending: false });
 
     console.log('getUserSessions result:', { sessions, error });
@@ -362,20 +341,6 @@ export class DatabaseService {
       aiMetadata
     });
 
-    // First get the user profile to get the internal ID
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('supabase_user_id', supabaseUserId)
-      .single();
-
-    console.log('User profile lookup:', { userProfile, profileError });
-
-    if (profileError || !userProfile) {
-      console.error('User profile not found for Supabase user ID:', supabaseUserId);
-      return null;
-    }
-
     // Get the next message order - simplified approach
     console.log('Getting message count for session...');
     const { count, error: countError } = await supabase
@@ -408,7 +373,7 @@ export class DatabaseService {
       .from('messages')
       .insert({
         session_id: sessionId,
-        user_id: userProfile.id,
+        user_id: supabaseUserId,  // ✅ Direct auth.users.id usage
         account_id: sessionData.account_id,
         content,
         role,

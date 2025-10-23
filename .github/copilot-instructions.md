@@ -800,6 +800,38 @@ The project includes comprehensive browser automation through MCP (Model Context
 
 ### ⚡ MCP Browser Testing Speed Tips & Best Practices
 
+#### **Browser MCP Session Management**
+
+**Session Lifecycle & Reactivation:**
+Browser MCP tools maintain an active browser automation session. The session may become inactive due to:
+- **Timeout**: No activity for extended period
+- **Browser closure**: Browser window/tab closed
+- **Resource cleanup**: MCP server closed the session automatically
+
+**🔄 Reactivating Browser MCP Tools:**
+When browser MCP tools are disabled (error: "Tool ... is currently disabled by the user"):
+
+```javascript
+// Reactivate all browser interaction tools
+activate_browser_interaction_tools();
+
+// This reopens a new browser session and enables:
+// - mcp_browser_navigate, mcp_browser_go_back, mcp_browser_go_forward
+// - mcp_browser_click, mcp_browser_type, mcp_browser_hover
+// - mcp_browser_screenshot, mcp_browser_snapshot
+// - mcp_browser_get_console_logs, mcp_browser_wait
+// - mcp_browser_press_key, mcp_browser_select_option
+
+// After reactivation, navigate to the app:
+mcp_browser_navigate({ url: 'http://localhost:3100' });
+```
+
+**Best Practices:**
+- ✅ Check if tools are active before attempting browser operations
+- ✅ Reactivate tools if you receive "disabled by user" errors
+- ✅ Navigate to the app immediately after reactivation
+- ✅ The browser state is fresh after reactivation (need to re-login if required)
+
 #### **Quick Test Setup Workflow**
 **Example Code Pattern (for test scripts, not Copilot execution):**
 ```javascript

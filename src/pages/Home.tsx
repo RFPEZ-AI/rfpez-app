@@ -330,7 +330,7 @@ const Home: React.FC = () => {
     };
   }, [currentRfp, supabase]);
 
-  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, clearToolInvocations, loadToolInvocationsForSession } = useMessageHandling(setGlobalRFPContext);
+  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, loadToolInvocationsForSession } = useMessageHandling(setGlobalRFPContext);
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -1149,20 +1149,20 @@ const Home: React.FC = () => {
         setMessages([initialMessage]);
       }
     } finally {
-      // Clear the flags after successfully setting up the new session
-      setTimeout(() => {
-        console.log('🏁 New session preparation complete, clearing flags');
-        console.log('📊 Final state check:', {
-          currentSessionId,
-          selectedSessionId,
-          refSessionId: currentSessionIdRef.current,
-          messagesCount: messages.length,
-          isCreatingNewSession: false
-        });
-        setIsCreatingNewSession(false);
-        setIsSessionLoading(false); // Reset auto-focus trigger
-        console.log('🆕 ========== NEW SESSION CREATION END ==========');
-      }, 100); // Small delay to ensure all state updates are processed
+      // CRITICAL FIX: Clear flags immediately, not with setTimeout delay
+      // The setTimeout was causing race conditions where user could send message
+      // before flag was cleared, leading to emergency session creation
+      console.log('🏁 New session preparation complete, clearing flags immediately');
+      console.log('📊 Final state check:', {
+        currentSessionId,
+        selectedSessionId,
+        refSessionId: currentSessionIdRef.current,
+        messagesCount: messages.length,
+        isCreatingNewSession: false
+      });
+      setIsCreatingNewSession(false);
+      setIsSessionLoading(false); // Reset auto-focus trigger
+      console.log('🆕 ========== NEW SESSION CREATION END ==========');
     }
   };
 
@@ -1213,6 +1213,14 @@ const Home: React.FC = () => {
     
     // 🎯 LAZY SESSION CREATION: If no session exists but we have a pending welcome message,
     // this is the user's first message - create the session now
+    console.log('🔍 LAZY SESSION CHECK:', {
+      activeSessionId: !!activeSessionId,
+      isAuthenticated,
+      userId: !!userId,
+      pendingWelcomeMessage: !!pendingWelcomeMessage,
+      pendingWelcomeContent: pendingWelcomeMessage?.content?.substring(0, 50)
+    });
+    
     if (!activeSessionId && isAuthenticated && userId && pendingWelcomeMessage) {
       console.log('🎯 LAZY SESSION CREATION: First user message detected - creating session now');
       console.log('👋 Pending welcome message will be saved with session');
@@ -1267,9 +1275,11 @@ const Home: React.FC = () => {
             setPendingWelcomeMessage(null);
             console.log('✨ Pending welcome message cleared - session now active');
             
-            // Clear tool invocations for the new session (start fresh)
-            clearToolInvocations(newSessionId);
-            loadToolInvocationsForSession(newSessionId);
+            // 🚨 CRITICAL FIX: Do NOT clear tool invocations during lazy creation!
+            // The streaming response is still in progress and tool events are being captured.
+            // Clearing here would wipe out all the tools that were just executed.
+            // Tool invocations will be saved when the streaming completes in handleSendMessage.
+            console.log('✅ Skipping tool invocation clear - streaming still in progress');
             
             // Reload sessions to include the new session
             if (loadUserSessions) {

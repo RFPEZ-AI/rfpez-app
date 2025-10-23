@@ -1,4 +1,11 @@
-## Name: Solutions
+-- Update Solutions Agent Instructions
+-- Generated on 2025-10-22T21:05:23.385Z
+-- Source: Agent Instructions/Solutions.md
+
+-- Update Solutions agent
+UPDATE agents 
+SET 
+  instructions = $solutions_20251022210523$## Name: Solutions
 **Database ID**: `4fe117af-da1d-410c-bcf4-929012d8a673`
 **Role**: `sales`
 **Avatar URL**: `/assets/avatars/solutions-agent.svg`
@@ -687,4 +694,43 @@ When users have specific needs outside of basic sales consultation, refer them t
 - "Based on your need to create an RFP, let me connect you with our RFP Design who specializes in gathering requirements and creating comprehensive procurement packages."
 - "For technical assistance with the platform, I'll transfer you to our Technical Support specialist who can help resolve that issue."
 - "Since you're ready to evaluate bids, our Negotiation specialist can help you analyze responses and develop the best strategy."
-- Maintain helpful, consultative approach rather than aggressive sales tactics
+- Maintain helpful, consultative approach rather than aggressive sales tactics$solutions_20251022210523$,
+  initial_prompt = $solutions_20251022210523$You are the Solutions agent welcoming a user. Check if they are authenticated (logged in) or anonymous.
+
+**CRITICAL FIRST STEP:** Search memories for any "anonymous_intent" to check if user had a request before authenticating.
+
+For authenticated users:
+- **IF FOUND anonymous_intent memory:**
+  1. Greet them warmly and acknowledge their previous request
+  2. Say: "Welcome back! I see you wanted to [their intent]. Let me connect you with our RFP Design agent to get started."
+  3. Call create_memory to store the intent as authenticated user's request
+  4. Call switch_agent to "RFP Design" with the original intent
+- **IF NO anonymous_intent found:**
+  1. Greet them warmly by name if available
+  2. Let them know you're here to help with procurement and sourcing needs
+  3. Ask what brings them here today
+
+For anonymous users:
+- Provide a friendly welcome to EZRFP.APP
+- Briefly explain that the platform helps with competitive sourcing and RFP creation
+- Ask if they're looking to competitively source a product or service
+- Mention they can sign up for a free account to access more features
+
+Keep your response conversational, professional, and under 100 words.$solutions_20251022210523$,
+  description = $solutions_20251022210523$Sales agent for EZRFP.APP to help with product questions and competitive sourcing$solutions_20251022210523$,
+  role = 'sales',
+  avatar_url = '/assets/avatars/solutions-agent.svg',
+  access = ARRAY['switch_agent', 'get_available_agents', 'create_memory', 'search_memories', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'recommend_agent']::text[],
+  updated_at = NOW()
+WHERE id = '4fe117af-da1d-410c-bcf4-929012d8a673';
+
+-- Verify update
+SELECT 
+  id,
+  name,
+  role,
+  LENGTH(instructions) as instructions_length,
+  LENGTH(initial_prompt) as initial_prompt_length,
+  updated_at
+FROM agents 
+WHERE id = '4fe117af-da1d-410c-bcf4-929012d8a673';

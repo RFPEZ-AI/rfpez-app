@@ -578,10 +578,18 @@ export function getToolDefinitions(agentRole?: string, allowedTools?: string[]):
   
   // NEW: Database-driven tool access control (preferred method)
   if (allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0) {
-    console.log(`� Using database-driven tool access control (${allowedTools.length} allowed tools)`);
+    // CRITICAL FIX: Split comma-separated tool names and flatten into single array
+    // Database stores tools like: ["create_memory, search_memories", "switch_agent"]
+    // We need: ["create_memory", "search_memories", "switch_agent"]
+    const flattenedTools = allowedTools.flatMap(toolStr => 
+      toolStr.split(',').map(t => t.trim())
+    );
+    
+    console.log(`📋 Raw access array from database:`, allowedTools);
+    console.log(`✅ Flattened tool names (${flattenedTools.length} tools):`, flattenedTools);
     
     const filteredTools = TOOL_DEFINITIONS.filter(tool => {
-      const allowed = allowedTools.includes(tool.name);
+      const allowed = flattenedTools.includes(tool.name);
       console.log(`🧪 Tool '${tool.name}': ${allowed ? '✅ ALLOWED' : '❌ BLOCKED'} (database access list)`);
       return allowed;
     });

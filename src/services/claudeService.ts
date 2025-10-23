@@ -338,13 +338,18 @@ export class ClaudeService {
       processInitialPrompt // Add flag to indicate initial prompt processing
     };
 
-    console.log('🚀 Calling claude-api-v3 edge function with payload:', {
+    // 🚨 DEBUG: Log the processInitialPrompt flag value
+    console.log('� generateResponseViaEdgeFunction - processInitialPrompt:', processInitialPrompt);
+    console.log('🚨 Call stack trace:', new Error().stack?.split('\n').slice(2, 5).join('\n'));
+
+    console.log('�🚀 Calling claude-api-v3 edge function with payload:', {
       userMessage: userMessage.substring(0, 100) + '...',
       agentId: agent?.id,
       sessionId,
       hasRfp: !!currentRfp,
       hasArtifact: !!currentArtifact,
-      historyLength: conversationHistory.length
+      historyLength: conversationHistory.length,
+      processInitialPrompt // Add to debug output
     });
 
     try {

@@ -39,11 +39,15 @@ export const useAgentManagement = (sessionId: string | null = null) => {
         setCurrentAgent(sessionActiveAgent);
         console.log('🎯 loadDefaultAgentWithPrompt: currentAgent state set successfully');
         
-        // Persist agent to session context only (agents are session-based now)
+        // 🚨 CRITICAL: Only persist agent to database if we have a VALID session
+        // During new session creation, sessionId may contain stale OLD session ID
+        // We skip the database update to prevent restoring old session state
         if (sessionId) {
-          await DatabaseService.updateSessionContext(sessionId, {
-            current_agent_id: defaultAgent.id
-          });
+          console.log('⚠️ Skipping database session context update during new session preparation');
+          console.log('📌 Session ID would have been:', sessionId, '(likely stale from closure)');
+          // await DatabaseService.updateSessionContext(sessionId, {
+          //   current_agent_id: defaultAgent.id
+          // });
         }
         
         console.log('Loaded default agent with prompt:', sessionActiveAgent);

@@ -497,6 +497,28 @@ export const useMessageHandling = (
         }
         
         // CRITICAL FIX: Don't auto-create session if we're in the middle of restoring one
+        // 🔍 CRITICAL FIX: Verify session exists in database before using it
+        // Sessions can exist in client state but not in database (e.g., after page reload with localStorage)
+        if (activeSessionId) {
+          console.log('🔍 Verifying session exists in database:', activeSessionId);
+          try {
+            const sessionExists = await DatabaseService.getSession(activeSessionId);
+            if (!sessionExists) {
+              console.warn('⚠️ Session', activeSessionId, 'exists in client state but NOT in database - will create new session');
+              activeSessionId = undefined; // Force creation of new session
+              setCurrentSessionId('');
+              setSelectedSessionId('');
+            } else {
+              console.log('✅ Session verified in database:', activeSessionId);
+            }
+          } catch (error) {
+            console.warn('⚠️ Failed to verify session in database - will create new session:', error);
+            activeSessionId = undefined;
+            setCurrentSessionId('');
+            setSelectedSessionId('');
+          }
+        }
+        
         // Check if session restoration is in progress by looking for database current session
         if (!activeSessionId) {
           console.log('❓ No current session - checking if restoration is in progress...');
@@ -772,29 +794,45 @@ export const useMessageHandling = (
             return;
           }
           
+          // 🔍 DEBUG: Log toolEvent parameter status BEFORE the if check
+          console.log('🔍 TOOL EVENT CHECK:', {
+            hasToolEvent: !!toolEvent,
+            toolEventValue: toolEvent,
+            toolEventType: typeof toolEvent,
+            isComplete,
+            toolProcessing
+          });
+          
           // Handle tool invocation events
           if (toolEvent) {
             console.log('🔧 Tool invocation event received:', toolEvent.type, toolEvent.toolName);
+            console.log('🔧 Current agent for tool attribution:', agentForResponse?.agent_id, agentForResponse?.agent_name);
+            
+            // 🎯 CRITICAL FIX: Add agentId to tool events for proper attribution
+            const toolEventWithAgent = {
+              ...toolEvent,
+              agentId: agentForResponse?.agent_id
+            };
             
             setToolInvocations(prev => {
               const existing = prev.find(t => t.toolName === toolEvent.toolName && t.type === 'tool_start');
               
               if (toolEvent.type === 'tool_start') {
-                console.log('➕ Adding tool_start to buffer:', toolEvent.toolName, '| Buffer size:', prev.length, '→', prev.length + 1);
-                // Add new tool start event
-                return [...prev, toolEvent];
+                console.log('➕ Adding tool_start to buffer:', toolEvent.toolName, 'with agentId:', agentForResponse?.agent_id, '| Buffer size:', prev.length, '→', prev.length + 1);
+                // Add new tool start event WITH agent ID
+                return [...prev, toolEventWithAgent];
               } else if (toolEvent.type === 'tool_complete' && existing) {
                 console.log('✅ Updating tool to completed:', toolEvent.toolName, '| Buffer size stays:', prev.length);
-                // Update existing tool to completed status
+                // Update existing tool to completed status WITH agent ID
                 return prev.map(t => 
                   t.toolName === toolEvent.toolName && t.type === 'tool_start'
-                    ? { ...toolEvent } // Replace with completion event
+                    ? { ...toolEventWithAgent } // Replace with completion event WITH agent ID
                     : t
                 );
               } else if (toolEvent.type === 'tool_complete') {
-                console.log('➕ Adding tool_complete (no start found):', toolEvent.toolName, '| Buffer size:', prev.length, '→', prev.length + 1);
-                // Add completion event if no start event found
-                return [...prev, toolEvent];
+                console.log('➕ Adding tool_complete (no start found):', toolEvent.toolName, 'with agentId:', agentForResponse?.agent_id, '| Buffer size:', prev.length, '→', prev.length + 1);
+                // Add completion event if no start event found WITH agent ID
+                return [...prev, toolEventWithAgent];
               }
               
               console.log('⚠️ Tool event not handled:', toolEvent.type, toolEvent.toolName);
@@ -1057,6 +1095,11 @@ export const useMessageHandling = (
               const newAgentId = claudeResponse.metadata.agent_switch_result.new_agent.id;
               console.log('🔄 Agent switch detected - Old:', agentForResponse?.agent_id, 'New:', newAgentId);
               
+              // 🎯 CRITICAL DEBUG: Check tool buffer state before filtering
+              console.log('🔍 TOOL BUFFER STATE AT AGENT SWITCH:');
+              console.log('  Total tools in buffer:', toolInvocations.length);
+              console.log('  All tool agentIds:', toolInvocations.map(t => ({ tool: t.toolName, agentId: t.agentId })));
+              
               // 🎯 CRITICAL FIX: Filter tools by PREVIOUS agent's ID
               const previousAgentId = agentForResponse?.agent_id;
               const previousAgentTools = toolInvocations.filter(t => t.agentId === previousAgentId);
@@ -1195,7 +1238,11 @@ export const useMessageHandling = (
             setMessages(prev => {
               const updated = prev.map(msg => 
                 msg.id === aiMessageId 
-                  ? { ...msg, content: accumulatedContent } // Use accumulated content instead of msg.content + buffer
+                  ? { 
+                      ...msg, 
+                      content: accumulatedContent, // Use accumulated content instead of msg.content + buffer
+                      hidden: false // 🎯 CRITICAL FIX: Unhide message when content arrives
+                    }
                   : msg
               );
               
@@ -1206,7 +1253,8 @@ export const useMessageHandling = (
                 agentName: updatedMessage?.agentName,
                 accumulatedLength: accumulatedContent.length,
                 newContentLength: updatedMessage?.content.length,
-                newContentPreview: updatedMessage?.content.substring(0, 100) + '...'
+                newContentPreview: updatedMessage?.content.substring(0, 100) + '...',
+                hidden: updatedMessage?.hidden
               });
               
               return updated;
@@ -1316,6 +1364,28 @@ export const useMessageHandling = (
         //   );
         // });
 
+        // 🎯 CRITICAL FIX: Get current message content from UI to ensure database has latest
+        const currentMessages = messages;
+        const currentMessage = currentMessages.find(msg => msg.id === aiMessageId);
+        const finalContent = currentMessage?.content || claudeResponse.content || '';
+        
+        console.log('💾 Preparing final message content for save:', {
+          messageId: aiMessageId,
+          uiContentLength: currentMessage?.content?.length || 0,
+          apiContentLength: claudeResponse.content?.length || 0,
+          finalContentLength: finalContent.length,
+          contentPreview: finalContent.substring(0, 100) + '...'
+        });
+        
+        // 🎯 CRITICAL FIX: Update UI with final content and unhide message before database save
+        setMessages(prev => 
+          prev.map(msg => 
+            msg.id === aiMessageId 
+              ? { ...msg, content: finalContent, hidden: false }
+              : msg
+          )
+        );
+        
         // Generate artifact references (still needed for database save, but UI update will be delayed)
         const artifactRefs = generateArtifactReferences(claudeResponse.metadata);
         
@@ -1405,6 +1475,42 @@ export const useMessageHandling = (
         // Reset processing flag after successful completion
         isProcessingRef.current = false;
 
+        // 🎯 CRITICAL: Attribute tools to current agent's message BEFORE agent switch UI update
+        if (claudeResponse.metadata.agent_switch_occurred) {
+          console.log('🔧 PRE-SWITCH TOOL ATTRIBUTION:');
+          console.log('  Current agent:', agentForResponse?.agent_id, agentForResponse?.agent_name);
+          console.log('  Total tools in buffer:', toolInvocations.length);
+          
+          // Get current agent's tools
+          const currentAgentId = agentForResponse?.agent_id;
+          const currentAgentTools = toolInvocations.filter(t => t.agentId === currentAgentId);
+          
+          console.log('  Current agent tools:', currentAgentTools.map(t => t.toolName).join(', '));
+          
+          // Attach tools to the current message BEFORE switching
+          if (currentAgentTools.length > 0) {
+            console.log('✅ Attaching', currentAgentTools.length, 'tools to current agent message:', aiMessageId);
+            
+            setMessages(prev => 
+              prev.map(msg => 
+                msg.id === aiMessageId 
+                  ? { 
+                      ...msg, 
+                      metadata: {
+                        ...msg.metadata,
+                        toolInvocations: currentAgentTools
+                      }
+                    }
+                  : msg
+              )
+            );
+            
+            console.log('✅ Tools attached successfully - now proceeding with agent switch UI update');
+          } else {
+            console.log('⚠️ No tools found for current agent - skipping attribution');
+          }
+        }
+
         // Check if an agent switch occurred during the Claude response
         if (claudeResponse.metadata.agent_switch_occurred) {
           await new Promise(resolve => setTimeout(resolve, 200));
@@ -1478,63 +1584,92 @@ export const useMessageHandling = (
             
             // 🎯 CRITICAL FIX: Only attach tools for the CURRENT AGENT
             // Filter tool invocations by current agent ID
-            const currentAgentId = agentForResponse?.agent_id;
-            const currentAgentTools = toolInvocations.filter(t => t.agentId === currentAgentId);
-            
             console.log('🔍 END OF STREAM TOOL ATTRIBUTION:');
-            console.log('  Current agent:', currentAgentId);
-            console.log('  Total tools in buffer:', toolInvocations.length);
-            console.log('  Tools for this agent:', currentAgentTools.length, '-', currentAgentTools.map(t => t.toolName).join(', '));
+            console.log('🔍 About to enter try block...');
+            console.log('🔍 agentForResponse available:', !!agentForResponse);
+            console.log('🔍 toolInvocations available:', !!toolInvocations);
+            console.log('🔍 Agent switch occurred:', !!claudeResponse?.metadata?.agent_switch_occurred);
+
+            // ✅ REMOVED: Skip logic no longer needed - we handle attribution before agent switch
+            // Attribution now happens BEFORE agent switch UI update (around line 1450)
+            // This code path only runs for non-switch scenarios
             
-            // Check if this message already has tools (from agent switch handling)
-            const currentMessage = messages.find(m => m.id === aiMessageId);
-            const alreadyHasTools = currentMessage?.metadata?.toolInvocations && 
-                                     Array.isArray(currentMessage?.metadata?.toolInvocations) && 
-                                     (currentMessage?.metadata?.toolInvocations?.length ?? 0) > 0;
-            
-            if (alreadyHasTools && currentMessage) {
-              const existingToolNames = Array.isArray(currentMessage?.metadata?.toolInvocations)
-                ? (currentMessage?.metadata?.toolInvocations as Array<{ toolName: string }>).map(t => t.toolName).join(', ')
-                : 'none';
-              console.log('⚠️ Message', aiMessageId, 'already has tools:', existingToolNames);
-            }
-            
-            // Only attach tools if:
-            // 1. We have tools for this agent AND
-            // 2. This message doesn't already have tools attached
-            const shouldAttachTools = currentAgentTools.length > 0 && !alreadyHasTools;
-            
-            // Build user-facing metadata (not AI response metadata)
-            const metadataWithTools = {
-              ...(shouldAttachTools ? { toolInvocations: currentAgentTools } : {})
-            };
-            
-            if (shouldAttachTools) {
-              console.log('✅ ATTACHING', currentAgentTools.length, 'tools to FINAL message ID:', aiMessageId);
-              console.log('✅ Tools being attached:', currentAgentTools.map(t => t.toolName).join(', '));
+            if (!claudeResponse?.metadata?.agent_switch_occurred) {
+              try {
+                console.log('🔍 INSIDE try block now');
               
-              // Also update the UI message immediately with tools
-              setMessages(prev => 
-                prev.map(msg => 
-                  msg.id === aiMessageId 
-                    ? { 
-                        ...msg, 
-                        metadata: {
-                          ...msg.metadata,
-                          toolInvocations: currentAgentTools
+              // �️ DEFENSIVE COPIES: Create immutable copies to avoid React re-render triggers
+              const agentSnapshot = agentForResponse ? { ...agentForResponse } : null;
+              console.log('🔍 Agent snapshot created:', agentSnapshot);
+              
+              const toolsSnapshot = [...toolInvocations];
+              console.log('🔍 Tools snapshot created, length:', toolsSnapshot.length);
+              
+              const currentAgentId = agentSnapshot?.agent_id;
+              console.log('🔍 Got currentAgentId from snapshot:', currentAgentId);
+              
+              // Use snapshots for filtering to avoid triggering React state reads
+              const currentAgentTools = toolsSnapshot.filter(t => t.agentId === currentAgentId);
+              console.log('🔍 Tools filtered from snapshot, count:', currentAgentTools.length);
+              
+              const toolAgentMapping = toolsSnapshot.map(t => ({ tool: t.toolName, agentId: t.agentId }));
+              console.log('🔍 All tool agent IDs:', toolAgentMapping);
+              
+              const toolNames = currentAgentTools.map(t => t.toolName).join(', ');
+              console.log('🔍 Tools for this agent:', currentAgentTools.length, '-', toolNames);
+              
+              // Now perform actual tool attribution using snapshots
+              console.log('🔍 Performing tool attribution for message:', aiMessageId);
+              
+              // Check if this message already has tools
+              const currentMessage = messages.find(m => m.id === aiMessageId);
+              const alreadyHasTools = currentMessage?.metadata?.toolInvocations && 
+                                       Array.isArray(currentMessage?.metadata?.toolInvocations) && 
+                                       (currentMessage?.metadata?.toolInvocations?.length ?? 0) > 0;
+              
+              console.log('🔍 Message already has tools?', alreadyHasTools);
+              
+              const shouldAttachTools = currentAgentTools.length > 0 && !alreadyHasTools;
+              console.log('🔍 Should attach tools?', shouldAttachTools);
+              
+              if (shouldAttachTools) {
+                console.log('✅ ATTACHING', currentAgentTools.length, 'tools to FINAL message ID:', aiMessageId);
+                console.log('✅ Tools being attached:', toolNames);
+                
+                setMessages(prev => 
+                  prev.map(msg => 
+                    msg.id === aiMessageId 
+                      ? { 
+                          ...msg, 
+                          metadata: {
+                            ...msg.metadata,
+                            toolInvocations: currentAgentTools
+                          }
                         }
-                      }
-                    : msg
-                )
-              );
-            } else if (alreadyHasTools && currentMessage) {
-              const toolCount = Array.isArray(currentMessage?.metadata?.toolInvocations) 
-                ? (currentMessage?.metadata?.toolInvocations?.length ?? 0)
-                : 0;
-              console.log('⏭️ SKIPPING tool attachment - message', aiMessageId, 'already has', toolCount, 'tools');
-            } else if (currentAgentTools.length === 0) {
-              console.log('⏭️ SKIPPING tool attachment - no tools for current agent', currentAgentId);
-            }
+                      : msg
+                  )
+                );
+                console.log('✅ Tool attachment complete');
+              } else {
+                console.log('⏭️  Skipping tool attachment:', {
+                  hasTools: currentAgentTools.length > 0,
+                  alreadyAttached: alreadyHasTools
+                });
+              }
+              
+              } catch (attrError) {
+                console.error('❌ ERROR during tool attribution:', attrError);
+                console.error('❌ Error details:', {
+                  agentForResponse,
+                  toolInvocationsLength: toolInvocations?.length,
+                  errorMessage: attrError instanceof Error ? attrError.message : String(attrError)
+                });
+              }
+            } // End of agent switch check
+            
+            // Tool attribution complete - continue with message saving
+            // Empty metadata since tools already attached via setMessages above
+            const metadataWithTools = {};
             
             const savedAiMessage = await DatabaseService.addMessage(
               activeSessionId, 

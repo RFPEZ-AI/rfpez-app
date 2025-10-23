@@ -766,12 +766,30 @@ export async function storeMessage(supabase: SupabaseClient, data: MessageData) 
     metadataKeys: metadata ? Object.keys(metadata) : []
   });
   
+  // Get the user's account_id from account_users (required for messages table)
+  // userId is the auth user ID (auth.users.id)
+  const { data: accountUser, error: accountError } = await supabase
+    .from('account_users')
+    .select('account_id')
+    .eq('user_id', userId)  // account_users.user_id is auth.users.id
+    .single();
+
+  if (accountError || !accountUser) {
+    console.error('❌ Error finding account for user:', userId, accountError);
+    throw new Error(`Account not found for user_id: ${userId}. Cannot store message.`);
+  }
+
+  // @ts-expect-error - We know accountUser has an account_id property
+  const accountId = accountUser.account_id;
+  console.log('✅ Found account_id:', accountId, 'for auth user:', userId);
+  
   const { data: message, error } = await supabase
     .from('messages')
     .insert({
       session_id: sessionId,
       agent_id: agentId,
-      user_id: userId,
+      user_id: userId, // Now using auth.users.id directly (FK constraint updated) ✅
+      account_id: accountId, // Required NOT NULL field
       role: sender, // Use 'role' column (not 'sender')
       content: content,
       metadata: metadata || {}, // Store tool execution metadata
@@ -805,34 +823,31 @@ export async function createSession(supabase: SupabaseClient, data: SessionData)
     timestamp: new Date().toISOString()
   });
   
-  // First get the user profile to get the internal ID (userId here is supabaseUserId)
-  const { data: userProfile, error: profileError } = await supabase
-    .from('user_profiles')
-    .select('id, email, supabase_user_id')
-    .eq('supabase_user_id', userId)
+  // Get the user's account_id from account_users
+  // userId is auth.users.id - sessions.user_id now directly references auth.users
+  const { data: accountUser, error: accountError } = await supabase
+    .from('account_users')
+    .select('account_id')
+    .eq('user_id', userId)
     .single();
 
-  console.log('🔧 User profile lookup result:', { 
-    userProfile, 
-    profileError: profileError ? JSON.stringify(profileError) : null
+  console.log('🔧 Account lookup result:', { 
+    accountUser, 
+    accountError: accountError ? JSON.stringify(accountError) : null
   });
 
-  if (profileError || !userProfile) {
-    console.error('❌ User profile not found for Supabase user ID:', userId);
-    console.error('❌ Available user profiles check...');
-    
-    // Debug: Show available user profiles
-    const { data: allProfiles } = await supabase
-      .from('user_profiles')
-      .select('id, email, supabase_user_id')
-      .limit(5);
-    
-    console.error('❌ Available user profiles:', allProfiles);
-    throw new Error(`User profile not found for user ID: ${userId}. Profile error: ${JSON.stringify(profileError)}`);
+  if (accountError || !accountUser) {
+    console.error('❌ Account not found for auth user ID:', userId);
+    throw new Error(`Account not found for user_id: ${userId}. Error: ${JSON.stringify(accountError)}`);
   }
+
+  // @ts-expect-error - We know accountUser has an account_id property
+  const accountId = accountUser.account_id;
+  console.log('✅ Found account_id:', accountId, 'for auth user:', userId);
   
   const sessionData = {
-    user_id: (userProfile as unknown as { id: string }).id, // Use the user_profiles.id (internal UUID)
+    user_id: userId,  // Now directly uses auth.users.id (FK updated)
+    account_id: accountId,  // Required field after schema update
     title: title || 'New Conversation',
     created_at: new Date().toISOString()
   };
@@ -2589,11 +2604,11 @@ export async function updateBidStatus(supabase: SupabaseClient, data: {
 
 /**
  * Generate placeholder embedding vector
- * Returns array of 384 zeros for vector(384) column
- * TODO: Replace with real embedding generation (OpenAI or local model)
+ * Returns array of 1024 zeros for vector(1024) column (Voyage AI dimension)
+ * TODO: Replace with real embedding generation via generate-embedding function
  */
 function generatePlaceholderEmbedding(): number[] {
-  return new Array(384).fill(0);
+  return new Array(1024).fill(0);
 }
 
 /**
@@ -2621,38 +2636,22 @@ export async function createMemory(
       throw new Error('importance_score must be between 0.0 and 1.0');
     }
 
-    // CRITICAL FIX: userId is actually the Supabase auth user ID, but agent_memories.user_id 
-    // is a foreign key to user_profiles.id. We need to look up the user_profiles.id first.
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('supabase_user_id', userId)
-      .single();
-
-    if (profileError || !userProfile) {
-      console.error('❌ Error finding user profile:', profileError);
-      throw new Error(`User profile not found for supabase_user_id: ${userId}`);
-    }
-
-    // @ts-expect-error - We know userProfile has an id property
-    const userProfileId = userProfile.id;
-    console.log('✅ Found user_profile.id:', userProfileId, 'for supabase_user_id:', userId);
-
     // Get the user's account_id from account_users
+    // userId is auth.users.id - account_memories.user_id now directly references auth.users
     const { data: accountUser, error: accountError } = await supabase
       .from('account_users')
       .select('account_id')
-      .eq('user_id', userProfileId)
+      .eq('user_id', userId)  // Use auth user ID directly
       .single();
 
     if (accountError || !accountUser) {
       console.error('❌ Error finding account for user:', accountError);
-      throw new Error(`Account not found for user_id: ${userProfileId}`);
+      throw new Error(`Account not found for user_id: ${userId}`);
     }
 
     // @ts-expect-error - We know accountUser has an account_id property
     const accountId = accountUser.account_id;
-    console.log('✅ Found account_id:', accountId, 'for user_profile.id:', userProfileId);
+    console.log('✅ Found account_id:', accountId, 'for auth user:', userId);
 
     // Generate placeholder embedding (will be replaced with real embeddings later)
     const embedding = generatePlaceholderEmbedding();
@@ -2662,7 +2661,7 @@ export async function createMemory(
       .from('account_memories')
       .insert({
         account_id: accountId,     // Account-based: shared across account users
-        user_id: userProfileId,    // Track which user created the memory
+        user_id: userId,           // Now directly uses auth.users.id (FK updated)
         session_id: sessionId,
         content: params.content,
         memory_type: params.memory_type,
@@ -2734,36 +2733,22 @@ export async function searchMemories(
   console.log('🔍 Searching memories:', { ...params, userId, agentId });
 
   try {
-    // Get user_profiles.id from supabase auth user id
-    const { data: userProfile, error: profileError } = await supabase
-      .from('user_profiles')
-      .select('id')
-      .eq('supabase_user_id', userId)
-      .single();
-
-    if (profileError || !userProfile) {
-      console.error('❌ Error finding user profile:', profileError);
-      throw new Error(`User profile not found for supabase_user_id: ${userId}`);
-    }
-
-    // @ts-expect-error - We know userProfile has an id property
-    const userProfileId = userProfile.id;
-
     // Get the user's account_id from account_users
+    // userId is auth.users.id - account_memories.user_id now directly references auth.users
     const { data: accountUser, error: accountError } = await supabase
       .from('account_users')
       .select('account_id')
-      .eq('user_id', userProfileId)
+      .eq('user_id', userId)  // Use auth user ID directly
       .single();
 
     if (accountError || !accountUser) {
       console.error('❌ Error finding account for user:', accountError);
-      throw new Error(`Account not found for user_id: ${userProfileId}`);
+      throw new Error(`Account not found for user_id: ${userId}`);
     }
 
     // @ts-expect-error - We know accountUser has an account_id property
     const accountId = accountUser.account_id;
-    console.log('✅ Searching memories for account_id:', accountId);
+    console.log('✅ Searching memories for account_id:', accountId, 'auth user:', userId);
 
     // Parse memory types from comma-separated string
     const memoryTypes = params.memory_types 
@@ -2792,7 +2777,7 @@ export async function searchMemories(
 
     const { data: memories, error } = await rpcClient.rpc('search_account_memories', {
       p_account_id: accountId,
-      p_user_id: userProfileId,
+      p_user_id: userId,  // Now directly uses auth.users.id
       p_query_embedding: queryEmbedding,
       p_memory_types: memoryTypes || null,
       p_limit: limit,

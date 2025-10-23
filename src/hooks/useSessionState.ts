@@ -10,23 +10,14 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingWelcomeMessage, setPendingWelcomeMessage] = useState<Message | null>(null);
 
-  // Load user sessions on mount if authenticated
-  useEffect(() => {
-    if (isAuthenticated && userId) {
-      loadUserSessions();
-    }
-  }, [isAuthenticated, userId]);
-
-  const loadUserSessions = async () => {
+  // Define loadUserSessions function (can be called manually or by useEffect)
+  const loadUserSessions = useCallback(async () => {
     if (!isAuthenticated || !userId) {
-      console.log('User not authenticated or userId not available, skipping session load');
       return;
     }
     
     try {
-      console.log('Attempting to load sessions from Supabase for user:', userId);
       const sessionsData = await DatabaseService.getUserSessions(userId);
-      console.log('Sessions loaded:', sessionsData);
       const formattedSessions: Session[] = sessionsData
         .map(session => ({
           id: session.id,
@@ -34,18 +25,21 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
           timestamp: new Date(session.updated_at),
           agent_name: session.agent_name
         }))
-        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Sort descending (newest first)
+        .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       setSessions(formattedSessions);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     }
-  };
+  }, [isAuthenticated, userId]);
+
+  // Auto-load sessions when authentication state changes
+  useEffect(() => {
+    loadUserSessions();
+  }, [isAuthenticated, userId]); // loadUserSessions omitted from deps to avoid infinite loops
 
   const loadSessionMessages = async (sessionId: string) => {
     try {
-      console.log('🔍 Loading messages for session:', sessionId);
       const messagesData = await DatabaseService.getSessionMessages(sessionId);
-      console.log('📨 Raw messages data from database:', messagesData);
       const formattedMessages: Message[] = messagesData
         .map(msg => ({
           id: msg.id,
@@ -57,9 +51,7 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
           artifactRefs: (msg.metadata?.artifactRefs as ArtifactReference[]) || []
         }))
         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
-      console.log('✨ Formatted messages:', formattedMessages);
       setMessages(formattedMessages);
-      console.log('✅ Messages set to state, total:', formattedMessages.length);
     } catch (error) {
       console.error('Failed to load session messages:', error);
     }
@@ -70,10 +62,7 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     inheritedRfpId?: number,
     firstUserMessage?: string
   ): Promise<string | null> => {
-    console.log('🎯 Lazy Session Creation - Creating session with first user message');
-    console.log('Creating new session, auth state:', { isAuthenticated, user: !!userId, inheritedRfpId, hasFirstMessage: !!firstUserMessage });
     if (!isAuthenticated || !userId) {
-      console.log('Not authenticated or userId not available, skipping session creation');
       return null;
     }
     
@@ -94,14 +83,12 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
         undefined, // description
         rfpIdForSession
       );
-      console.log('Session created:', session);
       if (session) {
         // CRITICAL FIX: Immediately set this new session as the user's current session
         // This ensures that when the user refreshes or sends their first message,
         // they stay in this session instead of creating another one
         try {
           await DatabaseService.setUserCurrentSession(session.id);
-          console.log('✅ New session set as current in user profile:', session.id);
         } catch (error) {
           console.warn('⚠️ Failed to set new session as current:', error);
         }
@@ -117,14 +104,12 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
 
   const deleteSession = async (sessionId: string) => {
     if (!isAuthenticated || !userId) {
-      console.log('Not authenticated, cannot delete session');
       return false;
     }
 
     try {
       const success = await DatabaseService.deleteSession(sessionId);
       if (success) {
-        console.log('Session deleted successfully:', sessionId);
         await loadUserSessions();
         return true;
       } else {
@@ -138,7 +123,6 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
   };
 
   const clearUIState = useCallback(() => {
-    console.log('Clearing UI state for logout');
     setMessages([]);
     setSessions([]);
   }, []); // No dependencies - setMessages and setSessions are stable
