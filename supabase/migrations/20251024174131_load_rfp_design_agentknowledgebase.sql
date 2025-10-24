@@ -1,16 +1,24 @@
-# RFP Design Agent Knowledge Base Content
-# This file contains structured knowledge entries to be loaded as system memories
+-- Knowledge Base: RFP Design Agent-knowledge-base
+-- Generated on 2025-10-24T17:41:31.311Z
+-- Source: RFP Design Agent-knowledge-base.md
+-- Entries: 11
 
-## Phase 1: RFP Context - Detailed Workflow
-
-### ID: rfp-design-phase1-workflow
-### Type: knowledge
-### Category: workflow
-### Phase: 1
-### Importance: 0.95
-
-**Content:**
-Phase 1 RFP Context Detailed Workflow:
+-- Insert knowledge base entries
+-- Phase 1: RFP Context - Detailed Workflow
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Phase 1 RFP Context Detailed Workflow:
 
 CRITICAL FIRST ACTION - Never skip this step:
 
@@ -41,20 +49,36 @@ CRITICAL FIRST ACTION - Never skip this step:
 - Skipping RFP creation and going straight to forms
 - Asking permission before creating RFP (just do it)
 - Forgetting to check get_current_rfp before creating artifacts
-- Creating artifacts without valid rfp_id
+- Creating artifacts without valid rfp_id$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.95,
+  '{
+  "knowledge_id": "rfp-design-phase1-workflow",
+  "category": "workflow",
+  "importance": 0.95,
+  "tags": [],
+  "phase": "1"
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-phase1-workflow'
+);
 
----
-
-## Phase 3: Interactive Questionnaire - Detailed Workflow
-
-### ID: rfp-design-phase3-workflow
-### Type: knowledge
-### Category: workflow
-### Phase: 3
-### Importance: 0.9
-
-**Content:**
-Phase 3 Interactive Questionnaire Detailed Workflow:
+-- Phase 3: Interactive Questionnaire - Detailed Workflow
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Phase 3 Interactive Questionnaire Detailed Workflow:
 
 STEP-BY-STEP PROCESS:
 
@@ -121,20 +145,36 @@ STEP-BY-STEP PROCESS:
 - Missing form_schema parameter
 - Missing session_id parameter
 - Missing artifact_role parameter
-- Wrong artifact_id in subsequent operations
+- Wrong artifact_id in subsequent operations$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.9,
+  '{
+  "knowledge_id": "rfp-design-phase3-workflow",
+  "category": "workflow",
+  "importance": 0.9,
+  "tags": [],
+  "phase": "3"
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-phase3-workflow'
+);
 
----
-
-## Phase 5-6: Auto-Generation - Detailed Workflow
-
-### ID: rfp-design-phase5-6-workflow  
-### Type: knowledge
-### Category: workflow
-### Phase: 5-6
-### Importance: 0.9
-
-**Content:**
-Phase 5-6 Auto-Generation Detailed Workflow:
+-- Phase 5-6: Auto-Generation - Detailed Workflow
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Phase 5-6 Auto-Generation Detailed Workflow:
 
 COMPLETE SEQUENCE - Must follow EXACTLY:
 
@@ -185,19 +225,36 @@ To submit your bid for this RFP, please access our [Bid Submission Form](BID_URL
 - Never skip Step 2 (URL generation)
 - Never write request content before getting URL
 - Always embed URL as named link, not raw URL
-- Verify artifacts before marking complete
+- Verify artifacts before marking complete$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.9,
+  '{
+  "knowledge_id": "rfp-design-phase5-6-workflow",
+  "category": "workflow",
+  "importance": 0.9,
+  "tags": [],
+  "phase": "5-6"
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-phase5-6-workflow'
+);
 
----
-
-## Sample Data Population - Best Practices
-
-### ID: rfp-design-sample-data-practices
-### Type: knowledge
-### Category: best-practices
-### Importance: 0.85
-
-**Content:**
-Sample Data Population Best Practices:
+-- Sample Data Population - Best Practices
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Sample Data Population Best Practices:
 
 **When to Populate Sample Data:**
 - User requests "sample data", "test data", "demo data"
@@ -288,19 +345,35 @@ Agent Response to User:
 - Using wrong field names (e.g., "address" instead of "site_address")
 - Using enum labels instead of values
 - Generating your own artifact IDs instead of using returned ones
-- Forgetting to press Enter or click submit in browser tests
+- Forgetting to press Enter or click submit in browser tests$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.85,
+  '{
+  "knowledge_id": "rfp-design-sample-data-practices",
+  "category": "best-practices",
+  "importance": 0.85,
+  "tags": []
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-sample-data-practices'
+);
 
----
-
-## Form Schema Validation Rules
-
-### ID: rfp-design-form-schema-rules
-### Type: knowledge
-### Category: validation
-### Importance: 0.9
-
-**Content:**
-Form Schema Validation Rules:
+-- Form Schema Validation Rules
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Form Schema Validation Rules:
 
 **CRITICAL STRUCTURAL RULES:**
 
@@ -384,19 +457,35 @@ Form Schema Validation Rules:
 - Missing form_schema causes "form_schema is required" error
 - Nested schemas cause database storage issues
 - Wrong field names in update_form_data cause silent failures
-- Missing artifact_role causes "null value in column" error
+- Missing artifact_role causes "null value in column" error$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.9,
+  '{
+  "knowledge_id": "rfp-design-form-schema-rules",
+  "category": "validation",
+  "importance": 0.9,
+  "tags": []
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-form-schema-rules'
+);
 
----
-
-## Demonstration Bid Submission Workflow
-
-### ID: rfp-design-demo-bid-workflow
-### Type: knowledge
-### Category: workflow
-### Importance: 0.8
-
-**Content:**
-Demonstration Bid Submission Workflow:
+-- Demonstration Bid Submission Workflow
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Demonstration Bid Submission Workflow:
 
 **When User Requests Demo Bids:**
 User says: "create some demo bids", "add test bids", "show sample bids"
@@ -481,19 +570,35 @@ All bids are now visible in the Bids view. Would you like me to help compare the
 - Use appropriate company names for industry
 - Include 3-5 bids for good comparison
 - Price-speed trade-off: faster = more expensive
-- Scale prices based on RFP quantity requirements
+- Scale prices based on RFP quantity requirements$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.8,
+  '{
+  "knowledge_id": "rfp-design-demo-bid-workflow",
+  "category": "workflow",
+  "importance": 0.8,
+  "tags": []
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-demo-bid-workflow'
+);
 
----
-
-## Error Messages and Troubleshooting
-
-### ID: rfp-design-error-troubleshooting
-### Type: knowledge
-### Category: troubleshooting
-### Importance: 0.85
-
-**Content:**
-Common Error Messages and Solutions:
+-- Error Messages and Troubleshooting
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Common Error Messages and Solutions:
 
 **Error: "form_schema is required"**
 - **Cause**: Called create_form_artifact without form_schema parameter
@@ -556,19 +661,35 @@ Common Error Messages and Solutions:
 1. For missing RFP: Call create_and_set_rfp immediately
 2. For form errors: Recreate with complete parameters
 3. For field issues: Call get_form_schema to verify structure
-4. For bid URL: Regenerate URL and update request document
+4. For bid URL: Regenerate URL and update request document$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.85,
+  '{
+  "knowledge_id": "rfp-design-error-troubleshooting",
+  "category": "troubleshooting",
+  "importance": 0.85,
+  "tags": []
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-error-troubleshooting'
+);
 
----
-
-## User Communication Best Practices
-
-### ID: rfp-design-communication-practices
-### Type: knowledge
-### Category: communication
-### Importance: 0.8
-
-**Content:**
-User Communication Best Practices:
+-- User Communication Best Practices
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$User Communication Best Practices:
 
 **CRITICAL RULE: NEVER Show Technical Details**
 - NEVER show code, schemas, or JSON to users
@@ -637,19 +758,35 @@ Say: "I need to set up your RFP first before we can create forms. Let me do that
 - Don't say "I found a memory that says..."
 - Instead: "I see you're looking to source 100 LED bulbs..."
 - Act on retrieved information naturally
-- Users shouldn't know you're using memory system
+- Users shouldn't know you're using memory system$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.8,
+  '{
+  "knowledge_id": "rfp-design-communication-practices",
+  "category": "communication",
+  "importance": 0.8,
+  "tags": []
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-communication-practices'
+);
 
----
-
-## RFP Context Change Handling
-
-### ID: rfp-design-context-change-handling
-### Type: knowledge
-### Category: workflow
-### Importance: 0.75
-
-**Content:**
-RFP Context Change Handling Guidelines:
+-- RFP Context Change Handling
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$RFP Context Change Handling Guidelines:
 
 **When You Receive System Notification:**
 Format: "[SYSTEM NOTIFICATION: RFP context changed from X to Y]"
@@ -701,19 +838,35 @@ What works best for you?"
 - Respect user intent (they changed for a reason)
 - Provide value through workflow suggestions
 - Keep it brief and return to helping quickly
-- Make it feel like a tool, not a disruption
+- Make it feel like a tool, not a disruption$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.75,
+  '{
+  "knowledge_id": "rfp-design-context-change-handling",
+  "category": "workflow",
+  "importance": 0.75,
+  "tags": []
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-context-change-handling'
+);
 
----
-
-## Memory Search Best Practices
-
-### ID: rfp-design-memory-search-practices
-### Type: knowledge
-### Category: best-practices
-### Importance: 0.85
-
-**Content:**
-Memory Search Best Practices for RFP Design Agent:
+-- Memory Search Best Practices
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Memory Search Best Practices for RFP Design Agent:
 
 **When to Search Memories:**
 
@@ -840,20 +993,35 @@ create_memory({
 - Use specific keywords related to procurement
 - Consider recency when evaluating results
 - Combine explicit intent with general preferences
-- Store decisions and preferences for future sessions
+- Store decisions and preferences for future sessions$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.85,
+  '{
+  "knowledge_id": "rfp-design-memory-search-practices",
+  "category": "best-practices",
+  "importance": 0.85,
+  "tags": []
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'rfp-design-memory-search-practices'
+);
 
----
-
-## Demo Bid Workflow - Complete Guide
-
-### ID: demo-bid-workflow
-### Type: knowledge
-### Category: workflow
-### Phase: 6
-### Importance: 0.90
-
-**Content:**
-Demo Bid Workflow - Creating Demonstration Supplier Bids:
+-- Demo Bid Workflow - Complete Guide
+INSERT INTO account_memories (
+  account_id,
+  user_id,
+  memory_type,
+  content,
+  embedding,
+  importance_score,
+  metadata
+)
+SELECT 
+  (SELECT id FROM accounts LIMIT 1),
+  NULL, -- System knowledge (no specific user)
+  'knowledge',
+  $kb_rfp_design_agentknowledgebase_20251024174131$Demo Bid Workflow - Creating Demonstration Supplier Bids:
 
 **Purpose:**
 When users request demonstration, test, or sample bids, submit supplier bids directly without requiring form artifacts. This allows rapid prototyping and showcases the bidding process.
@@ -975,5 +1143,38 @@ For Office Furniture:
 **Relations:**
 - relates_to: rfp-design-phase1-workflow
 - prerequisite: create-and-set-rfp
-- follows: form-artifact-creation
+- follows: form-artifact-creation$kb_rfp_design_agentknowledgebase_20251024174131$,
+  NULL, -- Embedding will be generated later
+  0.9,
+  '{
+  "knowledge_id": "demo-bid-workflow",
+  "category": "workflow",
+  "importance": 0.9,
+  "tags": [],
+  "phase": "6"
+}'::jsonb
+WHERE NOT EXISTS (
+  SELECT 1 FROM account_memories 
+  WHERE metadata->>'knowledge_id' = 'demo-bid-workflow'
+);
 
+-- Verify insertions
+SELECT 
+  memory_type,
+  metadata->>'knowledge_id' as knowledge_id,
+  metadata->>'category' as category,
+  LEFT(content, 100) as content_preview,
+  importance_score,
+  created_at
+FROM account_memories
+WHERE memory_type = 'knowledge'
+  AND metadata->>'knowledge_id' IN ('rfp-design-phase1-workflow', 'rfp-design-phase3-workflow', 'rfp-design-phase5-6-workflow', 'rfp-design-sample-data-practices', 'rfp-design-form-schema-rules', 'rfp-design-demo-bid-workflow', 'rfp-design-error-troubleshooting', 'rfp-design-communication-practices', 'rfp-design-context-change-handling', 'rfp-design-memory-search-practices', 'demo-bid-workflow')
+ORDER BY importance_score DESC;
+
+-- Summary
+SELECT 
+  COUNT(*) as total_knowledge_entries,
+  AVG(importance_score) as avg_importance,
+  MAX(importance_score) as max_importance
+FROM account_memories
+WHERE memory_type = 'knowledge';

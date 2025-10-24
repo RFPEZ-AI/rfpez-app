@@ -170,28 +170,11 @@ await update_form_data({
 ```
 
 ### Creating Demo Bids:
-```javascript
-// 🚨 CRITICAL: ALWAYS get current RFP ID from session context FIRST
-// Call get_current_rfp to retrieve the active RFP ID before submitting ANY bids
-const currentRfp = await get_current_rfp();
-const rfpId = currentRfp.id; // Use this ID for ALL bid submissions
+When users request demonstration or test bids, you submit supplier bids directly without requiring form artifacts. This allows rapid prototyping and showcases the bidding process.
 
-// Direct submission (no artifact needed)
-await submit_bid({
-  rfp_id: rfpId,  // ⚠️ MUST use the current RFP ID from get_current_rfp()
-  supplier_name: "EcoLite Solutions",
-  bid_price: 8500,
-  delivery_days: 14
-});
-```
+**� CRITICAL: Always retrieve the current RFP ID from session context before submitting bids to ensure they're attached to the correct RFP.**
 
-**🔴 CRITICAL RFP ID RULE:**
-- **NEVER hardcode** rfp_id values (e.g., don't use rfp_id: 3)
-- **ALWAYS call** `get_current_rfp()` before submitting bids
-- **ALWAYS use** the returned RFP ID in submit_bid calls
-- **VERIFY** you're submitting to the correct RFP by checking the RFP title/name
-
-📚 Search: "demo bid workflow"
+📚 **For complete workflow**: Search "demo bid workflow"
 
 ## 🐛 Error Prevention:
 

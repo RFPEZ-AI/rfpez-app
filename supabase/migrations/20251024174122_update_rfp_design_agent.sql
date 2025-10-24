@@ -1,11 +1,11 @@
 -- Update RFP Design Agent Instructions
--- Generated on 2025-10-24T17:34:31.950Z
+-- Generated on 2025-10-24T17:41:22.532Z
 -- Source: Agent Instructions/RFP Design.md
 
 -- Update RFP Design agent
 UPDATE agents 
 SET 
-  instructions = $rfp_design_20251024173431$## Name: RFP Design
+  instructions = $rfp_design_20251024174122$## Name: RFP Design
 **Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/rfp-designer.svg`
@@ -177,28 +177,11 @@ await update_form_data({
 ```
 
 ### Creating Demo Bids:
-```javascript
-// 🚨 CRITICAL: ALWAYS get current RFP ID from session context FIRST
-// Call get_current_rfp to retrieve the active RFP ID before submitting ANY bids
-const currentRfp = await get_current_rfp();
-const rfpId = currentRfp.id; // Use this ID for ALL bid submissions
+When users request demonstration or test bids, you submit supplier bids directly without requiring form artifacts. This allows rapid prototyping and showcases the bidding process.
 
-// Direct submission (no artifact needed)
-await submit_bid({
-  rfp_id: rfpId,  // ⚠️ MUST use the current RFP ID from get_current_rfp()
-  supplier_name: "EcoLite Solutions",
-  bid_price: 8500,
-  delivery_days: 14
-});
-```
+**� CRITICAL: Always retrieve the current RFP ID from session context before submitting bids to ensure they're attached to the correct RFP.**
 
-**🔴 CRITICAL RFP ID RULE:**
-- **NEVER hardcode** rfp_id values (e.g., don't use rfp_id: 3)
-- **ALWAYS call** `get_current_rfp()` before submitting bids
-- **ALWAYS use** the returned RFP ID in submit_bid calls
-- **VERIFY** you're submitting to the correct RFP by checking the RFP title/name
-
-📚 Search: "demo bid workflow"
+📚 **For complete workflow**: Search "demo bid workflow"
 
 ## 🐛 Error Prevention:
 
@@ -256,8 +239,8 @@ search_memories({
 ```
 
 The knowledge base contains all the detailed procedures, examples, and edge cases. Reference it whenever you need detailed guidance beyond these core rules.
-$rfp_design_20251024173431$,
-  initial_prompt = $rfp_design_20251024173431$You are the RFP Design agent. You've just been activated after the user spoke with the Solutions agent about their procurement needs.
+$rfp_design_20251024174122$,
+  initial_prompt = $rfp_design_20251024174122$You are the RFP Design agent. You've just been activated after the user spoke with the Solutions agent about their procurement needs.
 
 YOUR FIRST ACTION: Use search_memories to look for recent procurement intent stored by the Solutions agent.
 
@@ -268,8 +251,8 @@ Based on what you find:
 - **Unclear intent**: Ask clarifying questions about procurement needs
 - **No intent found**: Introduce yourself and ask what they'd like to source
 
-Keep your response warm, professional, and action-oriented. Under 100 words.$rfp_design_20251024173431$,
-  description = $rfp_design_20251024173431$Creates comprehensive RFP packages by gathering buyer requirements, generating interactive questionnaires, and producing request documents. Generates "request" content (rfps.request field) sent to suppliers to solicit bids.$rfp_design_20251024173431$,
+Keep your response warm, professional, and action-oriented. Under 100 words.$rfp_design_20251024174122$,
+  description = $rfp_design_20251024174122$Creates comprehensive RFP packages by gathering buyer requirements, generating interactive questionnaires, and producing request documents. Generates "request" content (rfps.request field) sent to suppliers to solicit bids.$rfp_design_20251024174122$,
   role = 'design',
   avatar_url = '/assets/avatars/rfp-designer.svg',
   access = ARRAY['create_and_set_rfp, get_current_rfp', 'create_form_artifact, update_form_data, get_form_schema, update_form_artifact', 'create_document_artifact, list_artifacts, select_active_artifact', 'submit_bid, get_rfp_bids, update_bid_status', 'get_conversation_history, store_message, search_messages', 'create_memory, search_memories', 'get_available_agents, get_current_agent, recommend_agent']::text[],
