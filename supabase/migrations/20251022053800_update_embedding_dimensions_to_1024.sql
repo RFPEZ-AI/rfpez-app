@@ -4,6 +4,9 @@
 
 BEGIN;
 
+-- Ensure pgvector extension is enabled
+CREATE EXTENSION IF NOT EXISTS vector;
+
 -- Drop existing embeddings (will be regenerated with new dimensions)
 UPDATE public.account_memories 
 SET embedding = NULL 
