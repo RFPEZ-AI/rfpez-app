@@ -48,7 +48,15 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
           timestamp: new Date(msg.created_at),
           agentName: msg.agent_name,
           // Restore artifact references from metadata
-          artifactRefs: (msg.metadata?.artifactRefs as ArtifactReference[]) || []
+          artifactRefs: (msg.metadata?.artifactRefs as ArtifactReference[]) || [],
+          // 🔧 CRITICAL FIX: Preserve all metadata including tool calls
+          // Merge metadata and ai_metadata to support both structures
+          metadata: {
+            ...(msg.metadata || {}),
+            ...(msg.ai_metadata || {}),
+            // Ensure functions_called from ai_metadata is accessible
+            functions_called: msg.ai_metadata?.functions_called || msg.metadata?.functions_called
+          }
         }))
         .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime());
       setMessages(formattedMessages);

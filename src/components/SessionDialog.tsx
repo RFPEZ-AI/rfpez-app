@@ -253,33 +253,71 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                 
                 {/* Tool invocations from message metadata */}
                 {(() => {
-                  // Debug logging for tool invocations
-                  if (!message.isUser) {
-                    const toolInvocations = message.metadata?.toolInvocations;
-                    console.log('🔍 Message metadata check:', {
-                      messageId: message.id,
-                      agentName: message.agentName,
-                      hasMetadata: !!message.metadata,
-                      hasToolInvocations: !!toolInvocations,
-                      isArray: Array.isArray(toolInvocations),
-                      toolCount: Array.isArray(toolInvocations) ? toolInvocations.length : 0,
-                      toolNames: Array.isArray(toolInvocations) 
-                        ? toolInvocations.map((t: any) => t.toolName).join(', ')
-                        : 'N/A'
-                    });
-                  }
+                  // Check for tool calls in metadata - supports both structures:
+                  // 1. toolInvocations (detailed ToolInvocationEvent[])
+                  // 2. functions_called (simple string[]) from ai_metadata
+                  const toolInvocations = message.metadata?.toolInvocations;
+                  const functionsCalled = message.metadata?.functions_called;
                   
-                  if (!message.isUser && message.metadata?.toolInvocations && Array.isArray(message.metadata.toolInvocations) && message.metadata.toolInvocations.length > 0) {
-                    console.log('✅ Rendering ToolExecutionDisplay for message:', message.id, 'with', message.metadata.toolInvocations.length, 'tools');
+                  // Display detailed tool invocations if available
+                  if (!message.isUser && toolInvocations && Array.isArray(toolInvocations) && toolInvocations.length > 0) {
                     return (
                       <div style={{ marginTop: '8px' }}>
                         <ToolExecutionDisplay
-                          toolInvocations={message.metadata.toolInvocations as ToolInvocationEvent[]}
+                          toolInvocations={toolInvocations as ToolInvocationEvent[]}
                           isActive={false}
                         />
                       </div>
                     );
                   }
+                  
+                  // Display simple function names if available (from ai_metadata)
+                  if (!message.isUser && functionsCalled && Array.isArray(functionsCalled) && functionsCalled.length > 0) {
+                    return (
+                      <div style={{
+                        marginTop: '8px',
+                        padding: '8px',
+                        background: 'rgba(var(--ion-color-primary-rgb), 0.1)',
+                        borderRadius: '6px',
+                        fontSize: '0.85em'
+                      }}>
+                        <div style={{ 
+                          fontWeight: '600', 
+                          marginBottom: '4px',
+                          color: 'var(--ion-color-primary)',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '6px'
+                        }}>
+                          <span>🔧</span>
+                          <span>Tools Used:</span>
+                        </div>
+                        <div style={{ 
+                          display: 'flex', 
+                          flexWrap: 'wrap', 
+                          gap: '4px',
+                          marginTop: '6px'
+                        }}>
+                          {functionsCalled.map((toolName: string, idx: number) => (
+                            <span
+                              key={`tool-${idx}`}
+                              style={{
+                                padding: '3px 8px',
+                                background: 'var(--ion-color-primary)',
+                                color: 'white',
+                                borderRadius: '4px',
+                                fontSize: '0.9em',
+                                fontFamily: 'monospace'
+                              }}
+                            >
+                              {toolName}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  }
+                  
                   return null;
                 })()}
                 

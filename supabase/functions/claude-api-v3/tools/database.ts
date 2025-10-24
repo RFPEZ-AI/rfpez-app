@@ -505,8 +505,37 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
     throw linkingError;
   }
 
-  // Verify the artifact was actually saved by querying it back
+  // 🔗 CRITICAL FIX: Link artifact to session via session_artifacts junction table
+  // This is required for the UI to display artifacts in the artifact panel
   const createdArtifactId = (artifact as unknown as { id: string }).id;
+  try {
+    console.log('🔗 Linking form artifact to session:', {
+      sessionId,
+      artifactId: createdArtifactId,
+      accountId
+    });
+    
+    const { error: sessionLinkError } = await supabase
+      .from('session_artifacts')
+      .insert({
+        session_id: sessionId,
+        artifact_id: createdArtifactId,
+        account_id: accountId
+      });
+    
+    if (sessionLinkError) {
+      console.error('⚠️ Failed to link artifact to session:', sessionLinkError);
+      // Don't throw - artifact was created successfully, this is just UI linkage
+      // But log it prominently so we know there's an issue
+    } else {
+      console.log('✅ Successfully linked form artifact to session');
+    }
+  } catch (sessionLinkingError) {
+    console.error('⚠️ Error during session-artifact linking:', sessionLinkingError);
+    // Continue - artifact exists, just UI might not show it immediately
+  }
+
+  // Verify the artifact was actually saved by querying it back
   const { data: verification, error: verifyError } = await supabase
     .from('artifacts')
     .select('id, name, type')
@@ -703,6 +732,35 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
   } catch (linkingError) {
     console.error('⚠️ Claude API V3: Error during document linking:', linkingError);
     throw linkingError;
+  }
+
+  // 🔗 CRITICAL FIX: Link artifact to session via session_artifacts junction table
+  // This is required for the UI to display artifacts in the artifact panel
+  const createdArtifactId = (artifact as unknown as { id: string }).id;
+  try {
+    console.log('🔗 Linking document artifact to session:', {
+      sessionId,
+      artifactId: createdArtifactId,
+      accountId
+    });
+    
+    const { error: sessionLinkError } = await supabase
+      .from('session_artifacts')
+      .insert({
+        session_id: sessionId,
+        artifact_id: createdArtifactId,
+        account_id: accountId
+      });
+    
+    if (sessionLinkError) {
+      console.error('⚠️ Failed to link document artifact to session:', sessionLinkError);
+      // Don't throw - artifact was created successfully, this is just UI linkage
+    } else {
+      console.log('✅ Successfully linked document artifact to session');
+    }
+  } catch (sessionLinkingError) {
+    console.error('⚠️ Error during session-artifact linking:', sessionLinkingError);
+    // Continue - artifact exists, just UI might not show it immediately
   }
 
   return {
