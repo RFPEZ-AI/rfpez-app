@@ -4,17 +4,26 @@
 
 BEGIN;
 
--- Ensure pgvector extension is enabled
-CREATE EXTENSION IF NOT EXISTS vector;
+-- Ensure pgvector extension is enabled in extensions schema
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
 
 -- Drop existing embeddings (will be regenerated with new dimensions)
 UPDATE public.account_memories 
 SET embedding = NULL 
 WHERE memory_type = 'knowledge';
 
+-- Drop the existing index before changing vector dimensions
+DROP INDEX IF EXISTS idx_account_memories_embedding;
+
 -- Update the embedding column type to 768 dimensions
+-- Use extensions.vector to reference the vector type from the extensions schema
 ALTER TABLE public.account_memories 
-  ALTER COLUMN embedding TYPE vector(768);
+  ALTER COLUMN embedding TYPE extensions.vector(768);
+
+-- Recreate the index with new vector dimensions
+CREATE INDEX IF NOT EXISTS idx_account_memories_embedding 
+  ON public.account_memories 
+  USING hnsw (embedding extensions.vector_cosine_ops);
 
 -- Add comment explaining the dimension change
 COMMENT ON COLUMN public.account_memories.embedding IS 
