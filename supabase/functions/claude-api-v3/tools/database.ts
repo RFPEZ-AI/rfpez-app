@@ -2388,6 +2388,17 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
       }
     }
 
+    // Get account_id from session for RLS compliance
+    const { data: sessionData } = await supabase
+      .from('sessions')
+      .select('account_id')
+      .eq('id', sessionId)
+      .single();
+    
+    const accountId = (sessionData && typeof sessionData === 'object' && 'account_id' in sessionData) 
+      ? (sessionData.account_id as string)
+      : null;
+
     // Call the submit_bid database function
     // Note: Using type assertion for RPC call as SupabaseClient type doesn't include rpc method
     const rpcClient = supabase as unknown as { rpc: (name: string, params: Record<string, unknown>) => Promise<{ data: string; error: unknown }> };
@@ -2397,7 +2408,8 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
       supplier_id_param: data.supplier_id || null,
       agent_id_param: null,
       session_id_param: sessionId,
-      user_id_param: userId
+      user_id_param: userId,
+      account_id_param: accountId
     });
 
     if (rpcResult.error) {
