@@ -42,7 +42,9 @@ function parseKnowledgeBase(content) {
     const title = lines[0].trim();
     
     // Skip the file header
-    if (title.includes('Knowledge Base Content')) continue;
+    if (title.includes('Knowledge Base Content')) {
+      continue;
+    }
     
     const entry = {
       title,
@@ -74,9 +76,14 @@ function parseKnowledgeBase(content) {
       } else if (line.startsWith('### Tags:')) {
         const tagsStr = line.replace('### Tags:', '').trim();
         entry.tags = tagsStr.split(',').map(t => t.trim()).filter(t => t);
-      } else if (line === '### Content:') {
+      } else if (line.trim() === '### Content:' || line.trim() === '**Content:**') {
         contentStarted = true;
-      } else if (contentStarted && line.trim()) {
+      } else if (contentStarted) {
+        // Stop collecting content at section separator
+        if (line.trim() === '---') {
+          break;
+        }
+        // Capture all lines after Content: marker, including empty lines
         contentLines.push(line);
       }
     }
@@ -143,18 +150,16 @@ INSERT INTO account_memories (
   content,
   embedding,
   importance_score,
-  metadata,
-  search_vector
+  metadata
 )
 SELECT 
   ${agentId ? `(SELECT id FROM accounts LIMIT 1)` : `(SELECT id FROM accounts LIMIT 1)`},
   NULL, -- System knowledge (no specific user)
-  '${entry.type}'::memory_type,
+  '${entry.type}',
   ${escapeSQL(entry.content, delimiter)},
   NULL, -- Embedding will be generated later
   ${entry.importance},
-  '${metadataJson.replace(/'/g, "''")}'::jsonb,
-  to_tsvector('english', ${escapeSQL(entry.title + ' ' + entry.content, delimiter)})
+  '${metadataJson.replace(/'/g, "''")}'::jsonb
 WHERE NOT EXISTS (
   SELECT 1 FROM account_memories 
   WHERE metadata->>'knowledge_id' = '${entry.id}'
