@@ -1668,8 +1668,12 @@ export const useMessageHandling = (
             } // End of agent switch check
             
             // Tool attribution complete - continue with message saving
-            // Empty metadata since tools already attached via setMessages above
-            const metadataWithTools = {};
+            // Filter tool invocations for current agent and include in metadata
+            const currentAgentId = agentForResponse?.agent_id || 'unknown';
+            const relevantToolInvocations = toolInvocations.filter(t => t.agentId === currentAgentId);
+            const metadataWithTools = {
+              toolInvocations: relevantToolInvocations
+            };
             
             const savedAiMessage = await DatabaseService.addMessage(
               activeSessionId, 
@@ -1750,7 +1754,7 @@ export const useMessageHandling = (
                   'assistant',
                   undefined, // agent_id not available in this scope
                   lastAiMessage.agentName,
-                  {},
+                  lastAiMessage.metadata || {}, // Use message metadata which may contain toolInvocations
                   { is_streaming: true, stream_complete: true }, // Metadata indicating this was a streaming response
                   lastAiMessage.artifactRefs // Pass any artifact references
                 );
