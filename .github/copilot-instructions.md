@@ -411,6 +411,287 @@ This demonstrates the complete local-to-remote workflow ensuring all development
 ✅ Core functionality tested against remote endpoints
 ```
 
+### Agent Instructions and Knowledge Base Management
+
+#### **Overview**
+Agent instructions and knowledge base entries are managed through markdown files converted to SQL migrations. This ensures version control, automated deployment via GitHub Actions, and consistent application across environments.
+
+#### **Agent Instructions Update Workflow**
+
+**1. Edit Agent Markdown File**
+```bash
+# Edit the agent instruction file
+# Location: Agent Instructions/[Agent Name].md
+# Example: Agent Instructions/RFP Design Agent.md
+
+# File structure:
+# - Metadata fields at top (ID, Name, Access Level, etc.)
+# - Instructions section with system prompts
+# - Initial Prompts section with user-facing messages
+```
+
+**2. Generate Migration Using CLI Tool**
+```bash
+# Use the md-to-sql-migration.js script to generate SQL migration
+node scripts/md-to-sql-migration.js "Agent Instructions/RFP Design Agent.md"
+
+# Output: Creates timestamped migration file
+# Example: supabase/migrations/20251024032255_update_rfp_design_agent.sql
+
+# Benefits:
+# - Automatically handles SQL escaping and special characters
+# - Generates proper UPDATE statements with agent metadata
+# - Creates timestamped migration following project conventions
+# - Ready for version control and automated deployment
+```
+
+**3. Apply Migration Locally**
+```bash
+# Apply the migration to local database
+supabase migration up
+
+# This applies ONLY pending migrations incrementally
+# ⚠️ NEVER use 'supabase db reset' - it wipes all data!
+```
+
+**4. Verify Agent Update**
+```bash
+# Using Docker SQL command line
+docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -c "\
+SELECT name, 
+       LENGTH(instructions) as instruction_length,
+       LEFT(instructions, 100) as preview, 
+       updated_at 
+FROM agents 
+WHERE name = 'RFP Design'
+ORDER BY updated_at DESC;"
+
+# Expected output shows updated timestamp and instruction length
+```
+
+**5. Deploy to Remote**
+```bash
+# Commit and push - GitHub Actions deploys automatically
+git add supabase/migrations/*.sql
+git commit -m "Update RFP Design Agent instructions"
+git push origin master
+
+# Monitor deployment: https://github.com/markesphere/rfpez-app/actions
+```
+
+#### **Knowledge Base Update Workflow**
+
+**1. Edit Knowledge Base Markdown File**
+```bash
+# Create or edit knowledge base file
+# Location: scripts/[agent-name]-knowledge-base.md
+# Example: scripts/rfp-design-knowledge-base.md
+
+# Required format for each entry:
+## [Entry Title]
+
+### ID: [unique-identifier]
+### Type: [knowledge|fact|guideline|procedure|context]
+### Importance: [0.0-1.0]
+### Category: [workflow|validation|best-practices|troubleshooting|communication]
+
+**Content:**
+[Multi-line content with markdown formatting]
+[Can include code blocks, lists, etc.]
+
+**Metadata:**
+```json
+{
+  "knowledge_id": "[unique-identifier]",
+  "category": "[category-value]",
+  "importance": [0.0-1.0],
+  "tags": ["tag1", "tag2"]
+}
+```
+
+**Relations:** (optional)
+- relates_to: [other-knowledge-id]
+- prerequisite: [other-knowledge-id]
+
+---
+```
+
+**2. Generate Knowledge Base Migration**
+```bash
+# Get agent UUID first
+docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -c "\
+SELECT id, name FROM agents WHERE name = 'RFP Design';"
+
+# Use kb-to-sql-migration.js script to generate migration
+node scripts/kb-to-sql-migration.js "scripts/rfp-design-knowledge-base.md" "8c5f11cb-1395-4d67-821b-89dd58f0c8dc"
+
+# Output: Creates timestamped migration file
+# Example: supabase/migrations/20251024032829_load_rfp_design_agentknowledgebase.sql
+
+# Script handles:
+# - Parsing markdown format (both ### Content: and **Content:** formats)
+# - Proper SQL escaping for content and JSON metadata
+# - Embedding vector generation (placeholder - actual embeddings computed by backend)
+# - Correct INSERT statements without generated columns (search_vector)
+```
+
+**3. Apply Migration Locally**
+```bash
+# Apply the migration to local database
+supabase migration up
+
+# Applies only pending migrations incrementally
+```
+
+**4. Verify Knowledge Base Entries**
+```bash
+# Using Docker SQL command line
+docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -c "\
+SELECT COUNT(*) as knowledge_entries,
+       COUNT(DISTINCT metadata->>'category') as categories,
+       MIN(importance_score) as min_importance,
+       MAX(importance_score) as max_importance,
+       AVG(importance_score) as avg_importance
+FROM account_memories 
+WHERE memory_type = 'knowledge';"
+
+# Expected output shows entry count, category count, and importance statistics
+
+# View specific entries:
+docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -c "\
+SELECT LEFT(content, 100) as content_preview,
+       metadata->>'category' as category,
+       importance_score
+FROM account_memories 
+WHERE memory_type = 'knowledge'
+ORDER BY importance_score DESC
+LIMIT 10;"
+```
+
+**5. Deploy to Remote**
+```bash
+# Commit and push - GitHub Actions deploys automatically
+git add supabase/migrations/*.sql scripts/kb-to-sql-migration.js
+git commit -m "Add RFP Design agent knowledge base entries"
+git push origin master
+
+# Monitor deployment: https://github.com/markesphere/rfpez-app/actions
+```
+
+#### **Complete Agent + Knowledge Update Example**
+```bash
+# Full workflow to update both agent instructions and knowledge base:
+
+# 1. Edit markdown files
+# Agent Instructions/RFP Design Agent.md - update agent instructions
+# scripts/rfp-design-knowledge-base.md - update knowledge entries
+
+# 2. Get agent UUID
+AGENT_UUID=$(docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -t -c "SELECT id FROM agents WHERE name = 'RFP Design';")
+
+# 3. Generate both migrations
+node scripts/md-to-sql-migration.js "Agent Instructions/RFP Design Agent.md"
+node scripts/kb-to-sql-migration.js "scripts/rfp-design-knowledge-base.md" "$AGENT_UUID"
+
+# 4. Review generated migrations
+ls -lh supabase/migrations/ | tail -5
+
+# 5. Apply migrations locally
+supabase migration up
+
+# 6. Verify updates
+docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -c "\
+SELECT 'Agent:' as type, name, updated_at FROM agents WHERE name = 'RFP Design'
+UNION ALL
+SELECT 'Knowledge:' as type, COUNT(*)::text as name, MAX(updated_at) as updated_at 
+FROM account_memories WHERE memory_type = 'knowledge';"
+
+# 7. Commit and deploy
+git add supabase/migrations/*.sql scripts/*.js
+git commit -m "Update RFP Design agent instructions and knowledge base"
+git push origin master
+```
+
+#### **Database Schema Reference**
+
+**agents table:**
+- `id` - UUID primary key
+- `name` - VARCHAR agent name
+- `instructions` - TEXT agent system prompts
+- `initial_prompts` - TEXT[] user-facing initial messages
+- `access_level` - VARCHAR (public, free, premium)
+- `updated_at` - TIMESTAMP last update time
+
+**account_memories table:**
+- `account_id` - UUID (nullable for global knowledge)
+- `user_id` - UUID (nullable for global knowledge)
+- `memory_type` - VARCHAR (knowledge, fact, guideline, procedure, context)
+- `content` - TEXT the knowledge content
+- `embedding` - extensions.vector(768) vector representation
+- `importance_score` - FLOAT8 (0.0-1.0)
+- `metadata` - JSONB (knowledge_id, category, importance, tags, etc.)
+- `search_vector` - tsvector (GENERATED COLUMN - do not insert)
+- `updated_at` - TIMESTAMP last update time
+
+#### **Common Issues and Solutions**
+
+**Vector Type Error:**
+```
+ERROR: type "vector" does not exist
+```
+**Solution:** Use schema-qualified type `extensions.vector(768)` instead of just `vector(768)`
+
+**Memory Type Casting Error:**
+```
+ERROR: invalid input syntax for type memory_type
+```
+**Solution:** Remove `::memory_type` cast. The column is VARCHAR, not enum. Use `'knowledge'` not `'knowledge'::memory_type`
+
+**Generated Column Error:**
+```
+ERROR: cannot insert into column "search_vector"
+```
+**Solution:** Remove `search_vector` from INSERT statements. It's a GENERATED column computed automatically.
+
+**Parser Format Error:**
+```
+Could not parse knowledge entry
+```
+**Solution:** Ensure markdown uses either `### Content:` or `**Content:**` format (both supported). Script handles `.trim()` for whitespace.
+
+**File Corruption from sed Commands:**
+```
+Syntax error near ','
+```
+**Solution:** Don't use sed to modify SQL files. Regenerate the migration instead of repairing corrupted files.
+
+#### **Best Practices**
+
+1. **Always Test Locally First**: Apply migrations with `supabase migration up` locally before pushing
+2. **Use Docker SQL for Verification**: Preferred over MCP tools for database inspection
+3. **Incremental Migrations**: Use `supabase migration up`, never `supabase db reset` (wipes data)
+4. **Schema-Qualified Types**: Always use `extensions.vector` not just `vector`
+5. **Generated Columns**: Never include in INSERT statements (search_vector)
+6. **Version Control**: Keep both markdown source and generated SQL in git
+7. **Automated Deployment**: Rely on GitHub Actions for production deployment
+8. **Importance Scores**: Use 0.75-0.95 range for high-importance knowledge, 0.5-0.75 for general knowledge
+9. **Categories**: Standardize on: workflow, validation, best-practices, troubleshooting, communication
+10. **Relations**: Use metadata relations field to link related knowledge entries
+
+#### **CLI Tool Reference**
+
+**md-to-sql-migration.js:**
+- Purpose: Convert agent instruction markdown to SQL migration
+- Usage: `node scripts/md-to-sql-migration.js "Agent Instructions/[Agent Name].md"`
+- Output: `supabase/migrations/[timestamp]_update_[agent_name].sql`
+- Features: SQL escaping, metadata extraction, UPDATE statement generation
+
+**kb-to-sql-migration.js:**
+- Purpose: Convert knowledge base markdown to SQL migration
+- Usage: `node scripts/kb-to-sql-migration.js "[markdown-file]" "[agent-uuid]"`
+- Output: `supabase/migrations/[timestamp]_load_[agent_name]knowledgebase.sql`
+- Features: Multi-entry parsing, JSON metadata handling, vector placeholder, category extraction
+
 ### Debugging and Logging Patterns
 
 #### **Edge Function Logging & Debugging**
