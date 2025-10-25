@@ -32,14 +32,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'create_form_artifact',
-    description: 'Create a form artifact (questionnaire, bid form, etc.) and store it in the database. CRITICAL: Must be associated with an RFP. Either call create_and_set_rfp first, or use get_current_rfp to get the session\'s current RFP ID.',
+    description: 'Create a form artifact (questionnaire, bid form, etc.) and store it in the database. The artifact will be automatically associated with the session\'s current active RFP. NOTE: You must call create_and_set_rfp first to set a current RFP before creating artifacts.',
     input_schema: {
       type: 'object',
       properties: {
-        rfp_id: {
-          type: 'number',
-          description: 'REQUIRED: RFP ID to associate this artifact with. Get this from create_and_set_rfp (returns rfp_id) or get_current_rfp tool. Forms MUST be linked to an RFP.'
-        },
         name: {
           type: 'string',
           description: 'Name of the form artifact'
@@ -70,19 +66,15 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           ]
         }
       },
-      required: ['rfp_id', 'name', 'description', 'content', 'artifactRole']
+      required: ['name', 'description', 'content', 'artifactRole']
     }
   },
   {
     name: 'create_document_artifact',
-    description: 'Create a document artifact (text document, RFP document, etc.) and store it in the database. CRITICAL: Must be associated with an RFP. Either call create_and_set_rfp first, or use get_current_rfp to get the session\'s current RFP ID.',
+    description: 'Create a document artifact (text document, RFP document, etc.) and store it in the database. The artifact will be automatically associated with the session\'s current active RFP. NOTE: You must call create_and_set_rfp first to set a current RFP before creating artifacts.',
     input_schema: {
       type: 'object',
       properties: {
-        rfp_id: {
-          type: 'number',
-          description: 'REQUIRED: RFP ID to associate this artifact with. Get this from create_and_set_rfp (returns rfp_id) or get_current_rfp tool. Documents MUST be linked to an RFP.'
-        },
         name: {
           type: 'string',
           description: 'Name/title of the document artifact'
@@ -120,7 +112,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional tags for categorizing the document'
         }
       },
-      required: ['rfp_id', 'name', 'content', 'artifactRole']
+      required: ['name', 'content', 'artifactRole']
     }
   },
   {
@@ -350,7 +342,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'get_current_rfp',
-    description: 'Get the current active RFP for the session. Use this to get the rfp_id needed for creating artifacts. Returns null if no RFP is set - in that case, you MUST call create_and_set_rfp first.',
+    description: 'Get information about the current active RFP for the session. Use this when the user asks about the current RFP or wants to see RFP details. Returns null if no RFP is set.',
     input_schema: {
       type: 'object',
       properties: {
@@ -422,14 +414,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'submit_bid',
-    description: 'Submit a bid to create a permanent bid record. Can be used in two ways: (1) With artifact_id to submit from a form artifact, or (2) Directly with supplier_name, bid_price, and delivery_days for quick bid submission without a form.',
+    description: 'Submit a bid for the current active RFP to create a permanent bid record. The RFP ID is automatically determined from the session context. Can be used in two ways: (1) With artifact_id to submit from a form artifact, or (2) Directly with supplier_name, bid_price, and delivery_days for quick bid submission without a form.',
     input_schema: {
       type: 'object',
       properties: {
-        rfp_id: {
-          type: 'number',
-          description: 'ID of the RFP this bid is for'
-        },
         artifact_id: {
           type: 'string',
           description: 'Optional: ID of the form artifact containing the bid data (for form-based submission)'
@@ -454,22 +442,15 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           type: 'number',
           description: 'Optional: Number of days for delivery for direct submission (when no artifact_id)'
         }
-      },
-      required: ['rfp_id']
+      }
     }
   },
   {
     name: 'get_rfp_bids',
-    description: 'Get all bids for a specific RFP with their current status and details',
+    description: 'Get all bids for the current active RFP with their current status and details. The RFP ID is automatically determined from the session context.',
     input_schema: {
       type: 'object',
-      properties: {
-        rfp_id: {
-          type: 'number',
-          description: 'ID of the RFP to get bids for'
-        }
-      },
-      required: ['rfp_id']
+      properties: {}
     }
   },
   {

@@ -378,7 +378,11 @@ const Home: React.FC = () => {
     currentSessionIdRef.current = sessionId;
     console.log('📌 Session ID ref updated via handleSelectSession:', sessionId);
     
-    // Save as last session for persistence
+    // CRITICAL FIX: Save to localStorage IMMEDIATELY for page refresh persistence
+    localStorage.setItem('rfpez_last_session', sessionId);
+    console.log('💾 Session saved to localStorage for refresh persistence:', sessionId);
+    
+    // Save as last session for persistence (backup via artifactWindowState)
     artifactWindowState.saveLastSession(sessionId);
     
     // Update user profile with current session ID for database persistence

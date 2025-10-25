@@ -307,7 +307,7 @@ export async function getCurrentRfp(supabase: SupabaseClient, sessionId: string)
     return {
       success: true,
       rfp_id: null,
-      message: 'No RFP is currently set for this session. You must call create_and_set_rfp first before creating artifacts.'
+      message: 'No RFP is currently set for this session. Call create_and_set_rfp to create a new RFP first.'
     };
   }
   
@@ -344,9 +344,9 @@ export async function getCurrentRfp(supabase: SupabaseClient, sessionId: string)
 export async function createFormArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: FormArtifactData) {
   const { name, description, content, artifactRole, rfp_id } = data;
   
-  // ⚠️ CRITICAL: Validate RFP ID is provided
+  // ⚠️ CRITICAL: Validate RFP ID is provided (automatically injected by executeTool)
   if (!rfp_id) {
-    throw new Error('❌ CRITICAL: rfp_id is required. You must either call create_and_set_rfp first (which returns rfp_id) or use get_current_rfp to get the session\'s current RFP ID. Forms cannot be created without an associated RFP.');
+    throw new Error('❌ CRITICAL: rfp_id is required but was not auto-injected. This indicates a system error - the current RFP should be automatically retrieved from the session.');
   }
   
   // Validate RFP exists
@@ -589,9 +589,9 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
   
   const { rfp_id, name, description, content, content_type = 'markdown', artifactRole, tags = [] } = data;
   
-  // ⚠️ CRITICAL: Validate RFP ID is provided
+  // ⚠️ CRITICAL: Validate RFP ID is provided (automatically injected by executeTool)
   if (!rfp_id) {
-    throw new Error('❌ CRITICAL: rfp_id is required. You must either call create_and_set_rfp first (which returns rfp_id) or use get_current_rfp to get the session\'s current RFP ID. Documents cannot be created without an associated RFP.');
+    throw new Error('❌ CRITICAL: rfp_id is required but was not auto-injected. This indicates a system error - the current RFP should be automatically retrieved from the session.');
   }
   
   // Validate RFP exists
@@ -602,7 +602,7 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
     .single() as { data: { id: number; name: string } | null; error: Error | null };
   
   if (rfpError || !rfp) {
-    throw new Error(`❌ Invalid RFP ID: ${rfp_id}. The specified RFP does not exist. Use get_current_rfp or create_and_set_rfp to get a valid RFP ID.`);
+    throw new Error(`❌ Invalid RFP ID: ${rfp_id}. The specified RFP does not exist or has been deleted.`);
   }
   
   console.log('✅ Validated RFP association:', { rfp_id, rfp_name: rfp.name });

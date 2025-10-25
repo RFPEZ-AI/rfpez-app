@@ -358,9 +358,49 @@ export class ToolExecutionService {
             };
           }
           
+          // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
+          // @ts-expect-error - Supabase client type is unknown but compatible
+          const sessionQuery = await this.supabase
+            .from('sessions')
+            .select('current_rfp_id')
+            .eq('id', sessionId)
+            .single();
+          
+          const { data: sessionData, error: sessionError } = sessionQuery as { 
+            data: { current_rfp_id?: number } | null; 
+            error: Error | null 
+          };
+          
+          if (sessionError) {
+            console.error('❌ Failed to fetch session data:', sessionError);
+            return {
+              success: false,
+              error: 'Failed to retrieve session information',
+              message: 'Could not fetch session data to determine current RFP.'
+            };
+          }
+          
+          if (!sessionData?.current_rfp_id) {
+            console.error('❌ No current RFP set for this session');
+            return {
+              success: false,
+              error: 'No current RFP set',
+              message: 'No RFP is currently active for this session. To create this form artifact, you must first create an RFP using the create_and_set_rfp tool. Call it now with a descriptive name based on what the user is procuring (e.g., "LED Bulbs RFP" or "Industrial Alcohol RFP"), then retry creating the form artifact.',
+              recovery_action: {
+                tool: 'create_and_set_rfp',
+                instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
+              }
+            };
+          }
+          
+          console.log('✅ Auto-injecting current RFP ID:', sessionData.current_rfp_id);
+          
           const { createFormArtifact } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
-          return await createFormArtifact(this.supabase, sessionId, this.userId, input);
+          return await createFormArtifact(this.supabase, sessionId, this.userId, {
+            ...input,
+            rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
+          });
         }
 
         case 'create_document_artifact': {
@@ -380,9 +420,49 @@ export class ToolExecutionService {
             };
           }
           
+          // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
+          // @ts-expect-error - Supabase client type is unknown but compatible
+          const sessionQuery = await this.supabase
+            .from('sessions')
+            .select('current_rfp_id')
+            .eq('id', sessionId)
+            .single();
+          
+          const { data: sessionData, error: sessionError } = sessionQuery as { 
+            data: { current_rfp_id?: number } | null; 
+            error: Error | null 
+          };
+          
+          if (sessionError) {
+            console.error('❌ Failed to fetch session data:', sessionError);
+            return {
+              success: false,
+              error: 'Failed to retrieve session information',
+              message: 'Could not fetch session data to determine current RFP.'
+            };
+          }
+          
+          if (!sessionData?.current_rfp_id) {
+            console.error('❌ No current RFP set for this session');
+            return {
+              success: false,
+              error: 'No current RFP set',
+              message: 'No RFP is currently active for this session. To create this document artifact, you must first create an RFP using the create_and_set_rfp tool. Call it now with a descriptive name based on what the user is procuring (e.g., "LED Bulbs RFP" or "Industrial Alcohol RFP"), then retry creating the document artifact.',
+              recovery_action: {
+                tool: 'create_and_set_rfp',
+                instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
+              }
+            };
+          }
+          
+          console.log('✅ Auto-injecting current RFP ID:', sessionData.current_rfp_id);
+          
           const { createDocumentArtifact } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
-          const result = await createDocumentArtifact(this.supabase, sessionId, this.userId, input);
+          const result = await createDocumentArtifact(this.supabase, sessionId, this.userId, {
+            ...input,
+            rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
+          });
           console.log('🎯 CREATE_DOCUMENT_ARTIFACT RESULT:', JSON.stringify(result, null, 2));
           return result;
         }
@@ -603,15 +683,99 @@ export class ToolExecutionService {
           if (!sessionId) {
             return { success: false, error: 'Session ID is required' };
           }
+          
+          // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
+          // @ts-expect-error - Supabase client type is unknown but compatible
+          const sessionQuery = await this.supabase
+            .from('sessions')
+            .select('current_rfp_id')
+            .eq('id', sessionId)
+            .single();
+          
+          const { data: sessionData, error: sessionError } = sessionQuery as { 
+            data: { current_rfp_id?: number } | null; 
+            error: Error | null 
+          };
+          
+          if (sessionError) {
+            console.error('❌ Failed to fetch session data:', sessionError);
+            return {
+              success: false,
+              error: 'Failed to retrieve session information',
+              message: 'Could not fetch session data to determine current RFP.'
+            };
+          }
+          
+          if (!sessionData?.current_rfp_id) {
+            console.error('❌ No current RFP set for this session');
+            return {
+              success: false,
+              error: 'No current RFP set',
+              message: 'No RFP is currently active for this session. To submit a bid, you must first create an RFP using the create_and_set_rfp tool. Call it now with a descriptive name based on what the user is procuring (e.g., "LED Bulbs RFP" or "Industrial Alcohol RFP"), then retry submitting the bid.',
+              recovery_action: {
+                tool: 'create_and_set_rfp',
+                instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
+              }
+            };
+          }
+          
+          console.log('✅ Auto-injecting current RFP ID for bid submission:', sessionData.current_rfp_id);
+          
           const { submitBid } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
-          return await submitBid(this.supabase, sessionId, this.userId, input);
+          return await submitBid(this.supabase, sessionId, this.userId, {
+            ...input,
+            rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
+          });
         }
 
         case 'get_rfp_bids': {
+          if (!sessionId) {
+            return { success: false, error: 'Session ID is required' };
+          }
+          
+          // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
+          // @ts-expect-error - Supabase client type is unknown but compatible
+          const sessionQuery = await this.supabase
+            .from('sessions')
+            .select('current_rfp_id')
+            .eq('id', sessionId)
+            .single();
+          
+          const { data: sessionData, error: sessionError } = sessionQuery as { 
+            data: { current_rfp_id?: number } | null; 
+            error: Error | null 
+          };
+          
+          if (sessionError) {
+            console.error('❌ Failed to fetch session data:', sessionError);
+            return {
+              success: false,
+              error: 'Failed to retrieve session information',
+              message: 'Could not fetch session data to determine current RFP.'
+            };
+          }
+          
+          if (!sessionData?.current_rfp_id) {
+            console.error('❌ No current RFP set for this session');
+            return {
+              success: false,
+              error: 'No current RFP set',
+              message: 'No RFP is currently active for this session. To retrieve bids, you must first create an RFP using the create_and_set_rfp tool. Call it now with a descriptive name based on what the user is procuring (e.g., "LED Bulbs RFP" or "Industrial Alcohol RFP"), then retry getting the bids.',
+              recovery_action: {
+                tool: 'create_and_set_rfp',
+                instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
+              }
+            };
+          }
+          
+          console.log('✅ Auto-injecting current RFP ID for getting bids:', sessionData.current_rfp_id);
+          
           const { getRfpBids } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
-          return await getRfpBids(this.supabase, input);
+          return await getRfpBids(this.supabase, {
+            rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
+          });
         }
 
         case 'update_bid_status': {

@@ -231,4 +231,8 @@ export interface ToolResult {
   clientCallbacks?: ClientCallback[];
   current_rfp_id?: number;
   rfp?: RFPRecord;
+  recovery_action?: {
+    tool: string;
+    instruction: string;
+  };
 }
