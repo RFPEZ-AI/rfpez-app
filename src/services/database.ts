@@ -215,19 +215,48 @@ export class DatabaseService {
   }
 
   static async deleteSession(sessionId: string): Promise<boolean> {
+    console.log('[DatabaseService.deleteSession] Starting session deletion', { sessionId });
+    
+    // Get current user context for debugging
+    const { data: { user } } = await supabase.auth.getUser();
+    console.log('[DatabaseService.deleteSession] Current auth user:', { 
+      userId: user?.id,
+      email: user?.email 
+    });
+    
+    // Check if session exists and user has access before deleting
+    const { data: sessionCheck, error: checkError } = await supabase
+      .from('sessions')
+      .select('id, user_id')
+      .eq('id', sessionId)
+      .single();
+    
+    if (checkError) {
+      console.error('[DatabaseService.deleteSession] Error checking session:', checkError);
+      return false;
+    }
+    
+    console.log('[DatabaseService.deleteSession] Session check result:', sessionCheck);
+    
     const { error } = await supabase
       .from('sessions')
       .delete()
       .eq('id', sessionId);
-
+    
     if (error) {
-      console.error('Error deleting session:', error);
+      console.error('[DatabaseService.deleteSession] Error deleting session:', {
+        error,
+        code: error.code,
+        message: error.message,
+        details: error.details,
+        hint: error.hint
+      });
       return false;
     }
+    
+    console.log('[DatabaseService.deleteSession] Session deleted successfully');
     return true;
-  }
-
-  // Session context management
+  }  // Session context management
   static async updateSessionContext(
     sessionId: string, 
     context: { 

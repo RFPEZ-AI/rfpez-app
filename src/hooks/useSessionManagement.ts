@@ -189,28 +189,59 @@ export function useSessionManagement() {
     }
   }, [handleError, loadSessionWithContext, user]);
 
-  const deleteSession = useCallback(async (sessionId: string) => {
+  const deleteSession = useCallback(async (sessionId: string): Promise<boolean> => {
     try {
       logger.info('Deleting session', {
         component: 'useSessionManagement',
         sessionId
       });
 
-      // Remove from local state immediately for UI responsiveness
-      setSessions(prev => prev.filter(s => s.id !== sessionId));
-
+      // CRITICAL FIX: If deleting the currently selected session, switch to the most recent other session first
       if (selectedSessionId === sessionId) {
-        setSelectedSessionId(undefined);
-        setCurrentSessionId(undefined);
+        // Find the most recent session that isn't the one being deleted
+        const otherSessions = sessions
+          .filter(s => s.id !== sessionId)
+          .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+        if (otherSessions.length > 0) {
+          const nextSession = otherSessions[0];
+          logger.info('Switching to most recent other session before deletion', {
+            component: 'useSessionManagement',
+            deletingSessionId: sessionId,
+            switchingToSessionId: nextSession.id
+          });
+
+          // Switch to the next session before deleting
+          await selectSession(nextSession.id);
+        } else {
+          // No other sessions available, clear current session
+          logger.info('No other sessions available, clearing current session', {
+            component: 'useSessionManagement',
+            sessionId
+          });
+          setSelectedSessionId(undefined);
+          setCurrentSessionId(undefined);
+          if (user) {
+            await UserContextService.setCurrentSession(user.id, null);
+          }
+        }
       }
 
-      // Note: Add actual deletion API call here when available
-      // await DatabaseService.deleteSession(sessionId);
+      // Delete the session from the database
+      const deleted = await DatabaseService.deleteSession(sessionId);
+      if (!deleted) {
+        throw new Error('Failed to delete session from database');
+      }
 
       logger.info('Session deleted successfully', {
         component: 'useSessionManagement',
         sessionId
       });
+
+      // Reload sessions to ensure UI is in sync with database
+      await loadSessions();
+
+      return true; // SUCCESS
 
     } catch (error) {
       // Revert local state on error
@@ -221,8 +252,10 @@ export function useSessionManagement() {
         action: 'deleteSession',
         sessionId
       });
+      
+      return false; // FAILURE
     }
-  }, [selectedSessionId, loadSessions, handleError]);
+  }, [selectedSessionId, sessions, selectSession, loadSessions, handleError, user]);
 
   const clearSessions = useCallback(() => {
     setSessions([]);

@@ -47,6 +47,9 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
     if (forceCollapsed) {
       console.log('🔄 SessionHistory: Force collapsing due to forceCollapsed=true');
       setInternalExpanded(false);
+      // Clear action sheet when force collapsing
+      setShowActionSheet(false);
+      setSelectedSessionForAction(null);
     }
   }, [forceCollapsed]);
 
@@ -69,8 +72,10 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
-        // Only auto-collapse if expanded and not on mobile (mobile has different UX patterns)
-        if (isExpanded && !isMobile) {
+        // 🚨 CRITICAL: Do NOT auto-collapse if action sheet is open!
+        // The action sheet clicks are "outside" the container and would trigger collapse
+        // before the Delete button handler can execute
+        if (isExpanded && !isMobile && !showActionSheet) {
           console.log('🔄 SessionHistory: Auto-collapsing due to click outside');
           setInternalExpanded(false);
         }
@@ -78,29 +83,54 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
     };
 
     // Only add listener when expanded to avoid unnecessary event handling
-    if (isExpanded) {
+    // Also disable when action sheet is open to prevent interference
+    if (isExpanded && !showActionSheet) {
       document.addEventListener('mousedown', handleClickOutside);
       return () => {
         document.removeEventListener('mousedown', handleClickOutside);
       };
     }
-  }, [isExpanded, isMobile]);
+  }, [isExpanded, isMobile, showActionSheet]);
+
+  // Debug: Log action sheet state changes
+  useEffect(() => {
+    console.log('🎬 Action sheet state changed:', {
+      showActionSheet,
+      selectedSessionForAction,
+      timestamp: new Date().toISOString()
+    });
+  }, [showActionSheet, selectedSessionForAction]);
 
   const toggleExpanded = () => {
     // Allow toggle always, but force collapse may override it
     setInternalExpanded(!internalExpanded);
+    // Clear any stale action sheet state when toggling
+    if (showActionSheet) {
+      setShowActionSheet(false);
+      setSelectedSessionForAction(null);
+    }
   };
 
   const handleSessionRightClick = (e: React.MouseEvent, sessionId: string) => {
     e.preventDefault();
+    console.log('🖱️ Right-click detected on session:', sessionId);
     setSelectedSessionForAction(sessionId);
     setShowActionSheet(true);
+    console.log('📊 Action sheet state updated - isOpen should now be true');
   };
 
   const handleDeleteConfirm = () => {
+    console.log('🗑️ SessionHistory: handleDeleteConfirm called', { 
+      selectedSessionForAction,
+      hasOnDeleteProp: !!onDeleteSession 
+    });
+    
     if (selectedSessionForAction) {
+      console.log('🗑️ SessionHistory: Calling onDeleteSession prop with:', selectedSessionForAction);
       onDeleteSession(selectedSessionForAction);
       setSelectedSessionForAction(null);
+    } else {
+      console.warn('⚠️ SessionHistory: No selectedSessionForAction - deletion skipped');
     }
     setShowActionSheet(false);
   };
@@ -260,18 +290,29 @@ const SessionHistory: React.FC<SessionHistoryProps> = ({
           {/* Action Sheet for Delete Confirmation */}
           <IonActionSheet
             isOpen={showActionSheet}
-            onDidDismiss={() => setShowActionSheet(false)}
+            onDidDismiss={() => {
+              console.log('🚪 IonActionSheet: Dismissed');
+              setShowActionSheet(false);
+            }}
             header="Session Actions"
             buttons={[
               {
                 text: 'Delete Session',
                 role: 'destructive',
                 icon: trash,
-                handler: handleDeleteConfirm
+                handler: () => {
+                  console.log('🔥 Delete button handler triggered');
+                  handleDeleteConfirm();
+                  return true; // Allow the action sheet to dismiss
+                }
               },
               {
                 text: 'Cancel',
-                role: 'cancel'
+                role: 'cancel',
+                handler: () => {
+                  console.log('❌ Cancel button handler triggered');
+                  return true; // Allow the action sheet to dismiss
+                }
               }
             ]}
           />
