@@ -111,26 +111,100 @@ export async function createAndSetRfpWithClient(authenticatedSupabase: SupabaseC
       created_at: rfpResultData.rfp_created_at
     };
     
+    // FIX 3: Create a new session for the new RFP (per user requirement)
+    let newSessionId = sessionContext?.sessionId;
+    
+    try {
+      console.log('🆕 Creating new session for RFP:', rfpRecord.name);
+      
+      // Import createSession from database tools
+      const { createSession } = await import('./database.ts');
+      
+      // Create new session with RFP name as title
+      // @ts-expect-error - Type compatibility between Supabase client interfaces
+      const sessionResult = await createSession(authenticatedSupabase, {
+        userId: userId,
+        title: String(rfpRecord.name || 'New RFP Session'),
+        agentId: sessionContext?.agent?.id // Preserve current agent if available
+      });
+      
+      if (sessionResult && sessionResult.session_id) {
+        newSessionId = sessionResult.session_id;
+        console.log('✅ New session created:', newSessionId, 'with title:', rfpRecord.name);
+        
+        // FIX 2: Set current_rfp_id in the new session
+        const { error: updateError } = await authenticatedSupabase
+          .from('sessions')
+          .update({ current_rfp_id: rfpRecord.id })
+          .eq('id', newSessionId);
+        
+        if (updateError) {
+          console.warn('⚠️ Failed to set current RFP in new session:', updateError);
+        } else {
+          console.log('✅ Current RFP set in new session');
+        }
+      }
+    } catch (sessionError) {
+      console.error('❌ Error creating new session:', sessionError);
+      // Fall back to updating existing session if session creation fails
+      console.log('⚠️ Falling back to updating existing session:', sessionContext?.sessionId);
+      
+      if (sessionContext?.sessionId) {
+        const { error: updateError } = await authenticatedSupabase
+          .from('sessions')
+          .update({ 
+            current_rfp_id: rfpRecord.id,
+            title: String(rfpRecord.name || 'Untitled RFP') // FIX 2: Update session title with RFP name
+          })
+          .eq('id', sessionContext.sessionId);
+        
+        if (updateError) {
+          console.warn('⚠️ Failed to update existing session:', updateError);
+        } else {
+          console.log('✅ Existing session updated with current RFP and title');
+        }
+      }
+    }
+    
     // Return success response with client callbacks
+    // If we created a new session, include session_switch callback
+    const callbacks: import('../types.ts').ClientCallback[] = [
+      {
+        type: 'ui_refresh',
+        target: 'rfp_context',
+        payload: {
+          rfp_id: rfpRecord.id as number,
+          rfp_name: String(rfpRecord.name || 'Untitled'),
+          rfp_data: rfpRecord,
+          session_id: newSessionId, // Include session ID in payload
+          message: `RFP "${String(rfpRecord.name || 'Untitled')}" has been created successfully`
+        },
+        priority: 'high'
+      }
+    ];
+    
+    // Add session switch callback if we created a new session
+    if (newSessionId && newSessionId !== sessionContext?.sessionId) {
+      callbacks.push({
+        type: 'ui_refresh',
+        target: 'session_switch',
+        payload: {
+          session_id: newSessionId,
+          rfp_id: rfpRecord.id as number,
+          rfp_name: String(rfpRecord.name || 'Untitled'),
+          message: `Switched to new session for RFP "${String(rfpRecord.name || 'Untitled')}"`
+        },
+        priority: 'high'
+      });
+    }
+    
     return {
       success: true,
       data: rfpRecord,
       current_rfp_id: rfpRecord.id as number,
       rfp: undefined,
-      message: `RFP "${String(rfpRecord.name || 'Untitled')}" created successfully with ID ${String(rfpRecord.id || '')}`,
-      clientCallbacks: [
-        {
-          type: 'ui_refresh',
-          target: 'rfp_context',
-          payload: {
-            rfp_id: rfpRecord.id as number,
-            rfp_name: String(rfpRecord.name || 'Untitled'),
-            rfp_data: rfpRecord,
-            message: `RFP "${String(rfpRecord.name || 'Untitled')}" has been created successfully`
-          },
-          priority: 'high'
-        }
-      ]
+      message: `RFP "${String(rfpRecord.name || 'Untitled')}" created successfully with ID ${String(rfpRecord.id || '')}${newSessionId !== sessionContext?.sessionId ? ' in new session' : ''}`,
+      clientCallbacks: callbacks
     };
     
   } catch (error) {

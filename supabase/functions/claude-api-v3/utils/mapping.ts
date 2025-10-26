@@ -33,10 +33,13 @@ export function mapArtifactRole(role: string): string | null {
     // Buyer forms -> buyer_questionnaire  
     'buyer_form': 'buyer_questionnaire',
     'requirements_form': 'buyer_questionnaire',
-    // Valid roles pass through
+    // Valid roles pass through (including new document types)
     'buyer_questionnaire': 'buyer_questionnaire',
     'bid_form': 'bid_form',
     'request_document': 'request_document',
+    'specification_document': 'specification_document',
+    'analysis_document': 'analysis_document',
+    'report_document': 'report_document',
     'template': 'template'
   };
   

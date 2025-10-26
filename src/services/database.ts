@@ -302,6 +302,30 @@ export class DatabaseService {
     return data;
   }
 
+  static async getMostRecentSessionForRfp(rfpId: number, supabaseUserId: string): Promise<Session | null> {
+    console.log('DatabaseService.getMostRecentSessionForRfp called with:', { rfpId, supabaseUserId });
+    
+    const { data, error } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('user_id', supabaseUserId)
+      .eq('current_rfp_id', rfpId)
+      .order('updated_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      // No error logging if no session found (404 is expected)
+      if (error.code !== 'PGRST116') { // Not a "no rows returned" error
+        console.error('Error fetching most recent session for RFP:', error);
+      }
+      return null;
+    }
+    
+    console.log('Most recent session for RFP found:', data.id);
+    return data;
+  }
+
   // User profile context management
   static async updateUserProfileContext(
     supabaseUserId: string,
@@ -1057,11 +1081,44 @@ export class DatabaseService {
           return [];
         }
 
-        return artifactData || [];
+        // Flatten the nested artifacts structure
+        console.log('🔍 RAW artifactData structure:', JSON.stringify(artifactData?.slice(0, 2), null, 2));
+        
+        const flattenedArtifacts = (artifactData || [])
+          .map((item: any) => {
+            console.log('🔍 Processing item:', JSON.stringify(item, null, 2));
+            return item.artifacts;
+          })
+          .filter((artifact: any) => {
+            const hasId = artifact && artifact.id;
+            if (!hasId) {
+              console.warn('⚠️ Filtered out artifact without id:', artifact);
+            }
+            return hasId;
+          });
+        
+        console.log(`✅ Loaded ${flattenedArtifacts.length} artifacts for RFP ${rfpId}`);
+        console.log('🔍 First flattened artifact:', JSON.stringify(flattenedArtifacts[0], null, 2));
+        return flattenedArtifacts;
       }
 
-      console.log(`✅ Loaded ${data?.length || 0} artifacts for RFP ${rfpId}`);
-      return data || [];
+      // RPC function succeeded - map artifact_* columns to expected format
+      console.log('🔍 RPC returned data:', JSON.stringify(data?.slice(0, 2), null, 2));
+      const mappedArtifacts = (data || []).map((item: any) => ({
+        id: item.artifact_id,
+        name: item.artifact_name,
+        type: item.artifact_type,
+        schema: item.schema,
+        ui_schema: item.ui_schema,
+        default_values: item.default_values,
+        submit_action: item.submit_action,
+        created_at: item.created_at,
+        role: item.artifact_role
+      }));
+      
+      console.log(`✅ Loaded and mapped ${mappedArtifacts.length} artifacts for RFP ${rfpId}`);
+      console.log('🔍 First mapped artifact:', JSON.stringify(mappedArtifacts[0], null, 2));
+      return mappedArtifacts;
     } catch (error) {
       console.error('❌ Exception loading RFP artifacts:', error);
       return [];

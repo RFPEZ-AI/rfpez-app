@@ -129,12 +129,19 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
     }
     
     if (typeDetection.isBidView) {
-      // Use artifact's rfpId as fallback if currentRfpId is not set
+      // Use currentRfpId from Home component, fallback to artifact's rfpId
       const effectiveRfpId = currentRfpId ?? artifact.rfpId ?? null;
+      
+      console.log('🔍 BidView rendering with:', { 
+        currentRfpId, 
+        artifactRfpId: artifact.rfpId, 
+        effectiveRfpId,
+        artifactId: artifact.id 
+      });
       
       return (
         <ArtifactBidRenderer
-          key={artifact.id} // Force re-mount when artifact changes
+          key={`${artifact.id}-${effectiveRfpId}`} // Force re-mount when artifact OR RFP changes
           currentRfpId={effectiveRfpId}
           rfpName={artifact.content || artifact.name}
         />

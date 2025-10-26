@@ -799,6 +799,69 @@ const Home: React.FC = () => {
         return;
       }
 
+      // NEW: Handle EDGE_FUNCTION_CALLBACK messages (modern callback format from claude-api-v3)
+      if (event.data?.type === 'EDGE_FUNCTION_CALLBACK') {
+        console.log('🎯 HOME MESSAGE DEBUG: EDGE_FUNCTION_CALLBACK received:', {
+          callbackType: event.data.callbackType,
+          target: event.data.target,
+          payload: event.data.payload,
+          timestamp: new Date().toISOString()
+        });
+
+        // Handle rfp_context updates (from create_and_set_rfp tool)
+        if (event.data.target === 'rfp_context' && event.data.payload?.rfp_id) {
+          console.log('🎯 RFP CONTEXT CALLBACK: Updating RFP context from edge function:', {
+            rfp_id: event.data.payload.rfp_id,
+            rfp_name: event.data.payload.rfp_name
+          });
+          
+          try {
+            await handleSetCurrentRfp(event.data.payload.rfp_id, event.data.payload.rfp_data);
+            console.log('✅ HOME MESSAGE DEBUG: RFP context updated from EDGE_FUNCTION_CALLBACK');
+            
+            // Refresh artifacts to ensure new form artifacts are loaded
+            if (currentSessionId) {
+              await loadSessionArtifacts(currentSessionId);
+              console.log('✅ Artifacts refreshed after RFP context update');
+            }
+          } catch (error) {
+            console.error('❌ HOME MESSAGE DEBUG: Failed to update RFP context from EDGE_FUNCTION_CALLBACK:', error);
+          }
+        }
+        
+        // Handle session_switch callback (when new RFP creates new session)
+        if (event.data.target === 'session_switch' && event.data.payload?.session_id) {
+          console.log('🎯 SESSION SWITCH CALLBACK: Switching to new session from edge function:', {
+            session_id: event.data.payload.session_id,
+            rfp_id: event.data.payload.rfp_id,
+            rfp_name: event.data.payload.rfp_name
+          });
+          
+          try {
+            const newSessionId = event.data.payload.session_id;
+            
+            // Switch to the new session
+            setCurrentSessionId(newSessionId);
+            
+            // Load messages, agent, and artifacts for new session
+            await loadSessionMessages(newSessionId);
+            await loadSessionAgent(newSessionId);
+            await loadSessionArtifacts(newSessionId);
+            
+            // Update RFP context if provided
+            if (event.data.payload.rfp_id) {
+              await handleSetCurrentRfp(event.data.payload.rfp_id, event.data.payload.rfp_data);
+            }
+            
+            console.log('✅ HOME MESSAGE DEBUG: Session switched successfully to:', newSessionId);
+          } catch (error) {
+            console.error('❌ HOME MESSAGE DEBUG: Failed to switch session from EDGE_FUNCTION_CALLBACK:', error);
+          }
+        }
+        
+        return;
+      }
+
       // NEW: Handle RFP_CREATED_SUCCESS messages from useMessageHandling
       if (event.data?.type === 'RFP_CREATED_SUCCESS') {
         console.log('🎯 HOME MESSAGE DEBUG: RFP_CREATED_SUCCESS received:', {
@@ -1487,10 +1550,12 @@ const Home: React.FC = () => {
     if (existingBidView) {
       console.log('Reusing existing bid view artifact:', existingBidView.id);
       // Update the name in case RFP name changed
+      // CRITICAL FIX: Also update rfpId to ensure BidView loads correct bids
       bidViewArtifact = {
         ...existingBidView,
         name: `Bids for ${currentRfp.name}`,
-        content: currentRfp.name
+        content: currentRfp.name,
+        rfpId: currentRfp.id // ✅ Update rfpId to current RFP
       };
       
       // Update in state if name changed
@@ -2082,16 +2147,39 @@ const Home: React.FC = () => {
             selectedIdType: typeof rfpId
           });
           
-          // CRITICAL FIX: Set as GLOBAL context to ensure artifacts reload properly
+          // ENHANCED: Check if there's a previous session for this RFP
+          if (user?.id) {
+            const mostRecentSession = await DatabaseService.getMostRecentSessionForRfp(rfpId, user.id);
+            
+            if (mostRecentSession) {
+              console.log('✅ Found existing session for RFP:', {
+                sessionId: mostRecentSession.id,
+                sessionTitle: mostRecentSession.title,
+                rfpId
+              });
+              
+              // Switch to the most recent session for this RFP
+              await handleSelectSession(mostRecentSession.id);
+              console.log('🔄 Switched to existing session for RFP');
+              return; // Exit early - session switching will handle RFP context
+            } else {
+              console.log('ℹ️ No existing session found for RFP, updating current session');
+            }
+          }
+          
+          // FALLBACK: If no previous session found, set RFP as GLOBAL context
           // This ensures the RFP change is detected by useArtifactManagement
           // Mark as user-initiated to trigger agent notification
           await handleSetCurrentRfp(rfpId, undefined, true, true);
           
-          // Update the current session's RFP context
+          // Update the current session's RFP context AND clear artifact context
           if (currentSessionId) {
             try {
-              await DatabaseService.updateSessionContext(currentSessionId, { current_rfp_id: rfpId });
-              console.log('✅ Session RFP context updated:', { sessionId: currentSessionId, rfpId });
+              await DatabaseService.updateSessionContext(currentSessionId, { 
+                current_rfp_id: rfpId,
+                current_artifact_id: null  // Clear artifact when switching RFPs
+              });
+              console.log('✅ Session RFP context updated and artifact cleared:', { sessionId: currentSessionId, rfpId });
             } catch (error) {
               console.error('❌ Failed to update session RFP context:', error);
             }

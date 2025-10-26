@@ -178,6 +178,10 @@ export const useArtifactManagement = (
       rfpName: currentRfp?.name
     });
     
+    // Clear selected artifact when RFP changes to prevent showing artifacts from previous RFP
+    console.log('🧹 Clearing selected artifact on RFP change');
+    setSelectedArtifactId(null);
+    
     if (currentRfp && currentRfp.id) {
       console.log('Loading artifacts for RFP:', currentRfp.id, currentRfp.name);
       
@@ -267,30 +271,19 @@ export const useArtifactManagement = (
           })));
           
           // Use functional update to avoid dependency on artifacts
-          setArtifacts(prev => {
-            // Preserve Claude-generated artifacts
-            const existingClaudeArtifacts = prev.filter(artifact => 
-              artifact.id && (
-                artifact.id.includes('claude-artifact') ||
-                (!artifact.id.startsWith('form_') && !artifact.id.includes('-'))
-              )
-            );
-            console.log(`📋 Preserving ${existingClaudeArtifacts.length} Claude-generated artifacts`);
-            
-            const newArtifacts = [...existingClaudeArtifacts, ...formattedArtifacts];
-            console.log('📋 Final artifacts after merge:', {
-              total: newArtifacts.length,
-              artifacts: newArtifacts.map(a => ({
-                id: a.id,
-                name: a.name,
-                type: a.type,
-                created_at: a.created_at,
-                hasCreatedAt: !!a.created_at
-              }))
-            });
-            
-            return newArtifacts;
+          // When RFP is active, ONLY show artifacts for that RFP
+          // Don't merge with previous artifacts to avoid cross-RFP contamination
+          console.log('📋 Setting RFP-specific artifacts:', {
+            rfpId: currentRfp.id,
+            artifactCount: formattedArtifacts.length,
+            artifacts: formattedArtifacts.map(a => ({
+              id: a.id,
+              name: a.name,
+              type: a.type
+            }))
           });
+          
+          setArtifacts(formattedArtifacts);
         } catch (error) {
           console.error('Failed to load RFP artifacts:', error);
         }
@@ -397,8 +390,22 @@ export const useArtifactManagement = (
   const loadSessionArtifacts = async (sessionId: string) => {
     try {
       console.log('🔄 loadSessionArtifacts called for session:', sessionId);
+      console.log('🔍 Current RFP context:', {
+        hasRfp: !!currentRfp,
+        rfpId: currentRfp?.id,
+        rfpName: currentRfp?.name
+      });
+      
+      // If RFP context is active, use RFP artifacts instead of session artifacts
+      // This prevents loading artifacts from other RFPs in the same session
+      if (currentRfp && currentRfp.id) {
+        console.log('🎯 RFP context active - delegating to loadRFPArtifacts');
+        return await loadRFPArtifacts(currentRfp.id);
+      }
+      
+      // No RFP context - load all session artifacts
       const artifactsData: DatabaseArtifact[] = await DatabaseService.getSessionArtifacts(sessionId);
-      console.log('📦 Retrieved artifacts from database:', {
+      console.log('📦 Retrieved session artifacts from database:', {
         count: artifactsData.length,
         artifacts: artifactsData.map(a => ({
           id: a.id,
