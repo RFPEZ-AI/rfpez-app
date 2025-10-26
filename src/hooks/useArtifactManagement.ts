@@ -198,7 +198,37 @@ export const useArtifactManagement = (
           const artifactsData = await DatabaseService.getRFPArtifacts(parseInt(currentRfp.id.toString()));
           console.log('📋 Database returned', artifactsData.length, 'artifacts for RFP', currentRfp.id);
           
-          const formattedArtifacts: Artifact[] = (artifactsData as DatabaseArtifact[]).map(artifact => {
+          // Map RPC result structure (artifact_id, artifact_name, etc.) to DatabaseArtifact structure (id, name, etc.)
+          const formattedArtifacts: Artifact[] = (artifactsData as Array<{
+            artifact_id: string;
+            artifact_name: string;
+            artifact_type: string;
+            artifact_role: string;
+            schema?: Record<string, unknown>;
+            ui_schema?: Record<string, unknown>;
+            default_values?: Record<string, unknown>;
+            submit_action?: Record<string, unknown>;
+            processed_content?: string;
+            session_id?: string;
+            created_at: string;
+          }>).map(rpcResult => {
+            // Convert RPC result to DatabaseArtifact-like structure
+            const artifact: DatabaseArtifact = {
+              id: rpcResult.artifact_id,
+              name: rpcResult.artifact_name,
+              type: rpcResult.artifact_type,
+              artifact_role: rpcResult.artifact_role,
+              schema: rpcResult.schema,
+              ui_schema: rpcResult.ui_schema,
+              default_values: rpcResult.default_values,
+              submit_action: rpcResult.submit_action,
+              processed_content: rpcResult.processed_content,
+              session_id: rpcResult.session_id,
+              created_at: rpcResult.created_at
+            };
+            
+            return artifact;
+          }).map(artifact => {
             let content: string | undefined;
             
             // For form artifacts, handle schema and processed_content
@@ -525,6 +555,8 @@ export const useArtifactManagement = (
       console.log('📋 Loading RFP-associated artifacts for RFP:', rfpId);
       const artifactsData = await DatabaseService.getRFPArtifacts(rfpId);
       
+      // DatabaseService already maps artifact_id→id, artifact_name→name, etc.
+      // No need for RPCResult mapping - use data directly as DatabaseArtifact[]
       const formattedArtifacts: Artifact[] = (artifactsData as DatabaseArtifact[]).map(artifact => {
         let content: string | undefined;
         

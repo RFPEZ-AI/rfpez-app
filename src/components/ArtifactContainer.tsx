@@ -267,14 +267,14 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
                 name: a.name,
                 type: a.type,
                 description: a.size || '', // Use size as description fallback
-                created_at: new Date().toISOString() // Fallback for missing created_at
+                created_at: a.created_at || new Date().toISOString() // Preserve database timestamp
               }))}
               selectedArtifact={artifact ? {
                 id: artifact.id,
                 name: artifact.name,
                 type: artifact.type,
                 description: artifact.size || '',
-                created_at: new Date().toISOString()
+                created_at: artifact.created_at || new Date().toISOString()
               } : null}
               onSelectArtifact={(dropdownArtifact) => {
                 const fullArtifact = artifacts.find(a => a.id === dropdownArtifact.id);

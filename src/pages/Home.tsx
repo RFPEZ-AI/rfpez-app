@@ -1615,7 +1615,7 @@ const Home: React.FC = () => {
           return; // Exit early if no account
         }
 
-        const { error } = await supabase
+        const { data: insertedArtifact, error } = await supabase
           .from('artifacts')
           .insert({
             id: bidViewArtifact.id,
@@ -1640,13 +1640,25 @@ const Home: React.FC = () => {
           // Artifact might already exist (code 23505 = unique violation)
           if (error.code === '23505') {
             console.log('ℹ️ Bid view artifact already exists in database:', bidViewId);
-            // Continue - artifact exists, we can use it
+            // Load the existing artifact from database to get its created_at
+            const { data: existingArtifact } = await supabase
+              .from('artifacts')
+              .select('created_at')
+              .eq('id', bidViewId)
+              .single();
+            if (existingArtifact) {
+              bidViewArtifact.created_at = existingArtifact.created_at;
+            }
           } else {
             console.error('❌ Failed to save bid view artifact to database:', error);
             return; // Exit early if database save fails
           }
         } else {
           console.log('✅ Bid view artifact saved to database:', bidViewId);
+          // Update bidViewArtifact with database-generated created_at
+          if (insertedArtifact) {
+            bidViewArtifact.created_at = insertedArtifact.created_at;
+          }
         }
       } catch (error) {
         console.error('❌ Exception saving bid view artifact to database:', error);
