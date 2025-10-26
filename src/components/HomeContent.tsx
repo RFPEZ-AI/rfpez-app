@@ -116,24 +116,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
         display: 'flex',
         flexDirection: isMobile ? 'column' : 'row'
       }}>
-        {isMobile && (
-          /* Left Panel - Session History (Mobile - top) */
-          <div style={{
-            maxHeight: forceSessionHistoryCollapsed ? '40px' : '200px', // Limit height to prevent excessive space usage
-            flexShrink: 0, // Don't shrink below minimum
-            transition: 'max-height 0.3s ease'
-          }}>
-            <SessionHistory
-              sessions={sessions}
-              onNewSession={onNewSession}
-              onSelectSession={onSelectSession}
-              onDeleteSession={onDeleteSession}
-              selectedSessionId={selectedSessionId}
-              forceCollapsed={forceSessionHistoryCollapsed}
-              onToggleExpanded={onSessionHistoryToggle}
-            />
-          </div>
-        )}
+        {/* Mobile SessionHistory removed - now accessible via header button modal */}
         
         {/* Message area - flex to accommodate artifact panel on mobile */}
         <div style={{ 
