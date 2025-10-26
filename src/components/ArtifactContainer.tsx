@@ -1,6 +1,8 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState, useEffect } from 'react';
+import { IonIcon } from '@ionic/react';
+import { swapVerticalOutline, swapHorizontalOutline } from 'ionicons/icons';
 import { SingletonArtifactWindowProps } from '../types/home';
 import { useArtifactTypeDetection } from '../hooks/useArtifactTypeDetection';
 import ArtifactFormRenderer from './artifacts/ArtifactFormRenderer';
@@ -239,19 +241,17 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
           title={isPortrait ? "Drag to resize height, double-click for fullscreen" : "Drag to resize width, double-click for fullscreen"}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {/* Drag handle indicator */}
-            <div style={{
-              display: 'flex',
-              flexDirection: isPortrait ? 'row' : 'column',
-              gap: '2px',
-              padding: '4px 8px',
-              opacity: 0.4,
-              pointerEvents: 'none'
-            }}>
-              <div style={{ width: '20px', height: '3px', backgroundColor: '#666', borderRadius: '2px' }} />
-              <div style={{ width: '20px', height: '3px', backgroundColor: '#666', borderRadius: '2px' }} />
-              <div style={{ width: '20px', height: '3px', backgroundColor: '#666', borderRadius: '2px' }} />
-            </div>
+            {/* Drag resize icon */}
+            <IonIcon 
+              icon={isPortrait ? swapVerticalOutline : swapHorizontalOutline}
+              style={{ 
+                fontSize: '20px', 
+                color: '#666',
+                opacity: 0.6,
+                pointerEvents: 'none',
+                paddingLeft: '4px'
+              }}
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
             <ArtifactDropdown
