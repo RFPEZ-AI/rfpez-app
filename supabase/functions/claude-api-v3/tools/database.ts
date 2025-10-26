@@ -340,6 +340,96 @@ export async function getCurrentRfp(supabase: SupabaseClient, sessionId: string)
   };
 }
 
+/**
+ * Set an existing RFP as the current active RFP for a session
+ * Allows switching between existing RFPs without creating new ones
+ */
+export async function setCurrentRfp(
+  supabase: SupabaseClient, 
+  sessionId: string, 
+  rfpId?: number, 
+  rfpName?: string
+) {
+  console.log('🔄 Setting current RFP for session:', { sessionId, rfpId, rfpName });
+  
+  // Must provide either rfp_id or rfp_name
+  if (!rfpId && !rfpName) {
+    throw new Error('Either rfp_id or rfp_name must be provided');
+  }
+
+  let targetRfpId = rfpId;
+
+  // If searching by name, find the RFP first
+  if (!targetRfpId && rfpName) {
+    console.log('🔍 Searching for RFP by name:', rfpName);
+    
+    const { data: rfps, error: searchError } = await supabase
+      .from('rfps')
+      .select('id, name')
+      .ilike('name', `%${rfpName}%`)
+      .order('created_at', { ascending: false })
+      .limit(5) as { data: Array<{ id: number; name: string }> | null; error: Error | null };
+    
+    if (searchError) {
+      console.error('Error searching for RFP:', searchError);
+      throw new Error(`Failed to search for RFP: ${searchError.message}`);
+    }
+    
+    if (!rfps || rfps.length === 0) {
+      throw new Error(`No RFP found matching name: ${rfpName}`);
+    }
+    
+    if (rfps.length > 1) {
+      const rfpList = rfps.map(r => `"${r.name}" (ID: ${r.id})`).join(', ');
+      console.log(`⚠️ Multiple RFPs found matching "${rfpName}": ${rfpList}`);
+      // Use the most recent one
+      targetRfpId = rfps[0].id;
+      console.log(`Using most recent: ${rfps[0].name} (ID: ${targetRfpId})`);
+    } else {
+      targetRfpId = rfps[0].id;
+      console.log(`✅ Found RFP: ${rfps[0].name} (ID: ${targetRfpId})`);
+    }
+  }
+
+  // Verify the RFP exists
+  const { data: rfp, error: rfpError } = await supabase
+    .from('rfps')
+    .select('id, name, description, status')
+    .eq('id', targetRfpId as number)
+    .single() as { data: { id: number; name: string; description?: string; status: string } | null; error: Error | null };
+  
+  if (rfpError || !rfp) {
+    console.error('RFP not found:', { targetRfpId, error: rfpError });
+    throw new Error(`RFP with ID ${targetRfpId} not found`);
+  }
+
+  // Update the session's current_rfp_id
+  const { error: updateError } = await supabase
+    .from('sessions')
+    .update({ current_rfp_id: targetRfpId })
+    .eq('id', sessionId);
+  
+  if (updateError) {
+    console.error('Error updating session:', updateError);
+    throw new Error(`Failed to set current RFP: ${typeof updateError === 'object' && updateError && 'message' in updateError ? String(updateError.message) : 'Unknown error'}`);
+  }
+
+  console.log('✅ Successfully set current RFP:', { 
+    sessionId, 
+    rfpId: rfp.id, 
+    rfpName: rfp.name 
+  });
+
+  return {
+    success: true,
+    rfp_id: rfp.id,
+    name: rfp.name,
+    description: rfp.description,
+    status: rfp.status,
+    message: `Switched to RFP: ${rfp.name} (ID: ${rfp.id})`
+  };
+}
+
 // Create a form artifact in the database
 export async function createFormArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: FormArtifactData) {
   const { name, description, content, artifactRole, rfp_id } = data;
@@ -636,6 +726,67 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
   const validContentTypes = ['markdown', 'plain', 'html'];
   if (!validContentTypes.includes(content_type)) {
     throw new Error(`Content type must be one of: ${validContentTypes.join(', ')}`);
+  }
+  
+  // 🎯 UPSERT LOGIC: For rfp_request_email, check if one already exists and update it
+  if (mappedRole === 'rfp_request_email') {
+    console.log('🔍 Checking for existing rfp_request_email for RFP:', rfp_id);
+    
+    const { data: existingArtifacts, error: searchError } = await supabase
+      .from('rfp_artifacts')
+      .select('artifact_id, artifacts!inner(id, name, artifact_role)')
+      .eq('rfp_id', rfp_id)
+      .eq('artifacts.artifact_role', 'rfp_request_email')
+      .limit(1);
+    
+    if (searchError) {
+      console.error('❌ Error searching for existing rfp_request_email:', searchError);
+      // Continue with creation if search fails
+    } else if (existingArtifacts && Array.isArray(existingArtifacts) && existingArtifacts.length > 0) {
+      const existingArtifactId = (existingArtifacts[0] as { artifact_id: string }).artifact_id;
+      console.log('✅ Found existing rfp_request_email:', existingArtifactId, '- updating instead of creating');
+      
+      // Update the existing artifact
+      const { error: updateError } = await supabase
+        .from('artifacts')
+        .update({
+          name,
+          description,
+          default_values: { content, content_type, tags },
+          processed_content: content,
+          file_size: content.length,
+          mime_type: content_type === 'html' ? 'text/html' : content_type === 'plain' ? 'text/plain' : 'text/markdown',
+          metadata: {
+            type: 'text',
+            content_type,
+            description: description || null,
+            tags: tags || [],
+            user_id: userId,
+            updated_reason: 'Regenerated RFP request email'
+          },
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', existingArtifactId)
+        .select()
+        .single();
+      
+      if (updateError) {
+        console.error('❌ Error updating existing rfp_request_email:', updateError);
+        throw updateError;
+      }
+      
+      console.log('✅ Successfully updated existing rfp_request_email:', existingArtifactId);
+      
+      return {
+        success: true,
+        artifact_id: existingArtifactId,
+        artifact_name: name,
+        message: `Updated existing RFP request email: ${name}`,
+        is_update: true
+      };
+    }
+    
+    console.log('📝 No existing rfp_request_email found - creating new one');
   }
   
   const insertData = {

@@ -652,6 +652,24 @@ export class ToolExecutionService {
           return await getCurrentRfp(this.supabase, input.session_id || sessionId || '');
         }
 
+        case 'set_current_rfp': {
+          if (!sessionId) {
+            return { 
+              success: false, 
+              error: 'Session ID is required',
+              message: 'Cannot set current RFP without a valid session.'
+            };
+          }
+          const { setCurrentRfp } = await import('../tools/database.ts');
+          return await setCurrentRfp(
+            // @ts-expect-error - Supabase client type is unknown but compatible
+            this.supabase, 
+            sessionId, 
+            input.rfp_id as number | undefined, 
+            input.rfp_name as string | undefined
+          );
+        }
+
         case 'get_form_schema': {
           if (!sessionId) {
             return { success: false, error: 'Session ID is required' };

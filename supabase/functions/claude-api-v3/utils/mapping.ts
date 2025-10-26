@@ -36,6 +36,7 @@ export function mapArtifactRole(role: string): string | null {
     // Valid roles pass through (including new document types)
     'buyer_questionnaire': 'buyer_questionnaire',
     'bid_form': 'bid_form',
+    'rfp_request_email': 'rfp_request_email',  // Specific role for RFP request emails
     'request_document': 'request_document',
     'specification_document': 'specification_document',
     'analysis_document': 'analysis_document',

@@ -95,8 +95,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         },
         artifactRole: {
           type: 'string',
-          description: 'Role/type of the document artifact',
+          description: 'Role/type of the document artifact. Use rfp_request_email for RFP vendor request emails.',
           enum: [
+            'rfp_request_email',  // Specific for RFP request emails to vendors
             'request_document',
             'rfp_document',
             'proposal_document',
@@ -355,6 +356,28 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
     }
   },
   {
+    name: 'set_current_rfp',
+    description: 'Set an existing RFP as the current active RFP for the session. Use this when switching between existing RFPs or when the user mentions working with a specific RFP by name or ID. This allows access to existing RFP artifacts without creating a new RFP.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        session_id: {
+          type: 'string',
+          description: 'Current session ID'
+        },
+        rfp_id: {
+          type: 'number',
+          description: 'ID of the RFP to set as current (numeric ID from database)'
+        },
+        rfp_name: {
+          type: 'string',
+          description: 'Optional: Name of the RFP to set as current (alternative to rfp_id). System will search for RFP by name.'
+        }
+      },
+      required: ['session_id']
+    }
+  },
+  {
     name: 'get_form_schema',
     description: 'Get the JSON schema for a form artifact to see what fields are available and their data types/constraints. ALWAYS call this before update_form_data to ensure you use the correct field names and enum values.',
     input_schema: {
@@ -545,7 +568,7 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
   },
   'design': {
     // RFP Design has access to all RFP creation tools, bid management tools, and memory tools - REMOVED switch_agent to prevent self-switching loops
-    allowed: ['create_and_set_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
+    allowed: ['create_and_set_rfp', 'set_current_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
   },
   'support': {
     // Support agents don't need RFP creation tools but can create documents
