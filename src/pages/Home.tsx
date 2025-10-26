@@ -1960,6 +1960,11 @@ const Home: React.FC = () => {
         userProfile={userProfile}
         isAuthenticated={isAuthenticated}
         user={user}
+        sessions={sessions}
+        selectedSessionId={selectedSessionId}
+        onNewSession={handleNewSession}
+        onSelectSession={handleSelectSession}
+        onDeleteSession={handleDeleteSession}
         rfps={rfps}
         currentRfpId={currentRfpId ?? null}
         showRFPMenu={showRFPMenu}

@@ -1,8 +1,8 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React from 'react';
-import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon } from '@ionic/react';
-import { documentTextOutline, personCircle } from 'ionicons/icons';
+import React, { useState } from 'react';
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonModal, IonList, IonItem, IonLabel } from '@ionic/react';
+import { documentTextOutline, personCircle, timeOutline, add, chatbubbleOutline } from 'ionicons/icons';
 import type { User } from '@supabase/supabase-js';
 import { RFP } from '../types/rfp';
 import { Agent, SessionActiveAgent, UserProfile } from '../types/database';
@@ -15,11 +15,25 @@ import { RoleService } from '../services/roleService';
 import { useIsMobile } from '../utils/useMediaQuery';
 import packageJson from '../../package.json';
 
+interface Session {
+  id: string;
+  title: string;
+  timestamp: Date;
+  agent_name?: string;
+}
+
 interface HomeHeaderProps {
   // User and authentication props
   userProfile: UserProfile | null;
   isAuthenticated: boolean;
   user: User | null;
+  
+  // Session management props
+  sessions: Session[];
+  selectedSessionId?: string;
+  onNewSession: () => void;
+  onSelectSession: (sessionId: string) => void;
+  onDeleteSession: (sessionId: string) => void;
   
   // RFP management props
   rfps: RFP[];
@@ -57,6 +71,11 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   userProfile,
   isAuthenticated,
   user,
+  sessions,
+  selectedSessionId,
+  onNewSession,
+  onSelectSession,
+  onDeleteSession,
   rfps,
   currentRfpId,
   showRFPMenu,
@@ -82,6 +101,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   artifactCount = 0
 }) => {
   const isMobile = useIsMobile();
+  const [showSessionModal, setShowSessionModal] = useState(false);
   
   // Get version info - use build number if available, otherwise package version
   const buildNumber = process.env.REACT_APP_BUILD_NUMBER;
@@ -92,11 +112,36 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
     ? `v${baseVersion}.${buildNumber}${commitSha ? ` (${commitSha})` : ''}`
     : `v${baseVersion}`;
 
+  const handleSessionRightClick = (e: React.MouseEvent, sessionId: string) => {
+    e.preventDefault();
+    if (window.confirm('Delete this session?')) {
+      onDeleteSession(sessionId);
+    }
+  };
+
   return (
     <IonHeader>
       <IonToolbar>
         {/* Left section - Logo and title */}
         <div slot="start" style={{ display: 'flex', alignItems: 'center', padding: '0 8px' }}>
+          {/* Mobile-only Session History Button */}
+          {isMobile && (
+            <IonButton 
+              fill="clear" 
+              size="small"
+              onClick={() => setShowSessionModal(true)}
+              title="Session History"
+              data-testid="mobile-session-history-button"
+              style={{ 
+                '--padding-start': '4px',
+                '--padding-end': '4px',
+                marginRight: '4px'
+              }}
+            >
+              <IonIcon icon={timeOutline} />
+            </IonButton>
+          )}
+          
           <img 
             src="/assets/logo.svg?v=3" 
             alt="RFPEZ.AI" 
@@ -301,6 +346,56 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
           </div>
         </IonButtons>
       </IonToolbar>
+      
+      {/* Mobile Session History Modal */}
+      <IonModal 
+        isOpen={showSessionModal} 
+        onDidDismiss={() => setShowSessionModal(false)}
+        breakpoints={[0, 0.5, 0.75, 1]}
+        initialBreakpoint={0.75}
+      >
+        <IonHeader>
+          <IonToolbar>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 16px' }}>
+              <h2 style={{ margin: 0 }}>Sessions</h2>
+              <IonButton 
+                fill="outline" 
+                size="small"
+                onClick={() => {
+                  setShowSessionModal(false);
+                  onNewSession();
+                }}
+                data-testid="mobile-new-session-button"
+              >
+                <IonIcon icon={add} slot="start" />
+                New
+              </IonButton>
+            </div>
+          </IonToolbar>
+        </IonHeader>
+        <IonList>
+          {sessions.map((session) => (
+            <IonItem
+              key={session.id}
+              button
+              onClick={() => {
+                setShowSessionModal(false);
+                onSelectSession(session.id);
+              }}
+              onContextMenu={(e) => handleSessionRightClick(e, session.id)}
+              color={selectedSessionId === session.id ? 'primary' : undefined}
+            >
+              <IonIcon icon={chatbubbleOutline} slot="start" />
+              <IonLabel>
+                <h3>{session.title}</h3>
+                <p>
+                  {session.agent_name || 'No Agent'} • {new Date(session.timestamp).toLocaleString()}
+                </p>
+              </IonLabel>
+            </IonItem>
+          ))}
+        </IonList>
+      </IonModal>
     </IonHeader>
   );
 };
