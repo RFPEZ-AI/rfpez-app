@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState } from 'react';
-import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonModal, IonList, IonItem, IonLabel } from '@ionic/react';
+import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonModal, IonContent, IonList, IonItem, IonLabel } from '@ionic/react';
 import { documentTextOutline, personCircle, timeOutline, add, chatbubbleOutline } from 'ionicons/icons';
 import type { User } from '@supabase/supabase-js';
 import { RFP } from '../types/rfp';
@@ -373,28 +373,30 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
             </div>
           </IonToolbar>
         </IonHeader>
-        <IonList>
-          {sessions.map((session) => (
-            <IonItem
-              key={session.id}
-              button
-              onClick={() => {
-                setShowSessionModal(false);
-                onSelectSession(session.id);
-              }}
-              onContextMenu={(e) => handleSessionRightClick(e, session.id)}
-              color={selectedSessionId === session.id ? 'primary' : undefined}
-            >
-              <IonIcon icon={chatbubbleOutline} slot="start" />
-              <IonLabel>
-                <h3>{session.title}</h3>
-                <p>
-                  {session.agent_name || 'No Agent'} • {new Date(session.timestamp).toLocaleString()}
-                </p>
-              </IonLabel>
-            </IonItem>
-          ))}
-        </IonList>
+        <IonContent>
+          <IonList style={{ paddingTop: 0 }}>
+            {sessions.map((session) => (
+              <IonItem
+                key={session.id}
+                button
+                onClick={() => {
+                  setShowSessionModal(false);
+                  onSelectSession(session.id);
+                }}
+                onContextMenu={(e) => handleSessionRightClick(e, session.id)}
+                color={selectedSessionId === session.id ? 'primary' : undefined}
+              >
+                <IonIcon icon={chatbubbleOutline} slot="start" />
+                <IonLabel>
+                  <h3>{session.title}</h3>
+                  <p>
+                    {session.agent_name || 'No Agent'} • {new Date(session.timestamp).toLocaleString()}
+                  </p>
+                </IonLabel>
+              </IonItem>
+            ))}
+          </IonList>
+        </IonContent>
       </IonModal>
     </IonHeader>
   );
