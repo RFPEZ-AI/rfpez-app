@@ -1,10 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState, useEffect } from 'react';
-import { IonButton, IonIcon } from '@ionic/react';
-import { 
-  expandOutline
-} from 'ionicons/icons';
 import { SingletonArtifactWindowProps } from '../types/home';
 import { useArtifactTypeDetection } from '../hooks/useArtifactTypeDetection';
 import ArtifactFormRenderer from './artifacts/ArtifactFormRenderer';
@@ -239,6 +235,8 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
           }}
           onMouseDown={handleDragStart}
           onTouchStart={handleDragStart}
+          onDoubleClick={() => setIsFullScreen(true)}
+          title={isPortrait ? "Drag to resize height, double-click for fullscreen" : "Drag to resize width, double-click for fullscreen"}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             {/* Drag handle indicator */}
@@ -246,25 +244,14 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
               display: 'flex',
               flexDirection: isPortrait ? 'row' : 'column',
               gap: '2px',
-              padding: '4px',
-              opacity: 0.5
+              padding: '4px 8px',
+              opacity: 0.4,
+              pointerEvents: 'none'
             }}>
-              <div style={{ width: '16px', height: '2px', backgroundColor: '#666', borderRadius: '1px' }} />
-              <div style={{ width: '16px', height: '2px', backgroundColor: '#666', borderRadius: '1px' }} />
-              <div style={{ width: '16px', height: '2px', backgroundColor: '#666', borderRadius: '1px' }} />
+              <div style={{ width: '20px', height: '3px', backgroundColor: '#666', borderRadius: '2px' }} />
+              <div style={{ width: '20px', height: '3px', backgroundColor: '#666', borderRadius: '2px' }} />
+              <div style={{ width: '20px', height: '3px', backgroundColor: '#666', borderRadius: '2px' }} />
             </div>
-            <IonButton
-              fill="clear"
-              size="small"
-              onClick={(e) => {
-                e.stopPropagation();
-                setIsFullScreen(true);
-              }}
-              data-testid="fullscreen-button"
-              style={{ flexShrink: 0, backgroundColor: '#e0f7fa', border: '1px solid #00bcd4' }}
-            >
-              <IonIcon icon={expandOutline} style={{ fontSize: '16px', color: '#00796b' }} />
-            </IonButton>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', flex: 1, minWidth: 0 }}>
             <ArtifactDropdown
