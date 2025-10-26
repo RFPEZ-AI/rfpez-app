@@ -1071,6 +1071,11 @@ export class DatabaseService {
               schema,
               ui_schema,
               default_values,
+              processed_content,
+              description,
+              artifact_role,
+              session_id,
+              message_id,
               created_at
             )
           `)
@@ -1099,6 +1104,15 @@ export class DatabaseService {
         
         console.log(`✅ Loaded ${flattenedArtifacts.length} artifacts for RFP ${rfpId}`);
         console.log('🔍 First flattened artifact:', JSON.stringify(flattenedArtifacts[0], null, 2));
+        // 🔍 DEBUG: Check if processed_content is present
+        if (flattenedArtifacts.length > 0) {
+          const first = flattenedArtifacts[0];
+          console.log('🔍 First artifact processed_content check:', {
+            hasProcessedContent: !!first.processed_content,
+            contentLength: first.processed_content?.length || 0,
+            contentPreview: first.processed_content?.substring(0, 100)
+          });
+        }
         return flattenedArtifacts;
       }
 
@@ -1112,6 +1126,11 @@ export class DatabaseService {
         ui_schema: item.ui_schema,
         default_values: item.default_values,
         submit_action: item.submit_action,
+        processed_content: item.processed_content,
+        description: item.description,
+        artifact_role: item.artifact_role,
+        session_id: item.session_id,
+        message_id: item.message_id,
         created_at: item.created_at,
         role: item.artifact_role
       }));

@@ -223,7 +223,8 @@ export const useArtifactManagement = (
                 content = JSON.stringify(formSpec);
               }
             } else {
-              content = artifact.processed_content;
+              // For document artifacts, content is stored in default_values.content
+              content = (artifact.default_values as { content?: string })?.content || artifact.processed_content;
             }
             
             let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other';
@@ -459,9 +460,9 @@ export const useArtifactManagement = (
             content = JSON.stringify(formSpec);
           }
         }
-        // For non-form artifacts, use processed_content
+        // For non-form artifacts, use default_values.content (documents) or processed_content
         else {
-          content = artifact.processed_content;
+          content = (artifact.default_values as { content?: string })?.content || artifact.processed_content;
         }
         
         // Map database type to frontend type
@@ -568,9 +569,9 @@ export const useArtifactManagement = (
             content = JSON.stringify(formSpec);
           }
         }
-        // For non-form artifacts, use processed_content
+        // For non-form artifacts, use default_values.content (documents) or processed_content
         else {
-          content = artifact.processed_content;
+          content = (artifact.default_values as { content?: string })?.content || artifact.processed_content;
         }
         
         // Map database type to frontend type
@@ -1026,59 +1027,65 @@ export const useArtifactManagement = (
             console.log('Document artifact detected from function result:', result);
             
             const artifactId = result.artifact_id;
+            const isUpdate = artifacts.some(a => a.id === artifactId);
             
-            // Check if this artifact already exists or has been processed
-            if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
+            // Check if this is a duplicate (not an update)
+            if (!isUpdate && processedArtifactIds.has(artifactId)) {
               console.log('⚠️ Skipping duplicate document artifact:', artifactId);
               return;
             }
             
             processedArtifactIds.add(artifactId);
-            console.log('📝 Processing new document artifact:', artifactId);
             
-            // Type the result object for document artifacts
-            const typedResult = result as {
-              artifact_name?: string;
-              description?: string;
-              content?: string;
-              content_type?: string;
-              tags?: string[];
-            };
-            
-            const documentArtifact: Artifact = {
-              id: artifactId,
-              name: typedResult.artifact_name || 'Generated Document',
-              type: 'document',
-              size: `${typedResult.content?.length || 0} characters`,
-              content: JSON.stringify({
-                name: typedResult.artifact_name,
-                description: typedResult.description || null,
-                content: typedResult.content || '',
-                content_type: typedResult.content_type || 'markdown',
-                tags: typedResult.tags || []
-              }),
-              sessionId: currentSessionId,
-              messageId,
-              isReferencedInSession: true
-            };
-            
-            // Add artifact to state and ensure immediate availability
-            setArtifacts(prev => {
-              const updated = [...prev, documentArtifact];
-              console.log('📝 Document artifact added to state immediately:', documentArtifact.id, 'Total:', updated.length);
+            if (isUpdate) {
+              console.log('📝 Updating existing document artifact:', artifactId);
               
-              // Defer selection and callback to next tick to ensure state is updated
-              setTimeout(() => {
-                selectArtifact(documentArtifact.id);
-                onArtifactAdded?.(documentArtifact.id);
-              }, 0);
+              // Use async IIFE to reload from database (ensures fresh content)
+              (async () => {
+                console.log('🔄 Refreshing document artifact from database...');
+                if (currentSessionId) {
+                  await loadSessionArtifacts(currentSessionId);
+                  console.log('✅ Artifacts reloaded from database with updated content');
+                }
+                
+                // Auto-select the updated artifact to show the changes
+                setSelectedArtifactId(artifactId);
+                
+                // Trigger auto-opening of artifact window
+                if (onArtifactAdded) {
+                  console.log('🚀 Triggering auto-open for updated document artifact:', artifactId);
+                  onArtifactAdded(artifactId);
+                }
+                
+                console.log('✅ Completed artifact refresh and auto-open for:', artifactId);
+              })();
+            } else {
+              console.log('📝 Processing new document artifact:', artifactId);
               
-              return updated;
-            });
+              // 🔄 CRITICAL FIX: Always reload from database for document artifacts
+              // The edge function doesn't return content in the result, only artifact_id and artifact_name
+              // We must reload from database to get the actual processed_content
+              (async () => {
+                console.log('🔄 Loading new document artifact from database...');
+                if (currentSessionId) {
+                  await loadSessionArtifacts(currentSessionId);
+                  console.log('✅ Artifacts loaded from database with full content');
+                }
+                
+                // Auto-select the newly created artifact
+                setSelectedArtifactId(artifactId);
+                
+                // Trigger auto-opening of artifact window
+                if (onArtifactAdded) {
+                  console.log('🚀 Triggering auto-open for new document artifact:', artifactId);
+                  onArtifactAdded(artifactId);
+                }
+                
+                console.log('✅ Completed artifact load and auto-open for:', artifactId);
+              })();
+            }
             
-            console.log('✅ Added document artifact from function result:', documentArtifact);
-            
-            // Create artifact reference for the message
+            // Create artifact reference for the message (for both new and updated)
             const artifactRef: ArtifactReference = {
               artifactId: artifactId,
               artifactName: result.title || 'Generated Text',
@@ -1096,51 +1103,65 @@ export const useArtifactManagement = (
             console.log('Request artifact detected from function result:', result);
             
             const artifactId = result.artifact_id || `request-${Date.now()}-${index}`;
+            const isUpdate = artifacts.some(a => a.id === artifactId);
             
-            // Check if this artifact already exists or has been processed
-            if (processedArtifactIds.has(artifactId) || artifacts.some(a => a.id === artifactId)) {
+            // Check if this is a duplicate (not an update)
+            if (!isUpdate && processedArtifactIds.has(artifactId)) {
               console.log('⚠️ Skipping duplicate request artifact:', artifactId);
               return;
             }
             
             processedArtifactIds.add(artifactId);
-            console.log('📝 Processing new request artifact:', artifactId);
             
-            const requestArtifact: Artifact = {
-              id: artifactId,
-              name: result.title || 'Generated Request',
-              type: 'document', // Use 'document' type for request artifacts
-              size: `${(result.content as string)?.length || 0} characters`,
-              content: JSON.stringify({
-                title: result.title,
-                description: result.description,
-                content: result.content,
-                content_type: result.content_type || 'markdown',
-                tags: result.tags || ['request'],
-                rfp_id: result.rfp_id
-              }),
-              sessionId: currentSessionId,
-              messageId,
-              isReferencedInSession: true
-            };
-            
-            // Add artifact to state and ensure immediate availability
-            setArtifacts(prev => {
-              const updated = [...prev, requestArtifact];
-              console.log('📝 Request artifact added to state immediately:', requestArtifact.id, 'Total:', updated.length);
+            if (isUpdate) {
+              console.log('📝 Updating existing request artifact:', artifactId);
               
-              // Defer selection and callback to next tick to ensure state is updated
-              setTimeout(() => {
-                selectArtifact(requestArtifact.id);
-                onArtifactAdded?.(requestArtifact.id);
-              }, 0);
+              // Use async IIFE to reload from database (ensures fresh content)
+              (async () => {
+                console.log('🔄 Refreshing request artifact from database...');
+                if (currentSessionId) {
+                  await loadSessionArtifacts(currentSessionId);
+                  console.log('✅ Artifacts reloaded from database with updated content');
+                }
+                
+                // Auto-select the updated artifact to show the changes
+                setSelectedArtifactId(artifactId);
+                
+                // Trigger auto-opening of artifact window
+                if (onArtifactAdded) {
+                  console.log('🚀 Triggering auto-open for updated request artifact:', artifactId);
+                  onArtifactAdded(artifactId);
+                }
+                
+                console.log('✅ Completed artifact refresh and auto-open for:', artifactId);
+              })();
+            } else {
+              console.log('📝 Processing new request artifact:', artifactId);
               
-              return updated;
-            });
+              // 🔄 CRITICAL FIX: Always reload from database for request artifacts
+              // The edge function doesn't return content in the result, only artifact_id and title
+              // We must reload from database to get the actual processed_content
+              (async () => {
+                console.log('🔄 Loading new request artifact from database...');
+                if (currentSessionId) {
+                  await loadSessionArtifacts(currentSessionId);
+                  console.log('✅ Artifacts loaded from database with full content');
+                }
+                
+                // Auto-select the newly created artifact
+                setSelectedArtifactId(artifactId);
+                
+                // Trigger auto-opening of artifact window
+                if (onArtifactAdded) {
+                  console.log('🚀 Triggering auto-open for new request artifact:', artifactId);
+                  onArtifactAdded(artifactId);
+                }
+                
+                console.log('✅ Completed artifact load and auto-open for:', artifactId);
+              })();
+            }
             
-            console.log('✅ Added request artifact from function result:', requestArtifact);
-            
-            // Create artifact reference for the message
+            // Create artifact reference for the message (for both new and updated)
             const artifactRef: ArtifactReference = {
               artifactId: artifactId,
               artifactName: result.title || 'Generated Request',

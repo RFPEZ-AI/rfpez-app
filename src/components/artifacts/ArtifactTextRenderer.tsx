@@ -33,6 +33,16 @@ const ArtifactTextRenderer: React.FC<ArtifactTextRendererProps> = ({
       let content_type: string;
       let tags: string[] = [];
 
+      // 🔍 DEBUG: Log the artifact object to see what we're working with
+      console.log('🎨 ArtifactTextRenderer received artifact:', {
+        id: artifact.id,
+        name: artifact.name,
+        type: artifact.type,
+        hasContent: !!artifact.content,
+        contentLength: artifact.content?.length || 0,
+        contentPreview: artifact.content?.substring(0, 100)
+      });
+
       try {
         // Check if content looks like JSON first to avoid parsing errors
         const contentStr = artifact.content || '';
