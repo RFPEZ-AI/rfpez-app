@@ -732,8 +732,10 @@ export class RFPService {
     // This is a mock implementation - in reality this would call Claude API
     // to generate a comprehensive request for proposal based on the RFP spec and bid data
     
-    // Generate the bid form URL using the same route as the RFP Design Agent
-    const bidFormUrl = `/rfp/${rfp.id}/bid`;
+    // Generate the bid form URL with full domain for email links
+    // Use window.location.origin for dynamic domain support (works in dev and prod)
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3100';
+    const bidFormUrl = `${baseUrl}/bid/submit?rfp_id=${rfp.id}`;
     
     const requestText = `
 # Request for Proposal: ${rfp.name}

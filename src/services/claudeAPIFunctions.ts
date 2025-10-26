@@ -2555,8 +2555,10 @@ Please retry the create_form_artifact call with the complete form_schema paramet
   private generateRequestContent(rfp: RFPData, questionnaire_response: QuestionnaireResponse, sections: string[], content_type: string): string {
     const default_values = questionnaire_response?.default_values || {};
     
-    // Generate the bid form URL
-    const bidFormUrl = `/rfp/${rfp.id}/bid`;
+    // Generate the bid form URL with full domain
+    // Use window.location.origin for dynamic domain support (works in dev and prod)
+    const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'http://localhost:3100';
+    const bidFormUrl = `${baseUrl}/bid/submit?rfp_id=${rfp.id}`;
     
     let content = '';
     
