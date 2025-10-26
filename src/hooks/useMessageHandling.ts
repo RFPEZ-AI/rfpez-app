@@ -1314,7 +1314,7 @@ export const useMessageHandling = (
             specification: currentRfp.specification
           } : null,
           currentArtifact || null,
-          undefined, // DISABLE ABORT SIGNAL - bypass AbortController issues
+          thisRequestController.signal, // Pass abort signal for cancellation support
           shouldUseStreaming, // Use streaming based on query type
           shouldUseStreaming ? onStreamingChunk : undefined // Only provide callback if streaming
         );

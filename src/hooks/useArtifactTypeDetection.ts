@@ -74,19 +74,28 @@ export const useArtifactTypeDetection = (artifact: Artifact | null): ArtifactTyp
 
     // Check if artifact is a text artifact
     const isTextArtifact = (): boolean => {
-      if (!artifact.content) return false;
-      
       // Support both 'document' and 'text' types for text artifacts
-      if ((artifact.type === 'document' || artifact.type === 'text') && typeof artifact.content === 'string') {
+      if (artifact.type === 'document' || artifact.type === 'text') {
+        // If type is document/text, treat as text artifact even if content is empty
+        // The renderer will handle empty/loading states
+        if (!artifact.content || typeof artifact.content !== 'string') {
+          return true; // Still a text artifact, just empty
+        }
+        
         const content = artifact.content.trim();
+        
+        // Empty content is still a valid text artifact
+        if (content.length === 0) {
+          return true;
+        }
         
         // First check if it looks like JSON before attempting to parse
         if (content.startsWith('{') && content.endsWith('}')) {
           try {
             // Try to parse as JSON (structured text artifact)
             const parsed = JSON.parse(artifact.content);
-            if (parsed.content_type && typeof parsed.content === 'string') {
-              return true;
+            if (parsed.content_type) {
+              return true; // Structured text artifact format
             }
           } catch (e) {
             // Not valid JSON, fall through to raw content check
@@ -104,6 +113,8 @@ export const useArtifactTypeDetection = (artifact: Artifact | null): ArtifactTyp
             return true;
           }
         }
+        
+        return true; // Default to text artifact for document/text types
       }
       
       return false;
