@@ -46,22 +46,44 @@ jest.mock('ionicons/icons', () => ({
 }));
 
 // Mock matchmedia
+const mockMatchMedia = jest.fn((query: string) => ({
+  matches: false,
+  media: query,
+  onchange: null,
+  addListener: jest.fn(),
+  removeListener: jest.fn(),
+  addEventListener: jest.fn(),
+  removeEventListener: jest.fn(),
+  dispatchEvent: jest.fn(),
+}));
+
+delete (window as any).matchMedia;
+delete (global as any).matchMedia;
+
 Object.defineProperty(window, 'matchMedia', {
   writable: true,
-  value: jest.fn().mockImplementation(query => ({
-    matches: false,
-    media: query,
-    onchange: null,
-    addListener: jest.fn(), // Deprecated
-    removeListener: jest.fn(), // Deprecated
-    addEventListener: jest.fn(),
-    removeEventListener: jest.fn(),
-    dispatchEvent: jest.fn(),
-  })),
+  configurable: true,
+  value: mockMatchMedia,
 });
 
-// Also mock it on the global object for Ionic
-global.matchMedia = window.matchMedia;
+Object.defineProperty(global, 'matchMedia', {
+  writable: true,
+  configurable: true,
+  value: mockMatchMedia,
+});
+
+// Mock window dimensions
+Object.defineProperty(window, 'innerWidth', {
+  writable: true,
+  configurable: true,
+  value: 1024,
+});
+
+Object.defineProperty(window, 'innerHeight', {
+  writable: true,
+  configurable: true,
+  value: 768,
+});
 
 // Mock scrollIntoView for tests
 Element.prototype.scrollIntoView = jest.fn();

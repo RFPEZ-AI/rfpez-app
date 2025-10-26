@@ -25,6 +25,13 @@ jest.mock('@ionic/react', () => ({
     <div data-testid={dataTestId} onClick={onClick} {...props}>{children}</div>
   ),
   IonIcon: ({ icon }: any) => <div data-testid="ion-icon">{icon}</div>,
+  IonModal: ({ children, isOpen }: any) => isOpen ? <div data-testid="ion-modal">{children}</div> : null,
+  IonContent: ({ children }: any) => <div data-testid="ion-content">{children}</div>,
+  IonList: ({ children }: any) => <div data-testid="ion-list">{children}</div>,
+  IonItem: ({ children, onClick, button }: any) => (
+    <div data-testid="ion-item" onClick={onClick} role={button ? 'button' : undefined}>{children}</div>
+  ),
+  IonLabel: ({ children }: any) => <div data-testid="ion-label">{children}</div>,
 }));
 
 // Mock the component dependencies
@@ -72,6 +79,11 @@ describe('HomeHeader', () => {
     userProfile: null,
     isAuthenticated: false,
     user: null,
+    sessions: [],
+    selectedSessionId: undefined,
+    onNewSession: jest.fn(),
+    onSelectSession: jest.fn(),
+    onDeleteSession: jest.fn(),
     rfps: [],
     currentRfpId: null,
     showRFPMenu: false,

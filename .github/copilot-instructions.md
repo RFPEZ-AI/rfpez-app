@@ -1065,249 +1065,283 @@ Required environment variables:
 - Health check utilities for API server validation
 - Cross-project test execution via VS Code tasks
 
-## Browser MCP Connector Usage
-The project includes comprehensive browser automation through MCP (Model Context Protocol) tools for end-to-end testing and validation.
+## Chrome MCP Browser Automation (Official mcp-chrome API)
+The project uses the official **mcp-chrome** browser automation server for comprehensive end-to-end testing and validation.
 
-### Prerequisites for Browser MCP Testing
+**📚 Official Documentation:** https://github.com/hangwin/mcp-chrome/blob/main/docs/TOOLS.md
+
+### Prerequisites for Chrome MCP Testing
 ```bash
 # Ensure the main application is running via VS Code Tasks
 # Use: Ctrl+Shift+P → "Tasks: Run Task" → "Start Development Server"
 # This starts the React app on http://localhost:3100 via VS Code task
 # ⚠️ NEVER use "npm start" directly - always use the VS Code task to avoid port conflicts
+
 # For authentication tests, use test account:
 # Email: mskiba@esphere.com
 # Password: thisisatest
+
+# Ensure mcp-chrome is configured in .vscode/mcp.json
+# Chrome browser must be installed with Playwright support
 ```
 
-### ⚡ MCP Browser Testing Speed Tips & Best Practices
+### 🎯 Chrome MCP Tool Categories
 
-#### **Browser MCP Session Management**
+#### **📊 Browser Management**
+- `get_windows_and_tabs` - List all open windows and tabs
+- `chrome_navigate` - Navigate to URL with viewport control
+- `chrome_close_tabs` - Close specific tabs or windows
+- `chrome_switch_tab` - Switch to specific tab by ID
+- `chrome_go_back_or_forward` - Navigate browser history
 
-**Session Lifecycle & Reactivation:**
-Browser MCP tools maintain an active browser automation session. The session may become inactive due to:
-- **Timeout**: No activity for extended period
-- **Browser closure**: Browser window/tab closed
-- **Resource cleanup**: MCP server closed the session automatically
+#### **� Screenshots & Visual**
+- `chrome_screenshot` - Advanced screenshots (full page, element-specific, base64)
 
-**🔄 Reactivating Browser MCP Tools:**
-When browser MCP tools are disabled (error: "Tool ... is currently disabled by the user"):
+#### **🌐 Network Monitoring**
+- `chrome_network_capture_start` - Capture network requests (webRequest API)
+- `chrome_network_capture_stop` - Stop capture and return collected data
+- `chrome_network_debugger_start` - Capture with response bodies (Debugger API)
+- `chrome_network_debugger_stop` - Stop debugger capture
+- `chrome_network_request` - Send custom HTTP requests
 
+#### **🔍 Content Analysis**
+- `search_tabs_content` - AI-powered semantic search across tabs
+- `chrome_get_web_content` - Extract HTML or text content
+- `chrome_get_interactive_elements` - Find clickable/interactive elements
+
+#### **🎯 Interaction**
+- `chrome_click_element` - Click elements using CSS selectors
+- `chrome_fill_or_select` - Fill form fields or select options
+- `chrome_keyboard` - Simulate keyboard input and shortcuts
+
+#### **📚 Data Management**
+- `chrome_history` - Search browser history with filters
+- `chrome_bookmark_search` - Search bookmarks by keywords
+- `chrome_bookmark_add` - Add new bookmarks with folder support
+- `chrome_bookmark_delete` - Delete bookmarks by ID or URL
+
+### ⚡ Chrome MCP Best Practices & Patterns
+
+#### **🔑 Primary Selection Strategy: Use CSS Selectors**
 ```javascript
-// Reactivate all browser interaction tools
-activate_browser_interaction_tools();
+// ✅ ALWAYS PREFER: CSS selector targeting (reliable, stable)
+chrome_click_element({ 
+  selector: '[data-testid="new-session-button"]' 
+});
 
-// This reopens a new browser session and enables:
-// - mcp_browser_navigate, mcp_browser_go_back, mcp_browser_go_forward
-// - mcp_browser_click, mcp_browser_type, mcp_browser_hover
-// - mcp_browser_screenshot, mcp_browser_snapshot
-// - mcp_browser_get_console_logs, mcp_browser_wait
-// - mcp_browser_press_key, mcp_browser_select_option
+chrome_fill_or_select({ 
+  selector: '[data-testid="message-input"]', 
+  value: 'Create a new RFP' 
+});
 
-// After reactivation, navigate to the app:
-mcp_browser_navigate({ url: 'http://localhost:3100' });
+// Use data-testid attributes for test reliability
+// All critical UI elements in RFPEZ.AI have data-testid attributes
 ```
 
-**Best Practices:**
-- ✅ Check if tools are active before attempting browser operations
-- ✅ Reactivate tools if you receive "disabled by user" errors
-- ✅ Navigate to the app immediately after reactivation
-- ✅ The browser state is fresh after reactivation (need to re-login if required)
-
-#### **Quick Test Setup Workflow**
-**Example Code Pattern (for test scripts, not Copilot execution):**
+#### **🎨 Advanced Screenshot Capabilities**
 ```javascript
-// EXAMPLE: Tool activation pattern for test scripts
-// Note: These are examples for documentation purposes only
-// activate_mcp_browser_navigation_tools();    // Navigate, tabs
-// activate_mcp_browser_interaction_tools();   // Click, fill, keys
-// activate_mcp_browser_script_tools();        // Get elements, evaluate
-// activate_mcp_browser_visual_tools();        // Screenshot, scroll
+// Full page screenshot with base64 data
+chrome_screenshot({
+  fullPage: true,
+  storeBase64: true,
+  width: 1920,
+  height: 1080,
+  name: 'full-page-capture'
+});
 
-// SPEED TIP: Navigate and screenshot in one go
-// mcp_browser_navigate({ url: 'http://localhost:3100' });
-// mcp_browser_screenshot({ name: 'initial-state' });
+// Element-specific screenshot
+chrome_screenshot({
+  selector: '.main-content',
+  fullPage: false,
+  storeBase64: true
+});
 ```
 
-#### **Authentication Testing Pattern**
-**Example Code Pattern (for reference only):**
+#### **🌐 Network Request Monitoring**
 ```javascript
-// FAST LOGIN SEQUENCE - Use this exact pattern (example)
-// const loginSequence = async () => {
-//   // 1. Get elements (always fresh)
-//   const elements = await mcp_browser_get_clickable_elements();
-//   
-//   // 2. Click Login button (usually index 2)
-//   await mcp_browser_click({ index: 2 });
-//   
-//   // 3. Fill credentials (email: index 3, password: index 5)
-//   await mcp_browser_form_input_fill({ index: 3, value: 'mskiba@esphere.com' });
-//   await mcp_browser_form_input_fill({ index: 5, value: 'thisisatest' });
-//   
-//   // 4. Submit (Sign In button: index 6)
-//   await mcp_browser_click({ index: 6 });
-//   
-//   // 5. Verify success (look for username in top right)
-//   await mcp_browser_screenshot({ name: 'logged-in' });
-// };
+// Start capturing network requests
+chrome_network_capture_start({
+  url: 'http://localhost:3100',
+  maxCaptureTime: 30000,      // 30 seconds max
+  inactivityTimeout: 3000,    // Stop after 3s inactivity
+  includeStatic: false         // Exclude CSS/images/fonts
+});
+
+// Perform actions that trigger API calls...
+
+// Stop and retrieve captured requests
+chrome_network_capture_stop();
+// Returns: { capturedRequests: [...], summary: { totalRequests, captureTime } }
 ```
 
-#### **Browser Session Reset Prevention**
-**Example Code Pattern (for reference only):**
+#### **🔍 AI Semantic Search Across Tabs**
 ```javascript
-// CRITICAL: Browser can reset unexpectedly
-// Always check login state before running tests (example)
-// const verifyAuthentication = async () => {
-//   const elements = await mcp_browser_get_clickable_elements();
-//   const hasLoginButton = elements.some(el => el.text?.includes('Login'));
-//   
-//   if (hasLoginButton) {
-//     console.log('⚠️ Session reset detected - need to login again');
-//     await loginSequence();
-//   }
-//   return !hasLoginButton;
-// };
+// Search for specific content across all browser tabs
+search_tabs_content({
+  query: 'RFP requirements validation'
+});
+
+// Returns matched tabs with semantic scores and snippets
+// Useful for multi-tab testing scenarios
 ```
 
-#### **Message Testing Optimization**
-**⚠️ CRITICAL: Message Submission Requirements**
-After filling in message text with `mcp_browser_form_input_fill`, you MUST either:
-1. **Press Enter key**: `mcp_browser_press_key({ key: 'Enter' })` (RECOMMENDED - faster)
-2. **Click submit button**: Find and click the submit button element
-
-**Without one of these actions, the message will NOT be sent!**
-
-**Example Code Pattern (for reference only):**
+#### **⌨️ Keyboard Shortcuts & Input**
 ```javascript
-// FAST MESSAGE SENDING - Always use this pattern (example)
-// const sendTestMessage = async (message) => {
-//   // 1. Get current elements
-//   const elements = await mcp_browser_get_clickable_elements();
-//   
-//   // 2. Find textarea (usually last input element)
-//   const textareaIndex = elements.findIndex(el => el.tag === 'textarea');
-//   
-//   // 3. Click and fill
-//   await mcp_browser_click({ index: textareaIndex });
-//   await mcp_browser_form_input_fill({ index: textareaIndex, value: message });
-//   
-//   // 4. ⚡ CRITICAL: Submit with Enter key (faster than finding button)
-//   await mcp_browser_press_key({ key: 'Enter' });
-//   
-//   // 5. Take screenshot for verification
-//   await mcp_browser_screenshot({ name: 'message-sent' });
-// };
+// Simulate keyboard combinations
+chrome_keyboard({
+  keys: 'Ctrl+A',           // Select all
+  selector: '#text-input',
+  delay: 100
+});
+
+chrome_keyboard({
+  keys: 'Enter',            // Submit form
+  selector: '[data-testid="message-input"]'
+});
 ```
 
-#### **Element Finding Speed Tips**
-**Example Code Pattern (for reference only):**
+#### **🪟 Window & Tab Management**
 ```javascript
-// DON'T: Call get_clickable_elements multiple times
-// ❌ Slow approach (example)
-// const elements1 = await mcp_browser_get_clickable_elements();
-// await mcp_browser_click({ index: 2 });
-// const elements2 = await mcp_browser_get_clickable_elements(); // Unnecessary
+// Get all windows and tabs
+const windows = get_windows_and_tabs();
+// Returns: { windowCount, tabCount, windows: [...] }
 
-// ✅ Fast approach - reuse elements until interaction changes page (example)
-// const elements = await mcp_browser_get_clickable_elements();
-// await mcp_browser_click({ index: 2 });
-// await mcp_browser_form_input_fill({ index: 3, value: 'test' });
-// Only refresh elements after major page changes
+// Switch to specific tab
+chrome_switch_tab({
+  tabId: 456,
+  windowId: 123  // Optional
+});
+
+// Close specific tabs
+chrome_close_tabs({
+  tabIds: [123, 456],
+  windowIds: [789]  // Close entire windows
+});
 ```
 
-#### **Common Index Patterns (for speed)**
-**Example Code Pattern (for reference only):**
+### 🎯 RFPEZ.AI Testing Workflows
+
+#### **Standard Login & Authentication Flow**
 ```javascript
-// These indices are typically consistent (example pattern):
-// const COMMON_INDICES = {
-//   LOGIN_BUTTON: 2,           // Main login button
-//   EMAIL_FIELD: 3,            // Email input in login modal
-//   PASSWORD_FIELD: 5,         // Password input in login modal  
-//   SIGNIN_BUTTON: 6,          // Sign in submit button
-//   MAIN_TEXTAREA: 11,         // Main chat textarea (when logged in)
-//   AGENT_SELECTOR: 1,         // Agent chip in header
-//   ARTIFACT_TOGGLE: 13        // Artifact panel toggle
-// };
+// Navigate to app
+chrome_navigate({ 
+  url: 'http://localhost:3100',
+  width: 1920,
+  height: 1080
+});
 
-// Use with caution - verify with screenshot if failing
-// await mcp_browser_click({ index: COMMON_INDICES.LOGIN_BUTTON });
+// Click login button using data-testid
+chrome_click_element({ 
+  selector: '[data-testid="login-button"]' 
+});
+
+// Fill credentials
+chrome_fill_or_select({ 
+  selector: 'input[type="email"]', 
+  value: 'mskiba@esphere.com' 
+});
+
+chrome_fill_or_select({ 
+  selector: 'input[type="password"]', 
+  value: 'thisisatest' 
+});
+
+// Submit login
+chrome_keyboard({ 
+  keys: 'Enter', 
+  selector: 'input[type="password"]' 
+});
+
+// Verify login success
+chrome_screenshot({ 
+  name: 'logged-in-state',
+  fullPage: true 
+});
 ```
 
-#### **Error Recovery Patterns**
+#### **Message Sending & RFP Creation Flow**
 ```javascript
-// Handle common browser issues
-const robustClick = async (index, retries = 2) => {
-  for (let i = 0; i < retries; i++) {
-    try {
-      await mcp_browser_click({ index });
-      return true;
-    } catch (error) {
-      if (i === retries - 1) throw error;
-      
-      // Refresh elements and try again
-      await mcp_browser_get_clickable_elements();
-      await new Promise(resolve => setTimeout(resolve, 500));
-    }
-  }
-};
+// Create new session
+chrome_click_element({ 
+  selector: '[data-testid="new-session-button"]' 
+});
+
+// Fill message using data-testid
+chrome_fill_or_select({ 
+  selector: '[data-testid="message-input"]', 
+  value: 'Create a new RFP for LED lighting procurement' 
+});
+
+// ⚡ CRITICAL: Submit message with keyboard
+chrome_keyboard({ 
+  keys: 'Enter', 
+  selector: '[data-testid="message-input"]' 
+});
+
+// Wait for response and take screenshot
+chrome_screenshot({ 
+  name: 'rfp-created',
+  fullPage: true,
+  storeBase64: false
+});
 ```
 
-#### **Testing Session Checklist**
+#### **Network Monitoring for API Debugging**
 ```javascript
-// Before starting any test session:
-// 1. ✅ Dev server running (VS Code task)
-// 2. ✅ Activate all MCP browser tools
-// 3. ✅ Navigate to localhost:3100
-// 4. ✅ Take initial screenshot  
-// 5. ✅ Check authentication state
-// 6. ✅ Login if needed
-// 7. ✅ Verify successful login (username visible)
-// 8. ✅ Ready for testing!
+// Start network capture before action
+chrome_network_capture_start({
+  maxCaptureTime: 60000,
+  includeStatic: false
+});
+
+// Perform action that triggers API calls
+chrome_click_element({ 
+  selector: '[data-testid="submit-message-button"]' 
+});
+
+// Stop capture and analyze requests
+const networkData = chrome_network_capture_stop();
+// Inspect networkData.capturedRequests for API call details
 ```
 
-### Available MCP Browser Tools
-- **Navigation**: `mcp_browser_navigate`, `mcp_browser_go_back`, `mcp_browser_go_forward`
-- **Interaction**: `mcp_browser_click`, `mcp_browser_hover`, `mcp_browser_form_input_fill`, `mcp_browser_press_key`
-- **Content**: `mcp_browser_get_text`, `mcp_browser_get_markdown`, `mcp_browser_read_links`
-- **Visual**: `mcp_browser_screenshot`, `mcp_browser_scroll`
-- **Elements**: `mcp_browser_get_clickable_elements`
-- **Downloads**: `mcp_browser_get_download_list`
-
-### Test File Examples
-- `nail-procurement/real-browser-mcp-test.js` - Live browser automation with real MCP calls
-- `nail-procurement/active-mcp-test.js` - Full test suite with mock and real modes
-- `nail-procurement/mcp-browser-demo.js` - Demonstration of MCP capabilities
-
-### Activating Real Browser Tools
-**Example Code Pattern (for test scripts, not Copilot execution):**
+#### **Multi-Tab Content Search**
 ```javascript
-// EXAMPLE: MCP browser tool activation pattern for test scripts
-// Note: These are examples for documentation purposes only
-// activate_mcp_browser_navigation_tools();
-// activate_mcp_browser_interaction_tools();
-// activate_mcp_browser_content_tools();
-// activate_mcp_browser_visual_tools();
+// Open multiple tabs with different RFPs
+chrome_navigate({ 
+  url: 'http://localhost:3100/rfp/1',
+  newWindow: false 
+});
 
-// Example usage after activation
-// mcp_browser_navigate({ url: 'http://localhost:3100' });
-// mcp_browser_screenshot({ name: 'homepage' });
-// const elements = mcp_browser_get_clickable_elements();
-// mcp_browser_click({ index: elements[0].index });
+chrome_navigate({ 
+  url: 'http://localhost:3100/rfp/2',
+  newWindow: false 
+});
+
+// Search across all tabs
+const results = search_tabs_content({
+  query: 'technical specifications'
+});
+
+// Results include semantic matching and snippets from all tabs
 ```
 
-### UI Test Automation Identifiers
-Key UI elements are decorated with `data-testid` attributes for reliable MCP browser testing:
+### 📋 RFPEZ.AI UI Test Identifiers (data-testid)
+
+### 📋 RFPEZ.AI UI Test Identifiers (data-testid)
+
+All critical UI elements are decorated with `data-testid` attributes for reliable Chrome MCP testing:
 
 **Navigation & Menu Access:**
-- `data-testid="new-session-button"` - New session creation button in sidebar (✅ CRITICAL)
-- `data-testid="main-menu-button"` - Main developer/admin menu trigger button (developer role+)
-- `data-testid="rfp-menu-button"` - RFP management menu trigger button (administrators only)
-- `data-testid="agents-menu-button"` - Agent management menu trigger button (administrators only)
+- `data-testid="new-session-button"` - New session creation (✅ CRITICAL - always use selector)
+- `data-testid="main-menu-button"` - Main developer/admin menu trigger (developer role+)
+- `data-testid="rfp-menu-button"` - RFP management menu trigger (administrators only)
+- `data-testid="agents-menu-button"` - Agent management menu trigger (administrators only)
 
 **Core Messaging & Actions:**
 - `data-testid="message-input"` - Main message input textarea (✅ CRITICAL)
-- `data-testid="submit-message-button"` - Message submit button (or use ENTER key)
+- `data-testid="submit-message-button"` - Message submit button
 - `data-testid="agent-selector"` - Agent indicator/selector (click to switch agents)
-- `data-testid="select-agent-button"` - Explicit agent selection button (when no agent selected)
+- `data-testid="select-agent-button"` - Explicit agent selection button
 
 **RFP & Context Management:**
 - `data-testid="new-rfp-button"` - New RFP creation button in RFP menu
@@ -1322,71 +1356,139 @@ Key UI elements are decorated with `data-testid` attributes for reliable MCP bro
 - `data-testid="form-submit-button"` - Form submission button in artifacts
 - `data-testid="artifact-toggle"` - Artifact panel expand/collapse button
 
-**Preferred MCP Browser Testing Approach:**
-**Example Code Pattern (for reference only):**
+### 🚨 Chrome MCP Critical Testing Rules
+
+1. **✅ ALWAYS USE CSS SELECTORS** - Use `data-testid` attributes for all interactions
+   - More reliable than index-based selection
+   - Survives UI refactoring and layout changes
+   - Self-documenting test code
+
+2. **⚡ SUBMIT MESSAGES WITH KEYBOARD** - After filling message input, MUST press Enter:
+   ```javascript
+   chrome_fill_or_select({ 
+     selector: '[data-testid="message-input"]', 
+     value: 'message text' 
+   });
+   chrome_keyboard({ keys: 'Enter', selector: '[data-testid="message-input"]' });
+   ```
+
+3. **📸 TAKE SCREENSHOTS FOR VERIFICATION** - Use screenshots to verify state changes:
+   ```javascript
+   chrome_screenshot({ name: 'descriptive-state-name', fullPage: true });
+   ```
+
+4. **🌐 MONITOR NETWORK FOR API DEBUGGING** - Capture API calls when debugging:
+   ```javascript
+   chrome_network_capture_start({ maxCaptureTime: 30000 });
+   // ... perform actions ...
+   const requests = chrome_network_capture_stop();
+   ```
+
+5. **🔍 USE SEMANTIC SEARCH FOR MULTI-TAB TESTING** - Search content across tabs:
+   ```javascript
+   const results = search_tabs_content({ query: 'specific content' });
+   ```
+
+### 📚 Chrome MCP vs Legacy Browser MCP
+
+**⚠️ MIGRATION NOTE:** The current test suite may use legacy tool names. When refactoring tests:
+
+| ❌ Legacy (Old) | ✅ Chrome MCP (New) | Notes |
+|----------------|---------------------|-------|
+| `mcp_browser_navigate()` | `chrome_navigate()` | Use new tool |
+| `mcp_browser_click({ index })` | `chrome_click_element({ selector })` | Prefer CSS selectors |
+| `mcp_browser_form_input_fill({ index })` | `chrome_fill_or_select({ selector })` | More reliable |
+| `mcp_browser_screenshot()` | `chrome_screenshot()` | Enhanced options |
+| `mcp_browser_press_key()` | `chrome_keyboard()` | More keyboard features |
+| `mcp_browser_get_clickable_elements()` | `chrome_get_interactive_elements()` | Better detection |
+| N/A | `search_tabs_content()` | NEW: AI semantic search |
+| N/A | `chrome_network_capture_*()` | NEW: Network monitoring |
+
+### 🎯 Complete Test Example: RFP Creation E2E
+
 ```javascript
-// 🎯 RECOMMENDED: Use selector-based targeting instead of index-based
-// ✅ Reliable approach - works across UI changes (examples)
-// await mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
-// await mcp_browser_form_input_fill({ selector: '[data-testid="message-input"]', value: 'test message' });
-// 
-// ⚡ CRITICAL: Always submit the message with Enter key or click submit button!
-// await mcp_browser_press_key({ key: 'Enter' }); // REQUIRED - Submit message
-// 
-// await mcp_browser_click({ selector: '[data-testid="agent-selector"]' }); // Switch agent
+// 1. Navigate to app with proper viewport
+chrome_navigate({ 
+  url: 'http://localhost:3100',
+  width: 1920,
+  height: 1080
+});
 
-// ❌ Avoid index-based targeting when possible (brittle)
-// await mcp_browser_click({ index: 2 });  // Index can change with UI updates
+// 2. Take initial screenshot
+chrome_screenshot({ 
+  name: '01-homepage',
+  fullPage: true 
+});
 
-// 🔍 Fallback: Use index when selector not available (with screenshot verification)
-// const elements = await mcp_browser_get_clickable_elements();
-// await mcp_browser_screenshot({ name: 'before-click' }); // Debug screenshot
-// await mcp_browser_click({ index: elements.findIndex(el => el.text?.includes('Target Text')) });
+// 3. Start network monitoring
+chrome_network_capture_start({
+  maxCaptureTime: 60000,
+  includeStatic: false
+});
+
+// 4. Login using data-testid selectors
+chrome_click_element({ selector: '[data-testid="login-button"]' });
+chrome_fill_or_select({ selector: 'input[type="email"]', value: 'mskiba@esphere.com' });
+chrome_fill_or_select({ selector: 'input[type="password"]', value: 'thisisatest' });
+chrome_keyboard({ keys: 'Enter', selector: 'input[type="password"]' });
+
+// 5. Verify login success
+chrome_screenshot({ name: '02-logged-in' });
+
+// 6. Create new session
+chrome_click_element({ selector: '[data-testid="new-session-button"]' });
+chrome_screenshot({ name: '03-new-session' });
+
+// 7. Send RFP creation message
+chrome_fill_or_select({ 
+  selector: '[data-testid="message-input"]', 
+  value: 'Create a new RFP for LED lighting procurement with technical specs' 
+});
+chrome_keyboard({ keys: 'Enter', selector: '[data-testid="message-input"]' });
+
+// 8. Wait and capture response
+chrome_screenshot({ name: '04-rfp-response', fullPage: true });
+
+// 9. Stop network capture and analyze
+const networkData = chrome_network_capture_stop();
+// Check networkData for API calls to /api/sessions, /api/messages, etc.
+
+// 10. Verify RFP context in footer
+const footerText = chrome_get_web_content({ 
+  selector: '[data-testid="current-rfp-display"]',
+  format: 'text'
+});
+// Should contain "Current RFP: LED Lighting Procurement"
+
+// 11. Final state screenshot
+chrome_screenshot({ name: '05-final-state', fullPage: true, storeBase64: true });
 ```
 
-**Complete Testing Workflow Example:**
-**Example Code Pattern (for test scripts, not Copilot execution):**
-```javascript
-// EXAMPLE: Standard test session setup with new identifiers
-// Note: These are examples for documentation purposes only
-// activate_mcp_browser_navigation_tools();
-// activate_mcp_browser_interaction_tools();
-// activate_mcp_browser_visual_tools();
+### 📖 Test File Examples (Update Needed)
 
-// Navigate and start session
-// mcp_browser_navigate({ url: 'http://localhost:3100' });
-// mcp_browser_screenshot({ name: 'homepage' });
+### 📖 Test File Examples (Update Needed)
 
-// Create new session (much more reliable now!)
-// mcp_browser_click({ selector: '[data-testid="new-session-button"]' });
+**⚠️ MIGRATION NOTICE:** Current test files use legacy MCP browser tools. They should be refactored to use official Chrome MCP API:
 
-// Send message using selector instead of guessing index
-// mcp_browser_form_input_fill({ 
-//   selector: '[data-testid="message-input"]', 
-//   value: 'Create a new RFP for LED lighting procurement' 
-// });
-// ⚡ CRITICAL: Must press Enter or click submit button to actually send the message!
-// mcp_browser_press_key({ key: 'Enter' }); // This step is REQUIRED
+- `nail-procurement/real-browser-mcp-test.js` - ⚠️ Uses legacy `mcp_browser_*` tools
+- `nail-procurement/active-mcp-test.js` - ⚠️ Needs migration to `chrome_*` tools
+- `nail-procurement/mcp-browser-demo.js` - ⚠️ Update to showcase Chrome MCP capabilities
 
-// Verify state changes
-// const footer = mcp_browser_get_text({ selector: '[data-testid="current-rfp-display"]' });
-// Should show "Current RFP: [name]" immediately after creation
-```
-
-**🎯 Key MCP Browser Testing Improvements:**
-- **Reliable Element Location**: All critical navigation elements now have consistent `data-testid` attributes
-- **Fixed Missing UI Elements**: Added missing trigger buttons for RFP and Agents menus (were previously inaccessible)
-- **Comprehensive Coverage**: Core user workflows (session creation, messaging, agent switching, menu access) all have proper test identifiers
-- **Consistent Naming**: Uses kebab-case naming convention (`element-name-action`)
-- **Selector-First Approach**: Prefer `data-testid` selectors over brittle index-based targeting
-- **Test identifiers follow kebab-case naming**: `data-testid="element-name-action"`
+**Migration Checklist for Test Files:**
+1. Replace `mcp_browser_navigate` → `chrome_navigate`
+2. Replace index-based selection with CSS selectors (`data-testid`)
+3. Use `chrome_keyboard` instead of `mcp_browser_press_key`
+4. Add network monitoring with `chrome_network_capture_*`
+5. Use `chrome_screenshot` with enhanced options
+6. Remove activation tool calls (not needed with Chrome MCP)
 
 ## Testing Notes
 - Console warnings for Ionic/Stencil components are expected
 - Use `test-utils.tsx` render wrapper for component tests
-- MCP tests in separate automation project for integration testing integrated into the debug page
-- VS Code tasks available for automated test execution and MCP validation
-- **⚡ CRITICAL**: When sending message prompts using MCP browser tools, you MUST press Enter key (`mcp_browser_press_key({ key: 'Enter' })`) or click the submit button after filling the message input - the message will NOT be sent otherwise!
+- Chrome MCP tests integrated into debug page for real-time validation
+- VS Code tasks available for automated test execution
+- **⚡ CRITICAL**: Always submit messages with `chrome_keyboard({ keys: 'Enter' })` after filling input
+- **✅ BEST PRACTICE**: Use `data-testid` selectors for all element interactions
 - Test identifiers follow kebab-case naming: `data-testid="element-name-action"`
 
 ## Memory MCP Best Practices
