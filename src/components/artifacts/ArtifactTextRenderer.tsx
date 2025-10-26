@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Artifact } from '../../types/home';
@@ -10,62 +10,98 @@ interface ArtifactTextRendererProps {
   isPortrait?: boolean;
 }
 
+interface ParsedContent {
+  title: string;
+  description: string;
+  content: string;
+  content_type: string;
+  tags: string[];
+}
+
 const ArtifactTextRenderer: React.FC<ArtifactTextRendererProps> = ({ 
   artifact, 
   isPortrait = false 
 }) => {
-  let title: string;
-  let description: string;
-  let content: string;
-  let content_type: string;
-  let tags: string[] = [];
+  const [parsedContent, setParsedContent] = useState<ParsedContent | null>(null);
 
-  try {
-    // Check if content looks like JSON first to avoid parsing errors
-    const contentStr = artifact.content || '';
-    const trimmedContent = contentStr.trim();
-    const looksLikeJSON = trimmedContent.startsWith('{') && trimmedContent.endsWith('}') && trimmedContent.length > 2;
-    
-    if (looksLikeJSON) {
+  // Parse artifact content when artifact changes
+  useEffect(() => {
+    const parseArtifactContent = () => {
+      let title: string;
+      let description: string;
+      let content: string;
+      let content_type: string;
+      let tags: string[] = [];
+
       try {
-        // Try to parse as structured JSON artifact
-        const textSpec = JSON.parse(contentStr);
-        if (textSpec && typeof textSpec === 'object' && textSpec.content && typeof textSpec.content === 'string') {
-          // Structured text artifact
-          title = textSpec.title || artifact.name;
-          description = textSpec.description || '';
-          content = textSpec.content;
-          content_type = textSpec.content_type || 'markdown';
-          tags = textSpec.tags || [];
+        // Check if content looks like JSON first to avoid parsing errors
+        const contentStr = artifact.content || '';
+        const trimmedContent = contentStr.trim();
+        const looksLikeJSON = trimmedContent.startsWith('{') && trimmedContent.endsWith('}') && trimmedContent.length > 2;
+        
+        if (looksLikeJSON) {
+          try {
+            // Try to parse as structured JSON artifact
+            const textSpec = JSON.parse(contentStr);
+            if (textSpec && typeof textSpec === 'object' && textSpec.content && typeof textSpec.content === 'string') {
+              // Structured text artifact
+              title = textSpec.title || artifact.name;
+              description = textSpec.description || '';
+              content = textSpec.content;
+              content_type = textSpec.content_type || 'markdown';
+              tags = textSpec.tags || [];
+            } else {
+              throw new Error('Not a structured text artifact');
+            }
+          } catch (jsonError) {
+            // JSON parsing failed, treat as raw content
+            console.warn('Failed to parse artifact content as JSON, treating as raw content:', jsonError);
+            title = artifact.name;
+            description = 'Document content';
+            content = contentStr;
+            content_type = 'markdown';
+            tags = [];
+          }
         } else {
-          throw new Error('Not a structured text artifact');
+          // Raw content - treat as markdown
+          title = artifact.name;
+          description = 'Document content';
+          content = contentStr;
+          content_type = 'markdown';
+          tags = [];
         }
-      } catch (jsonError) {
-        // JSON parsing failed, treat as raw content
-        console.warn('Failed to parse artifact content as JSON, treating as raw content:', jsonError);
-        title = artifact.name;
+      } catch (error) {
+        // Fallback error handling
+        console.error('Error in TextRenderer:', error);
+        title = artifact.name || 'Document';
         description = 'Document content';
-        content = contentStr;
+        content = (artifact.content as string) || 'Unable to display content';
         content_type = 'markdown';
         tags = [];
       }
-    } else {
-      // Raw content - treat as markdown
-      title = artifact.name;
-      description = 'Document content';
-      content = contentStr;
-      content_type = 'markdown';
-      tags = [];
-    }
-  } catch (error) {
-    // Fallback error handling
-    console.error('Error in TextRenderer:', error);
-    title = artifact.name || 'Document';
-    description = 'Document content';
-    content = (artifact.content as string) || 'Unable to display content';
-    content_type = 'markdown';
-    tags = [];
+
+      setParsedContent({ title, description, content, content_type, tags });
+    };
+
+    parseArtifactContent();
+  }, [artifact, artifact.content, artifact.name]);
+
+  // Show loading state while parsing
+  if (!parsedContent) {
+    return (
+      <div style={{ 
+        padding: '16px', 
+        height: '100%', 
+        display: 'flex', 
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <p style={{ color: 'var(--ion-color-medium)' }}>Loading content...</p>
+      </div>
+    );
   }
+
+  const { title, description, content, content_type, tags } = parsedContent;
 
   const formatContent = (text: string, type: string) => {
     switch (type) {
