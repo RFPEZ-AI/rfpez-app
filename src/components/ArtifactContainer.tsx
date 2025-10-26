@@ -37,6 +37,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   });
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [portraitHeight, setPortraitHeight] = useState<number>(40);
+  const [landscapeWidth, setLandscapeWidth] = useState<number>(400);
   const [isDragging, setIsDragging] = useState<boolean>(false);
 
   // Type detection
@@ -74,12 +75,23 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   };
 
   const handleDragMove = (e: MouseEvent | TouchEvent) => {
-    if (!isDragging || !isPortrait) return;
+    if (!isDragging) return;
     
-    const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-    const windowHeight = window.innerHeight;
-    const newHeight = Math.max(10, Math.min(50, ((windowHeight - clientY) / windowHeight) * 100));
-    setPortraitHeight(newHeight);
+    if (isPortrait) {
+      // Portrait mode: resize height
+      const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
+      const windowHeight = window.innerHeight;
+      const newHeight = Math.max(10, Math.min(95, ((windowHeight - clientY) / windowHeight) * 100));
+      setPortraitHeight(newHeight);
+    } else {
+      // Landscape mode: resize width
+      const clientX = 'touches' in e ? e.touches[0].clientX : e.clientX;
+      const windowWidth = window.innerWidth;
+      
+      // Calculate new width in pixels (drag right increases width)
+      const newWidth = Math.max(300, Math.min(windowWidth - 100, windowWidth - clientX));
+      setLandscapeWidth(newWidth);
+    }
   };
 
   const handleDragEnd = () => {
@@ -191,7 +203,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
     right: isPortrait ? 0 : 'auto',
     left: isPortrait ? 0 : 'auto',
     height: isPortrait ? `${portraitHeight}vh` : '100%',
-    width: isPortrait ? '100%' : '400px',
+    width: isPortrait ? '100%' : `${landscapeWidth}px`,
     backgroundColor: '#f8f9fa',
     borderTop: isPortrait ? '1px solid #ddd' : 'none',
     borderLeft: !isPortrait ? '1px solid #ddd' : 'none',
@@ -210,7 +222,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
         data-portrait={isPortrait}
         style={windowStyle}
       >
-        {/* Header - Always visible, no collapse button */}
+        {/* Header - Draggable for resizing */}
         <div 
           className="artifact-header"
           style={{
@@ -219,18 +231,35 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
             display: 'flex',
             alignItems: 'center',
             justifyContent: 'space-between',
-            backgroundColor: '#fff',
+            backgroundColor: isDragging ? '#e0f7fa' : '#fff',
             minHeight: '44px',
-            cursor: isPortrait ? 'ns-resize' : 'default'
+            cursor: isPortrait ? 'ns-resize' : 'ew-resize',
+            userSelect: 'none',
+            transition: isDragging ? 'none' : 'background-color 0.2s'
           }}
-          onMouseDown={isPortrait ? handleDragStart : undefined}
-          onTouchStart={isPortrait ? handleDragStart : undefined}
+          onMouseDown={handleDragStart}
+          onTouchStart={handleDragStart}
         >
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {/* Drag handle indicator */}
+            <div style={{
+              display: 'flex',
+              flexDirection: isPortrait ? 'row' : 'column',
+              gap: '2px',
+              padding: '4px',
+              opacity: 0.5
+            }}>
+              <div style={{ width: '16px', height: '2px', backgroundColor: '#666', borderRadius: '1px' }} />
+              <div style={{ width: '16px', height: '2px', backgroundColor: '#666', borderRadius: '1px' }} />
+              <div style={{ width: '16px', height: '2px', backgroundColor: '#666', borderRadius: '1px' }} />
+            </div>
             <IonButton
               fill="clear"
               size="small"
-              onClick={() => setIsFullScreen(true)}
+              onClick={(e) => {
+                e.stopPropagation();
+                setIsFullScreen(true);
+              }}
               data-testid="fullscreen-button"
               style={{ flexShrink: 0, backgroundColor: '#e0f7fa', border: '1px solid #00bcd4' }}
             >
