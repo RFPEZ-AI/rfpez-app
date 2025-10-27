@@ -89,7 +89,7 @@ const App: React.FC = () => {
         <IonReactRouter>
           <IonRouterOutlet>
           <Route exact path="/home" component={Home} />
-          <Route exact path="/bid/submit" component={BidSubmissionPage} />
+          <Route path="/bid/submit" component={BidSubmissionPage} />
           <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
           <Route exact path="/test/rjsf" component={RjsfTestPage} />
           <Route exact path="/debug" component={DebugPage} />
