@@ -860,18 +860,25 @@ export class ToolExecutionService {
           let baseUrl = '';
           if (includeDomain) {
             const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+            console.log('🔍 Environment detection - SUPABASE_URL:', supabaseUrl);
+            
             // Check if running locally (127.0.0.1 or localhost in Supabase URL)
             if (supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost')) {
               baseUrl = 'http://localhost:3100';
+              console.log('📍 Detected LOCAL environment');
             } else {
-              // Production/remote environment
-              baseUrl = 'https://dev.rfpez.ai';
+              // Production/remote environment - using hash router
+              baseUrl = 'https://dev.rfpez.ai/#';
+              console.log('📍 Detected REMOTE environment');
             }
           }
           
           const bidUrl = `${baseUrl}/bid/submit?rfp_id=${rfpId}`;
           
-          console.log('✅ Generated bid URL:', bidUrl, '(base:', baseUrl, ')');
+          console.log('✅ Generated bid URL:', bidUrl);
+          console.log('   - Base URL:', baseUrl);
+          console.log('   - RFP ID:', rfpId);
+          console.log('   - Include domain:', includeDomain);
           
           return {
             success: true,
