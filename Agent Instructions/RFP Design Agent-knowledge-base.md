@@ -378,6 +378,66 @@ Form Schema Validation Rules:
 **Required Fields:**
 - Always include "required" array at root level
 - List field names that must be filled
+- Required fields display with amber asterisk (*) indicator
+- No background styling for required fields - clean, minimal design
+
+---
+
+## Form Field Styling and Visual Design
+
+### ID: rfp-design-form-field-styling
+### Type: knowledge
+### Category: best-practices
+### Importance: 0.85
+
+**Content:**
+Form Field Visual Design Guidelines:
+
+**Required Field Styling:**
+- **Indicator**: Amber asterisk (*) with color #d97706 next to field label
+- **Background**: No special background for required fields (clean, minimal)
+- **Purpose**: Clear visual cue without being distracting
+
+**Error State Styling:**
+- **Background Color**: Red (danger color) for validation errors only
+- **Text Color**: Red error messages below field
+- **Asterisk**: Turns red when field has validation errors
+- **Distinction**: Only appears after validation fails (on submit or blur)
+
+**Visual Hierarchy:**
+1. Required fields: Amber asterisk (*) indicator only
+2. Optional fields: No asterisk, default styling
+3. Error fields: Red background with error message and red asterisk
+4. Disabled fields: Gray background
+
+**Example Schema with Required Fields:**
+```json
+{
+  "type": "object",
+  "properties": {
+    "company_name": {
+      "type": "string",
+      "title": "Company Name"
+    },
+    "contact_email": {
+      "type": "string",
+      "format": "email",
+      "title": "Contact Email"
+    },
+    "budget": {
+      "type": "string",
+      "title": "Budget (Optional)"
+    }
+  },
+  "required": ["company_name", "contact_email"]
+}
+```
+
+In this example:
+- "Company Name" and "Contact Email" show amber * indicator
+- "Budget (Optional)" has no indicator
+- If user submits without filling required fields, they turn red with error messages and red asterisks
+
 - Example: `"required": ["company_name", "contact_email"]`
 
 **Error Prevention:**

@@ -5,6 +5,13 @@ import { mapMessageToClaudeFormat, extractTextFromClaudeResponse, extractToolCal
 import { config } from '../config.ts';
 import type { ClaudeMessage, ClaudeToolDefinition, ClaudeResponse, ToolResult } from '../types.ts';
 
+// Global Deno environment access
+declare const Deno: {
+  env: {
+    get(key: string): string | undefined;
+  };
+};
+
 interface ClaudeToolCall {
   type: 'tool_use';
   id: string;
@@ -800,6 +807,80 @@ export class ToolExecutionService {
           const { updateBidStatus } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
           return await updateBidStatus(this.supabase, input);
+        }
+
+        case 'generate_rfp_bid_url': {
+          if (!sessionId) {
+            return { success: false, error: 'Session ID is required' };
+          }
+          
+          // Get RFP ID from input or session context
+          let rfpId = input.rfp_id;
+          
+          if (!rfpId) {
+            // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
+            // @ts-expect-error - Supabase client type is unknown but compatible
+            const sessionQuery = await this.supabase
+              .from('sessions')
+              .select('current_rfp_id')
+              .eq('id', sessionId)
+              .single();
+            
+            const { data: sessionData, error: sessionError } = sessionQuery as { 
+              data: { current_rfp_id?: number } | null; 
+              error: Error | null 
+            };
+            
+            if (sessionError) {
+              console.error('❌ Failed to fetch session data:', sessionError);
+              return {
+                success: false,
+                error: 'Failed to retrieve session information',
+                message: 'Could not fetch session data to determine current RFP.'
+              };
+            }
+            
+            if (!sessionData?.current_rfp_id) {
+              console.error('❌ No current RFP set for this session');
+              return {
+                success: false,
+                error: 'No current RFP set',
+                message: 'No RFP is currently active for this session. To generate a bid URL, you must first create an RFP using the create_and_set_rfp tool.'
+              };
+            }
+            
+            rfpId = sessionData.current_rfp_id;
+            console.log('✅ Auto-injecting current RFP ID for bid URL generation:', rfpId);
+          }
+          
+          // Generate the bid submission URL
+          const includeDomain = input.include_domain !== false; // Default to true
+          
+          // Determine the base URL based on environment
+          let baseUrl = '';
+          if (includeDomain) {
+            const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+            // Check if running locally (127.0.0.1 or localhost in Supabase URL)
+            if (supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost')) {
+              baseUrl = 'http://localhost:3100';
+            } else {
+              // Production/remote environment
+              baseUrl = 'https://dev.rfpez.ai';
+            }
+          }
+          
+          const bidUrl = `${baseUrl}/bid/submit?rfp_id=${rfpId}`;
+          
+          console.log('✅ Generated bid URL:', bidUrl, '(base:', baseUrl, ')');
+          
+          return {
+            success: true,
+            data: {
+              bid_url: bidUrl,
+              rfp_id: rfpId
+            },
+            message: `Bid submission URL generated successfully: ${bidUrl}`
+          };
         }
 
         case 'create_memory': {

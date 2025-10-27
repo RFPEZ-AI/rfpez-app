@@ -817,11 +817,12 @@ For questions about this RFP, please contact us through the RFPEZ.AI platform.
       console.log('🔍 Looking for bid form for RFP ID:', rfpId);
 
       // First, try the new schema with rfp_artifacts junction table
+      // Note: Filter on artifacts.artifact_role, not rfp_artifacts.artifact_role
       const { data: rfpArtifacts, error: rfpArtifactError } = await supabase
         .from('rfp_artifacts')
         .select('artifact_id, artifacts!inner(*)')
         .eq('rfp_id', rfpId)
-        .eq('artifact_role', 'bid_form')
+        .eq('artifacts.artifact_role', 'bid_form')
         .order('created_at', { ascending: false });
 
       if (rfpArtifactError) {

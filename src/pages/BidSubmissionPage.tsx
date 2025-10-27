@@ -19,12 +19,13 @@ import {
   IonItem,
   IonInput
 } from '@ionic/react';
-import { documentTextOutline, checkmarkCircleOutline } from 'ionicons/icons';
+import { documentTextOutline, checkmarkCircleOutline, mailOutline } from 'ionicons/icons';
 import { RfpForm } from '../components/forms/RfpForm';
 import { RFPService } from '../services/rfpService';
 import { UserContextService } from '../services/userContextService';
 import { supabase } from '../supabaseClient';
 import type { RFP, FormSpec, Bid } from '../types/rfp';
+import ReactMarkdown from 'react-markdown';
 
 // Empty interface serves as a base for future extension
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
@@ -36,6 +37,7 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
   const location = useLocation();
   const [rfp, setRfp] = useState<RFP | null>(null);
   const [formSpec, setFormSpec] = useState<FormSpec | null>(null);
+  const [requestEmailContent, setRequestEmailContent] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
@@ -104,6 +106,57 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
 
         console.log('✅ Found bid form for RFP:', rfpId);
         setFormSpec(bidFormSpec);
+
+        // Load RFP request email artifact
+        console.log('🔍 Loading RFP request email artifact for RFP:', rfpId);
+        try {
+          // Query through the rfp_artifacts junction table to get the request email artifact
+          const { data: rfpArtifactLinks, error: linkError } = await supabase
+            .from('rfp_artifacts')
+            .select('artifact_id')
+            .eq('rfp_id', rfpId)
+            .limit(100); // Get all artifact links for this RFP
+
+          if (linkError) {
+            console.warn('Error loading RFP artifact links:', linkError);
+          } else if (rfpArtifactLinks && rfpArtifactLinks.length > 0) {
+            // Get the artifact IDs
+            const artifactIds = rfpArtifactLinks.map(link => link.artifact_id);
+            
+            // Now fetch the actual request email artifact
+            const { data: requestArtifacts, error: artifactError } = await supabase
+              .from('artifacts')
+              .select('processed_content, draft_data')
+              .in('id', artifactIds)
+              .eq('artifact_role', 'rfp_request_email')
+              .order('created_at', { ascending: false })
+              .limit(1);
+
+            if (artifactError) {
+              console.warn('Error loading request email artifact:', artifactError);
+            } else if (requestArtifacts && requestArtifacts.length > 0) {
+              // Use processed_content if available, otherwise try draft_data
+              const artifact = requestArtifacts[0];
+              const emailContent = artifact.processed_content || 
+                                 (artifact.draft_data && typeof artifact.draft_data === 'object' && 'content' in artifact.draft_data 
+                                   ? (artifact.draft_data as { content?: string }).content 
+                                   : null);
+              
+              if (emailContent) {
+                console.log('✅ Found RFP request email artifact');
+                setRequestEmailContent(emailContent);
+              } else {
+                console.log('⚠️ Request email artifact found but has no content');
+              }
+            } else {
+              console.log('ℹ️ No request email artifact found for this RFP');
+            }
+          } else {
+            console.log('ℹ️ No artifacts linked to this RFP');
+          }
+        } catch (artifactErr) {
+          console.warn('Could not load request email artifact:', artifactErr);
+        }
 
         // Pre-fill supplier info if provided in URL
         if (supplierName || supplierEmail) {
@@ -268,30 +321,59 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
     <IonPage>
       <IonHeader>
         <IonToolbar>
-          <IonTitle>Submit Bid</IonTitle>
+          <IonTitle>Submit Bid - {rfp?.name}</IonTitle>
         </IonToolbar>
       </IonHeader>
       
       <IonContent className="ion-padding">
-        {/* RFP Information */}
-        <IonCard>
-          <IonCardHeader>
-            <IonCardTitle>
-              <IonIcon icon={documentTextOutline} style={{ marginRight: '8px' }} />
-              {rfp?.name}
-            </IonCardTitle>
-          </IonCardHeader>
-          <IonCardContent>
-            {rfp?.description && (
-              <IonText>
-                <p>{rfp.description}</p>
+        {/* RFP Request Email Content */}
+        {requestEmailContent && (
+          <IonCard>
+            <IonCardHeader>
+              <IonCardTitle>
+                <IonIcon icon={mailOutline} style={{ marginRight: '8px' }} />
+                Request for Proposal
+              </IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              <div style={{ 
+                whiteSpace: 'pre-wrap', 
+                fontFamily: 'inherit',
+                lineHeight: '1.6'
+              }}>
+                <ReactMarkdown>{requestEmailContent}</ReactMarkdown>
+              </div>
+            </IonCardContent>
+          </IonCard>
+        )}
+
+        {/* RFP Basic Information (fallback if no request content) */}
+        {!requestEmailContent && (
+          <IonCard>
+            <IonCardHeader>
+              <IonCardTitle>
+                <IonIcon icon={documentTextOutline} style={{ marginRight: '8px' }} />
+                {rfp?.name}
+              </IonCardTitle>
+            </IonCardHeader>
+            <IonCardContent>
+              {rfp?.description && (
+                <IonText>
+                  <p>{rfp.description}</p>
+                </IonText>
+              )}
+              {rfp?.specification && (
+                <IonText>
+                  <h3>Specifications</h3>
+                  <p style={{ whiteSpace: 'pre-wrap' }}>{rfp.specification}</p>
+                </IonText>
+              )}
+              <IonText color="medium">
+                <p><strong>Due Date:</strong> {rfp?.due_date ? new Date(rfp.due_date).toLocaleDateString() : 'Not specified'}</p>
               </IonText>
-            )}
-            <IonText color="medium">
-              <p><strong>Due Date:</strong> {rfp?.due_date ? new Date(rfp.due_date).toLocaleDateString() : 'Not specified'}</p>
-            </IonText>
-          </IonCardContent>
-        </IonCard>
+            </IonCardContent>
+          </IonCard>
+        )}
 
         {/* Supplier Information */}
         <IonCard>

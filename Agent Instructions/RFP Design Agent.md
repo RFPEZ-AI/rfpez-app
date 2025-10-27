@@ -150,6 +150,8 @@ await create_form_artifact({
 });
 ```
 
+**Visual Design**: Required fields show amber asterisks (*) - clear indicators without background styling. Errors display in red. 📚 Search: "form field styling"
+
 ### Populating Sample Data:
 ```javascript
 // Step 1: Get exact field names

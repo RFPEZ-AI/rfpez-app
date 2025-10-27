@@ -52,7 +52,7 @@ export const IonicFieldTemplate: React.FC<FieldTemplateProps> = ({
               color: hasErrors ? 'var(--ion-color-danger)' : 'var(--ion-text-color)'
             }}>
               {label}
-              {required && <span style={{ color: 'var(--ion-color-danger)' }}> *</span>}
+              {required && <span style={{ color: hasErrors ? 'var(--ion-color-danger)' : '#d97706' }}> *</span>}
             </h6>
           </IonText>
         )}
@@ -86,14 +86,15 @@ export const IonicFieldTemplate: React.FC<FieldTemplateProps> = ({
   return (
     <IonItem 
       className={`field-template ${classNames}`}
-      color={hasErrors ? 'danger' : undefined}
-      style={{ marginBottom: '8px' }}
+      style={{ 
+        marginBottom: '8px'
+      }}
     >
       <div style={{ width: '100%' }}>
         {displayLabel && label && (
           <IonLabel id={`${id}-label`} position="stacked">
             {label}
-            {required && <span style={{ color: 'var(--ion-color-danger)' }}> *</span>}
+            {required && <span style={{ color: '#d97706' }}> *</span>}
           </IonLabel>
         )}
         
