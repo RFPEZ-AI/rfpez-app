@@ -867,8 +867,8 @@ export class ToolExecutionService {
               baseUrl = 'http://localhost:3100';
               console.log('📍 Detected LOCAL environment');
             } else {
-              // Production/remote environment - using hash router
-              baseUrl = 'https://dev.rfpez.ai/#';
+              // Production/remote environment - using browser history routing (no hash)
+              baseUrl = 'https://dev.rfpez.ai';
               console.log('📍 Detected REMOTE environment');
             }
           }
