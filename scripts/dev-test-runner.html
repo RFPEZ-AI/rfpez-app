@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dev.rfpez.ai Automated Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        h1 {
+            color: #333;
+            border-bottom: 3px solid #4CAF50;
+            padding-bottom: 10px;
+        }
+        .step {
+            background: #f9f9f9;
+            padding: 15px;
+            margin: 15px 0;
+            border-left: 4px solid #2196F3;
+            border-radius: 4px;
+        }
+        .step.completed {
+            border-left-color: #4CAF50;
+            background: #e8f5e9;
+        }
+        .step.error {
+            border-left-color: #f44336;
+            background: #ffebee;
+        }
+        button {
+            background: #4CAF50;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            font-size: 16px;
+            cursor: pointer;
+            border-radius: 4px;
+            margin: 10px 5px;
+        }
+        button:hover {
+            background: #45a049;
+        }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        .log {
+            background: #263238;
+            color: #aed581;
+            padding: 15px;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            max-height: 400px;
+            overflow-y: auto;
+            margin-top: 20px;
+        }
+        .credentials {
+            background: #fff3e0;
+            padding: 15px;
+            border-radius: 4px;
+            margin: 15px 0;
+        }
+        iframe {
+            width: 100%;
+            height: 800px;
+            border: 2px solid #ddd;
+            border-radius: 4px;
+            margin-top: 20px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🧪 Dev.rfpez.ai Automated Test Suite</h1>
+        
+        <div class="credentials">
+            <strong>Test Credentials:</strong><br>
+            Email: mskiba@esphere.com<br>
+            Password: thisisatest
+        </div>
+
+        <div>
+            <button onclick="startTest()">▶️ Start Full Test</button>
+            <button onclick="runStep(currentStep)">⏭️ Run Current Step</button>
+            <button onclick="resetTest()">🔄 Reset Test</button>
+        </div>
+
+        <div id="steps"></div>
+        <div id="log" class="log"></div>
+        
+        <h2>Test Window</h2>
+        <iframe id="testFrame" src="about:blank"></iframe>
+    </div>
+
+    <script>
+        let currentStep = 0;
+        let testWindow = null;
+
+        const TEST_STEPS = [
+            {
+                name: "Navigate to dev.rfpez.ai",
+                action: async () => {
+                    const iframe = document.getElementById('testFrame');
+                    iframe.src = 'https://dev.rfpez.ai';
+                    await wait(3000);
+                    log('✓ Navigated to dev.rfpez.ai');
+                }
+            },
+            {
+                name: "Wait for page load",
+                action: async () => {
+                    await wait(2000);
+                    log('✓ Page loaded');
+                }
+            },
+            {
+                name: "Instructions: Manual Login Required",
+                action: async () => {
+                    log('⚠️ MANUAL STEP: Please login in the iframe below');
+                    log('   Email: mskiba@esphere.com');
+                    log('   Password: thisisatest');
+                    log('   Then click "Run Current Step" to continue');
+                    return false; // Pause here
+                }
+            },
+            {
+                name: "Create New Session",
+                action: async () => {
+                    log('📝 Instruction: Click the "+ New Session" button in the iframe');
+                    log('   Then click "Run Current Step" to continue');
+                    return false;
+                }
+            },
+            {
+                name: "Create RFP",
+                action: async () => {
+                    log('📝 Instruction: In the message input, type:');
+                    log('   "Create a new RFP for Office Furniture Procurement. Complete office furniture set for new 50-person office space"');
+                    log('   Press Enter, then click "Run Current Step" to continue');
+                    return false;
+                }
+            },
+            {
+                name: "Generate Specifications",
+                action: async () => {
+                    log('📝 Instruction: Type the following message:');
+                    log('   "Generate detailed technical specifications including: Executive desks (10 units), Standard workstations (40 units), Conference tables (3 units), Office chairs - ergonomic (50 units), Filing cabinets (15 units). Requirements: BIFMA certified furniture, Warranty minimum 5 years, Delivery within 6 weeks, Installation included"');
+                    log('   Press Enter, wait for response, then click "Run Current Step"');
+                    return false;
+                }
+            },
+            {
+                name: "Create Bid Form",
+                action: async () => {
+                    log('📝 Instruction: Type:');
+                    log('   "Create a bid submission form for suppliers to respond to this RFP"');
+                    log('   Press Enter, wait for response, then click "Run Current Step"');
+                    return false;
+                }
+            },
+            {
+                name: "Generate RFP Email",
+                action: async () => {
+                    log('📝 Instruction: Type:');
+                    log('   "Generate an RFP announcement email to send to potential suppliers"');
+                    log('   Press Enter, wait for response, then click "Run Current Step"');
+                    return false;
+                }
+            },
+            {
+                name: "Add First Supplier Bid (Premier Office Solutions - $125,000)",
+                action: async () => {
+                    log('📝 Instruction: Type:');
+                    log('   "Record a bid from Premier Office Solutions: Total bid $125,000, Delivery: 4 weeks, Warranty: 7 years. Notes: Includes white-glove installation and 2-year maintenance"');
+                    log('   Press Enter, wait for response, then click "Run Current Step"');
+                    return false;
+                }
+            },
+            {
+                name: "Add Second Supplier Bid (Corporate Workspace Inc - $118,000)",
+                action: async () => {
+                    log('📝 Instruction: Type:');
+                    log('   "Record a bid from Corporate Workspace Inc: Total bid $118,000, Delivery: 5 weeks, Warranty: 5 years. Notes: Volume discount applied, standard installation included"');
+                    log('   Press Enter, wait for response, then click "Run Current Step"');
+                    return false;
+                }
+            },
+            {
+                name: "Add Third Supplier Bid (Modern Office Outfitters - $135,000)",
+                action: async () => {
+                    log('📝 Instruction: Type:');
+                    log('   "Record a bid from Modern Office Outfitters: Total bid $135,000, Delivery: 3 weeks, Warranty: 10 years. Notes: Premium furniture line, expedited delivery, extended warranty"');
+                    log('   Press Enter, wait for response, then click "Run Current Step"');
+                    return false;
+                }
+            },
+            {
+                name: "Create Bid Comparison",
+                action: async () => {
+                    log('📝 Instruction: Type:');
+                    log('   "Create a comparison table of all received bids with recommendations"');
+                    log('   Press Enter, wait for response, then click "Run Current Step"');
+                    return false;
+                }
+            },
+            {
+                name: "Test Complete - Review Results",
+                action: async () => {
+                    log('');
+                    log('========================================');
+                    log('✅ TEST COMPLETE');
+                    log('========================================');
+                    log('');
+                    log('Validation Checklist:');
+                    log('[ ] RFP created: Office Furniture Procurement');
+                    log('[ ] Technical specifications generated');
+                    log('[ ] Bid form created');
+                    log('[ ] RFP email generated');
+                    log('[ ] 3 supplier bids recorded');
+                    log('[ ] Bid comparison table created');
+                    log('[ ] No console errors');
+                    log('[ ] All artifacts visible');
+                    log('[ ] RFP context shown in footer');
+                    log('');
+                }
+            }
+        ];
+
+        function wait(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            const timestamp = new Date().toLocaleTimeString();
+            logDiv.innerHTML += `[${timestamp}] ${message}\n`;
+            logDiv.scrollTop = logDiv.scrollHeight;
+        }
+
+        function updateStepsDisplay() {
+            const stepsDiv = document.getElementById('steps');
+            stepsDiv.innerHTML = TEST_STEPS.map((step, index) => {
+                let className = 'step';
+                if (index < currentStep) className += ' completed';
+                if (index === currentStep) className += ' current';
+                
+                return `
+                    <div class="${className}">
+                        <strong>Step ${index + 1}:</strong> ${step.name}
+                        ${index === currentStep ? ' 👈 Current' : ''}
+                        ${index < currentStep ? ' ✓' : ''}
+                    </div>
+                `;
+            }).join('');
+        }
+
+        async function runStep(stepIndex) {
+            if (stepIndex >= TEST_STEPS.length) {
+                log('All steps completed!');
+                return;
+            }
+
+            const step = TEST_STEPS[stepIndex];
+            log('');
+            log(`▶️ Running Step ${stepIndex + 1}: ${step.name}`);
+            
+            try {
+                const shouldContinue = await step.action();
+                if (shouldContinue !== false) {
+                    currentStep++;
+                    updateStepsDisplay();
+                    log(`✓ Step ${stepIndex + 1} completed`);
+                }
+            } catch (error) {
+                log(`❌ Error in step ${stepIndex + 1}: ${error.message}`);
+            }
+        }
+
+        async function startTest() {
+            currentStep = 0;
+            updateStepsDisplay();
+            log('🚀 Starting automated test...');
+            await runStep(0);
+        }
+
+        function resetTest() {
+            currentStep = 0;
+            document.getElementById('log').innerHTML = '';
+            document.getElementById('testFrame').src = 'about:blank';
+            updateStepsDisplay();
+            log('Test reset. Click "Start Full Test" to begin.');
+        }
+
+        // Initialize
+        updateStepsDisplay();
+        log('Ready to start test. Click "Start Full Test" button.');
+    </script>
+</body>
+</html>
