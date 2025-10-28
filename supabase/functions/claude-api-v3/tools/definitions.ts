@@ -576,6 +576,87 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       },
       required: []
     }
+  },
+  {
+    name: 'perplexity_search',
+    description: 'Direct web search using the Perplexity Search API. Returns ranked search results with metadata. Perfect for finding current information, market research, pricing data, vendor information, and industry trends. Use this for fact-finding and research queries.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query to find information about'
+        },
+        recency_filter: {
+          type: 'string',
+          description: 'Filter results by recency',
+          enum: ['day', 'week', 'month', 'year']
+        },
+        return_images: {
+          type: 'boolean',
+          description: 'Whether to return relevant images in results',
+          default: false
+        },
+        return_related_questions: {
+          type: 'boolean',
+          description: 'Whether to return related questions',
+          default: true
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'perplexity_ask',
+    description: 'Conversational AI with real-time web search using the sonar-pro model. Great for quick questions and everyday searches. Use this for getting concise answers to specific questions about current events, product information, or general knowledge.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Question or query to ask Perplexity AI'
+        },
+        search_recency_filter: {
+          type: 'string',
+          description: 'Filter search results by recency',
+          enum: ['day', 'week', 'month', 'year']
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'perplexity_research',
+    description: 'Deep, comprehensive research using the sonar-deep-research model. Ideal for thorough analysis and detailed reports. Use this for in-depth market analysis, competitive research, technical specifications research, or when you need a comprehensive understanding of a complex topic.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Research topic or question for deep analysis'
+        },
+        search_recency_filter: {
+          type: 'string',
+          description: 'Filter search results by recency',
+          enum: ['day', 'week', 'month', 'year']
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'perplexity_reason',
+    description: 'Advanced reasoning and problem-solving using the sonar-reasoning-pro model. Perfect for complex analytical tasks, comparing options, evaluating trade-offs, making recommendations, or solving multi-step problems. Use this when you need to analyze and reason about information rather than just retrieve it.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Problem or analytical question requiring advanced reasoning'
+        }
+      },
+      required: ['query']
+    }
   }
 ];
 

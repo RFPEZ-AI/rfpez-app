@@ -937,6 +937,47 @@ export class ToolExecutionService {
           );
         }
 
+        case 'perplexity_search': {
+          const { executePerplexitySearch } = await import('../tools/perplexity.ts');
+          const searchResult = await executePerplexitySearch(input as {
+            query: string;
+            recency_filter?: 'day' | 'week' | 'month' | 'year';
+            return_images?: boolean;
+            return_related_questions?: boolean;
+          });
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, searchResult);
+          return searchResult as ToolResult;
+        }
+
+        case 'perplexity_ask': {
+          const { executePerplexityAsk } = await import('../tools/perplexity.ts');
+          const askResult = await executePerplexityAsk(input as {
+            query: string;
+            search_recency_filter?: 'day' | 'week' | 'month' | 'year';
+          });
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, askResult);
+          return askResult as ToolResult;
+        }
+
+        case 'perplexity_research': {
+          const { executePerplexityResearch } = await import('../tools/perplexity.ts');
+          const researchResult = await executePerplexityResearch(input as {
+            query: string;
+            search_recency_filter?: 'day' | 'week' | 'month' | 'year';
+          });
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, researchResult);
+          return researchResult as ToolResult;
+        }
+
+        case 'perplexity_reason': {
+          const { executePerplexityReason } = await import('../tools/perplexity.ts');
+          const reasonResult = await executePerplexityReason(input as {
+            query: string;
+          });
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, reasonResult);
+          return reasonResult as ToolResult;
+        }
+
         default: {
           console.log(`Unknown tool: ${name}`);
           const unknownResult = {
