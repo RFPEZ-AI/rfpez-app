@@ -229,15 +229,18 @@ export class RFPService {
     console.log('🔄 Creating bid with data:', JSON.stringify(bid, null, 2));
     
     // Get the current user's account_id if not provided
+    // For anonymous users (bid submissions), account_id will be null
     let accountId = bid.account_id;
     if (!accountId) {
-      const { data: accountData } = await supabase.rpc('get_user_account_id');
-      accountId = accountData;
-      console.log('🔑 Retrieved user account_id:', accountId);
-      
-      if (!accountId) {
-        console.error('❌ Could not retrieve user account_id');
-        return null;
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session?.user) {
+        const { data: accountData } = await supabase.rpc('get_user_account_id');
+        accountId = accountData;
+        console.log('🔑 Retrieved authenticated user account_id:', accountId);
+      } else {
+        console.log('👤 Anonymous user - account_id will be null');
+        // Anonymous users don't have an account_id
+        // We'll rely on supplier_id for tracking
       }
     }
     
@@ -288,16 +291,26 @@ export class RFPService {
       }
     }
     
-    // Create the bid with account_id and supplier_id
-    const bidDataWithAccountAndSupplier = { 
-      ...bid,
-      account_id: accountId
+    // Create the bid with account_id (nullable for anonymous) and supplier_id
+    const bidDataWithAccountAndSupplier: Partial<Bid> = { 
+      ...bid
     };
+    
+    // Only set account_id if we have one (authenticated users)
+    if (accountId) {
+      bidDataWithAccountAndSupplier.account_id = accountId;
+    }
+    
+    // Set supplier_id if we have one
     if (supplierId) {
       bidDataWithAccountAndSupplier.supplier_id = supplierId;
     }
     
-    console.log('📤 Submitting bid with account_id:', accountId);
+    console.log('📤 Submitting bid:', {
+      hasAccountId: !!accountId,
+      hasSupplierId: !!supplierId,
+      isAnonymous: !accountId
+    });
     const { data, error } = await supabase.from('bids').insert(bidDataWithAccountAndSupplier).select().single();
     if (error) {
       console.error('❌ Supabase error creating bid:', JSON.stringify(error, null, 2));
