@@ -86,7 +86,10 @@ export const IonicFieldTemplate: React.FC<FieldTemplateProps> = ({
   return (
     <IonItem 
       className={`field-template ${classNames}`}
+      lines="none"
       style={{ 
+        '--padding-start': '0px',
+        '--inner-padding-end': '0px',
         marginBottom: '8px'
       }}
     >
@@ -99,12 +102,12 @@ export const IonicFieldTemplate: React.FC<FieldTemplateProps> = ({
         )}
         
         {description && (
-          <IonNote style={{ display: 'block', marginBottom: '8px', fontSize: '0.875rem' }}>
+          <IonNote style={{ display: 'block', marginBottom: '2px', fontSize: '0.875rem' }}>
             {description}
           </IonNote>
         )}
         
-        <div style={{ marginTop: displayLabel && label ? '8px' : '0' }}>
+        <div style={{ marginTop: '2px' }}>
           {children}
         </div>
         

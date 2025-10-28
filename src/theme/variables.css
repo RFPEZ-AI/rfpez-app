@@ -236,3 +236,43 @@ http://ionicframework.com/docs/theming/ */
     --ion-card-background: #1e1e1e;
   }
 }
+
+/* Fix for browser autofill black background */
+ion-input input:-webkit-autofill,
+/* Override browser autofill dark background */
+ion-input.ion-input-no-autofill input:-webkit-autofill,
+ion-input.ion-input-no-autofill input:-webkit-autofill:hover,
+ion-input.ion-input-no-autofill input:-webkit-autofill:focus,
+ion-input.ion-input-no-autofill input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 1000px var(--ion-background-color, white) inset !important;
+  -webkit-text-fill-color: var(--ion-text-color, black) !important;
+  box-shadow: 0 0 0 1000px var(--ion-background-color, white) inset !important;
+  background-color: var(--ion-background-color, white) !important;
+  transition: background-color 5000s ease-in-out 0s !important;
+}
+
+/* Generic ion-input autofill override */
+ion-input input:-webkit-autofill,
+ion-input input:-webkit-autofill:hover,
+ion-input input:-webkit-autofill:focus,
+ion-input input:-webkit-autofill:active {
+  -webkit-box-shadow: 0 0 0 30px var(--ion-item-background, white) inset !important;
+  -webkit-text-fill-color: var(--ion-text-color, black) !important;
+  transition: background-color 5000s ease-in-out 0s;
+}
+
+/* For light mode */
+:root {
+  ion-input input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 30px white inset !important;
+    -webkit-text-fill-color: black !important;
+  }
+}
+
+/* For dark mode */
+@media (prefers-color-scheme: dark) {
+  ion-input input:-webkit-autofill {
+    -webkit-box-shadow: 0 0 0 30px #1e1e1e inset !important;
+    -webkit-text-fill-color: white !important;
+  }
+}

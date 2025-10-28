@@ -26,6 +26,7 @@ import { UserContextService } from '../services/userContextService';
 import { supabase } from '../supabaseClient';
 import type { RFP, FormSpec, Bid } from '../types/rfp';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 // Empty interface serves as a base for future extension
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
@@ -336,12 +337,74 @@ export const BidSubmissionPage: React.FC<BidSubmissionPageProps> = () => {
               </IonCardTitle>
             </IonCardHeader>
             <IonCardContent>
-              <div style={{ 
-                whiteSpace: 'pre-wrap', 
-                fontFamily: 'inherit',
-                lineHeight: '1.6'
-              }}>
-                <ReactMarkdown>{requestEmailContent}</ReactMarkdown>
+              <div className="rfp-email-content">
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    p: ({ children }) => (
+                      <p style={{
+                        lineHeight: '1.6',
+                        marginBottom: '12px',
+                        fontSize: '14px'
+                      }}>
+                        {children}
+                      </p>
+                    ),
+                    h1: ({ children }) => (
+                      <h1 style={{
+                        fontSize: '1.8em',
+                        fontWeight: 'bold',
+                        marginBottom: '16px',
+                        marginTop: '24px',
+                        color: 'var(--ion-color-primary)',
+                        borderBottom: '2px solid var(--ion-color-primary-tint)',
+                        paddingBottom: '8px'
+                      }}>
+                        {children}
+                      </h1>
+                    ),
+                    h2: ({ children }) => (
+                      <h2 style={{
+                        fontSize: '1.5em',
+                        fontWeight: 'bold',
+                        marginBottom: '12px',
+                        marginTop: '20px',
+                        color: 'var(--ion-color-primary)'
+                      }}>
+                        {children}
+                      </h2>
+                    ),
+                    h3: ({ children }) => (
+                      <h3 style={{
+                        fontSize: '1.3em',
+                        fontWeight: 'bold',
+                        marginBottom: '10px',
+                        marginTop: '16px',
+                        color: 'var(--ion-color-primary)'
+                      }}>
+                        {children}
+                      </h3>
+                    ),
+                    ul: ({ children }) => (
+                      <ul style={{
+                        marginBottom: '12px',
+                        paddingLeft: '20px'
+                      }}>
+                        {children}
+                      </ul>
+                    ),
+                    li: ({ children }) => (
+                      <li style={{
+                        marginBottom: '4px',
+                        lineHeight: '1.5'
+                      }}>
+                        {children}
+                      </li>
+                    ),
+                  }}
+                >
+                  {requestEmailContent}
+                </ReactMarkdown>
               </div>
             </IonCardContent>
           </IonCard>

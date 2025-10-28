@@ -32,6 +32,7 @@ type Bid = {
   id: number;
   rfp_id: number;
   agent_id: number;
+  account_id: string; // UUID - references accounts table
   supplier_id?: number;
   artifact_submission_id?: string; // UUID reference to artifact submission (new schema)
   response?: Record<string, unknown>; // JSONB - contains supplier_info, response, submitted_at, form_version (legacy - use artifact_submission_id instead)

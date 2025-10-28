@@ -228,6 +228,19 @@ export class RFPService {
   static async createBid(bid: Partial<Bid>): Promise<Bid | null> {
     console.log('🔄 Creating bid with data:', JSON.stringify(bid, null, 2));
     
+    // Get the current user's account_id if not provided
+    let accountId = bid.account_id;
+    if (!accountId) {
+      const { data: accountData } = await supabase.rpc('get_user_account_id');
+      accountId = accountData;
+      console.log('🔑 Retrieved user account_id:', accountId);
+      
+      if (!accountId) {
+        console.error('❌ Could not retrieve user account_id');
+        return null;
+      }
+    }
+    
     // Extract supplier info from bid response to auto-create supplier profile if needed
     let supplierId = bid.supplier_id;
     
@@ -275,13 +288,17 @@ export class RFPService {
       }
     }
     
-    // Create the bid with supplier_id if we have one
-    const bidDataWithSupplier = { ...bid };
+    // Create the bid with account_id and supplier_id
+    const bidDataWithAccountAndSupplier = { 
+      ...bid,
+      account_id: accountId
+    };
     if (supplierId) {
-      bidDataWithSupplier.supplier_id = supplierId;
+      bidDataWithAccountAndSupplier.supplier_id = supplierId;
     }
     
-    const { data, error } = await supabase.from('bids').insert(bidDataWithSupplier).select().single();
+    console.log('📤 Submitting bid with account_id:', accountId);
+    const { data, error } = await supabase.from('bids').insert(bidDataWithAccountAndSupplier).select().single();
     if (error) {
       console.error('❌ Supabase error creating bid:', JSON.stringify(error, null, 2));
       console.error('Error message:', error.message);

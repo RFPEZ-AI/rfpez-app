@@ -28,15 +28,18 @@ export const IonTextWidget: React.FC<WidgetProps> = ({
   onFocus,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   options,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   schema,
   disabled,
   readonly,
   placeholder
 }) => {
+  // Determine input type - check if schema specifies email format
+  const inputType = schema?.format === 'email' ? 'email' : 'text';
+  
   return (
     <IonInput
       id={id}
+      type={inputType}
       value={value ?? ''}
       placeholder={placeholder}
       aria-labelledby={`${id}-label`}
@@ -45,6 +48,16 @@ export const IonTextWidget: React.FC<WidgetProps> = ({
       onIonBlur={() => onBlur && onBlur(id, value)}
       onIonFocus={() => onFocus && onFocus(id, value)}
       fill="outline"
+      className="ion-input-no-autofill"
+      autocomplete="new-password"
+      style={{
+        '--background': 'var(--ion-background-color, #fff)',
+        '--color': 'var(--ion-text-color)',
+        '--padding-start': '12px',
+        '--padding-end': '12px',
+        '--padding-top': '8px',
+        '--padding-bottom': '8px'
+      } as React.CSSProperties}
     />
   );
 };
@@ -81,6 +94,12 @@ export const IonNumberWidget: React.FC<WidgetProps> = ({
       onIonBlur={() => onBlur && onBlur(id, value)}
       onIonFocus={() => onFocus && onFocus(id, value)}
       fill="outline"
+      style={{
+        '--padding-start': '12px',
+        '--padding-end': '12px',
+        '--padding-top': '8px',
+        '--padding-bottom': '8px'
+      } as React.CSSProperties}
     />
   );
 };
@@ -110,6 +129,12 @@ export const IonTextareaWidget: React.FC<WidgetProps> = ({
       onIonFocus={() => onFocus && onFocus(id, value)}
       fill="outline"
       autoGrow
+      style={{
+        '--padding-start': '12px',
+        '--padding-end': '12px',
+        '--padding-top': '8px',
+        '--padding-bottom': '8px'
+      } as React.CSSProperties}
     />
   );
 };
@@ -309,6 +334,7 @@ export const IonArrayWidget: React.FC<WidgetProps> = ({
 // Widget Registry for RJSF
 export const ionicWidgets = {
   TextWidget: IonTextWidget,
+  EmailWidget: IonTextWidget, // Use IonTextWidget for email fields
   NumberWidget: IonNumberWidget,
   TextareaWidget: IonTextareaWidget,
   SelectWidget: IonSelectWidget,
