@@ -9,7 +9,10 @@ import type { Agent } from '../types/database';
 jest.mock('../supabaseClient', () => ({
   supabase: {
     from: jest.fn(),
-    rpc: jest.fn()
+    rpc: jest.fn(),
+    auth: {
+      getUser: jest.fn()
+    }
   }
 }));
 
@@ -206,10 +209,88 @@ describe('AgentService', () => {
   });
 
   describe('getDefaultAgent', () => {
-    it('should return the default agent', async () => {
+    it('should return RFP Design agent for authenticated users', async () => {
+      const rfpDesignAgent = mockAgents.find(agent => agent.name === 'RFP Design');
+      
+      // Mock authenticated user
+      mockSupabase.auth.getUser = jest.fn().mockResolvedValue({
+        data: { user: { id: 'test-user-id' } },
+        error: null
+      });
+      
+      // Mock RFP Design agent fetch
+      mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({
+                data: rfpDesignAgent,
+                error: null
+              })
+            })
+          })
+        })
+      } as any);
+
+      const result = await AgentService.getDefaultAgent();
+
+      expect(result).toEqual(rfpDesignAgent);
+      expect(result?.name).toBe('RFP Design');
+    });
+
+    it('should return Solutions agent (default) for anonymous users', async () => {
       const defaultAgent = mockAgents.find(agent => agent.is_default);
       
+      // Mock anonymous user (no user)
+      mockSupabase.auth.getUser = jest.fn().mockResolvedValue({
+        data: { user: null },
+        error: null
+      });
+      
+      // Mock default agent fetch
       mockSupabase.from.mockReturnValue({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockResolvedValue({
+              data: [defaultAgent],
+              error: null
+            })
+          })
+        })
+      } as any);
+
+      const result = await AgentService.getDefaultAgent();
+
+      expect(result).toEqual(defaultAgent);
+      expect(result?.is_default).toBe(true);
+      expect(result?.name).toBe('Solutions');
+    });
+
+    it('should fallback to default agent if RFP Design agent not found for authenticated user', async () => {
+      const defaultAgent = mockAgents.find(agent => agent.is_default);
+      
+      // Mock authenticated user
+      mockSupabase.auth.getUser = jest.fn().mockResolvedValue({
+        data: { user: { id: 'test-user-id' } },
+        error: null
+      });
+      
+      // Mock RFP Design agent fetch failure
+      mockSupabase.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              single: jest.fn().mockResolvedValue({
+                data: null,
+                error: { message: 'RFP Design agent not found' }
+              })
+            })
+          })
+        })
+      } as any);
+
+      // Mock default agent fetch as fallback
+      mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
             eq: jest.fn().mockResolvedValue({
@@ -227,6 +308,12 @@ describe('AgentService', () => {
     });
 
     it('should fallback to first active agent if no default is set', async () => {
+      // Mock anonymous user
+      mockSupabase.auth.getUser = jest.fn().mockResolvedValue({
+        data: { user: null },
+        error: null
+      });
+      
       // Mock no default agent found - return error to trigger fallback
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({

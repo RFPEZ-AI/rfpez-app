@@ -150,10 +150,39 @@ export class AgentService {
 
   /**
    * Get the default agent
+   * For authenticated users: returns RFP Design agent
+   * For anonymous users: returns Solutions agent (marked as is_default)
    */
   static async getDefaultAgent(): Promise<Agent | null> {
     console.log('AgentService.getDefaultAgent called');
     
+    // Check if user is authenticated
+    const { data: { user } } = await supabase.auth.getUser();
+    const isAuthenticated = !!user;
+    
+    console.log('User authentication status:', isAuthenticated ? 'authenticated' : 'anonymous');
+    
+    // For authenticated users, return RFP Design agent
+    if (isAuthenticated) {
+      console.log('Fetching RFP Design agent for authenticated user');
+      const { data: rfpAgent, error: rfpError } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('is_active', true)
+        .eq('name', 'RFP Design')
+        .single();
+      
+      if (rfpError) {
+        console.error('Error fetching RFP Design agent:', rfpError);
+        // Fallback to default agent if RFP Design not found
+      } else if (rfpAgent) {
+        console.log('RFP Design agent fetched for authenticated user:', rfpAgent);
+        return rfpAgent;
+      }
+    }
+    
+    // For anonymous users or if RFP Design agent not found, return Solutions agent (is_default=true)
+    console.log('Fetching default agent (Solutions) for anonymous user or as fallback');
     const { data, error } = await supabase
       .from('agents')
       .select('*')

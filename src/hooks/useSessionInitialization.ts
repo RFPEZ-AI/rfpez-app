@@ -76,7 +76,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       clearUIState();
       clearArtifacts();
       
-      // Show loading message immediately
+      // Show loading message immediately (anonymous users get Solutions agent)
       setMessages([{
         id: 'agent-loading',
         content: '🤖 Activating Solutions agent...',
@@ -108,10 +108,10 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       console.log('Loading default agent for initial app startup (no sessions available to restore)...');
       console.log('🔍 Condition check: isAuthenticated:', isAuthenticated, 'needsSessionRestore:', needsSessionRestore, 'sessions.length:', sessions.length);
       
-      // Show loading message immediately
+      // Show loading message immediately (authenticated users get RFP Design agent)
       setMessages([{
         id: 'agent-loading',
-        content: '🤖 Activating Solutions agent...',
+        content: '🤖 Activating RFP Design agent...',
         isUser: false,
         timestamp: new Date(),
         agentName: 'System'

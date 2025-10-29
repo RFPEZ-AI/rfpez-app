@@ -1177,9 +1177,10 @@ const Home: React.FC = () => {
       
       // Show activation message while loading agent
       console.log('🎭 Showing agent activation message...');
+      const agentName = isAuthenticated ? 'RFP Design agent' : 'Solutions agent';
       setMessages([{
         id: 'agent-loading',
-        content: '🤖 Activating Solutions agent...',
+        content: `🤖 Activating ${agentName}...`,
         isUser: false,
         timestamp: new Date(),
         agentName: 'System'
