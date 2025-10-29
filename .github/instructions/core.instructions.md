@@ -68,9 +68,9 @@ echo "API Server:" && curl -s http://localhost:3001/health >/dev/null && echo "â
 - **3100**: React Development Server (VS Code Task)
 - **3001**: API Server (VS Code Task)
 - **3000**: Supabase MCP Server
-- **54321**: Local Supabase API
-- **54322**: Local PostgreSQL Database  
-- **54323**: Local Supabase Studio
+- **54121**: Local Supabase API (changed from 54321 to avoid Windows reserved ports)
+- **54122**: Local PostgreSQL Database (changed from 54322 to avoid Windows reserved ports)
+- **54123**: Local Supabase Studio (changed from 54323 to avoid Windows reserved ports)
 
 ### Troubleshooting Quick Fixes
 ```bash

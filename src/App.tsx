@@ -11,10 +11,11 @@ import DebugPage from './pages/DebugPage';
 import MCPTestComponent from './components/MCPTestComponent';
 import AgentManagementTest from './components/AgentManagementTest';
 import AgentAvatarDemo from './pages/AgentAvatarDemo';
-import { SupabaseProvider } from './context/SupabaseContext';
+import { SupabaseProvider, useSupabase } from './context/SupabaseContext';
 import OfflineNotification from './components/OfflineNotification';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
 import AuthDebugPanel from './components/AuthDebugPanel';
+import LoadingScreen from './components/LoadingScreen';
 
 /* Core CSS required for Ionic components to work properly */
 import '@ionic/react/css/core.css';
@@ -43,8 +44,42 @@ const RfpBidRedirect: React.FC = () => {
   return <Redirect to={`/bid/submit?rfp_id=${id}`} />;
 };
 
-const App: React.FC = () => {
+// Wrapper component to show loading screen while auth initializes
+const AppContent: React.FC = () => {
+  const { loading } = useSupabase();
   const [showAuthDebug, setShowAuthDebug] = useState(false);
+  const [minimumLoadTimeElapsed, setMinimumLoadTimeElapsed] = useState(false);
+  const [hasShownLoading, setHasShownLoading] = useState(false);
+
+  // Remove the initial HTML loading screen once React takes over
+  useEffect(() => {
+    console.log('⚛️ React App mounting - removing initial loading screen');
+    const initialScreen = document.getElementById('initial-loading-screen');
+    if (initialScreen) {
+      // Fade out the initial loading screen
+      initialScreen.classList.add('fade-out');
+      setTimeout(() => {
+        initialScreen.remove();
+        console.log('✅ Initial loading screen removed');
+      }, 300); // Match CSS transition duration
+    }
+  }, []);
+
+  // Ensure loading screen shows for at least 500ms for better UX
+  useEffect(() => {
+    if (loading && !hasShownLoading) {
+      console.log('🔄 Auth loading started - showing loading screen');
+      setHasShownLoading(true);
+      setMinimumLoadTimeElapsed(false);
+      
+      const timer = setTimeout(() => {
+        console.log('⏰ Minimum load time elapsed');
+        setMinimumLoadTimeElapsed(true);
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [loading, hasShownLoading]);
 
   useEffect(() => {
     // Add global keyboard shortcut for auth debug panel (Ctrl+Shift+D)
@@ -59,6 +94,42 @@ const App: React.FC = () => {
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+  
+  // Show loading screen while authentication is initializing OR minimum time hasn't elapsed
+  const shouldShowLoading = loading || (hasShownLoading && !minimumLoadTimeElapsed);
+  
+  if (shouldShowLoading) {
+    console.log('📺 Displaying loading screen', { loading, minimumLoadTimeElapsed, hasShownLoading });
+    return <LoadingScreen message="Initializing..." />;
+  }
+  
+  console.log('✅ Loading complete - showing app content');
+  
+  return (
+    <>
+      <IonRouterOutlet>
+        <Route exact path="/home" component={Home} />
+        <Route path="/bid/submit" component={BidSubmissionPage} />
+        <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
+        <Route exact path="/test/rjsf" component={RjsfTestPage} />
+        <Route exact path="/debug" component={DebugPage} />
+        <Route exact path="/debug/avatars" component={AgentAvatarDemo} />
+        <Route exact path="/test/agent-management" component={AgentManagementTest} />
+        <Route exact path="/mcp-test" component={MCPTestComponent} />
+        <Route exact path="/callback" component={Home} />
+        <Route exact path="/" render={() => <Redirect to="/home" />} />
+      </IonRouterOutlet>
+      <OfflineNotification />
+      <PWAUpdatePrompt />
+      <AuthDebugPanel 
+        isOpen={showAuthDebug} 
+        onClose={() => setShowAuthDebug(false)} 
+      />
+    </>
+  );
+};
+
+const App: React.FC = () => {
 
   // Fix ARIA accessibility issue - prevent aria-hidden on focused elements
   useEffect(() => {
@@ -87,27 +158,10 @@ const App: React.FC = () => {
     <SupabaseProvider>
       <IonApp>
         <IonReactRouter>
-          <IonRouterOutlet>
-          <Route exact path="/home" component={Home} />
-          <Route path="/bid/submit" component={BidSubmissionPage} />
-          <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
-          <Route exact path="/test/rjsf" component={RjsfTestPage} />
-          <Route exact path="/debug" component={DebugPage} />
-          <Route exact path="/debug/avatars" component={AgentAvatarDemo} />
-          <Route exact path="/test/agent-management" component={AgentManagementTest} />
-          <Route exact path="/mcp-test" component={MCPTestComponent} />
-          <Route exact path="/callback" component={Home} />
-          <Route exact path="/" render={() => <Redirect to="/home" />} />
-        </IonRouterOutlet>
-      </IonReactRouter>
-      <OfflineNotification />
-      <PWAUpdatePrompt />
-      <AuthDebugPanel 
-        isOpen={showAuthDebug} 
-        onClose={() => setShowAuthDebug(false)} 
-      />
-    </IonApp>
-  </SupabaseProvider>
+          <AppContent />
+        </IonReactRouter>
+      </IonApp>
+    </SupabaseProvider>
   );
 };
 

@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
-import { IonContent, IonPage } from '@ionic/react';
+import { IonContent, IonPage, IonSpinner } from '@ionic/react';
 import { useHistory } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
 import DatabaseService from '../services/database';
@@ -393,44 +393,43 @@ const Home: React.FC = () => {
       console.warn('⚠️ Failed to save current session to user profile:', error);
     }
 
-    // Load session with context (RFP and artifact context)
-    try {
-      console.log('🔍 LOADING SESSION CONTEXT for sessionId:', sessionId);
-      const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
-      console.log('🔍 SESSION CONTEXT LOADED:', {
-        hasSession: !!sessionWithContext,
-        sessionId: sessionWithContext?.id,
-        currentRfpId: sessionWithContext?.current_rfp_id,
-        currentArtifactId: sessionWithContext?.current_artifact_id,
-        fullContext: sessionWithContext
-      });
-      
-      // Restore RFP context if it exists
-      if (sessionWithContext?.current_rfp_id) {
-        console.log('🎯 RESTORING RFP CONTEXT from session:', sessionWithContext.current_rfp_id);
-        try {
-          // FIXED: Set as global RFP context so UI components update properly
-          await handleSetCurrentRfp(sessionWithContext.current_rfp_id, undefined, true);
-          console.log('✅ RFP context restoration completed as GLOBAL context');
-        } catch (rfpError) {
-          console.error('❌ RFP context restoration FAILED:', rfpError);
-        }
-      } else {
-        console.log('📝 NO RFP CONTEXT found in session - checking if any RFPs exist for fallback');
-        // TODO: Add fallback to find the most recent RFP for this session
+    // ⚡ OPTIMIZATION: Load session data in parallel for faster restoration
+    console.log('⚡ Starting parallel session data loading...');
+    const loadStartTime = Date.now();
+    
+    // Load all session data in parallel
+    const [sessionWithContext, sessionArtifacts] = await Promise.all([
+      DatabaseService.getSessionWithContext(sessionId).catch(error => {
+        console.warn('⚠️ Failed to load session context:', error);
+        return null;
+      }),
+      loadSessionArtifacts(sessionId),
+      loadSessionMessages(sessionId),
+      loadSessionAgent(sessionId),
+      loadToolInvocationsForSession(sessionId)
+    ]);
+    
+    const loadTime = Date.now() - loadStartTime;
+    console.log(`✅ Parallel loading completed in ${loadTime}ms`);
+    
+    // Restore RFP context if it exists
+    if (sessionWithContext?.current_rfp_id) {
+      console.log('🎯 RESTORING RFP CONTEXT from session:', sessionWithContext.current_rfp_id);
+      try {
+        // FIXED: Set as global RFP context so UI components update properly
+        await handleSetCurrentRfp(sessionWithContext.current_rfp_id, undefined, true);
+        console.log('✅ RFP context restoration completed as GLOBAL context');
+      } catch (rfpError) {
+        console.error('❌ RFP context restoration FAILED:', rfpError);
       }
-      
-      // Note: Artifact context will be restored below when loading session artifacts
-      if (sessionWithContext?.current_artifact_id) {
-        console.log('📄 Session has artifact context:', sessionWithContext.current_artifact_id);
-      }
-    } catch (error) {
-      console.warn('⚠️ Failed to load session context:', error);
+    } else {
+      console.log('📝 NO RFP CONTEXT found in session');
     }
     
-    await loadSessionMessages(sessionId);
-    await loadSessionAgent(sessionId);
-    const sessionArtifacts = await loadSessionArtifacts(sessionId);
+    // Note artifact context
+    if (sessionWithContext?.current_artifact_id) {
+      console.log('📄 Session has artifact context:', sessionWithContext.current_artifact_id);
+    }
     
     // Trigger scroll to bottom after session is fully loaded
     setForceScrollToBottom(true);
@@ -440,11 +439,7 @@ const Home: React.FC = () => {
     // Reset session loading flag and trigger input focus after session is loaded
     setTimeout(() => setIsSessionLoading(false), 200);
     
-    // Load tool invocations for this session
-    loadToolInvocationsForSession(sessionId);
-    
     // Try to restore the session's current artifact first, then fall back to saved or most recent
-    const sessionWithContext = await DatabaseService.getSessionWithContext(sessionId);
     let artifactToSelect = sessionWithContext?.current_artifact_id;
     
     if (!artifactToSelect || !sessionArtifacts?.some(a => a.id === artifactToSelect)) {
@@ -2031,6 +2026,54 @@ const Home: React.FC = () => {
     }
   };
 
+  // Show loading screen while session is being restored
+  // Show loading if:
+  // 1. needsSessionRestore has a session ID (string)
+  // 2. OR needsSessionRestore is undefined (still checking database) AND we have sessions
+  const shouldShowSessionLoading = (
+    (typeof needsSessionRestore === 'string' && sessions.length > 0) ||
+    (needsSessionRestore === undefined && sessions.length > 0)
+  );
+  
+  if (shouldShowSessionLoading) {
+    console.log('📺 Showing session restoration loading screen', {
+      needsSessionRestore,
+      sessionsCount: sessions.length
+    });
+    
+    return (
+      <IonPage>
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          justifyContent: 'center',
+          height: '100vh',
+          backgroundColor: 'var(--ion-background-color, #ffffff)'
+        }}>
+          <IonSpinner 
+            name="crescent" 
+            style={{ 
+              width: '48px', 
+              height: '48px',
+              color: 'var(--ion-color-primary, #3880ff)',
+              marginBottom: '20px'
+            }} 
+          />
+          <div style={{ fontSize: '16px', color: 'var(--ion-color-medium, #666)', fontWeight: 500 }}>
+            Restoring your session...
+          </div>
+        </div>
+      </IonPage>
+    );
+  }
+  
+  console.log('✅ No loading needed - rendering main app', {
+    needsSessionRestore,
+    sessionsCount: sessions.length,
+    supabaseLoading
+  });
+  
   return (
     <IonPage>
       <HomeHeader

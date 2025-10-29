@@ -61,7 +61,7 @@ The current goal is to get the product demo ready following the instructions in 
 ```bash
 # Environment Status Check
 echo "Current Supabase Config:" && grep -E "REACT_APP_SUPABASE_URL|REACT_APP_SUPABASE_ANON_KEY" .env.local
-# Local: 127.0.0.1:54321 | Remote: jxlutaztoukwbbgtoulc.supabase.co
+# Local: 127.0.0.1:54121 | Remote: jxlutaztoukwbbgtoulc.supabase.co
 
 # Server Management (Use VS Code Tasks ONLY)
 # Ctrl+Shift+P → "Tasks: Run Task" → Select:
@@ -112,9 +112,9 @@ echo "API Server:" && curl -s http://localhost:3001/health >/dev/null && echo "�
 - **3100**: React Development Server (VS Code Task)
 - **3001**: API Server (VS Code Task)
 - **3000**: Supabase MCP Server
-- **54321**: Local Supabase API
-- **54322**: Local PostgreSQL Database  
-- **54323**: Local Supabase Studio
+- **54121**: Local Supabase API (changed from 54321 to avoid Windows reserved ports)
+- **54122**: Local PostgreSQL Database (changed from 54322 to avoid Windows reserved ports)
+- **54123**: Local Supabase Studio (changed from 54323 to avoid Windows reserved ports)
 
 ### Troubleshooting Quick Fixes
 ```bash
@@ -166,7 +166,7 @@ SELECT id, name FROM agents WHERE name IN ('Solutions', 'RFP Design', 'Support')
 ```bash
 # 1. Start Local Supabase Stack (if not already running)
 supabase start
-# This starts: DB (54322), API (54321), Studio (54323)
+# This starts: DB (54122), API (54121), Studio (54123)
 
 # 2. Switch to Local Configuration
 # Use scripts: ./scripts/supabase-local.bat (Windows) or ./scripts/supabase-local.sh (Linux/Mac)
@@ -185,11 +185,11 @@ use VS Code task "Start Development Server" (Ctrl+Shift+P → Tasks: Run Task)
 # Or manually: docker start supabase_edge_runtime_rfpez-app-local
 
 # 2. Develop & Test Functions Locally
-supabase functions serve claude-api-v3  # Serves locally on port 54321
-# Test against local function endpoint: http://127.0.0.1:54321/functions/v1/claude-api-v3
+supabase functions serve claude-api-v3  # Serves locally on port 54121
+# Test against local function endpoint: http://127.0.0.1:54121/functions/v1/claude-api-v3
 
 # 3. Local Function Testing
-curl -X POST http://127.0.0.1:54321/functions/v1/claude-api-v3 \
+curl -X POST http://127.0.0.1:54121/functions/v1/claude-api-v3 \
   -H "Content-Type: application/json" \
   -d '{"test": "data"}'
 
@@ -224,7 +224,7 @@ supabase migration up  # Apply only pending migrations
 
 # 3. Test Changes Locally
 # - Run React app against local DB
-# - Execute test queries in local Studio (localhost:54323)
+# - Execute test queries in local Studio (localhost:54123)
 # - Validate RLS policies and permissions
 # - Verify existing data is preserved and migrations work incrementally
 
@@ -252,9 +252,9 @@ supabase migration repair  # If needed to sync migration state
 
 # Manual Configuration Check
 # LOCAL URLs:
-# - API: http://127.0.0.1:54321
-# - Studio: http://127.0.0.1:54323
-# - Database: localhost:54322
+# - API: http://127.0.0.1:54121
+# - Studio: http://127.0.0.1:54123
+# - Database: localhost:54122
 
 # REMOTE URLs:
 # - API: https://jxlutaztoukwbbgtoulc.supabase.co
@@ -266,7 +266,7 @@ supabase migration repair  # If needed to sync migration state
 # Sync Remote Data to Local (for testing with real data)
 supabase db pull  # Pull schema from remote
 supabase db dump --data-only > data.sql  # Export remote data
-psql -h 127.0.0.1 -p 54322 -U postgres -d postgres < data.sql  # Import to local
+psql -h 127.0.0.1 -p 54122 -U postgres -d postgres < data.sql  # Import to local
 
 # Sync Local Schema to Remote (after local development)
 supabase db push  # Push schema changes
