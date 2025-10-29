@@ -1,5 +1,54 @@
 # GitHub Copilot Instructions for RFPEZ.AI
 
+## 📋 Scoped Instruction Files
+
+This project uses **scoped instruction files** to reduce context size and improve Copilot performance. Instructions are automatically applied based on file type:
+
+### Active Instruction Files
+
+1. **core.instructions.md** (`applyTo: **`)
+   - Project overview and quick reference
+   - Environment configuration
+   - Essential commands
+   - Port usage and troubleshooting
+
+2. **architecture.instructions.md** (`applyTo: src/**/*.{ts,tsx}`)
+   - Service layer patterns
+   - Component structure
+   - Multi-agent system
+   - Coding conventions
+
+3. **database-deployment.instructions.md** (`applyTo: {supabase/**,scripts/**,.github/workflows/**}`)
+   - Local-first development workflow
+   - Database migrations
+   - Edge function deployment
+   - Agent instructions management
+
+4. **testing.instructions.md** (`applyTo: **/*.{test.ts,test.tsx,spec.ts}`)
+   - Testing patterns
+   - Unit and integration testing
+   - Pre-commit testing checklist
+
+5. **chrome-mcp-testing.instructions.md** (`applyTo: {**/test-automation/**,**/tests/**}`)
+   - Chrome MCP browser automation
+   - E2E testing workflows
+   - UI test identifiers
+
+6. **memory-mcp.instructions.md** (`applyTo: **`)
+   - Memory MCP integration
+   - Process tracking
+   - Workflow patterns
+
+---
+
+**ℹ️ Note:** Most detailed instructions are now in scoped files above. This main file contains essential quick reference information that applies globally. For specific topics:
+- Working with TypeScript/React code → See `architecture.instructions.md`
+- Database migrations or deployment → See `database-deployment.instructions.md`
+- Writing tests → See `testing.instructions.md` and `chrome-mcp-testing.instructions.md`
+- Process tracking → See `memory-mcp.instructions.md`
+
+---
+
 ## Project Overview
 RFPEZ.AI is a multi-agent RFP management platform with React/TypeScript frontend, Supabase backend, and Claude API integration via MCP (Model Context Protocol). The system features specialized AI agents for different RFP workflows.
 

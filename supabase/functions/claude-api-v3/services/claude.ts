@@ -862,8 +862,8 @@ export class ToolExecutionService {
             const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
             console.log('🔍 Environment detection - SUPABASE_URL:', supabaseUrl);
             
-            // Check if running locally (127.0.0.1 or localhost in Supabase URL)
-            if (supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost')) {
+            // Check if running locally (127.0.0.1, localhost, or internal kong URL)
+            if (supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost') || supabaseUrl.includes('kong:')) {
               baseUrl = 'http://localhost:3100';
               console.log('📍 Detected LOCAL environment');
             } else {
