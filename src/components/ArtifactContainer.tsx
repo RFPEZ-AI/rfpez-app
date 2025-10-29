@@ -21,17 +21,10 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   currentRfpId,
   onArtifactSelect
 }) => {
-  // State management - Use aspect ratio with threshold for reliable orientation detection
+  // State management - Use consistent detection with useIsMobile hook (768px threshold)
+  // Portrait mode = narrow viewport (same as mobile detection)
   const [isPortrait, setIsPortrait] = useState<boolean>(() => {
-    const aspectRatio = window.innerWidth / window.innerHeight;
-    const mediaQuery = window.matchMedia('(orientation: portrait)').matches;
-    
-    // Use aspect ratio as primary, media query as secondary
-    // Aspect ratio < 1 is definitely portrait
-    // If aspect ratio is close to 1 (0.9-1.1), use media query
-    if (aspectRatio < 0.9) return true;   // Clearly portrait
-    if (aspectRatio > 1.1) return false;  // Clearly landscape
-    return mediaQuery;  // Use media query for edge cases
+    return window.innerWidth <= 768;
   });
   const [isFullScreen, setIsFullScreen] = useState<boolean>(false);
   const [portraitHeight, setPortraitHeight] = useState<number>(40);
@@ -41,28 +34,16 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   // Type detection
   const typeDetection = useArtifactTypeDetection(artifact);
 
-  // Listen for window resize to update aspect ratio detection
+  // Listen for window resize - use same threshold as useIsMobile (768px)
   useEffect(() => {
     const handleResize = () => {
-      const aspectRatio = window.innerWidth / window.innerHeight;
-      const mediaQuery = window.matchMedia('(orientation: portrait)').matches;
-      
-      // Use aspect ratio thresholds to avoid false positives from zoom/DevTools
-      if (aspectRatio < 0.9) {
-        setIsPortrait(true);   // Clearly portrait
-      } else if (aspectRatio > 1.1) {
-        setIsPortrait(false);  // Clearly landscape
-      } else {
-        setIsPortrait(mediaQuery);  // Use media query for edge cases
-      }
+      setIsPortrait(window.innerWidth <= 768);
     };
 
     window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
     
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
     };
   }, []);
 

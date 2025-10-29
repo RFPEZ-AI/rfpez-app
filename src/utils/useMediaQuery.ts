@@ -46,12 +46,20 @@ export const useIsMobileCSS = (): boolean => {
  * Ionic-based hook to detect mobile devices including DevTools simulation
  * Detects Android, iOS, or mobileweb (DevTools device simulation)
  * Falls back to viewport width detection for DevTools compatibility
+ * Uses hysteresis to prevent rapid layout switching during resize
  * @returns boolean indicating if running on mobile device or mobile simulation
  */
 export const useIsMobile = (): boolean => {
   const [isMobileDevice, setIsMobileDevice] = useState(false);
 
   useEffect(() => {
+    // Hysteresis thresholds to prevent layout flickering
+    // Switch to mobile when going below 768px
+    // Switch to desktop when going above 900px
+    // This creates a "sticky" zone between 768-900px that maintains current layout
+    const MOBILE_THRESHOLD = 768;
+    const DESKTOP_THRESHOLD = 900;
+    
     const checkMobile = () => {
       const platforms = getPlatforms();
       const ionicMobileDetection =
@@ -62,40 +70,65 @@ export const useIsMobile = (): boolean => {
         isPlatform('ios') ||
         isPlatform('mobileweb');
       
-      // Fallback: Check user agent for mobile indicators and viewport width
+      // Fallback: Check user agent for mobile indicators
       const userAgent = navigator.userAgent.toLowerCase();
       const isMobileUserAgent = /android|iphone|ipod|ipad|mobile|blackberry|iemobile|opera mini/i.test(userAgent);
-      const isMobileViewport = window.innerWidth <= 768;
       
-      // Consider mobile if Ionic detects it OR if user agent suggests mobile OR if viewport is narrow
-      const result = ionicMobileDetection || isMobileUserAgent || isMobileViewport;
+      // Get viewport width for final determination
+      const width = window.innerWidth;
       
-      setIsMobileDevice(result);
+      // If Ionic/UA detects mobile BUT viewport is wide (e.g., tablet landscape, DevTools),
+      // use viewport width thresholds instead of forcing mobile layout
+      // This handles VS Code Simple Browser and DevTools device emulation correctly
+      if (ionicMobileDetection || isMobileUserAgent) {
+        // For tablet/mobile devices: Use viewport width to determine layout
+        // Tablets in landscape at wide resolution should use desktop layout
+        setIsMobileDevice(prevIsMobile => {
+          if (prevIsMobile) {
+            return width <= DESKTOP_THRESHOLD;
+          }
+          return width <= MOBILE_THRESHOLD;
+        });
+        return;
+      }
+      
+      // For desktop/browser: Use hysteresis to prevent rapid layout switching
+      
+      setIsMobileDevice(prevIsMobile => {
+        // If currently in mobile mode, only switch to desktop if width exceeds desktop threshold
+        if (prevIsMobile) {
+          return width <= DESKTOP_THRESHOLD;
+        }
+        // If currently in desktop mode, only switch to mobile if width falls below mobile threshold
+        return width <= MOBILE_THRESHOLD;
+      });
       
       // Debug logging
       console.log('🔍 Mobile detection:', {
         platforms,
-        isPlatformAndroid: isPlatform('android'),
-        isPlatformIOS: isPlatform('ios'),
-        isPlatformMobileWeb: isPlatform('mobileweb'),
         ionicMobileDetection,
         isMobileUserAgent,
-        isMobileViewport,
-        windowWidth: window.innerWidth,
-        userAgent: userAgent.substring(0, 100) + '...',
-        finalResult: result
+        windowWidth: width,
+        currentState: isMobileDevice,
+        thresholds: { mobile: MOBILE_THRESHOLD, desktop: DESKTOP_THRESHOLD }
       });
     };
 
     checkMobile();
     
     // Recheck on window resize to catch DevTools viewport changes
+    // Debounced to reduce excessive recalculations
+    let resizeTimeout: NodeJS.Timeout;
     const handleResize = () => {
-      setTimeout(checkMobile, 100); // Small delay to let Ionic recalculate
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(checkMobile, 150); // Slightly longer delay for smoother transitions
     };
     
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(resizeTimeout);
+    };
   }, []);
 
   return isMobileDevice;

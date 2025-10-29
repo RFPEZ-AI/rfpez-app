@@ -796,34 +796,38 @@ WHERE type = 'form'
 ORDER BY created_at DESC LIMIT 5;
 ```
 
-#### **MCP Browser Access for Log Inspection**
+#### **Chrome MCP Browser Access for Log Inspection**
 **Example Code Pattern (for reference only):**
 ```javascript
-// Example: Use MCP browser tools to access Supabase Dashboard logs
+// Example: Use official Chrome MCP tools to access Supabase Dashboard logs
 // Note: These are examples for documentation purposes only
 
 // 1. Navigate to Supabase Dashboard
-// await mcp_browser_navigate({ 
-//   url: 'https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc/logs/edge-functions' 
+// chrome_navigate({ 
+//   url: 'https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc/logs/edge-functions',
+//   width: 1920,
+//   height: 1080
 // });
 
 // 2. Access Edge Function Logs via Browser
-// await mcp_browser_click({ element: 'claude-api-v3 function', ref: '[function-link]' });
-// await mcp_browser_screenshot(); // Capture current log state
+// chrome_click_element({ selector: '[data-function="claude-api-v3"]' });
+// chrome_screenshot({ name: 'edge-function-logs', fullPage: true });
 
 // 3. Browser Console Access for Client-side Errors
-// const consoleLogs = await mcp_browser_get_console_logs();
-// Check for JavaScript errors, network failures, API call issues
+// Use Chrome DevTools for JavaScript errors, network failures, API call issues
+// chrome_network_capture_start({ maxCaptureTime: 30000 });
+// ... perform actions ...
+// const networkData = chrome_network_capture_stop();
 
 // 4. Real-time Log Monitoring
-// Use browser automation to refresh logs page and capture new entries
+// Use chrome_screenshot and chrome_get_web_content to capture log entries
 // Useful when supabase CLI logs are not accessible or delayed
 ```
 
 #### **Logging Best Practices**
 - **Edge Functions**: Use `console.log()` for debugging info, `console.error()` for errors
 - **Database Issues**: Use direct SQL queries via `mcp_supabase-offi_execute_sql` instead of MCP tools
-- **Client-side Debugging**: Use browser MCP tools to access console logs and network requests
+- **Client-side Debugging**: Use Chrome MCP tools to access console logs and network requests
 - **Log Timing**: Edge function logs appear immediately in local serve, may have delays in remote
 - **Error Context**: Always include session_id, user_id, and timestamp context in logs
 
@@ -831,8 +835,8 @@ ORDER BY created_at DESC LIMIT 5;
 1. **Local First**: Always debug with local Supabase stack when possible
 2. **Function Logs**: Check edge function logs via `supabase functions serve --debug`
 3. **Database State**: Use direct SQL to verify data integrity and relationships
-4. **Browser Inspection**: Use MCP browser tools for dashboard access and console monitoring
-5. **Network Analysis**: Monitor API calls and responses through browser dev tools via MCP
+4. **Browser Inspection**: Use Chrome MCP tools for dashboard access and console monitoring
+5. **Network Analysis**: Monitor API calls and responses using `chrome_network_capture_*` tools
 6. **Schema Validation**: Verify JSON Schema structure and transformation in database
 
 ### Memory MCP Integration
