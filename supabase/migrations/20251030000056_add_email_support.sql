@@ -2,12 +2,9 @@
 -- Copyright Mark Skiba, 2025 All rights reserved
 -- Adds Gmail API integration support with OAuth credentials and email tracking
 
--- Enable uuid-ossp extension for UUID generation
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
 -- Store user Gmail credentials
 CREATE TABLE IF NOT EXISTS user_email_credentials (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   email_address TEXT NOT NULL,
   provider TEXT NOT NULL DEFAULT 'gmail',
@@ -37,7 +34,7 @@ CREATE POLICY user_email_credentials_delete ON user_email_credentials
 
 -- Email tracking table
 CREATE TABLE IF NOT EXISTS email_messages (
-  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID NOT NULL REFERENCES auth.users(id) ON DELETE CASCADE,
   session_id UUID REFERENCES sessions(id) ON DELETE SET NULL,
   rfp_id INTEGER REFERENCES rfps(id) ON DELETE SET NULL,
