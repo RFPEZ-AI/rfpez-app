@@ -3,10 +3,12 @@
 import React, { useState, useEffect } from 'react';
 import { IonContent, IonPage, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonItem, IonLabel, IonInput, IonText, IonSpinner } from '@ionic/react';
 import { useSupabase } from '../context/SupabaseContext';
-import { initiateGmailOAuth } from '../services/gmailAuthService';
+import { GmailAuthService } from '../services/gmailAuthService';
+import { supabase } from '../supabaseClient';
 
 const GmailOAuth: React.FC = () => {
   const { user } = useSupabase();
+  const [gmailService] = useState(() => new GmailAuthService(supabase));
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState('');
   const [credentials, setCredentials] = useState<any>(null);
@@ -52,7 +54,7 @@ const GmailOAuth: React.FC = () => {
     setMessage('Initiating OAuth flow...');
 
     try {
-      await initiateGmailOAuth(user.id);
+      await gmailService.initiateAuth(user.id);
       setMessage('Redirecting to Google...');
     } catch (error) {
       console.error('OAuth initiation failed:', error);
