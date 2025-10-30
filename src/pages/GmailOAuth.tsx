@@ -1,4 +1,5 @@
 // Copyright Mark Skiba, 2025 All rights reserved
+// Gmail OAuth integration page - v1.1
 
 import React, { useState, useEffect } from 'react';
 import { IonContent, IonPage, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonItem, IonLabel, IonInput, IonText, IonSpinner } from '@ionic/react';
