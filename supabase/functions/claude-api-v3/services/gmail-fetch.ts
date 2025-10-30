@@ -189,10 +189,9 @@ export class GmailFetchService {
 
     console.log(`📧 SEND_EMAIL: Preparing to send email to: ${message.to.join(', ')}`);
 
-    // Set default "from" address to agent@rfpez.ai if not specified
-    if (!message.from) {
-      message.from = 'RFPEZ Agent <agent@rfpez.ai>';
-    }
+    // Always use agent@rfpez.ai as the "from" address
+    message.from = 'RFPEZ Agent <agent@rfpez.ai>';
+    console.log(`📧 SEND_EMAIL: Using from address: ${message.from}`);
 
     // Create MIME message
     const mimeMessage = this.createMimeMessage(message);
