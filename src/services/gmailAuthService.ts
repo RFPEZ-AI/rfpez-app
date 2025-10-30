@@ -43,7 +43,9 @@ export class GmailAuthService {
     this.supabase = supabase;
     // Reuse existing Google OAuth credentials from authentication setup
     this.clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
-    this.redirectUri = `${window.location.origin}/api/gmail-oauth-callback`;
+    // Redirect URI should point to the Supabase Edge Function, not the React app
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
+    this.redirectUri = `${supabaseUrl}/functions/v1/gmail-oauth-callback`;
 
     if (!this.clientId) {
       console.warn('GOOGLE_CLIENT_ID not configured - Gmail integration requires Google OAuth credentials');
