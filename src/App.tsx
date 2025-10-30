@@ -8,6 +8,7 @@ import Home from './pages/Home';
 import BidSubmissionPage from './pages/BidSubmissionPage';
 import RjsfTestPage from './pages/RjsfTestPage';
 import DebugPage from './pages/DebugPage';
+import GmailOAuth from './pages/GmailOAuth';
 import MCPTestComponent from './components/MCPTestComponent';
 import AgentManagementTest from './components/AgentManagementTest';
 import AgentAvatarDemo from './pages/AgentAvatarDemo';
@@ -112,6 +113,7 @@ const AppContent: React.FC = () => {
         <Route path="/bid/submit" component={BidSubmissionPage} />
         <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
         <Route exact path="/test/rjsf" component={RjsfTestPage} />
+        <Route exact path="/test/gmail-oauth" component={GmailOAuth} />
         <Route exact path="/debug" component={DebugPage} />
         <Route exact path="/debug/avatars" component={AgentAvatarDemo} />
         <Route exact path="/test/agent-management" component={AgentManagementTest} />

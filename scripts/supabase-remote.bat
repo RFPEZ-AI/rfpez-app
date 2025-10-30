@@ -1,7 +1,7 @@
 @echo off
 
 ECHO - dont' switch to remote accideentally
-EXIT 
+REM EXIT 
 REM Windows batch script to switch to Supabase REMOTE production
 echo 🔄 Switching to Supabase REMOTE production...
 
@@ -32,23 +32,4 @@ echo WDS_SOCKET_PORT=3100
 echo FAST_REFRESH=true
 ) > .env.local
 
-REM Update MCP configuration for remote production
-echo 🔧 Updating MCP configuration for REMOTE...
-
-REM Update MCP configuration using Node.js script
-node -e "const fs=require('fs'); let content=fs.readFileSync('.vscode/mcp.json','utf8'); content=content.replace(/\/\*\s*(\"supabase-remote\")/gm,'    $1').replace(/(\"supabase-remote\"[\s\S]*?)(},)\s*\*\//gm,'$1$2').replace(/^(\s*)(\"supabase-local\")/gm,'$1/*     $2').replace(/(\"supabase-local\"[\s\S]*?)(},)/gm,'$1$2 */'); fs.writeFileSync('.vscode/mcp.json',content); console.log('✅ MCP configuration updated for REMOTE');"
-
-echo ✅ Switched to REMOTE Supabase
-echo 🔗 Remote Supabase URLs:
-echo   - API: https://jxlutaztoukwbbgtoulc.supabase.co
-echo   - Studio: https://supabase.com/dashboard/project/jxlutaztoukwbbgtoulc
-echo.
-echo � MCP Configuration: supabase-remote ACTIVE, supabase-local INACTIVE
-echo �💡 Restart your React app to connect to remote Supabase
-
-set /p answer="❓ Stop local Supabase stack? (y/N): "
-if /i "%answer:~,1%" EQU "y" (
-    echo 🛑 Stopping local Supabase...
-    supabase stop
-)
 pause
