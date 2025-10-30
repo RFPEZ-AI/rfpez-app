@@ -179,25 +179,34 @@ serve(async (req: Request) => {
 
     console.log('Credentials stored successfully');
 
+    // Determine app URL based on environment
+    const appUrl = supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost')
+      ? 'http://localhost:3100'  // Local development
+      : 'https://dev.rfpez.ai';   // Production
+    
     // Redirect back to app with success
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': `${url.origin}/settings?gmail_connected=true&email=${encodeURIComponent(userInfo.email)}`,
+        'Location': `${appUrl}/settings?gmail_connected=true&email=${encodeURIComponent(userInfo.email)}`,
       },
     });
 
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Redirect back to app with error
-    const url = new URL(req.url);
+    // Determine app URL based on environment
+    const supabaseUrlForError = Deno.env.get('SUPABASE_URL') || '';
+    const appUrl = supabaseUrlForError.includes('127.0.0.1') || supabaseUrlForError.includes('localhost')
+      ? 'http://localhost:3100'  // Local development
+      : 'https://dev.rfpez.ai';   // Production
+    
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     
     return new Response(null, {
       status: 302,
       headers: {
-        'Location': `${url.origin}/settings?gmail_error=${encodeURIComponent(errorMessage)}`,
+        'Location': `${appUrl}/settings?gmail_error=${encodeURIComponent(errorMessage)}`,
       },
     });
   }
