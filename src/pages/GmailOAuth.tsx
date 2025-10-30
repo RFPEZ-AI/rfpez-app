@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { IonContent, IonPage, IonButton, IonCard, IonCardContent, IonCardHeader, IonCardTitle, IonItem, IonLabel, IonInput, IonText, IonSpinner } from '@ionic/react';
-import { useSupabase } from '../contexts/SupabaseContext';
+import { useSupabase } from '../context/SupabaseContext';
 import { initiateGmailOAuth } from '../services/gmailAuthService';
 
 const GmailOAuth: React.FC = () => {
