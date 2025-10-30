@@ -2,6 +2,9 @@
 -- Copyright Mark Skiba, 2025 All rights reserved
 -- Adds Gmail API integration support with OAuth credentials and email tracking
 
+-- Enable uuid-ossp extension for UUID generation
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 -- Store user Gmail credentials
 CREATE TABLE IF NOT EXISTS user_email_credentials (
   id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
