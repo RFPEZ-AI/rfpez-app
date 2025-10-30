@@ -978,6 +978,46 @@ export class ToolExecutionService {
           return reasonResult as ToolResult;
         }
 
+        case 'send_email': {
+          const { sendEmail } = await import('../tools/email.ts');
+          this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
+          const emailResult = await sendEmail(
+            this.supabase,
+            this.userId,
+            {
+              ...input as any,
+              session_id: sessionId,
+              agent_id: agentId
+            }
+          );
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, emailResult);
+          return emailResult;
+        }
+
+        case 'search_emails': {
+          const { searchEmails } = await import('../tools/email.ts');
+          this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
+          const searchResult = await searchEmails(this.supabase, this.userId, input as any);
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, searchResult);
+          return searchResult;
+        }
+
+        case 'get_email': {
+          const { getEmail } = await import('../tools/email.ts');
+          this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
+          const getResult = await getEmail(this.supabase, this.userId, input as any);
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, getResult);
+          return getResult;
+        }
+
+        case 'list_recent_emails': {
+          const { listRecentEmails } = await import('../tools/email.ts');
+          this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
+          const listResult = await listRecentEmails(this.supabase, this.userId, input as any);
+          this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, listResult);
+          return listResult;
+        }
+
         default: {
           console.log(`Unknown tool: ${name}`);
           const unknownResult = {

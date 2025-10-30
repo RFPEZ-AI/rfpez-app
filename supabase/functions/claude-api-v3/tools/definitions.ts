@@ -657,6 +657,103 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       },
       required: ['query']
     }
+  },
+  {
+    name: 'send_email',
+    description: 'Send an email via Gmail. CRITICAL: User must have authorized Gmail access first (check with list_recent_emails or search_emails first). Use this to send emails to suppliers, customers, or team members about RFPs, bids, or procurement activities. Always include a professional subject line and clear message body.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        to: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Array of recipient email addresses (e.g., ["supplier@company.com"])'
+        },
+        cc: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional CC recipients'
+        },
+        bcc: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional BCC recipients'
+        },
+        subject: {
+          type: 'string',
+          description: 'Email subject line (required, should be descriptive)'
+        },
+        body_text: {
+          type: 'string',
+          description: 'Plain text email body (required). Use professional tone with clear formatting.'
+        },
+        body_html: {
+          type: 'string',
+          description: 'Optional HTML email body (if provided, will be used alongside body_text for rich formatting)'
+        }
+      },
+      required: ['to', 'subject', 'body_text']
+    }
+  },
+  {
+    name: 'search_emails',
+    description: 'Search for emails in Gmail inbox related to current RFP, session, or specific query. Use this to find previous communications about a procurement topic, supplier responses, or specific email threads. Returns up to 20 emails with metadata.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Search query (e.g., "LED bulbs", "RFP response", "from:supplier@company.com", "subject:quote"). Supports Gmail search operators.'
+        },
+        max_results: {
+          type: 'number',
+          description: 'Maximum number of emails to return (default: 20, max: 50)',
+          default: 20
+        },
+        after_date: {
+          type: 'string',
+          description: 'Only emails after this date (YYYY-MM-DD format)'
+        },
+        before_date: {
+          type: 'string',
+          description: 'Only emails before this date (YYYY-MM-DD format)'
+        }
+      },
+      required: ['query']
+    }
+  },
+  {
+    name: 'get_email',
+    description: 'Retrieve a specific email by its Gmail message ID. Use this to read the full content of an email found via search_emails or list_recent_emails. Returns complete email details including headers, body, and metadata.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        message_id: {
+          type: 'string',
+          description: 'Gmail message ID (obtained from search_emails or list_recent_emails)'
+        }
+      },
+      required: ['message_id']
+    }
+  },
+  {
+    name: 'list_recent_emails',
+    description: 'List recent emails from Gmail inbox (last 50 by default). Use this to check what communications have come in recently, see unread messages, or verify Gmail connection. Good for checking if user has Gmail connected before attempting other email operations.',
+    input_schema: {
+      type: 'object' as const,
+      properties: {
+        max_results: {
+          type: 'number',
+          description: 'Maximum number of emails to return (default: 50)',
+          default: 50
+        },
+        label_ids: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Optional Gmail label IDs to filter by (default: ["INBOX"]). Common labels: "INBOX", "SENT", "UNREAD", "STARRED"'
+        }
+      }
+    }
   }
 ];
 

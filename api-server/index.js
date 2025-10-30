@@ -1,6 +1,15 @@
 const express = require('express');
 const cors = require('cors');
 const { v4: uuidv4 } = require('uuid');
+const path = require('path');
+const fs = require('fs');
+
+// Load environment variables from .env.local
+const envPath = path.join(__dirname, '..', '.env.local');
+if (fs.existsSync(envPath)) {
+  require('dotenv').config({ path: envPath });
+  console.log('✅ Loaded environment variables from .env.local');
+}
 
 const app = express();
 const PORT = process.env.PORT || 3001;
@@ -314,6 +323,142 @@ function generateAgentResponse(prompt, context) {
 
   return response;
 }
+
+// Gmail OAuth Callback Proxy
+// Forwards OAuth callback to Supabase edge function
+app.get('/api/gmail-oauth-callback', async (req, res) => {
+  try {
+    // Get Supabase URL from environment
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://jxlutaztoukwbbgtoulc.supabase.co';
+    const edgeFunctionUrl = `${supabaseUrl}/functions/v1/gmail-oauth-callback`;
+    
+    // Forward all query parameters to edge function
+    const queryString = new URLSearchParams(req.query).toString();
+    const targetUrl = `${edgeFunctionUrl}?${queryString}`;
+    
+    console.log(`📧 Proxying Gmail OAuth callback to: ${targetUrl}`);
+    
+    // Forward the request to Supabase edge function
+    const response = await fetch(targetUrl, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+    
+    const data = await response.json();
+    
+    if (response.ok) {
+      // Success - redirect to success page or close window
+      res.send(`
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <title>Gmail Connected</title>
+          <style>
+            body {
+              font-family: system-ui, -apple-system, sans-serif;
+              display: flex;
+              align-items: center;
+              justify-content: center;
+              height: 100vh;
+              margin: 0;
+              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+              color: white;
+            }
+            .success-box {
+              text-align: center;
+              background: rgba(255, 255, 255, 0.1);
+              backdrop-filter: blur(10px);
+              padding: 3rem;
+              border-radius: 20px;
+              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+            }
+            h1 { margin: 0 0 1rem 0; font-size: 2.5rem; }
+            p { margin: 0.5rem 0; font-size: 1.2rem; opacity: 0.9; }
+            .close-btn {
+              margin-top: 2rem;
+              padding: 0.75rem 2rem;
+              background: white;
+              color: #667eea;
+              border: none;
+              border-radius: 10px;
+              font-size: 1rem;
+              font-weight: 600;
+              cursor: pointer;
+              transition: transform 0.2s;
+            }
+            .close-btn:hover { transform: scale(1.05); }
+          </style>
+        </head>
+        <body>
+          <div class="success-box">
+            <h1>✅ Gmail Connected!</h1>
+            <p>Your Gmail account has been successfully connected.</p>
+            <p>You can now send and receive emails through agents.</p>
+            <button class="close-btn" onclick="window.close()">Close Window</button>
+          </div>
+          <script>
+            // Auto-close after 3 seconds
+            setTimeout(() => window.close(), 3000);
+          </script>
+        </body>
+        </html>
+      `);
+    } else {
+      // Error from edge function
+      throw new Error(data.error || 'Failed to connect Gmail account');
+    }
+  } catch (error) {
+    console.error('❌ Gmail OAuth callback error:', error);
+    res.status(500).send(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Connection Failed</title>
+        <style>
+          body {
+            font-family: system-ui, -apple-system, sans-serif;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            color: white;
+          }
+          .error-box {
+            text-align: center;
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            padding: 3rem;
+            border-radius: 20px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+          }
+          h1 { margin: 0 0 1rem 0; font-size: 2.5rem; }
+          p { margin: 0.5rem 0; font-size: 1.1rem; opacity: 0.9; }
+          .error-detail { 
+            margin-top: 1rem; 
+            padding: 1rem; 
+            background: rgba(0, 0, 0, 0.2); 
+            border-radius: 10px;
+            font-family: monospace;
+            font-size: 0.9rem;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="error-box">
+          <h1>❌ Connection Failed</h1>
+          <p>Failed to connect your Gmail account.</p>
+          <div class="error-detail">${error.message}</div>
+          <p style="margin-top: 2rem; font-size: 0.9rem;">Please try again or contact support.</p>
+        </div>
+      </body>
+      </html>
+    `);
+  }
+});
 
 // Error handling middleware
 app.use((err, req, res, next) => {
