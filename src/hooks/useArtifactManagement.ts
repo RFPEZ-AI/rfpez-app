@@ -178,8 +178,9 @@ export const useArtifactManagement = (
       rfpName: currentRfp?.name
     });
     
-    // Clear selected artifact when RFP changes to prevent showing artifacts from previous RFP
-    console.log('🧹 Clearing selected artifact on RFP change');
+    // CRITICAL: Clear ALL artifacts when RFP changes to prevent contamination
+    console.log('🧹 Clearing all artifacts on RFP change');
+    setArtifacts([]);
     setSelectedArtifactId(null);
     
     if (currentRfp && currentRfp.id) {
@@ -645,17 +646,11 @@ export const useArtifactManagement = (
       console.log(`📋 Loaded ${formattedArtifacts.length} RFP-associated artifacts`);
       console.log(`📋 Previous artifact count: ${artifacts.length}`);
       
-      // Preserve Claude-generated artifacts (these don't have database IDs)
-      const existingClaudeArtifacts = artifacts.filter(artifact => 
-        artifact.id && (
-          artifact.id.includes('claude-artifact') ||
-          (!artifact.id.startsWith('form_') && !artifact.id.includes('-'))
-        )
-      );
-      console.log(`📋 Preserving ${existingClaudeArtifacts.length} Claude-generated artifacts`);
+      // STRICT RFP ARTIFACTS ONLY: Do not preserve Claude or session artifacts
+      // When RFP context is active, show ONLY artifacts linked in rfp_artifacts table
+      console.log(`📋 Using STRICT RFP artifacts only (no Claude artifact preservation)`);
       
-      const combinedArtifacts = [...existingClaudeArtifacts, ...formattedArtifacts];
-      setArtifacts(combinedArtifacts);
+      setArtifacts(formattedArtifacts);
 
       // Return the artifacts so the caller can handle selection
       return formattedArtifacts;
