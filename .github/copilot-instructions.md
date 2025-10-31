@@ -912,15 +912,22 @@ npm run mcp:test   # Test MCP server connection
 #### **MCP Tool Usage Guidelines**
 
 **For Database Operations (in order of preference):**
-1. **Primary**: `mcp_supabase-offi_execute_sql` - Direct SQL execution with full query capability
-2. **Alternative**: Native Supabase CLI commands when MCP tools unavailable
-3. **Avoid**: supabase-local MCP tools - limited functionality and 1-minute log window constraint
+1. **Primary**: Docker exec with psql commands - Direct SQL execution via `docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -c "QUERY"`
+2. **Alternative**: Native Supabase CLI commands (`supabase migration up`, `supabase db push`)
+3. **Fallback**: `mcp_supabase-offi_execute_sql` - Only when Docker and CLI unavailable
+4. **❌ NEVER USE**: `mcp_supabase-loca_*` tools - These tools have been experiencing chronic hanging issues and should be completely avoided
+
+**⚠️ CRITICAL: Supabase Local MCP Tools Are Unreliable**
+- `mcp_supabase-loca_*` tools frequently hang and cause timeouts
+- Use Docker commands or Supabase CLI instead for all local database operations
+- For queries: `docker exec supabase_db_rfpez-app-local psql -U postgres -d postgres -c "SELECT ..."`
+- For logs: `docker logs -f supabase_edge_runtime_rfpez-app-local`
 
 **For Logging and Monitoring:**
 - **Local Development**: `supabase functions serve --debug` for real-time edge function logs
 - **Local Container Logs**: `docker logs -f supabase_edge_runtime_rfpez-app-local` for edge runtime logs
 - **Remote Debugging**: Browser MCP tools to access Supabase Dashboard logs
-- **Historical Logs**: Direct dashboard access (MCP tools limited to last 1 minute)
+- **Historical Logs**: Direct dashboard access or Docker logs (avoid Supabase local MCP tools)
 
 **For Testing and Validation:**
 - **Database State**: Direct SQL queries via `mcp_supabase-offi_execute_sql`

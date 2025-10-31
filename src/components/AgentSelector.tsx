@@ -26,7 +26,6 @@ import {
 } from '@ionic/react';
 import { 
   closeOutline, 
-  chatbubbleOutline,
   checkmarkCircle,
   informationCircleOutline,
   starOutline,
@@ -216,7 +215,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                 {loading ? (
                   // Loading skeletons
                   Array.from({ length: 3 }).map((_, index) => (
-                    <IonCol size="12" sizeMd="6" sizeLg="4" key={index}>
+                    <IonCol size="12" sizeMd="6" sizeLg="4" sizeXl="3" key={index}>
                       <IonCard>
                         <IonCardHeader>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -268,7 +267,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                     }
                     
                     return (
-                      <IonCol size="12" sizeMd="6" sizeLg="4" key={agent.id}>
+                      <IonCol size="12" sizeMd="6" sizeLg="4" sizeXl="3" key={agent.id}>
                         <IonCard 
                           className={`agent-card ${isCurrentAgent ? 'current-agent' : ''} ${isLocked ? 'locked-agent' : ''}`}
                           button={true}
@@ -339,14 +338,6 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                             <IonText color={isLocked ? 'medium' : 'dark'} className="agent-description">
                               {agent.description}
                             </IonText>
-                            {!isLocked && (
-                              <div className="agent-initial-prompt">
-                                <IonIcon icon={chatbubbleOutline} color="primary" />
-                                <IonText color="dark">
-                                  <small>&quot;{agent.initial_prompt}&quot;</small>
-                                </IonText>
-                              </div>
-                            )}
                             {isLocked && (
                               <div className="access-notice" style={{ 
                                 marginTop: '12px', 
