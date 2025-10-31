@@ -152,7 +152,7 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
           scrollBehavior: 'smooth'
         }}
       >
-  {messages.filter((message) => !message.hidden).map((message) => (
+  {messages.filter((message) => !message.hidden && !message.metadata?.isSystemNotification).map((message) => (
             <IonCard 
               key={message.id}
               style={{

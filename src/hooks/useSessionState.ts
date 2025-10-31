@@ -11,13 +11,13 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
   const [pendingWelcomeMessage, setPendingWelcomeMessage] = useState<Message | null>(null);
 
   // Define loadUserSessions function (can be called manually or by useEffect)
-  const loadUserSessions = useCallback(async () => {
+  const loadUserSessions = useCallback(async (rfpId?: number | null) => {
     if (!isAuthenticated || !userId) {
       return;
     }
     
     try {
-      const sessionsData = await DatabaseService.getUserSessions(userId);
+      const sessionsData = await DatabaseService.getUserSessions(userId, rfpId);
       const formattedSessions: Session[] = sessionsData
         .map(session => ({
           id: session.id,

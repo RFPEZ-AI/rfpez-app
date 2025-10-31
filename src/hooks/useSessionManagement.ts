@@ -35,17 +35,18 @@ export function useSessionManagement() {
     }
   }, [isAuthenticated, user]);
 
-  const loadSessions = useCallback(async () => {
+  const loadSessions = useCallback(async (rfpId?: number | null) => {
     if (!user) return;
 
     setIsLoading(true);
     try {
       logger.info('Loading user sessions', {
         component: 'useSessionManagement',
-        userId: user.id
+        userId: user.id,
+        rfpId
       });
 
-      const userSessions = await DatabaseService.getUserSessions(user.id);
+      const userSessions = await DatabaseService.getUserSessions(user.id, rfpId);
       
       const formattedSessions: Session[] = userSessions
         .map(session => ({

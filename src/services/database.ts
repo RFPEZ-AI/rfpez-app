@@ -117,12 +117,12 @@ export class DatabaseService {
     return session;
   }
 
-  static async getUserSessions(supabaseUserId: string): Promise<SessionWithStats[]> {
-    console.log('DatabaseService.getUserSessions called for supabaseUserId:', supabaseUserId);
+  static async getUserSessions(supabaseUserId: string, rfpId?: number | null): Promise<SessionWithStats[]> {
+    console.log('DatabaseService.getUserSessions called for supabaseUserId:', supabaseUserId, 'rfpId:', rfpId);
     
     console.log('Fetching sessions directly from sessions table using Supabase user ID...');
     // Sessions table stores Supabase auth user ID directly, not the user_profiles internal ID
-    const { data: sessions, error } = await supabase
+    let query = supabase
       .from('sessions')
       .select(`
         id,
@@ -131,10 +131,17 @@ export class DatabaseService {
         description,
         created_at,
         updated_at,
-        is_archived
+        is_archived,
+        current_rfp_id
       `)
-      .eq('user_id', supabaseUserId)
-      .order('updated_at', { ascending: false });
+      .eq('user_id', supabaseUserId);
+    
+    // Filter by RFP if provided
+    if (rfpId !== undefined) {
+      query = query.eq('current_rfp_id', rfpId);
+    }
+    
+    const { data: sessions, error } = await query.order('updated_at', { ascending: false });
 
     console.log('getUserSessions result:', { sessions, error });
 

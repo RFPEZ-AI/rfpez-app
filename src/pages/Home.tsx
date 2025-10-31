@@ -133,26 +133,25 @@ const Home: React.FC = () => {
     handleShowAgentSelector
   } = useAgentManagement(currentSessionId);
 
+  // Create a ref to store handleSendMessage so we can use it in handleRfpContextChanged
+  const handleSendMessageRef = useRef<((message: string) => Promise<void>) | null>(null);
+
   // Callback to handle RFP context change notifications to the agent
   const handleRfpContextChanged = useCallback((prompt: string) => {
-    console.log('📢 RFP context changed, sending notification to agent:', prompt);
+    console.log('📢 RFP context changed, triggering Claude response:', prompt);
     
-    // Add system message to notify the agent about the RFP context change
-    setMessages((prev: Message[]) => [
-      ...prev,
-      {
-        id: `rfp-context-${Date.now()}`,
-        content: prompt,
-        isUser: false,
-        timestamp: new Date(),
-        agentName: currentAgent?.agent_name || 'System',
-        metadata: {
-          isSystemNotification: true,
-          rfpContextChange: true
-        }
-      }
-    ]);
-  }, [currentAgent, setMessages]);
+    // Call handleSendMessage directly to trigger Claude's response
+    // The message will have isSystemNotification metadata and be hidden from UI
+    if (handleSendMessageRef.current) {
+      // Send the notification to Claude with system notification metadata
+      // This will be added to the conversation history but hidden from the UI
+      handleSendMessageRef.current(prompt).catch(error => {
+        console.error('Failed to send RFP context notification:', error);
+      });
+    } else {
+      console.warn('handleSendMessage not yet available, skipping RFP context notification');
+    }
+  }, []);
 
   const {
     rfps,
@@ -278,7 +277,15 @@ const Home: React.FC = () => {
     };
   }, [currentRfp, supabase]);
 
-  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, loadToolInvocationsForSession } = useMessageHandling(setGlobalRFPContext);
+  // Reload sessions when RFP changes to show only sessions for current RFP
+  useEffect(() => {
+    if (isAuthenticated && userId) {
+      console.log('🔄 RFP changed, reloading sessions for RFP:', currentRfpId);
+      loadUserSessions(currentRfpId ?? undefined);
+    }
+  }, [currentRfpId, isAuthenticated, userId, loadUserSessions]);
+
+  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, loadToolInvocationsForSession} = useMessageHandling(setGlobalRFPContext);
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -1384,6 +1391,11 @@ const Home: React.FC = () => {
       selectedArtifact // Add current artifact context
     );
   };
+
+  // Store onSendMessage in ref so it can be used by handleRfpContextChanged
+  useEffect(() => {
+    handleSendMessageRef.current = onSendMessage;
+  }, [onSendMessage]);
 
   // Helper function to create system messages instead of alert popups
   const addSystemMessage = (content: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
