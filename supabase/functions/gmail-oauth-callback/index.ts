@@ -179,10 +179,8 @@ serve(async (req: Request) => {
 
     console.log('Credentials stored successfully');
 
-    // Determine app URL based on environment
-    const appUrl = supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost')
-      ? 'http://localhost:3100'  // Local development
-      : 'https://dev.rfpez.ai';   // Production
+    // Get app URL from environment variable (defaults to production if not set)
+    const appUrl = Deno.env.get('APP_URL') || 'https://dev.rfpez.ai';
     
     // Redirect back to app with success
     return new Response(null, {
@@ -195,11 +193,8 @@ serve(async (req: Request) => {
   } catch (error) {
     console.error('OAuth callback error:', error);
     
-    // Determine app URL based on environment
-    const supabaseUrlForError = Deno.env.get('SUPABASE_URL') || '';
-    const appUrl = supabaseUrlForError.includes('127.0.0.1') || supabaseUrlForError.includes('localhost')
-      ? 'http://localhost:3100'  // Local development
-      : 'https://dev.rfpez.ai';   // Production
+    // Get app URL from environment variable (defaults to production if not set)
+    const appUrl = Deno.env.get('APP_URL') || 'https://dev.rfpez.ai';
     
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     

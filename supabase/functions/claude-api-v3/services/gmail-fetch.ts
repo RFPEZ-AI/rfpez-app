@@ -196,8 +196,12 @@ export class GmailFetchService {
     // Create MIME message
     const mimeMessage = this.createMimeMessage(message);
     
-    // Encode as base64url (RFC 4648)
-    const encodedMessage = btoa(mimeMessage)
+    // Encode as base64url (RFC 4648) with proper UTF-8 support
+    // Use TextEncoder for UTF-8 encoding instead of btoa which only handles Latin1
+    const encoder = new TextEncoder();
+    const data = encoder.encode(mimeMessage);
+    const base64 = btoa(String.fromCharCode(...data));
+    const encodedMessage = base64
       .replace(/\+/g, '-')
       .replace(/\//g, '_')
       .replace(/=+$/, '');

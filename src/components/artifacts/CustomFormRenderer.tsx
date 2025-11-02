@@ -70,6 +70,20 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
     const type = fieldSchema.type;
     const enumValues = fieldSchema.enum;
     
+    // Debug logging for array fields
+    if (fieldName === 'vendors' || type === 'array') {
+      console.log(`🔍 Rendering field "${fieldName}":`, {
+        type,
+        hasItems: !!fieldSchema.items,
+        itemsType: fieldSchema.items?.type,
+        hasItemProperties: !!(fieldSchema.items?.properties),
+        isArray: Array.isArray(value),
+        arrayLength: Array.isArray(value) ? value.length : 'N/A',
+        valueType: typeof value,
+        valuePreview: Array.isArray(value) ? `Array(${value.length}) with first item: ${JSON.stringify(value[0])}` : value?.toString?.()?.substring(0, 100)
+      });
+    }
+    
     // Handle nested object schemas (like budget_and_pricing, evaluation_criteria)
     if (type === 'object' && fieldSchema.properties) {
       return (
@@ -93,6 +107,153 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
               });
             })}
           </div>
+        </div>
+      );
+    }
+
+    // Handle array fields (like vendors array)
+    if (type === 'array') {
+      if (!fieldSchema.items) {
+        console.warn(`⚠️ Array field "${fieldName}" has no items schema, rendering as simple list`);
+      }
+      
+      const arrayValue = Array.isArray(value) ? value : [];
+      const itemSchema = fieldSchema.items;
+      
+      if (!itemSchema) {
+        // Array with no item schema - render as simple list
+        return (
+          <div key={fieldName} style={{ marginBottom: '24px' }}>
+            <h3 style={{ margin: '16px 0 12px 0', fontSize: '1.1rem', fontWeight: '600' }}>
+              {title}
+            </h3>
+            {description && (
+              <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#666' }}>
+                {description}
+              </p>
+            )}
+            <ul style={{ paddingLeft: '24px' }}>
+              {arrayValue.length === 0 ? (
+                <li style={{ color: '#999', fontStyle: 'italic' }}>No items</li>
+              ) : (
+                arrayValue.map((item: any, index: number) => (
+                  <li key={index}>{JSON.stringify(item)}</li>
+                ))
+              )}
+            </ul>
+          </div>
+        );
+      }
+      
+      // If array items are objects with properties, render them in a structured way
+      if (itemSchema.type === 'object' && itemSchema.properties) {
+        return (
+          <div key={fieldName} style={{ marginBottom: '24px' }}>
+            <h3 style={{ margin: '16px 0 12px 0', fontSize: '1.1rem', fontWeight: '600' }}>
+              {title}
+            </h3>
+            {description && (
+              <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#666' }}>
+                {description}
+              </p>
+            )}
+            
+            {arrayValue.length === 0 ? (
+              <p style={{ color: '#999', fontStyle: 'italic', padding: '12px' }}>
+                No items
+              </p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                {arrayValue.map((item: any, index: number) => (
+                  <div 
+                    key={index}
+                    style={{ 
+                      padding: '12px',
+                      border: '1px solid var(--ion-color-light)',
+                      borderRadius: '8px',
+                      backgroundColor: 'var(--ion-color-light-tint)'
+                    }}
+                  >
+                    {Object.keys(itemSchema.properties).map(propName => {
+                      const propSchema = itemSchema.properties[propName];
+                      const propValue = item[propName];
+                      const propTitle = propSchema.title || propName;
+                      
+                      // Special handling for boolean checkboxes
+                      if (propSchema.type === 'boolean') {
+                        return (
+                          <div key={propName} style={{ marginBottom: '8px' }}>
+                            <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                              <input
+                                type="checkbox"
+                                checked={propValue === true}
+                                onChange={(e) => {
+                                  const newArray = [...arrayValue];
+                                  newArray[index] = { ...item, [propName]: e.target.checked };
+                                  handleFieldChange(fieldName, newArray);
+                                }}
+                                style={{ 
+                                  width: '20px', 
+                                  height: '20px',
+                                  cursor: 'pointer',
+                                  accentColor: 'var(--ion-color-primary)',
+                                  backgroundColor: 'white',
+                                  border: '2px solid #ccc',
+                                  borderRadius: '3px'
+                                }}
+                              />
+                              <span style={{ fontWeight: '500' }}>{propTitle}</span>
+                            </label>
+                          </div>
+                        );
+                      }
+                      
+                      // For other types, display as read-only for now
+                      return (
+                        <div key={propName} style={{ marginBottom: '8px' }}>
+                          <strong style={{ fontSize: '0.9rem', color: '#666' }}>
+                            {propTitle}:
+                          </strong>{' '}
+                          <span>
+                            {propSchema.format === 'uri' && propValue ? (
+                              <a href={propValue as string} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--ion-color-primary)' }}>
+                                {propValue as string}
+                              </a>
+                            ) : (
+                              propValue?.toString() || '-'
+                            )}
+                          </span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        );
+      }
+      
+      // For simple array types (strings, numbers), show as list
+      return (
+        <div key={fieldName} style={{ marginBottom: '24px' }}>
+          <h3 style={{ margin: '16px 0 12px 0', fontSize: '1.1rem', fontWeight: '600' }}>
+            {title}
+          </h3>
+          {description && (
+            <p style={{ margin: '0 0 12px 0', fontSize: '0.9rem', color: '#666' }}>
+              {description}
+            </p>
+          )}
+          <ul style={{ paddingLeft: '24px' }}>
+            {arrayValue.length === 0 ? (
+              <li style={{ color: '#999', fontStyle: 'italic' }}>No items</li>
+            ) : (
+              arrayValue.map((item: any, index: number) => (
+                <li key={index}>{item?.toString() || '-'}</li>
+              ))
+            )}
+          </ul>
         </div>
       );
     }
@@ -209,6 +370,50 @@ const CustomFormRenderer: React.FC<CustomFormRendererProps> = ({
 
     // Handle boolean fields
     if (type === 'boolean') {
+      // Special handling for select_all field to control vendor selection checkboxes
+      if (fieldName === 'select_all') {
+        const handleSelectAllChange = (selectAll: boolean) => {
+          // Update the select_all field
+          handleFieldChange(fieldName, selectAll);
+          
+          // Find and update all vendor checkboxes
+          const vendorsField = Object.keys(properties).find(key => {
+            const prop = properties[key];
+            return prop && typeof prop === 'object' && 'type' in prop && 
+              prop.type === 'array' && 
+              (key === 'vendors' || key.toLowerCase().includes('vendor'));
+          });
+          
+          if (vendorsField && formValues[vendorsField]) {
+            const vendors = formValues[vendorsField] as any[];
+            if (Array.isArray(vendors)) {
+              const updatedVendors = vendors.map(vendor => ({
+                ...vendor,
+                selected: selectAll
+              }));
+              handleFieldChange(vendorsField, updatedVendors);
+            }
+          }
+        };
+        
+        return (
+          <IonItem key={fieldName} style={{ marginBottom: '12px' }}>
+            <IonLabel>
+              {title}
+              {description && <p style={{ fontSize: '0.85em', color: '#666', marginTop: '4px' }}>{description}</p>}
+            </IonLabel>
+            <IonSelect
+              value={value?.toString() || 'false'}
+              onIonChange={(e) => handleSelectAllChange(e.detail.value === 'true')}
+            >
+              <IonSelectOption value="true">Yes</IonSelectOption>
+              <IonSelectOption value="false">No</IonSelectOption>
+            </IonSelect>
+          </IonItem>
+        );
+      }
+      
+      // Standard boolean field
       return (
         <IonItem key={fieldName} style={{ marginBottom: '12px' }}>
           <IonLabel>
