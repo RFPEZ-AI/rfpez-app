@@ -104,11 +104,6 @@ export async function sendEmail(
 This email was originally intended for: ${nonRegisteredRecipients.join(', ')}
 
 In development mode, all emails to non-registered users are routed back to you for review.
-These recipients are not registered users in the RFPEZ.AI system.
-
-To send this email to the actual recipients:
-1. Add their email addresses to the system by inviting them as users, or
-2. Disable EMAIL_DEV_MODE in the environment configuration
 
 ---ORIGINAL EMAIL BELOW---
 
@@ -116,18 +111,12 @@ To send this email to the actual recipients:
         
         data.body_text = devNotice + data.body_text;
         if (data.body_html) {
-          data.body_html = `<div style="background-color: #fff3cd; border: 2px solid #856404; padding: 15px; margin-bottom: 20px;">
-<h3 style="color: #856404; margin-top: 0;">⚠️ DEVELOPMENT MODE ROUTING NOTICE ⚠️</h3>
-<p>This email was originally intended for: <strong>${nonRegisteredRecipients.join(', ')}</strong></p>
-<p>In development mode, all emails to non-registered users are routed back to you for review.<br>
-These recipients are not registered users in the RFPEZ.AI system.</p>
-<p>To send this email to the actual recipients:</p>
-<ol>
-  <li>Add their email addresses to the system by inviting them as users, or</li>
-  <li>Disable EMAIL_DEV_MODE in the environment configuration</li>
-</ol>
-<hr>
-<p><strong>ORIGINAL EMAIL BELOW</strong></p>
+          data.body_html = `<div style="background-color: #fff3cd; border: 2px solid #856404; padding: 10px; margin-bottom: 15px;">
+<p style="margin: 0; color: #856404;"><strong>⚠️ DEVELOPMENT MODE ROUTING NOTICE ⚠️</strong></p>
+<p style="margin: 5px 0 0 0; font-size: 14px;">This email was originally intended for: <strong>${nonRegisteredRecipients.join(', ')}</strong><br>
+In development mode, all emails to non-registered users are routed back to you for review.</p>
+<hr style="margin: 10px 0;">
+<p style="margin: 0; font-size: 14px;"><strong>---ORIGINAL EMAIL BELOW---</strong></p>
 </div>` + data.body_html;
         }
         
