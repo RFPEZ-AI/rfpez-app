@@ -19,7 +19,7 @@ export interface Message {
 export interface ArtifactReference {
   artifactId: string;
   artifactName: string;
-  artifactType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other';
+  artifactType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'vendor_selection' | 'other';
   isCreated?: boolean; // True if this message created the artifact
   displayText?: string; // Optional custom display text for the reference
 }
@@ -45,7 +45,7 @@ export interface Session {
 export interface Artifact {
   id: string;
   name: string;
-  type: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other';
+  type: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'vendor_selection' | 'other';
   size: string;
   url?: string;
   content?: string;

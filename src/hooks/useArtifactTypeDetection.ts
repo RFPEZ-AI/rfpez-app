@@ -7,6 +7,7 @@ export interface ArtifactTypeDetection {
   isBuyerQuestionnaire: boolean;
   isTextArtifact: boolean;
   isBidView: boolean;
+  isVendorSelection: boolean;
   isDefaultArtifact: boolean;
 }
 
@@ -21,6 +22,7 @@ export const useArtifactTypeDetection = (artifact: Artifact | null): ArtifactTyp
         isBuyerQuestionnaire: false,
         isTextArtifact: false,
         isBidView: false,
+        isVendorSelection: false,
         isDefaultArtifact: false
       };
     }
@@ -125,15 +127,22 @@ export const useArtifactTypeDetection = (artifact: Artifact | null): ArtifactTyp
       return artifact.type === 'bid_view';
     };
 
+    // Check if artifact is a vendor selection
+    const isVendorSelection = (): boolean => {
+      return artifact.type === 'vendor_selection';
+    };
+
     const isBuyerQuestionnaireResult = isBuyerQuestionnaire();
     const isTextArtifactResult = isTextArtifact();
     const isBidViewResult = isBidView();
+    const isVendorSelectionResult = isVendorSelection();
 
     return {
       isBuyerQuestionnaire: isBuyerQuestionnaireResult,
       isTextArtifact: isTextArtifactResult,
       isBidView: isBidViewResult,
-      isDefaultArtifact: !isBuyerQuestionnaireResult && !isTextArtifactResult && !isBidViewResult
+      isVendorSelection: isVendorSelectionResult,
+      isDefaultArtifact: !isBuyerQuestionnaireResult && !isTextArtifactResult && !isBidViewResult && !isVendorSelectionResult
     };
   }, [artifact]);
 };
@@ -153,6 +162,8 @@ export const getArtifactTypeIcon = (type: string): string => {
       return 'image-outline';
     case 'bid_view':
       return 'reorder-two-outline';
+    case 'vendor_selection':
+      return 'people-outline';
     default:
       return 'document-text-outline';
   }

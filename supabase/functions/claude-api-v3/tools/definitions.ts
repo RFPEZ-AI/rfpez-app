@@ -117,6 +117,41 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
     }
   },
   {
+    name: 'manage_vendor_selection',
+    description: 'Manage vendor selection for an RFP. Create, read, update, or toggle vendor selections with auto-save. Only one vendor selection artifact exists per RFP. Use this to track which vendors are selected for bidding. Vendor objects must have: {id: string, name: string, selected: boolean, selectedAt?: string, metadata?: object}',
+    input_schema: {
+      type: 'object',
+      properties: {
+        operation: {
+          type: 'string',
+          enum: ['create', 'read', 'update', 'add_vendors', 'remove_vendors', 'toggle_selection'],
+          description: 'Operation: create (new selection), read (get current state), update (replace all vendors), add_vendors (add to list), remove_vendors (remove from list), toggle_selection (toggle selected status)'
+        },
+        rfp_id: {
+          type: 'number',
+          description: 'RFP ID to manage vendor selection for (required for all operations)'
+        },
+        vendors: {
+          type: 'array',
+          description: 'Array of vendor objects {id, name, selected, selectedAt?, metadata?} for create/update/add_vendors operations. Each vendor must have unique id (string), name (string), selected (boolean), optional selectedAt (ISO timestamp), optional metadata (object with email, phone, contact, etc.)'
+        },
+        vendor_ids: {
+          type: 'array',
+          description: 'Array of vendor ID strings to remove or toggle (for remove_vendors/toggle_selection operations)'
+        },
+        name: {
+          type: 'string',
+          description: 'Name for vendor selection artifact (optional, defaults to "Vendor Selection")'
+        },
+        description: {
+          type: 'string',
+          description: 'Description of vendor selection (optional)'
+        }
+      },
+      required: ['operation', 'rfp_id']
+    }
+  },
+  {
     name: 'get_conversation_history',
     description: 'Retrieve conversation history for the current session',
     input_schema: {

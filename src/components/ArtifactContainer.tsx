@@ -8,6 +8,7 @@ import { useArtifactTypeDetection } from '../hooks/useArtifactTypeDetection';
 import ArtifactFormRenderer from './artifacts/ArtifactFormRenderer';
 import ArtifactTextRenderer from './artifacts/ArtifactTextRenderer';
 import ArtifactBidRenderer from './artifacts/ArtifactBidRenderer';
+import ArtifactVendorSelectionRenderer from './artifacts/ArtifactVendorSelectionRenderer';
 import ArtifactDefaultRenderer from './artifacts/ArtifactDefaultRenderer';
 import ArtifactModal from './artifacts/ArtifactModal';
 import ArtifactDropdown from './ArtifactDropdown';
@@ -125,6 +126,19 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
           key={`${artifact.id}-${effectiveRfpId}`} // Force re-mount when artifact OR RFP changes
           currentRfpId={effectiveRfpId}
           rfpName={artifact.content || artifact.name}
+        />
+      );
+    }
+
+    if (typeDetection.isVendorSelection) {
+      return (
+        <ArtifactVendorSelectionRenderer
+          key={artifact.id} // Force re-mount when artifact changes
+          artifact={artifact}
+          onSelectionChange={(vendorId: string, selected: boolean) => {
+            console.log('Vendor selection changed:', { vendorId, selected });
+            // TODO: Implement auto-save via Claude API tool call
+          }}
         />
       );
     }

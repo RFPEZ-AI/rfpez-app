@@ -474,6 +474,79 @@ export class ToolExecutionService {
           return result;
         }
 
+        case 'manage_vendor_selection': {
+          console.log('🚀 EXECUTING MANAGE_VENDOR_SELECTION TOOL!', {
+            sessionId,
+            userId: this.userId,
+            operation: input.operation,
+            rfp_id: input.rfp_id
+          });
+          
+          // Validate session_id for vendor selection management
+          if (!sessionId || sessionId.trim() === '') {
+            console.error('❌ MANAGE_VENDOR_SELECTION ERROR: session_id is required and cannot be empty');
+            return {
+              success: false,
+              error: 'Session ID is required for vendor selection management',
+              message: 'Cannot manage vendor selections without a valid session. Please start a new session.'
+            };
+          }
+          
+          // 🎯 AUTO-INJECT CURRENT RFP if rfp_id not provided: Fetch current_rfp_id from session
+          let effectiveRfpId = input.rfp_id as number;
+          
+          if (!effectiveRfpId) {
+            // @ts-expect-error - Supabase client type is unknown but compatible
+            const sessionQuery = await this.supabase
+              .from('sessions')
+              .select('current_rfp_id')
+              .eq('id', sessionId)
+              .single();
+            
+            const { data: sessionData, error: sessionError } = sessionQuery as { 
+              data: { current_rfp_id?: number } | null; 
+              error: Error | null 
+            };
+            
+            if (sessionError) {
+              console.error('❌ Failed to fetch session data:', sessionError);
+              return {
+                success: false,
+                error: 'Failed to retrieve session information',
+                message: 'Could not fetch session data to determine current RFP.'
+              };
+            }
+            
+            if (!sessionData?.current_rfp_id) {
+              console.error('❌ No current RFP set for this session and no rfp_id provided');
+              return {
+                success: false,
+                error: 'No current RFP set',
+                message: 'No RFP is currently active for this session. To manage vendor selection, you must first create an RFP using the create_and_set_rfp tool. Call it now with a descriptive name based on what the user is procuring (e.g., "LED Bulbs RFP" or "Industrial Alcohol RFP"), then retry managing vendor selection.',
+                recovery_action: {
+                  tool: 'create_and_set_rfp',
+                  instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
+                }
+              };
+            }
+            
+            effectiveRfpId = sessionData.current_rfp_id;
+            console.log('✅ Auto-injected current RFP ID:', effectiveRfpId);
+          }
+          
+          const { handleManageVendorSelection } = await import('../tools/vendorSelection.ts');
+          // @ts-expect-error - VendorSelection function type compatibility
+          const result = await handleManageVendorSelection(this.supabase, {
+            ...input,
+            rfp_id: effectiveRfpId,  // 🎯 USE EFFECTIVE RFP ID (provided or auto-injected)
+            session_id: sessionId,
+            user_id: this.userId
+          });
+          console.log('🎯 MANAGE_VENDOR_SELECTION RESULT:', JSON.stringify(result, null, 2));
+          // @ts-expect-error - Return type compatibility
+          return result;
+        }
+
         case 'get_conversation_history': {
           // Use sessionId from input or parameter, but validate it's not empty
           const targetSessionId = (input.sessionId as string) || (input.session_id as string) || sessionId;

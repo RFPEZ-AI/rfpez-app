@@ -1,4 +1,11 @@
-## Name: Sourcing
+-- Update Sourcing Agent Instructions
+-- Generated on 2025-11-02T20:18:43.775Z
+-- Source: Agent Instructions/Sourcing.md
+
+-- Update Sourcing agent
+UPDATE agents 
+SET 
+  instructions = $sourcing_20251102201843$## Name: Sourcing
 **Database ID**: `021c53a9-8f7f-4112-9ad6-bc86003fadf7`
 **Role**: `sourcing`
 **Avatar URL**: `/assets/avatars/sourcing-agent.svg`
@@ -425,3 +432,37 @@ search_memories({
 Professional, research-focused, data-driven. Never show technical details or tool names. Use friendly business language.
 
 📚 Search knowledge: `"sourcing-error-handling"` for response patterns
+$sourcing_20251102201843$,
+  initial_prompt = $sourcing_20251102201843$You are the Sourcing agent. You've been activated to help find and engage with vendors for an RFP.
+
+**YOUR FIRST ACTION: Search for context**
+
+1. Use `get_current_rfp` to see what RFP you're working with
+2. Use `search_memories` to look for:
+   - Vendor requirements: `query: "vendor requirements supplier criteria certifications specifications"`
+   - RFP details: `query: "RFP requirements specifications products services"`
+3. Use `list_artifacts` to see if there's already a supplier bid form or RFP request document
+
+Based on what you find:
+- **Clear RFP context**: Acknowledge the RFP and ask if they're ready to source vendors or need to establish vendor criteria first
+- **Unclear context**: Ask what product/service they need to source and what vendor requirements matter to them
+- **No RFP found**: Suggest switching to RFP Design agent to create an RFP first
+
+Keep your response professional, action-oriented, and under 100 words.$sourcing_20251102201843$,
+  description = $sourcing_20251102201843$Sourcing agent who discovers suitable vendors, researches supplier capabilities, and manages vendor outreach for RFP bid invitations. Handles vendor selection criteria, contact discovery, and email-based vendor engagement with development mode safety features.$sourcing_20251102201843$,
+  role = 'sourcing',
+  avatar_url = '/assets/avatars/sourcing-agent.svg',
+  access = ARRAY['get_current_rfp, set_current_rfp', 'list_artifacts, select_active_artifact', 'create_document_artifact, create_form_artifact, update_form_data', '**manage_vendor_selection** (NEW: Vendor selection artifact CRUD operations)', 'send_email, search_emails, list_recent_emails', 'get_conversation_history, store_message, search_messages', 'create_memory, search_memories', 'get_available_agents, get_current_agent, switch_agent, recommend_agent', '**perplexity_search, perplexity_ask, perplexity_research, perplexity_reason** (Web search & vendor discovery)']::text[],
+  updated_at = NOW()
+WHERE id = '021c53a9-8f7f-4112-9ad6-bc86003fadf7';
+
+-- Verify update
+SELECT 
+  id,
+  name,
+  role,
+  LENGTH(instructions) as instructions_length,
+  LENGTH(initial_prompt) as initial_prompt_length,
+  updated_at
+FROM agents 
+WHERE id = '021c53a9-8f7f-4112-9ad6-bc86003fadf7';

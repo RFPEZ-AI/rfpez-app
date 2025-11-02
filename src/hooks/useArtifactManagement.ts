@@ -497,12 +497,14 @@ export const useArtifactManagement = (
         }
         
         // Map database type to frontend type
-        let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'other' = 'other';
+        let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'vendor_selection' | 'other' = 'other';
         if (artifact.type === 'form') frontendType = 'form';
         else if (artifact.type === 'document') frontendType = 'document';
         else if (artifact.type === 'text') frontendType = 'text';
         else if (artifact.type === 'image') frontendType = 'image';
         else if (artifact.type === 'pdf') frontendType = 'pdf';
+        else if (artifact.type === 'bid_view') frontendType = 'bid_view';
+        else if (artifact.type === 'vendor_selection') frontendType = 'vendor_selection';
         
         console.log('📋 Formatted artifact:', {
           id: artifact.id,
@@ -608,7 +610,7 @@ export const useArtifactManagement = (
         }
         
         // Map database type to frontend type
-        let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'other';
+        let frontendType: 'document' | 'text' | 'image' | 'pdf' | 'form' | 'bid_view' | 'vendor_selection' | 'other';
         switch (artifact.type) {
           case 'form':
             frontendType = 'form';
@@ -628,6 +630,9 @@ export const useArtifactManagement = (
           case 'bid_view':
             frontendType = 'bid_view';
             break;
+          case 'vendor_selection':
+            frontendType = 'vendor_selection';
+            break;
           default:
             frontendType = 'other';
         }
@@ -639,7 +644,12 @@ export const useArtifactManagement = (
           size: artifact.description || 'RFP Artifact',
           content: content || '',
           sessionId: artifact.session_id || undefined,
-          created_at: artifact.created_at // Preserve created_at for dropdown display
+          created_at: artifact.created_at, // Preserve created_at for dropdown display
+          // Preserve database fields for rendering (CRITICAL for vendor_selection and form data)
+          schema: artifact.schema,
+          ui_schema: artifact.ui_schema,
+          default_values: artifact.default_values,
+          submit_action: artifact.submit_action
         };
       });
       
