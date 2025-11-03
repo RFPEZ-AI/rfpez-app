@@ -365,6 +365,35 @@ export class ToolExecutionService {
             };
           }
           
+          // 🎯 VALIDATE ARTIFACT_ROLE: Ensure artifact_role is provided and valid
+          const validFormRoles = [
+            'buyer_questionnaire',    // Initial requirements gathering form
+            'bid_form',              // Supplier bid submission form
+            'vendor_selection_form', // Vendor evaluation/selection form
+            'template'               // Form templates
+          ];
+          const providedRole = (input as { artifact_role?: string }).artifact_role;
+          
+          if (!providedRole) {
+            console.error('❌ CREATE_FORM_ARTIFACT ERROR: artifact_role is required');
+            return {
+              success: false,
+              error: 'Missing artifact_role parameter',
+              message: `Form artifacts require an artifact_role parameter. Common roles: "buyer_questionnaire" (requirements), "bid_form" (supplier bids), "vendor_selection_form" (vendor evaluation). Full list: ${validFormRoles.join(', ')}. Example: create_form_artifact({ ..., artifact_role: "bid_form" })`
+            };
+          }
+          
+          if (!validFormRoles.includes(providedRole)) {
+            console.error(`❌ CREATE_FORM_ARTIFACT ERROR: Invalid artifact_role "${providedRole}"`);
+            return {
+              success: false,
+              error: `Invalid artifact_role: "${providedRole}"`,
+              message: `Form artifact_role must be one of: ${validFormRoles.join(', ')}. You provided: "${providedRole}". Common roles: "buyer_questionnaire", "bid_form", "vendor_selection_form".`
+            };
+          }
+          
+          console.log(`✅ Form artifact role validated: "${providedRole}"`)
+          
           // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
           // @ts-expect-error - Supabase client type is unknown but compatible
           const sessionQuery = await this.supabase
@@ -465,6 +494,37 @@ export class ToolExecutionService {
               message: 'Cannot create document artifacts without a valid session. Please start a new session.'
             };
           }
+          
+          // 🎯 VALIDATE ARTIFACT_ROLE: Ensure artifact_role is provided and valid
+          const validDocumentRoles = [
+            'rfp_request_email',         // Primary: RFP vendor request emails (enables upsert)
+            'request_document',          // General request documents
+            'specification_document',    // Technical specifications
+            'analysis_document',         // Analysis reports
+            'report_document',           // General reports
+            'template'                   // Document templates
+          ];
+          const providedRole = (input as { artifact_role?: string }).artifact_role;
+          
+          if (!providedRole) {
+            console.error('❌ CREATE_DOCUMENT_ARTIFACT ERROR: artifact_role is required');
+            return {
+              success: false,
+              error: 'Missing artifact_role parameter',
+              message: `Document artifacts require an artifact_role parameter. Common roles: "rfp_request_email" (for vendor requests), "request_document", "specification_document". Full list: ${validDocumentRoles.join(', ')}. Example: create_document_artifact({ ..., artifact_role: "rfp_request_email" })`
+            };
+          }
+          
+          if (!validDocumentRoles.includes(providedRole)) {
+            console.error(`❌ CREATE_DOCUMENT_ARTIFACT ERROR: Invalid artifact_role "${providedRole}"`);
+            return {
+              success: false,
+              error: `Invalid artifact_role: "${providedRole}"`,
+              message: `Document artifact_role must be one of: ${validDocumentRoles.join(', ')}. You provided: "${providedRole}". Note: Use "rfp_request_email" for RFP vendor request emails (enables intelligent upsert).`
+            };
+          }
+          
+          console.log(`✅ Document artifact role validated: "${providedRole}"`);
           
           // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
           // @ts-expect-error - Supabase client type is unknown but compatible
