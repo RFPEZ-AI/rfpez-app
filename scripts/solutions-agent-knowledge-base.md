@@ -719,11 +719,189 @@ You MUST use the `switch_agent` function with the appropriate agent name (not UU
   "knowledge_id": "agent-query-database-lookup",
   "category": "best-practices",
   "importance": 0.85,
-  "tags": ["agents", "database", "live-data", "queries"]
+  "tags": ["agents", "database", "live-data", "switching"]
 }
 ```
 
 **Relations:**
 - relates_to: agent-referral-guidelines
+
+---
+
+## Suggested Prompts Usage - UI Enhancement Guidelines
+
+### ID: suggested-prompts-usage
+### Type: knowledge
+### Importance: 0.90
+### Category: best-practices
+
+**Content:**
+Complete guide for using suggested prompt syntax to enhance user experience and reduce friction in conversations.
+
+### What Are Suggested Prompts?
+
+Suggested prompts are clickable buttons that appear in agent messages, allowing users to select common actions without typing. They improve workflow efficiency and guide users to appropriate next steps.
+
+### Syntax:
+
+**Complete Prompts (Auto-Submit)**:
+```markdown
+[Prompt text](prompt:complete)
+```
+- Renders as a **solid button**
+- Clicking **automatically submits** the message
+- Use for specific, ready-to-execute actions
+
+**Open-Ended Prompts (Fill Input)**:
+```markdown
+[I'd like to source ...](prompt:open)
+```
+- Renders as an **outline button** with "..." appended
+- Clicking **fills the input field** for user to complete
+- Use when user needs to provide additional information
+
+### When to Use:
+
+1. **Welcome Messages** - Offer 2-3 common starting points
+   ```markdown
+   Welcome! How can I help you today?
+   
+   [I'd like to source ...](prompt:open)
+   [Learn about EZRFP.APP](prompt:complete)
+   [Talk to a specialist](prompt:complete)
+   ```
+
+2. **After Explaining Features** - Provide action shortcuts
+   ```markdown
+   EZRFP.APP helps you create professional RFPs and find qualified suppliers.
+   
+   [Create my first RFP](prompt:complete)
+   [Tell me more about the process](prompt:complete)
+   [I need to source ...](prompt:open)
+   ```
+
+3. **Agent Transitions** - Make switching easy
+   ```markdown
+   For RFP creation, I recommend our Design specialist.
+   
+   [Yes, switch to RFP Design](prompt:complete)
+   [Tell me more first](prompt:complete)
+   [I want to ...](prompt:open)
+   ```
+
+4. **Anonymous Users** - Guide toward signup or exploration
+   ```markdown
+   Welcome to EZRFP.APP! We help with competitive sourcing.
+   
+   [Tell me more](prompt:complete)
+   [I'd like to source ...](prompt:open)
+   [Sign up for free](prompt:complete)
+   ```
+
+### Best Practices:
+
+**Quantity**:
+- Limit to **2-4 prompts** per message
+- Too many options overwhelm users
+- Focus on most common/valuable actions
+
+**Mix Prompt Types**:
+- Combine complete and open-ended prompts
+- Start with open-ended for custom input
+- Follow with complete for common actions
+
+**Action-Oriented Language**:
+- Use clear, direct language
+- Start with verbs: "Create", "Show", "Find", "Tell"
+- Keep prompts under 50 characters
+
+**Contextual Relevance**:
+- Match prompts to current conversation context
+- Anticipate user's next logical step
+- Provide shortcuts for common workflows
+
+### Examples by Scenario:
+
+**Authenticated User Welcome**:
+```markdown
+Welcome back, [Name]! Ready to continue your procurement work?
+
+[I'd like to source ...](prompt:open)
+[Show my previous RFPs](prompt:complete)
+[Create a new RFP](prompt:complete)
+```
+
+**Anonymous User Welcome**:
+```markdown
+Welcome to EZRFP.APP! We help with competitive sourcing and RFP creation.
+
+[Tell me more](prompt:complete)
+[I'd like to source ...](prompt:open)
+[Sign up for free](prompt:complete)
+```
+
+**After Product Explanation**:
+```markdown
+EZRFP.APP streamlines your procurement process with AI-powered RFP creation.
+
+[Create my first RFP](prompt:complete)
+[Learn about pricing](prompt:complete)
+[I need to source ...](prompt:open)
+```
+
+**Before Agent Switch**:
+```markdown
+The RFP Design agent specializes in creating procurement packages. Let me connect you.
+
+[Yes, switch to RFP Design](prompt:complete)
+[Tell me more about RFP Design](prompt:complete)
+[I want to ...](prompt:open)
+```
+
+**Procurement Intent Detected**:
+```markdown
+I can help you get started with that procurement request!
+
+[Switch to RFP Design to create RFP](prompt:complete)
+[Tell me more about the process](prompt:complete)
+[I need help with ...](prompt:open)
+```
+
+### Technical Details:
+
+- Prompts render as **Ionic React buttons** with proper styling
+- Complete prompts: solid fill, instant submission
+- Open-ended prompts: outline style, "..." suffix
+- Mobile-responsive: buttons wrap on narrow screens
+- Accessible: keyboard navigation supported
+
+### What NOT to Do:
+
+❌ Don't use for every response (feels spammy)
+❌ Don't create >4 prompts at once (overwhelming)
+❌ Don't use vague text like "Option 1", "Choice A"
+❌ Don't forget the "..." for open-ended prompts
+❌ Don't use for destructive actions (delete, cancel)
+
+### Accessibility Considerations:
+
+- Buttons are keyboard navigable
+- Screen reader friendly
+- Clear visual distinction between types
+- Sufficient click/tap target size (44x44px minimum)
+
+**Metadata:**
+```json
+{
+  "knowledge_id": "suggested-prompts-usage",
+  "category": "best-practices",
+  "importance": 0.90,
+  "tags": ["ux", "prompts", "ui-enhancement", "communication", "best-practices"]
+}
+```
+
+**Relations:**
+- relates_to: agent-referral-guidelines
+- relates_to: anonymous-intent-workflow
 
 ---

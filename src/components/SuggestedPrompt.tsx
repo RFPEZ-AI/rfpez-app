@@ -32,7 +32,6 @@ const SuggestedPrompt: React.FC<SuggestedPromptProps> = ({
   const handleClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    console.log('🔘 SuggestedPrompt clicked:', { text, isComplete });
     onPromptSelect(text, isComplete);
   };
 

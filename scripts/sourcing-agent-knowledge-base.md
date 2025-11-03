@@ -2069,3 +2069,181 @@ Common research patterns and strategies for different types of procurement categ
 **Relations:**
 - relates_to: perplexity-vendor-discovery
 - relates_to: vendor-selection-best-practices
+
+---
+
+## Suggested Prompts Usage - UI Enhancement Guidelines
+
+### ID: suggested-prompts-usage
+### Type: knowledge
+### Importance: 0.90
+### Category: best-practices
+
+**Content:**
+Complete guide for using suggested prompt syntax to enhance user experience and reduce friction in vendor sourcing conversations.
+
+### What Are Suggested Prompts?
+
+Suggested prompts are clickable buttons that appear in agent messages, allowing users to select common actions without typing. They improve workflow efficiency and guide users to appropriate next steps.
+
+### Syntax:
+
+**Complete Prompts (Auto-Submit)**:
+```markdown
+[Prompt text](prompt:complete)
+```
+- Renders as a **solid button**
+- Clicking **automatically submits** the message
+- Use for specific, ready-to-execute actions
+
+**Open-Ended Prompts (Fill Input)**:
+```markdown
+[I need to source ...](prompt:open)
+```
+- Renders as an **outline button** with "..." appended
+- Clicking **fills the input field** for user to complete
+- Use when user needs to provide additional information
+
+### When to Use:
+
+1. **Welcome Messages** - Offer 2-3 common sourcing paths
+   ```markdown
+   Welcome! I specialize in finding qualified suppliers.
+   
+   [I need to source ...](prompt:open)
+   [Search for specific vendors](prompt:complete)
+   [Review my vendor requirements](prompt:complete)
+   ```
+
+2. **After Requirements Discovery** - Provide action shortcuts
+   ```markdown
+   I understand your vendor requirements. Ready to find suppliers?
+   
+   [Start vendor search](prompt:complete)
+   [Refine my requirements](prompt:complete)
+   [I also need to source ...](prompt:open)
+   ```
+
+3. **After Research Results** - Enable next steps
+   ```markdown
+   I found 5 qualified suppliers matching your criteria.
+   
+   [Show me the vendors](prompt:complete)
+   [Narrow down the search](prompt:complete)
+   [I need to find ...](prompt:open)
+   ```
+
+4. **Agent Transitions** - Facilitate workflow handoffs
+   ```markdown
+   For RFP creation, I recommend our Design specialist.
+   
+   [Yes, switch to RFP Design](prompt:complete)
+   [Continue vendor research](prompt:complete)
+   [I want to ...](prompt:open)
+   ```
+
+### Best Practices:
+
+**Quantity**:
+- Limit to **2-4 prompts** per message
+- Too many options overwhelm users
+- Focus on most common/valuable actions
+
+**Mix Prompt Types**:
+- Combine complete and open-ended prompts
+- Start with open-ended for custom input
+- Follow with complete for common actions
+
+**Action-Oriented Language**:
+- Use clear, direct language
+- Start with verbs: "Search", "Show", "Find", "Review"
+- Keep prompts under 50 characters
+
+**Contextual Relevance**:
+- Match prompts to sourcing workflow stage
+- Anticipate user's next logical step
+- Provide shortcuts for common vendor research tasks
+
+### Examples by Scenario:
+
+**Initial Vendor Search Request**:
+```markdown
+I can help you find qualified suppliers! What are you sourcing?
+
+[I need to source ...](prompt:open)
+[I have specific requirements](prompt:complete)
+[Show me vendor options](prompt:complete)
+```
+
+**After Requirements Collection**:
+```markdown
+Great! I understand you need [summary]. Let me search for vendors.
+
+[Start the search](prompt:complete)
+[Add more requirements](prompt:complete)
+[I also need ...](prompt:open)
+```
+
+**After Presenting Vendor Results**:
+```markdown
+I found 5 suppliers with [certifications]: [Vendor list]
+
+[Tell me more about vendor X](prompt:complete)
+[Create RFP for these vendors](prompt:complete)
+[Find vendors for ...](prompt:open)
+```
+
+**Before Creating RFP**:
+```markdown
+Ready to create an RFP for these vendors? Our RFP Design agent can help.
+
+[Yes, create RFP](prompt:complete)
+[Refine vendor list first](prompt:complete)
+[I need to source ...](prompt:open)
+```
+
+**Multi-Category Sourcing**:
+```markdown
+I've found vendors for [Category A]. Need suppliers for other categories?
+
+[I need to source ...](prompt:open)
+[Create RFP with current vendors](prompt:complete)
+[Add vendor requirements](prompt:complete)
+```
+
+### Technical Details:
+
+- Prompts render as **Ionic React buttons** with proper styling
+- Complete prompts: solid fill, instant submission
+- Open-ended prompts: outline style, "..." suffix
+- Mobile-responsive: buttons wrap on narrow screens
+- Accessible: keyboard navigation supported
+
+### What NOT to Do:
+
+❌ Don't use for every response (feels spammy)
+❌ Don't create >4 prompts at once (overwhelming)
+❌ Don't use vague text like "Option 1", "Choice A"
+❌ Don't forget the "..." for open-ended prompts
+❌ Don't use for destructive actions (delete, cancel)
+
+### Accessibility Considerations:
+
+- Buttons are keyboard navigable
+- Screen reader friendly
+- Clear visual distinction between types
+- Sufficient click/tap target size (44x44px minimum)
+
+**Metadata:**
+```json
+{
+  "knowledge_id": "suggested-prompts-usage",
+  "category": "best-practices",
+  "importance": 0.90,
+  "tags": ["ux", "prompts", "ui-enhancement", "communication", "best-practices"]
+}
+```
+
+**Relations:**
+- relates_to: sourcing-vendor-requirements-workflow
+- relates_to: perplexity-vendor-discovery
