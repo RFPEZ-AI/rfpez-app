@@ -387,26 +387,65 @@ export class ToolExecutionService {
             };
           }
           
-          if (!sessionData?.current_rfp_id) {
-            console.error('❌ No current RFP set for this session');
-            return {
-              success: false,
-              error: 'No current RFP set',
-              message: 'No RFP is currently active for this session. To create this form artifact, you must first create an RFP using the create_and_set_rfp tool. Call it now with a descriptive name based on what the user is procuring (e.g., "LED Bulbs RFP" or "Industrial Alcohol RFP"), then retry creating the form artifact.',
-              recovery_action: {
-                tool: 'create_and_set_rfp',
-                instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
-              }
+          // Auto-create RFP if missing
+          let currentRfpId = sessionData?.current_rfp_id;
+          
+          if (!currentRfpId) {
+            console.log('⚠️ No current RFP set - attempting auto-create from session context...');
+            
+            // Try to auto-create RFP from session title
+            // @ts-expect-error - Supabase client type is unknown but compatible
+            const sessionInfoQuery = await this.supabase
+              .from('sessions')
+              .select('title')
+              .eq('id', sessionId)
+              .single();
+            
+            const { data: sessionInfo } = sessionInfoQuery as { 
+              data: { title?: string } | null 
             };
+            
+            const sessionTitle = sessionInfo?.title || 'New RFP';
+            const autoRfpName = sessionTitle.includes('RFP') ? sessionTitle : `RFP for ${sessionTitle}`;
+            
+            console.log(`🤖 Auto-creating RFP: "${autoRfpName}" for session "${sessionTitle}"`);
+            
+            // Import and call createAndSetRfpWithClient
+            const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
+            // @ts-expect-error - RFP function type compatibility
+            const createResult = await createAndSetRfpWithClient(this.supabase, {
+              name: autoRfpName,
+              description: `Automatically created RFP for ${sessionTitle}`
+            }, { 
+              sessionId: sessionId
+            });
+            
+            const createdRfpId = (createResult as { current_rfp_id?: number }).current_rfp_id;
+            
+            if (!createResult.success || !createdRfpId) {
+              console.error('❌ Failed to auto-create RFP:', createResult.error);
+              return {
+                success: false,
+                error: 'No current RFP set and auto-creation failed',
+                message: 'No RFP is currently active for this session. Attempted to auto-create RFP but failed. Please create an RFP manually using create_and_set_rfp with a descriptive name.',
+                recovery_action: {
+                  tool: 'create_and_set_rfp',
+                  instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
+                }
+              };
+            }
+            
+            console.log(`✅ Auto-created RFP successfully: ID ${createdRfpId}, Name: "${autoRfpName}"`);
+            currentRfpId = createdRfpId;
           }
           
-          console.log('✅ Auto-injecting current RFP ID:', sessionData.current_rfp_id);
+          console.log('✅ Auto-injecting current RFP ID:', currentRfpId);
           
           const { createFormArtifact } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
           return await createFormArtifact(this.supabase, sessionId, this.userId, {
             ...input,
-            rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
+            rfp_id: currentRfpId  // 🎯 INJECT RFP ID FROM SESSION OR AUTO-CREATED
           });
         }
 
@@ -449,26 +488,65 @@ export class ToolExecutionService {
             };
           }
           
-          if (!sessionData?.current_rfp_id) {
-            console.error('❌ No current RFP set for this session');
-            return {
-              success: false,
-              error: 'No current RFP set',
-              message: 'No RFP is currently active for this session. To create this document artifact, you must first create an RFP using the create_and_set_rfp tool. Call it now with a descriptive name based on what the user is procuring (e.g., "LED Bulbs RFP" or "Industrial Alcohol RFP"), then retry creating the document artifact.',
-              recovery_action: {
-                tool: 'create_and_set_rfp',
-                instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
-              }
+          // Auto-create RFP if missing (same logic as create_form_artifact)
+          let currentRfpId = sessionData?.current_rfp_id;
+          
+          if (!currentRfpId) {
+            console.log('⚠️ No current RFP set for document - attempting auto-create from session context...');
+            
+            // Try to auto-create RFP from session title
+            // @ts-expect-error - Supabase client type is unknown but compatible
+            const sessionInfoQuery = await this.supabase
+              .from('sessions')
+              .select('title')
+              .eq('id', sessionId)
+              .single();
+            
+            const { data: sessionInfo } = sessionInfoQuery as { 
+              data: { title?: string } | null 
             };
+            
+            const sessionTitle = sessionInfo?.title || 'New RFP';
+            const autoRfpName = sessionTitle.includes('RFP') ? sessionTitle : `RFP for ${sessionTitle}`;
+            
+            console.log(`🤖 Auto-creating RFP: "${autoRfpName}" for session "${sessionTitle}"`);
+            
+            // Import and call createAndSetRfpWithClient
+            const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
+            // @ts-expect-error - RFP function type compatibility
+            const createResult = await createAndSetRfpWithClient(this.supabase, {
+              name: autoRfpName,
+              description: `Automatically created RFP for ${sessionTitle}`
+            }, { 
+              sessionId: sessionId
+            });
+            
+            const createdRfpId = (createResult as { current_rfp_id?: number }).current_rfp_id;
+            
+            if (!createResult.success || !createdRfpId) {
+              console.error('❌ Failed to auto-create RFP for document:', createResult.error);
+              return {
+                success: false,
+                error: 'No current RFP set and auto-creation failed',
+                message: 'No RFP is currently active for this session. Attempted to auto-create RFP but failed. Please create an RFP manually using create_and_set_rfp with a descriptive name.',
+                recovery_action: {
+                  tool: 'create_and_set_rfp',
+                  instruction: 'Call create_and_set_rfp with a descriptive name based on the user\'s procurement needs, then retry this operation.'
+                }
+              };
+            }
+            
+            console.log(`✅ Auto-created RFP successfully: ID ${createdRfpId}, Name: "${autoRfpName}"`);
+            currentRfpId = createdRfpId;
           }
           
-          console.log('✅ Auto-injecting current RFP ID:', sessionData.current_rfp_id);
+          console.log('✅ Auto-injecting current RFP ID:', currentRfpId);
           
           const { createDocumentArtifact } = await import('../tools/database.ts');
           // @ts-expect-error - Database function type compatibility
           const result = await createDocumentArtifact(this.supabase, sessionId, this.userId, {
             ...input,
-            rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
+            rfp_id: currentRfpId  // 🎯 INJECT RFP ID FROM SESSION OR AUTO-CREATED
           });
           console.log('🎯 CREATE_DOCUMENT_ARTIFACT RESULT:', JSON.stringify(result, null, 2));
           return result;
