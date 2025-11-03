@@ -511,11 +511,69 @@ function handleStreamingResponse(
           return isToolExecutionResult(result) && result.function_name === 'switch_agent' && result.result?.success === true;
         });
 
+        // 🚨 AUTOMATIC READINESS CHECK for streaming: Check if RFP Design package is complete
+        let readinessCheckMessage = '';
+        const RFP_DESIGN_AGENT_ID = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+        
+        // Check if any artifact creation tools were executed
+        const artifactCreated = executedToolResults.some((result: unknown) => {
+          return isToolExecutionResult(result) && 
+                 (result.function_name === 'create_form_artifact' || result.function_name === 'create_document_artifact') && 
+                 result.result?.success === true;
+        });
+        
+        // Only check readiness if current agent is RFP Design and an artifact was just created
+        if (agentId === RFP_DESIGN_AGENT_ID && artifactCreated) {
+          try {
+            console.log('🔍 [STREAMING] Checking RFP Design package readiness after artifact creation...');
+            
+            // Import list_artifacts function
+            const { listArtifacts } = await import('../tools/database.ts');
+            
+            // Get all artifacts for this session
+            // @ts-expect-error - Supabase client type is unknown but compatible
+            const artifactList = await listArtifacts(supabase, {
+              sessionId: sessionId || '',
+              userId: userId || ''
+            });
+            
+            console.log('📦 [STREAMING] Artifacts in session:', JSON.stringify(artifactList, null, 2));
+            
+            // Check for required artifacts
+            const hasBidForm = artifactList?.artifacts?.some((a: { artifact_role?: string }) => 
+              a.artifact_role === 'bid_form'
+            );
+            const hasRequestEmail = artifactList?.artifacts?.some((a: { artifact_role?: string }) => 
+              a.artifact_role === 'rfp_request_email'
+            );
+            
+            console.log('✅ [STREAMING] Readiness check:', { hasBidForm, hasRequestEmail });
+            
+            // If both required artifacts exist, inject readiness message
+            if (hasBidForm && hasRequestEmail) {
+              readinessCheckMessage = `\n\n🎉 **Your RFP package is complete!** You now have:\n✅ Supplier Bid Form\n✅ RFP Request Email\n\nReady to find qualified suppliers and send invitations?\n\n💡 **Suggested next step:** Switch to the **Sourcing agent** to identify and invite suppliers.\n\nType "complete" to proceed or ask me to make any changes.`;
+              console.log('🎉 [STREAMING] RFP Design package complete - readiness message will be injected');
+              
+              // Stream the readiness message as content
+              const readinessEvent = {
+                type: 'content_block_delta',
+                delta: { type: 'text_delta', text: readinessCheckMessage }
+              };
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(readinessEvent)}\n\n`));
+            } else {
+              console.log('⏳ [STREAMING] RFP Design package incomplete - continuing...');
+            }
+          } catch (error) {
+            console.error('❌ [STREAMING] Error during automatic readiness check:', error);
+            // Don't fail the entire request if readiness check fails
+          }
+        }
+
         // Send completion event with metadata including agent switch detection
         const completeEvent: Record<string, unknown> = {
           type: 'complete',
-          full_content: fullContent,
-          token_count: fullContent.length, // Approximate token count
+          full_content: fullContent + readinessCheckMessage, // Append readiness message
+          token_count: (fullContent + readinessCheckMessage).length, // Approximate token count
           tool_results: toolsUsed.map(name => ({ name, success: true })),
           metadata: {
             agent_switch_occurred: agentSwitchOccurred,
@@ -1135,10 +1193,53 @@ Do NOT wait for a new user message - generate your introduction and welcome mess
       metadata.artifacts = artifacts;
     }
 
-    // Prepare response
+    // 🚨 AUTOMATIC READINESS CHECK: After artifact creation, check if RFP Design agent package is complete
+    let readinessCheckMessage = '';
+    const RFP_DESIGN_AGENT_ID = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+    
+    // Only check readiness if current agent is RFP Design and an artifact was just created
+    if (effectiveAgentId === RFP_DESIGN_AGENT_ID && artifacts.length > 0) {
+      try {
+        console.log('🔍 Checking RFP Design package readiness after artifact creation...');
+        
+        // Import list_artifacts function
+        const { listArtifacts } = await import('../tools/database.ts');
+        
+        // Get all artifacts for this session
+        const artifactList = await listArtifacts(supabase, {
+          sessionId: actualSessionId,
+          userId: String(metadata.userId || '')
+        });
+        
+        console.log('📦 Artifacts in session:', JSON.stringify(artifactList, null, 2));
+        
+        // Check for required artifacts
+        const hasBidForm = artifactList?.artifacts?.some((a: { artifact_role?: string }) => 
+          a.artifact_role === 'bid_form'
+        );
+        const hasRequestEmail = artifactList?.artifacts?.some((a: { artifact_role?: string }) => 
+          a.artifact_role === 'rfp_request_email'
+        );
+        
+        console.log('✅ Readiness check:', { hasBidForm, hasRequestEmail });
+        
+        // If both required artifacts exist, inject readiness message
+        if (hasBidForm && hasRequestEmail) {
+          readinessCheckMessage = `\n\n🎉 **Your RFP package is complete!** You now have:\n✅ Supplier Bid Form\n✅ RFP Request Email\n\nReady to find qualified suppliers and send invitations?\n\n💡 **Suggested next step:** Switch to the **Sourcing agent** to identify and invite suppliers.\n\nType "complete" to proceed or ask me to make any changes.`;
+          console.log('🎉 RFP Design package complete - readiness message injected');
+        } else {
+          console.log('⏳ RFP Design package incomplete - continuing...');
+        }
+      } catch (error) {
+        console.error('❌ Error during automatic readiness check:', error);
+        // Don't fail the entire request if readiness check fails
+      }
+    }
+
+    // Prepare response with automatic readiness message if applicable
     const responseData: Record<string, unknown> = {
       success: true,
-      content: claudeResponse.textResponse, // Changed from 'response' to 'content' for client compatibility
+      content: claudeResponse.textResponse + readinessCheckMessage, // Append readiness message if package complete
       metadata: metadata, // Add metadata object with artifact info
       toolCalls: claudeResponse.toolCalls,
       toolResults: toolResults,

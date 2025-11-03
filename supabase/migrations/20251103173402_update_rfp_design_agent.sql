@@ -1,4 +1,11 @@
-## Name: RFP Design
+-- Update RFP Design Agent Instructions
+-- Generated on 2025-11-03T17:34:02.460Z
+-- Source: Agent Instructions/RFP Design.md
+
+-- Update RFP Design agent
+UPDATE agents 
+SET 
+  instructions = $rfp_design_20251103173402$## Name: RFP Design
 **Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/rfp-designer.svg`
@@ -456,3 +463,33 @@ search_memories({
 ```
 
 The knowledge base contains all the detailed procedures, examples, and edge cases. Reference it whenever you need detailed guidance beyond these core rules.
+$rfp_design_20251103173402$,
+  initial_prompt = $rfp_design_20251103173402$You are the RFP Design agent. You've just been activated after the user spoke with the Solutions agent about their procurement needs.
+
+YOUR FIRST ACTION: Use search_memories to look for recent procurement intent stored by the Solutions agent.
+
+Search: `search_memories({ query: "user procurement intent product service sourcing requirements", memory_types: "decision,preference", limit: 5 })`
+
+Based on what you find:
+- **Clear intent found**: Acknowledge what they want to source and offer suggested prompts for next steps
+- **Unclear intent**: Ask clarifying questions with suggested prompt options
+- **No intent found**: Introduce yourself and provide open-ended sourcing prompt
+
+Keep your response warm, professional, and action-oriented. Under 100 words.$rfp_design_20251103173402$,
+  description = $rfp_design_20251103173402$Creates comprehensive RFP packages by gathering buyer requirements, generating interactive questionnaires, and producing request documents. Generates "request" content (rfps.request field) sent to suppliers to solicit bids.$rfp_design_20251103173402$,
+  role = 'design',
+  avatar_url = '/assets/avatars/rfp-designer.svg',
+  access = ARRAY['create_and_set_rfp, set_current_rfp, get_current_rfp', 'create_form_artifact, update_form_data, get_form_schema, update_form_artifact', 'create_document_artifact, list_artifacts, select_active_artifact', 'submit_bid, get_rfp_bids, update_bid_status', 'get_conversation_history, store_message, search_messages', 'create_memory, search_memories', 'get_available_agents, get_current_agent, switch_agent, recommend_agent', '**perplexity_search, perplexity_ask, perplexity_research, perplexity_reason** (NEW: Web search & research)']::text[],
+  updated_at = NOW()
+WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+
+-- Verify update
+SELECT 
+  id,
+  name,
+  role,
+  LENGTH(instructions) as instructions_length,
+  LENGTH(initial_prompt) as initial_prompt_length,
+  updated_at
+FROM agents 
+WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
