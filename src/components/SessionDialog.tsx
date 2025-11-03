@@ -6,6 +6,7 @@ import { chevronDownOutline } from 'ionicons/icons';
 import PromptComponent from './PromptComponent';
 import ArtifactReferenceTag from './ArtifactReferenceTag';
 import ToolExecutionDisplay from './ToolExecutionDisplay';
+import SuggestedPrompt from './SuggestedPrompt';
 import { ArtifactReference } from '../types/home';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
 import ReactMarkdown from 'react-markdown';
@@ -58,6 +59,23 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   const promptRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const [showScrollButton, setShowScrollButton] = useState(false);
+
+  // Handler for suggested prompts
+  const handleSuggestedPrompt = useCallback((promptText: string, autoSubmit: boolean) => {
+    console.log('🎯 handleSuggestedPrompt called:', { promptText, autoSubmit });
+    if (autoSubmit) {
+      // Complete prompts auto-submit
+      console.log('✉️ Auto-submitting prompt:', promptText);
+      onSendMessage(promptText);
+    } else {
+      // Open-ended prompts need to be filled into the input
+      // We'll use a custom event to communicate with PromptComponent
+      console.log('📋 Dispatching fillPrompt event for:', promptText);
+      const event = new CustomEvent('fillPrompt', { detail: { text: promptText } });
+      window.dispatchEvent(event);
+      console.log('✅ fillPrompt event dispatched');
+    }
+  }, [onSendMessage]);
 
   const scrollToBottom = useCallback(() => {
     // Try to scroll to prompt first, then to messages end
@@ -191,7 +209,73 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                   {message.isUser ? (
                     message.content
                   ) : (
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    <ReactMarkdown 
+                      remarkPlugins={[remarkGfm]}
+                      urlTransform={(url) => {
+                        // Allow our custom prompt: protocol
+                        if (url.startsWith('prompt:')) {
+                          return url;
+                        }
+                        // Default behavior for other URLs
+                        return url;
+                      }}
+                      components={{
+                        // Debug all links to see what's being rendered
+                        p: ({ children }) => {
+                          console.log('📄 Paragraph content:', children);
+                          return <p>{children}</p>;
+                        },
+                        // Custom link renderer to handle suggested prompts
+                        a: ({ href, children, ...props }) => {
+                          const childText = typeof children === 'string' 
+                            ? children 
+                            : Array.isArray(children) 
+                              ? children.join('') 
+                              : String(children);
+                          console.log('🔗 Link detected - href:', href, 'text:', childText, 'starts with prompt?', href?.startsWith('prompt:'));
+                          
+                          // Check if this is a suggested prompt link
+                          if (href?.startsWith('prompt:')) {
+                            const isComplete = href === 'prompt:complete';
+                            const promptText = typeof children === 'string' 
+                              ? children 
+                              : Array.isArray(children) 
+                                ? children.join('') 
+                                : String(children);
+                            
+                            console.log('✅ IS PROMPT LINK - Rendering SuggestedPrompt:', { href, promptText, isComplete });
+                            
+                            return (
+                              <SuggestedPrompt
+                                text={promptText}
+                                isComplete={isComplete}
+                                onPromptSelect={handleSuggestedPrompt}
+                              />
+                            );
+                          }
+                          
+                          // Regular link - prevent navigation and log
+                          console.log('❌ NOT PROMPT LINK - rendering as regular link');
+                          return (
+                            <a 
+                              href={href} 
+                              onClick={(e) => {
+                                e.preventDefault();
+                                console.log('🚫 Link clicked, navigation prevented. href was:', href);
+                              }}
+                              style={{
+                                color: 'var(--ion-color-primary)',
+                                textDecoration: 'underline',
+                                cursor: 'pointer'
+                              }}
+                              {...props}
+                            >
+                              {children}
+                            </a>
+                          );
+                        }
+                      }}
+                    >
                       {message.content}
                     </ReactMarkdown>
                   )}

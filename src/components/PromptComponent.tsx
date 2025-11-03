@@ -37,6 +37,32 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
     }
   }, [autoFocus]);
 
+  // Listen for fillPrompt events from suggested prompts
+  useEffect(() => {
+    const handleFillPrompt = (event: Event) => {
+      const customEvent = event as CustomEvent<{ text: string }>;
+      console.log('📝 PromptComponent received fillPrompt event:', customEvent.detail);
+      if (customEvent.detail?.text) {
+        setMessage(customEvent.detail.text);
+        console.log('✅ Message set to:', customEvent.detail.text);
+        // Focus the textarea after filling
+        setTimeout(() => {
+          if (textareaRef.current) {
+            textareaRef.current.setFocus();
+            console.log('✅ Textarea focused');
+          }
+        }, 100);
+      }
+    };
+
+    console.log('👂 PromptComponent: Setting up fillPrompt event listener');
+    window.addEventListener('fillPrompt', handleFillPrompt);
+    return () => {
+      console.log('🔕 PromptComponent: Removing fillPrompt event listener');
+      window.removeEventListener('fillPrompt', handleFillPrompt);
+    };
+  }, []);
+
   // Auto-scroll when textarea expands to ensure prompt stays fully visible
   useEffect(() => {
     if (containerRef.current) {

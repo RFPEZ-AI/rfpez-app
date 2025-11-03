@@ -37,6 +37,7 @@ import Phase1TestButton from '../components/Phase1TestButton';
 import Phase2TestButton from '../components/Phase2TestButton';
 import StreamManagementTest from '../components/StreamManagementTest';
 import TokenBatchTest from '../components/TokenBatchTest';
+import SuggestedPromptTest from '../components/SuggestedPromptTest';
 // DISABLED: Performance monitoring components cause memory pressure
 // import PerformanceMonitoringDashboard from '../components/PerformanceMonitoringDashboard';
 // import MemoryStressTest from '../components/MemoryStressTest';
@@ -166,6 +167,9 @@ const DebugPage: React.FC = () => {
         
         {/* Phase 2 Test Button - Streaming Integration */}
         <Phase2TestButton />
+        
+        {/* Suggested Prompts Test - UI Component Testing */}
+        <SuggestedPromptTest />
         
         {/* Stream Management Test - Advanced Streaming Features */}
         <StreamManagementTest />
