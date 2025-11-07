@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
+/* eslint-disable no-undef */
 // Copyright Mark Skiba, 2025 All rights reserved
 const { createProxyMiddleware } = require('http-proxy-middleware');
 
@@ -9,16 +11,17 @@ module.exports = function(app) {
       target: 'http://localhost:3001',
       changeOrigin: true,
       logLevel: 'debug',
-      onProxyReq: (proxyReq, req, res) => {
-        console.log(`[Proxy] ${req.method} ${req.url} -> http://localhost:3001${req.url}`);
+      onProxyReq: (proxyReq) => {
+        console.log(`[Proxy] ${proxyReq.method} ${proxyReq.path} -> http://localhost:3001${proxyReq.path}`);
       },
-      onProxyRes: (proxyRes, req, res) => {
+      onProxyRes: (proxyRes) => {
         console.log(`[Proxy] Response status: ${proxyRes.statusCode}`);
       },
-      onError: (err, req, res) => {
+      onError: (err, _req, res) => {
         console.error('[Proxy] Error:', err.message);
         res.status(502).json({ error: 'Proxy error', message: err.message });
       }
     })
   );
 };
+

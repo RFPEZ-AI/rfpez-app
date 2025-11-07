@@ -21,7 +21,7 @@ if (typeof globalThis.process === 'undefined') {
     console.warn('[Init] Could not pre-populate env vars:', e);
   }
   
-  // @ts-ignore
+  // @ts-ignore: Deno Deploy environment compatibility - process global required for Node.js libraries
   globalThis.process = {
     env: new Proxy(envObj, {
       get: (target, prop) => {

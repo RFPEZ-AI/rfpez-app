@@ -2,7 +2,7 @@
 // Vendor List Tool Handler for Claude API v3
 // Manages Vendor List artifacts with auto-save functionality
 
-// Note: Supabase client is passed as parameter, no direct import needed
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
 interface VendorSelectionVendor {
   id: string;
@@ -37,7 +37,7 @@ interface ManageVendorSelectionParams {
  * This tool provides CRUD operations for Vendor Lists with auto-save
  */
 export async function handleManageVendorSelection(
-  supabase: any, // SupabaseClient passed from caller
+  supabase: SupabaseClient,
   params: ManageVendorSelectionParams
 ): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
   
@@ -83,7 +83,7 @@ export async function handleManageVendorSelection(
  * Only one vendor selection artifact is allowed per RFP
  */
 async function createVendorSelection(
-  supabase: any,
+  supabase: SupabaseClient,
   params: ManageVendorSelectionParams
 ): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
   // 🔧 FIX: Parse vendors if it's a JSON string (Claude API serialization issue)
@@ -242,7 +242,7 @@ async function createVendorSelection(
  * Read vendor selection artifact for an RFP
  */
 async function readVendorSelection(
-  supabase: any,
+  supabase: SupabaseClient,
   params: ManageVendorSelectionParams
 ): Promise<{ success: boolean; data?: unknown; error?: string }> {
   // Find vendor selection artifact for this RFP
@@ -297,7 +297,7 @@ async function readVendorSelection(
  * Update vendor selection artifact (replace entire vendor list)
  */
 async function updateVendorSelection(
-  supabase: any,
+  supabase: SupabaseClient,
   params: ManageVendorSelectionParams
 ): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
   // 🔧 FIX: Parse vendors if it's a JSON string (Claude API serialization issue)
@@ -381,7 +381,7 @@ async function updateVendorSelection(
  * Add vendors to existing vendor selection
  */
 async function addVendors(
-  supabase: any,
+  supabase: SupabaseClient,
   params: ManageVendorSelectionParams
 ): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
   // 🔧 FIX: Parse vendors if it's a JSON string (Claude API serialization issue)
@@ -474,7 +474,7 @@ async function addVendors(
  * Remove vendors from vendor selection
  */
 async function removeVendors(
-  supabase: any,
+  supabase: SupabaseClient,
   params: ManageVendorSelectionParams
 ): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
   if (!params.vendor_ids || params.vendor_ids.length === 0) {
@@ -555,7 +555,7 @@ async function removeVendors(
  * Toggle vendor selection status (select/deselect)
  */
 async function toggleVendorSelection(
-  supabase: any,
+  supabase: SupabaseClient,
   params: ManageVendorSelectionParams
 ): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
   if (!params.vendor_ids || params.vendor_ids.length === 0) {

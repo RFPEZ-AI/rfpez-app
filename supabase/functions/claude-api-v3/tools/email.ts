@@ -6,6 +6,14 @@ import { GmailFetchService } from '../services/gmail-fetch.ts';
 import type { ToolResult } from '../types.ts';
 
 /**
+ * Gmail message header interface
+ */
+interface GmailHeader {
+  name: string;
+  value: string;
+}
+
+/**
  * Helper function to check if an email belongs to a registered user
  */
 async function isRegisteredUser(supabase: SupabaseClient, email: string): Promise<boolean> {
@@ -211,9 +219,9 @@ export async function searchEmails(
           id: fullEmail.id,
           threadId: fullEmail.threadId,
           snippet: fullEmail.snippet,
-          subject: fullEmail.payload?.headers?.find((h: any) => h.name === 'Subject')?.value,
-          from: fullEmail.payload?.headers?.find((h: any) => h.name === 'From')?.value,
-          date: fullEmail.payload?.headers?.find((h: any) => h.name === 'Date')?.value,
+          subject: fullEmail.payload?.headers?.find((h: GmailHeader) => h.name === 'Subject')?.value,
+          from: fullEmail.payload?.headers?.find((h: GmailHeader) => h.name === 'From')?.value,
+          date: fullEmail.payload?.headers?.find((h: GmailHeader) => h.name === 'Date')?.value,
           labelIds: fullEmail.labelIds
         });
       } catch (e) {
@@ -261,7 +269,7 @@ export async function getEmail(
 
     // Extract relevant email information
     const headers = email.payload?.headers || [];
-    const getHeader = (name: string) => headers.find((h: any) => h.name === name)?.value;
+    const getHeader = (name: string) => headers.find((h: GmailHeader) => h.name === name)?.value;
 
     return {
       success: true,
@@ -309,7 +317,7 @@ export async function listRecentEmails(
       try {
         const fullEmail = await gmailService.getEmail(email.id);
         const headers = fullEmail.payload?.headers || [];
-        const getHeader = (name: string) => headers.find((h: any) => h.name === name)?.value;
+        const getHeader = (name: string) => headers.find((h: GmailHeader) => h.name === name)?.value;
         
         emailDetails.push({
           id: fullEmail.id,

@@ -1199,7 +1199,7 @@ export class ToolExecutionService {
             this.supabase,
             this.userId,
             {
-              ...input as any,
+              ...(input as Record<string, unknown>),
               session_id: sessionId,
               agent_id: agentId
             }
@@ -1211,7 +1211,7 @@ export class ToolExecutionService {
         case 'search_emails': {
           const { searchEmails } = await import('../tools/email.ts');
           this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
-          const searchResult = await searchEmails(this.supabase, this.userId, input as any);
+          const searchResult = await searchEmails(this.supabase, this.userId, input as Record<string, unknown>);
           this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, searchResult);
           return searchResult;
         }
@@ -1219,7 +1219,7 @@ export class ToolExecutionService {
         case 'get_email': {
           const { getEmail } = await import('../tools/email.ts');
           this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
-          const getResult = await getEmail(this.supabase, this.userId, input as any);
+          const getResult = await getEmail(this.supabase, this.userId, input as Record<string, unknown>);
           this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, getResult);
           return getResult;
         }
@@ -1227,7 +1227,7 @@ export class ToolExecutionService {
         case 'list_recent_emails': {
           const { listRecentEmails } = await import('../tools/email.ts');
           this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
-          const listResult = await listRecentEmails(this.supabase, this.userId, input as any);
+          const listResult = await listRecentEmails(this.supabase, this.userId, input as Record<string, unknown>);
           this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, listResult);
           return listResult;
         }

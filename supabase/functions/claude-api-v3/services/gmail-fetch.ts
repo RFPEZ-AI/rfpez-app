@@ -4,6 +4,21 @@
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
 
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  snippet?: string;
+  labelIds?: string[];
+  payload?: {
+    headers?: Array<{ name: string; value: string }>;
+    body?: { data?: string };
+    parts?: Array<{
+      mimeType: string;
+      body?: { data?: string };
+    }>;
+  };
+}
+
 export interface EmailMessage {
   to: string[];
   cc?: string[];
@@ -273,7 +288,7 @@ export class GmailFetchService {
   /**
    * Get a specific message by ID
    */
-  async getMessage(messageId: string): Promise<any> {
+  async getMessage(messageId: string): Promise<GmailMessage> {
     if (!this.accessToken) {
       await this.loadCredentials();
     }
@@ -298,8 +313,8 @@ export class GmailFetchService {
   /**
    * Alias for getMessage - for compatibility
    */
-  async getEmail(messageId: string): Promise<any> {
-    return this.getMessage(messageId);
+  async getEmail(messageId: string): Promise<GmailMessage> {
+    return await this.getMessage(messageId);
   }
 
   /**
@@ -323,7 +338,7 @@ export class GmailFetchService {
       query += ` before:${beforeStr}`;
     }
 
-    return this.listMessages({
+    return await this.listMessages({
       query: query.trim(),
       maxResults: params.maxResults
     });
@@ -333,7 +348,7 @@ export class GmailFetchService {
    * List emails with optional filters - alias for compatibility
    */
   async listEmails(maxResults?: number, labelIds?: string[]): Promise<Array<{ id: string; threadId: string }>> {
-    return this.listMessages({
+    return await this.listMessages({
       maxResults,
       labelIds
     });
