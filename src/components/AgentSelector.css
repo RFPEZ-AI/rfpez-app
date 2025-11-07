@@ -1,5 +1,12 @@
 /* Copyright Mark Skiba, 2025 All rights reserved */
 
+/* Make the agent selector modal wider to show more content */
+.agent-selector-modal {
+  --width: 95%;
+  --max-width: 1400px;
+  --height: 90vh;
+}
+
 .agent-selector-content {
   padding: 0;
 }

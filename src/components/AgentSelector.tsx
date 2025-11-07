@@ -182,6 +182,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
         onDidDismiss={onClose}
         aria-label="Agent Selection Modal"
         backdropDismiss={true}
+        className="agent-selector-modal"
       >
         <IonHeader>
           <IonToolbar>
@@ -215,7 +216,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                 {loading ? (
                   // Loading skeletons
                   Array.from({ length: 3 }).map((_, index) => (
-                    <IonCol size="12" sizeMd="6" sizeLg="4" sizeXl="3" key={index}>
+                    <IonCol size="12" sizeMd="6" sizeLg="6" sizeXl="4" key={index}>
                       <IonCard>
                         <IonCardHeader>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
@@ -267,7 +268,7 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                     }
                     
                     return (
-                      <IonCol size="12" sizeMd="6" sizeLg="4" sizeXl="3" key={agent.id}>
+                      <IonCol size="12" sizeMd="6" sizeLg="6" sizeXl="4" key={agent.id}>
                         <IonCard 
                           className={`agent-card ${isCurrentAgent ? 'current-agent' : ''} ${isLocked ? 'locked-agent' : ''}`}
                           button={true}
