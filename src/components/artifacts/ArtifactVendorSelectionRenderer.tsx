@@ -51,6 +51,13 @@ export const ArtifactVendorSelectionRenderer: React.FC<ArtifactVendorSelectionRe
   artifact,
   onSelectionChange
 }) => {
+  // Debug: Log if callback is provided
+  console.log('[ArtifactVendorSelectionRenderer] Received props:', {
+    hasCallback: !!onSelectionChange,
+    artifactId: artifact.id,
+    artifactName: artifact.name
+  });
+
   const [schema, setSchema] = useState<VendorSelectionSchema | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -87,8 +94,16 @@ export const ArtifactVendorSelectionRenderer: React.FC<ArtifactVendorSelectionRe
 
   // Handle checkbox toggle
   const handleToggle = (vendorId: string, currentlySelected: boolean) => {
+    console.log('[ArtifactVendorSelectionRenderer] handleToggle called:', {
+      vendorId,
+      currentlySelected,
+      hasCallback: !!onSelectionChange
+    });
+
     if (onSelectionChange) {
       onSelectionChange(vendorId, !currentlySelected);
+    } else {
+      console.warn('[ArtifactVendorSelectionRenderer] No onSelectionChange callback available!');
     }
 
     // Optimistically update local state
@@ -181,14 +196,23 @@ export const ArtifactVendorSelectionRenderer: React.FC<ArtifactVendorSelectionRe
           </IonText>
         ) : (
           <IonList>
-            {schema.vendors.map((vendor) => (
-              <IonItem key={vendor.id} lines="full">
-                <IonCheckbox
-                  slot="start"
-                  checked={vendor.selected}
-                  onIonChange={() => handleToggle(vendor.id, vendor.selected)}
-                  disabled={!onSelectionChange}
-                />
+            {schema.vendors.map((vendor) => {
+              const isDisabled = !onSelectionChange;
+              console.log('[ArtifactVendorSelectionRenderer] Rendering checkbox:', {
+                vendorId: vendor.id,
+                vendorName: vendor.name,
+                isDisabled,
+                hasCallback: !!onSelectionChange
+              });
+              
+              return (
+                <IonItem key={vendor.id} lines="full">
+                  <IonCheckbox
+                    slot="start"
+                    checked={vendor.selected}
+                    onIonChange={() => handleToggle(vendor.id, vendor.selected)}
+                    disabled={isDisabled}
+                  />
                 <IonLabel>
                   <h2>{vendor.name}</h2>
                   {vendor.metadata && (
@@ -218,7 +242,8 @@ export const ArtifactVendorSelectionRenderer: React.FC<ArtifactVendorSelectionRe
                   )}
                 </IonLabel>
               </IonItem>
-            ))}
+              );
+            })}
           </IonList>
         )}
       </IonCardContent>

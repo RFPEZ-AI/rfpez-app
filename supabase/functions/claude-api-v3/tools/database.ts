@@ -1281,14 +1281,23 @@ export function debugAgentSwitch(_supabase: SupabaseClient, userId: string, data
 function detectAgentFromMessage(userMessage: string): string | null {
   const message = userMessage.toLowerCase();
   
-  // RFP Design agent keywords (procurement, sourcing, buying)
-  const rfpKeywords = ['source', 'buy', 'purchase', 'procure', 'rfp', 'equipment', 'supplies', 'computers', 'office', 'furniture', 'materials', 'construction', 'procurement', 'sourcing', 'need to buy', 'need to source', 'need to purchase'];
+  // Sourcing agent keywords (vendor identification, supplier search, finding vendors)
+  // MUST CHECK FIRST to avoid "source" matching RFP Design
+  const sourcingKeywords = ['sourcing agent', 'sourcing', 'find suppliers', 'find vendors', 'identify vendors', 'invite suppliers', 'send invitations', 'vendor search'];
+  
+  // RFP Design agent keywords (procurement, buying, creating RFPs)
+  const rfpKeywords = ['rfp design', 'create rfp', 'design rfp', 'buy', 'purchase', 'procure', 'rfp', 'equipment', 'supplies', 'computers', 'office', 'furniture', 'materials', 'construction', 'procurement', 'need to buy', 'need to purchase'];
   
   // Solutions agent keywords (sales, product info)
-  const salesKeywords = ['sell', 'products', 'services', 'pricing', 'demo', 'features', 'capabilities', 'what do you offer', 'how does it work'];
+  const salesKeywords = ['solutions agent', 'solutions', 'sell', 'products', 'services', 'pricing', 'demo', 'features', 'capabilities', 'what do you offer', 'how does it work'];
   
   // Support agent keywords  
-  const supportKeywords = ['help', 'support', 'problem', 'issue', 'bug', 'error', 'how to', 'tutorial'];
+  const supportKeywords = ['support agent', 'support', 'help', 'problem', 'issue', 'bug', 'error', 'how to', 'tutorial'];
+  
+  // Check Sourcing FIRST to avoid "sourcing" matching RFP Design via "source"
+  if (sourcingKeywords.some(keyword => message.includes(keyword))) {
+    return 'Sourcing';
+  }
   
   if (rfpKeywords.some(keyword => message.includes(keyword))) {
     return 'RFP Design';
@@ -1633,6 +1642,7 @@ export async function recommendAgent(supabase: SupabaseClient, data: { topic: st
 
   // Priority matching based on keywords
   const agentMatching = [
+    { keywords: ['sourcing', 'find suppliers', 'find vendors', 'identify vendors', 'invite suppliers', 'send invitations', 'vendor search'], agentNames: ['Sourcing'] },
     { keywords: ['rfp', 'request for proposal', 'bid', 'procurement'], agentNames: ['RFP Design', 'RFP Assistant'] },
     { keywords: ['technical', 'support', 'help', 'error', 'bug'], agentNames: ['Technical Support'] },
     { keywords: ['sales', 'pricing', 'quote', 'cost'], agentNames: ['Solutions'] },

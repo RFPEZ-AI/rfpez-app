@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
-// Vendor Selection Tool Handler for Claude API v3
-// Manages vendor selection artifacts with auto-save functionality
+// Vendor List Tool Handler for Claude API v3
+// Manages Vendor List artifacts with auto-save functionality
 
 // Note: Supabase client is passed as parameter, no direct import needed
 
@@ -33,8 +33,8 @@ interface ManageVendorSelectionParams {
 }
 
 /**
- * Tool handler for managing vendor selection artifacts
- * This tool provides CRUD operations for vendor selection with auto-save
+ * Tool handler for managing Vendor List artifacts
+ * This tool provides CRUD operations for Vendor Lists with auto-save
  */
 export async function handleManageVendorSelection(
   supabase: any, // SupabaseClient passed from caller
@@ -150,8 +150,8 @@ async function createVendorSelection(
 
   const artifactData = {
     id: crypto.randomUUID(),
-    name: params.name || `Vendor Selection - ${rfpName}`,
-    description: params.description || 'Select vendors for this RFP',
+    name: params.name || `Vendor List - ${rfpName}`,
+    description: params.description || 'Vendor list for this RFP (select vendors to invite)',
     type: 'vendor_selection',
     artifact_role: 'vendor_selection_form',
     schema: initialSchema,

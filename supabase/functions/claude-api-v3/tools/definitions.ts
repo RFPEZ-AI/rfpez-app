@@ -50,18 +50,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         },
         artifactRole: {
           type: 'string',
-          description: 'Role/type of the artifact',
+          description: 'Role/type of the form artifact. MUST match database constraint: buyer_questionnaire (requirements), bid_form (supplier bids), vendor_selection_form (vendor evaluation), template (reusable forms)',
           enum: [
             'buyer_questionnaire',
-            'bid_form', 
-            'vendor_response_form',
-            'supplier_response_form',
-            'vendor_form',
-            'supplier_form',
-            'response_form',
-            'buyer_form',
-            'requirements_form',
-            'request_document',
+            'bid_form',
+            'vendor_selection_form',
             'template'
           ]
         }
@@ -118,18 +111,18 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'manage_vendor_selection',
-    description: 'Manage vendor selection for an RFP. Create, read, update, or toggle vendor selections with auto-save. Only one vendor selection artifact exists per RFP. Use this to track which vendors are selected for bidding. Vendor objects must have: {id: string, name: string, selected: boolean, selectedAt?: string, metadata?: object}',
+    description: 'Manage Vendor List for an RFP (NOT a form - a dynamic vendor list). Create, read, update, or toggle vendor selections with auto-save. Only one Vendor List exists per RFP. Use this to track which vendors are selected for bidding. Vendor objects must have: {id: string, name: string, selected: boolean, selectedAt?: string, metadata?: object}',
     input_schema: {
       type: 'object',
       properties: {
         operation: {
           type: 'string',
           enum: ['create', 'read', 'update', 'add_vendors', 'remove_vendors', 'toggle_selection'],
-          description: 'Operation: create (new selection), read (get current state), update (replace all vendors), add_vendors (add to list), remove_vendors (remove from list), toggle_selection (toggle selected status)'
+          description: 'Operation: create (new Vendor List), read (get current state), update (replace all vendors), add_vendors (add to list), remove_vendors (remove from list), toggle_selection (toggle selected status)'
         },
         rfp_id: {
           type: 'number',
-          description: 'RFP ID to manage vendor selection for (required for all operations)'
+          description: 'RFP ID to manage Vendor List for (required for all operations)'
         },
         vendors: {
           type: 'array',
@@ -141,11 +134,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         },
         name: {
           type: 'string',
-          description: 'Name for vendor selection artifact (optional, defaults to "Vendor Selection")'
+          description: 'Name for Vendor List artifact (optional, defaults to "Vendor List")'
         },
         description: {
           type: 'string',
-          description: 'Description of vendor selection (optional)'
+          description: 'Description of Vendor List (optional)'
         }
       },
       required: ['operation', 'rfp_id']

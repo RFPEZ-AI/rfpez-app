@@ -135,9 +135,98 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
         <ArtifactVendorSelectionRenderer
           key={artifact.id} // Force re-mount when artifact changes
           artifact={artifact}
-          onSelectionChange={(vendorId: string, selected: boolean) => {
-            console.log('Vendor selection changed:', { vendorId, selected });
-            // TODO: Implement auto-save via Claude API tool call
+          onSelectionChange={async (vendorId: string, selected: boolean) => {
+            console.log('[ArtifactContainer] ========================================');
+            console.log('[ArtifactContainer] Vendor selection changed:', { vendorId, selected, currentRfpId });
+            console.log('[ArtifactContainer] Artifact:', { id: artifact.id, name: artifact.name, type: artifact.type });
+            console.log('[ArtifactContainer] ========================================');
+            
+            if (!currentRfpId) {
+              console.error('[ArtifactContainer] ❌ Cannot save vendor selection: No current RFP ID');
+              return;
+            }
+
+            try {
+              console.log('[ArtifactContainer] ✓ Current RFP ID verified:', currentRfpId);
+              console.log('[ArtifactContainer] 📝 Parsing artifact schema...');
+              
+              // Parse current schema to get vendors array
+              const schema = artifact.schema as any;
+              console.log('[ArtifactContainer] Schema type:', typeof schema);
+              console.log('[ArtifactContainer] Schema keys:', schema ? Object.keys(schema) : 'null');
+              console.log('[ArtifactContainer] Has vendors?', schema?.vendors ? 'YES' : 'NO');
+              
+              if (!schema || !schema.vendors) {
+                console.error('[ArtifactContainer] ❌ Invalid artifact schema:', schema);
+                return;
+              }
+              
+              console.log('[ArtifactContainer] ✓ Found vendors array with', schema.vendors.length, 'vendors');
+
+              // Toggle the selected state for this vendor
+              console.log('[ArtifactContainer] 🔄 Creating updated vendors array...');
+              const updatedVendors = schema.vendors.map((vendor: any) => {
+                if (vendor.id === vendorId) {
+                  console.log('[ArtifactContainer] 🎯 Found target vendor:', vendor.name, '- Setting selected to:', selected);
+                  return {
+                    ...vendor,
+                    selected: selected,
+                    selectedAt: selected ? new Date().toISOString() : null
+                  };
+                }
+                return vendor;
+              });
+
+              // Update the schema
+              const updatedSchema = {
+                ...schema,
+                vendors: updatedVendors,
+                lastModified: new Date().toISOString()
+              };
+              console.log('[ArtifactContainer] ✓ Updated schema created with lastModified:', updatedSchema.lastModified);
+
+              // Save to database via authenticated Supabase client
+              console.log('[ArtifactContainer] 🔌 Using authenticated Supabase client...');
+              const { supabase } = await import('../supabaseClient');
+              console.log('[ArtifactContainer] ✓ Authenticated client obtained');
+
+              console.log('[ArtifactContainer] 💾 Updating artifact schema in database...', {
+                artifactId: artifact.id,
+                vendorId,
+                selected,
+                timestamp: new Date().toISOString()
+              });
+
+              const updatePayload = { 
+                schema: updatedSchema,
+                last_saved_at: new Date().toISOString()
+              };
+              console.log('[ArtifactContainer] 📤 Sending update to database...', { artifactId: artifact.id });
+              
+              const { error, data } = await supabase
+                .from('artifacts')
+                .update(updatePayload)
+                .eq('id', artifact.id)
+                .select();
+
+              console.log('[ArtifactContainer] 📥 Database response received');
+              
+              if (error) {
+                console.error('[ArtifactContainer] ❌ Failed to save vendor selection:', error);
+                console.error('[ArtifactContainer] Error details:', {
+                  message: error.message,
+                  code: error.code,
+                  details: error.details,
+                  hint: error.hint
+                });
+              } else {
+                console.log('[ArtifactContainer] ✅ Vendor selection saved successfully!');
+                console.log('[ArtifactContainer] Response data:', data);
+              }
+            } catch (error) {
+              console.error('[ArtifactContainer] ⚠️ Exception during save:', error);
+              console.error('[ArtifactContainer] Error stack:', error instanceof Error ? error.stack : 'No stack');
+            }
           }}
         />
       );

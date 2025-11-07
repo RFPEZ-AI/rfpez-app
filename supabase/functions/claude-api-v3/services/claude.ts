@@ -365,30 +365,32 @@ export class ToolExecutionService {
             };
           }
           
-          // 🎯 VALIDATE ARTIFACT_ROLE: Ensure artifact_role is provided and valid
+          // 🎯 VALIDATE ARTIFACT_ROLE: Ensure artifactRole is provided and valid
+          // Tool definitions use camelCase "artifactRole" - accept that as the primary parameter
+          // MUST match database CHECK constraint in artifacts_new_artifact_role_check
           const validFormRoles = [
-            'buyer_questionnaire',    // Initial requirements gathering form
-            'bid_form',              // Supplier bid submission form
-            'vendor_selection_form', // Vendor evaluation/selection form
-            'template'               // Form templates
+            'buyer_questionnaire',      // Initial requirements gathering form
+            'bid_form',                 // Supplier bid submission form
+            'vendor_selection_form',    // Vendor evaluation/selection form
+            'template'                  // Form templates
           ];
-          const providedRole = (input as { artifact_role?: string }).artifact_role;
+          const providedRole = (input as { artifactRole?: string }).artifactRole;
           
           if (!providedRole) {
-            console.error('❌ CREATE_FORM_ARTIFACT ERROR: artifact_role is required');
+            console.error('❌ CREATE_FORM_ARTIFACT ERROR: artifactRole is required');
             return {
               success: false,
-              error: 'Missing artifact_role parameter',
-              message: `Form artifacts require an artifact_role parameter. Common roles: "buyer_questionnaire" (requirements), "bid_form" (supplier bids), "vendor_selection_form" (vendor evaluation). Full list: ${validFormRoles.join(', ')}. Example: create_form_artifact({ ..., artifact_role: "bid_form" })`
+              error: 'Missing artifactRole parameter',
+              message: `Form artifacts require an artifactRole parameter (camelCase). Common roles: "buyer_questionnaire" (requirements), "bid_form" (supplier bids), "vendor_selection_form" (vendor evaluation). Full list: ${validFormRoles.join(', ')}. Example: create_form_artifact({ ..., artifactRole: "bid_form" })`
             };
           }
           
           if (!validFormRoles.includes(providedRole)) {
-            console.error(`❌ CREATE_FORM_ARTIFACT ERROR: Invalid artifact_role "${providedRole}"`);
+            console.error(`❌ CREATE_FORM_ARTIFACT ERROR: Invalid artifactRole "${providedRole}"`);
             return {
               success: false,
-              error: `Invalid artifact_role: "${providedRole}"`,
-              message: `Form artifact_role must be one of: ${validFormRoles.join(', ')}. You provided: "${providedRole}". Common roles: "buyer_questionnaire", "bid_form", "vendor_selection_form".`
+              error: `Invalid artifactRole: "${providedRole}"`,
+              message: `Form artifactRole must be one of: ${validFormRoles.join(', ')}. You provided: "${providedRole}". Common roles: "buyer_questionnaire", "bid_form", "vendor_selection_form".`
             };
           }
           
@@ -495,7 +497,8 @@ export class ToolExecutionService {
             };
           }
           
-          // 🎯 VALIDATE ARTIFACT_ROLE: Ensure artifact_role is provided and valid
+          // 🎯 VALIDATE ARTIFACT_ROLE: Ensure artifactRole is provided and valid
+          // Tool definitions use camelCase "artifactRole" - accept that as the primary parameter
           const validDocumentRoles = [
             'rfp_request_email',         // Primary: RFP vendor request emails (enables upsert)
             'request_document',          // General request documents
@@ -504,23 +507,23 @@ export class ToolExecutionService {
             'report_document',           // General reports
             'template'                   // Document templates
           ];
-          const providedRole = (input as { artifact_role?: string }).artifact_role;
+          const providedRole = (input as { artifactRole?: string }).artifactRole;
           
           if (!providedRole) {
-            console.error('❌ CREATE_DOCUMENT_ARTIFACT ERROR: artifact_role is required');
+            console.error('❌ CREATE_DOCUMENT_ARTIFACT ERROR: artifactRole is required');
             return {
               success: false,
-              error: 'Missing artifact_role parameter',
-              message: `Document artifacts require an artifact_role parameter. Common roles: "rfp_request_email" (for vendor requests), "request_document", "specification_document". Full list: ${validDocumentRoles.join(', ')}. Example: create_document_artifact({ ..., artifact_role: "rfp_request_email" })`
+              error: 'Missing artifactRole parameter',
+              message: `Document artifacts require an artifactRole parameter (camelCase). Common roles: "rfp_request_email" (for vendor requests), "request_document", "specification_document". Full list: ${validDocumentRoles.join(', ')}. Example: create_document_artifact({ ..., artifactRole: "rfp_request_email" })`
             };
           }
           
           if (!validDocumentRoles.includes(providedRole)) {
-            console.error(`❌ CREATE_DOCUMENT_ARTIFACT ERROR: Invalid artifact_role "${providedRole}"`);
+            console.error(`❌ CREATE_DOCUMENT_ARTIFACT ERROR: Invalid artifactRole "${providedRole}"`);
             return {
               success: false,
-              error: `Invalid artifact_role: "${providedRole}"`,
-              message: `Document artifact_role must be one of: ${validDocumentRoles.join(', ')}. You provided: "${providedRole}". Note: Use "rfp_request_email" for RFP vendor request emails (enables intelligent upsert).`
+              error: `Invalid artifactRole: "${providedRole}"`,
+              message: `Document artifactRole must be one of: ${validDocumentRoles.join(', ')}. You provided: "${providedRole}". Note: Use "rfp_request_email" for RFP vendor request emails (enables intelligent upsert).`
             };
           }
           
