@@ -4,6 +4,7 @@
 import { mapMessageToClaudeFormat, extractTextFromClaudeResponse, extractToolCallsFromClaudeResponse } from '../utils/mapping.ts';
 import { config } from '../config.ts';
 import type { ClaudeMessage, ClaudeToolDefinition, ClaudeResponse, ToolResult } from '../types.ts';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 // Global Deno environment access
 declare const Deno: {
@@ -301,7 +302,7 @@ export class ClaudeAPIService {
 
 // Tool execution service
 export class ToolExecutionService {
-  private supabase: unknown;
+  private supabase: SupabaseClient<any, "public", any>;
   private userId: string;
   private userMessage?: string;
   private toolInvocations: Array<{
@@ -313,7 +314,7 @@ export class ToolExecutionService {
     timestamp: string;
   }> = [];
 
-  constructor(supabase: unknown, userId: string, userMessage?: string) {
+  constructor(supabase: SupabaseClient<any, "public", any>, userId: string, userMessage?: string) {
     this.supabase = supabase;
     this.userId = userId;
     this.userMessage = userMessage;
@@ -397,7 +398,6 @@ export class ToolExecutionService {
           console.log(`✅ Form artifact role validated: "${providedRole}"`)
           
           // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
-          // @ts-expect-error - Supabase client type is unknown but compatible
           const sessionQuery = await this.supabase
             .from('sessions')
             .select('current_rfp_id')
@@ -425,7 +425,6 @@ export class ToolExecutionService {
             console.log('⚠️ No current RFP set - attempting auto-create from session context...');
             
             // Try to auto-create RFP from session title
-            // @ts-expect-error - Supabase client type is unknown but compatible
             const sessionInfoQuery = await this.supabase
               .from('sessions')
               .select('title')
@@ -443,7 +442,6 @@ export class ToolExecutionService {
             
             // Import and call createAndSetRfpWithClient
             const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
-            // @ts-expect-error - RFP function type compatibility
             const createResult = await createAndSetRfpWithClient(this.supabase, {
               name: autoRfpName,
               description: `Automatically created RFP for ${sessionTitle}`
@@ -530,7 +528,6 @@ export class ToolExecutionService {
           console.log(`✅ Document artifact role validated: "${providedRole}"`);
           
           // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
-          // @ts-expect-error - Supabase client type is unknown but compatible
           const sessionQuery = await this.supabase
             .from('sessions')
             .select('current_rfp_id')
@@ -558,7 +555,6 @@ export class ToolExecutionService {
             console.log('⚠️ No current RFP set for document - attempting auto-create from session context...');
             
             // Try to auto-create RFP from session title
-            // @ts-expect-error - Supabase client type is unknown but compatible
             const sessionInfoQuery = await this.supabase
               .from('sessions')
               .select('title')
@@ -576,7 +572,6 @@ export class ToolExecutionService {
             
             // Import and call createAndSetRfpWithClient
             const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
-            // @ts-expect-error - RFP function type compatibility
             const createResult = await createAndSetRfpWithClient(this.supabase, {
               name: autoRfpName,
               description: `Automatically created RFP for ${sessionTitle}`
@@ -637,7 +632,6 @@ export class ToolExecutionService {
           let effectiveRfpId = input.rfp_id as number;
           
           if (!effectiveRfpId) {
-            // @ts-expect-error - Supabase client type is unknown but compatible
             const sessionQuery = await this.supabase
               .from('sessions')
               .select('current_rfp_id')
@@ -701,13 +695,11 @@ export class ToolExecutionService {
           }
           
           const { getConversationHistory } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await getConversationHistory(this.supabase, targetSessionId);
         }
 
         case 'create_session': {
           const { createSession } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await createSession(this.supabase, {
             ...input,
             userId: this.userId
@@ -770,7 +762,6 @@ export class ToolExecutionService {
 
         case 'get_current_agent': {
           const { getCurrentAgent } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await getCurrentAgent(this.supabase, {
             ...input,
             session_id: sessionId || ''
@@ -805,7 +796,6 @@ export class ToolExecutionService {
           }
           
           const { switchAgent } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           const switchResult = await switchAgent(this.supabase, this.userId, {
             ...input,
             session_id: sessionId
@@ -816,7 +806,6 @@ export class ToolExecutionService {
 
         case 'recommend_agent': {
           const { recommendAgent } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await recommendAgent(this.supabase, input);
         }
 
@@ -832,7 +821,6 @@ export class ToolExecutionService {
           }
           
           const { createAndSetRfpWithClient } = await import('../tools/rfp.ts');
-          // @ts-expect-error - RFP function type compatibility
           const toolResult = await createAndSetRfpWithClient(this.supabase, input, { 
             sessionId: sessionId
           });
@@ -842,7 +830,6 @@ export class ToolExecutionService {
 
         case 'list_artifacts': {
           const { listArtifacts } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await listArtifacts(this.supabase, {
             ...input,
             userId: this.userId
@@ -851,7 +838,6 @@ export class ToolExecutionService {
 
         case 'get_current_artifact_id': {
           const { getCurrentArtifactId } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await getCurrentArtifactId(this.supabase, {
             ...input,
             sessionId: sessionId || ''
@@ -883,7 +869,6 @@ export class ToolExecutionService {
           }
           const { setCurrentRfp } = await import('../tools/database.ts');
           return await setCurrentRfp(
-            // @ts-expect-error - Supabase client type is unknown but compatible
             this.supabase, 
             sessionId, 
             input.rfp_id as number | undefined, 
@@ -924,7 +909,6 @@ export class ToolExecutionService {
           }
           
           // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
-          // @ts-expect-error - Supabase client type is unknown but compatible
           const sessionQuery = await this.supabase
             .from('sessions')
             .select('current_rfp_id')
@@ -961,7 +945,6 @@ export class ToolExecutionService {
           console.log('✅ Auto-injecting current RFP ID for bid submission:', sessionData.current_rfp_id);
           
           const { submitBid } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await submitBid(this.supabase, sessionId, this.userId, {
             ...input,
             rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
@@ -974,7 +957,6 @@ export class ToolExecutionService {
           }
           
           // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
-          // @ts-expect-error - Supabase client type is unknown but compatible
           const sessionQuery = await this.supabase
             .from('sessions')
             .select('current_rfp_id')
@@ -1011,7 +993,6 @@ export class ToolExecutionService {
           console.log('✅ Auto-injecting current RFP ID for getting bids:', sessionData.current_rfp_id);
           
           const { getRfpBids } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
           return await getRfpBids(this.supabase, {
             rfp_id: sessionData.current_rfp_id  // 🎯 INJECT RFP ID FROM SESSION
           });
@@ -1019,8 +1000,13 @@ export class ToolExecutionService {
 
         case 'update_bid_status': {
           const { updateBidStatus } = await import('../tools/database.ts');
-          // @ts-expect-error - Database function type compatibility
-          return await updateBidStatus(this.supabase, input);
+          return await updateBidStatus(this.supabase, input as {
+            bid_id: number;
+            status: string;
+            status_reason?: string;
+            reviewer_id?: string;
+            score?: number;
+          });
         }
 
         case 'generate_rfp_bid_url': {
@@ -1033,7 +1019,6 @@ export class ToolExecutionService {
           
           if (!rfpId) {
             // 🎯 AUTO-INJECT CURRENT RFP: Fetch current_rfp_id from session
-            // @ts-expect-error - Supabase client type is unknown but compatible
             const sessionQuery = await this.supabase
               .from('sessions')
               .select('current_rfp_id')
@@ -1119,9 +1104,14 @@ export class ToolExecutionService {
 
           const { createMemory } = await import('../tools/database.ts');
           const memoryResult = await createMemory(
-            // @ts-expect-error - Supabase client type is unknown but compatible
             this.supabase,
-            input,
+            input as {
+              content: string;
+              memory_type: 'preference' | 'fact' | 'decision' | 'context' | 'conversation';
+              importance_score: number;
+              reference_type?: 'rfp' | 'bid' | 'artifact' | 'message' | 'user_profile';
+              reference_id?: string;
+            },
             this.userId,
             agentId,
             sessionId
@@ -1143,9 +1133,12 @@ export class ToolExecutionService {
 
           const { searchMemories } = await import('../tools/database.ts');
           return await searchMemories(
-            // @ts-expect-error - Supabase client type is unknown but compatible
             this.supabase,
-            input,
+            input as {
+              query: string;
+              memory_types?: string;
+              limit?: number;
+            },
             this.userId,
             agentId
           );
@@ -1199,7 +1192,14 @@ export class ToolExecutionService {
             this.supabase,
             this.userId,
             {
-              ...(input as Record<string, unknown>),
+              ...(input as {
+                to: string[];
+                cc?: string[];
+                bcc?: string[];
+                subject: string;
+                body_text: string;
+                body_html?: string;
+              }),
               session_id: sessionId,
               agent_id: agentId
             }
@@ -1211,7 +1211,12 @@ export class ToolExecutionService {
         case 'search_emails': {
           const { searchEmails } = await import('../tools/email.ts');
           this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
-          const searchResult = await searchEmails(this.supabase, this.userId, input as Record<string, unknown>);
+          const searchResult = await searchEmails(this.supabase, this.userId, input as { 
+            query: string; 
+            max_results?: number; 
+            after_date?: string; 
+            before_date?: string; 
+          });
           this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, searchResult);
           return searchResult;
         }
@@ -1219,7 +1224,7 @@ export class ToolExecutionService {
         case 'get_email': {
           const { getEmail } = await import('../tools/email.ts');
           this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
-          const getResult = await getEmail(this.supabase, this.userId, input as Record<string, unknown>);
+          const getResult = await getEmail(this.supabase, this.userId, input as { message_id: string });
           this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, getResult);
           return getResult;
         }
@@ -1227,7 +1232,7 @@ export class ToolExecutionService {
         case 'list_recent_emails': {
           const { listRecentEmails } = await import('../tools/email.ts');
           this.addToolInvocation('tool_start', name, agentId, input as Record<string, unknown>);
-          const listResult = await listRecentEmails(this.supabase, this.userId, input as Record<string, unknown>);
+          const listResult = await listRecentEmails(this.supabase, this.userId, input as { max_results?: number });
           this.addToolInvocation('tool_complete', name, agentId, input as Record<string, unknown>, listResult);
           return listResult;
         }

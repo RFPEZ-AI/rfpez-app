@@ -9,39 +9,7 @@ import { ClaudeAPIService, ToolExecutionService } from '../services/claude.ts';
 import { getToolDefinitions } from '../tools/definitions.ts';
 import { buildSystemPrompt, loadAgentContext, loadUserProfile } from '../utils/system-prompt.ts';
 import { ClaudeMessage, ClaudeToolDefinition } from '../types.ts';
-
-// Supabase client interface
-interface SupabaseClient {
-  from: (table: string) => {
-    select: (columns?: string) => SupabaseQuery;
-    insert: (data: Record<string, unknown>) => SupabaseQuery;
-    update: (data: Record<string, unknown>) => SupabaseQuery;
-    delete: () => SupabaseQuery;
-    eq: (column: string, value: unknown) => SupabaseQuery;
-    in: (column: string, values: unknown[]) => SupabaseQuery;
-    order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
-    limit: (count: number) => SupabaseQuery;
-    single: () => SupabaseQuery;
-  };
-  auth: {
-    getUser: () => Promise<{ data: { user: Record<string, unknown> } | null; error: unknown }>;
-  };
-}
-
-interface SupabaseQuery {
-  select: (columns?: string) => SupabaseQuery;
-  insert: (data: Record<string, unknown>) => SupabaseQuery;
-  update: (data: Record<string, unknown>) => SupabaseQuery;
-  delete: () => SupabaseQuery;
-  eq: (column: string, value: unknown) => SupabaseQuery;
-  in: (column: string, values: unknown[]) => SupabaseQuery;
-  order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
-  limit: (count: number) => SupabaseQuery;
-  single: () => SupabaseQuery;
-  textSearch: (column: string, query: string) => SupabaseQuery;
-  ilike: (column: string, pattern: string) => SupabaseQuery;
-  then: <T>(onfulfilled?: (value: { data: T; error: unknown }) => T | PromiseLike<T>) => Promise<T>;
-}
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 // Interface for tool calls (matching Claude service)
 interface ClaudeToolCall {
@@ -72,7 +40,7 @@ async function streamWithRecursiveTools(
   claudeService: ClaudeAPIService,
   toolService: ToolExecutionService,
   controller: ReadableStreamDefaultController<Uint8Array>,
-  supabase: unknown,
+  supabase: SupabaseClient<any, "public", any>,
   sessionId?: string,
   agentId?: string,
   userId?: string,
@@ -244,7 +212,7 @@ async function streamWithRecursiveTools(
         
         if (originalAgentToolInvocations.length > 0 && userId && sessionId) {
           const { storeMessage } = await import('../tools/database.ts');
-          const originalAgentMessageResult = await storeMessage(supabase as SupabaseClient, {
+          const originalAgentMessageResult = await storeMessage(supabase, {
             sessionId: sessionId,
             userId: userId,
             sender: 'assistant',
@@ -414,7 +382,7 @@ async function streamWithRecursiveTools(
 // Handle streaming response with proper SSE format and tool execution
 function handleStreamingResponse(
   messages: unknown[], 
-  supabase: unknown, 
+  supabase: SupabaseClient<any, "public", any>, 
   userId: string, 
   sessionId?: string, 
   agentId?: string,
@@ -530,8 +498,6 @@ function handleStreamingResponse(
             // Import list_artifacts function
             const { listArtifacts } = await import('../tools/database.ts');
             
-            // Get all artifacts for this session
-            // @ts-expect-error - Supabase client type is unknown but compatible
             const artifactList = await listArtifacts(supabase, {
               sessionId: sessionId || '',
               userId: userId || ''
@@ -821,7 +787,7 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
       const { createSession } = await import('../tools/database.ts');
       
       try {
-        const sessionResult = await createSession(supabase as unknown as SupabaseClient, {
+        const sessionResult = await createSession(supabase, {
           userId: userId,
           title: userMessage?.substring(0, 50) || 'New Conversation',
           agentId: effectiveAgentId
@@ -966,7 +932,7 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
         try {
           // Fetch full conversation history for the new agent
           const { fetchConversationHistory } = await import('../tools/database.ts');
-          const conversationHistory = await fetchConversationHistory(supabase as SupabaseClient, sessionId);
+          const conversationHistory = await fetchConversationHistory(supabase, sessionId);
           
           console.log('📚 Retrieved conversation history:', {
             message_count: conversationHistory.length,
@@ -1008,7 +974,7 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
             
             // Get new agent context and tools
             const newAgentContext = await loadAgentContext(
-              supabase as SupabaseClient,
+              supabase,
               sessionId,
               newAgentData?.id as string
             );

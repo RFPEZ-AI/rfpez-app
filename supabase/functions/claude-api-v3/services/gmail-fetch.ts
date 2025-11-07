@@ -2,7 +2,7 @@
 // Gmail API service using native fetch (no googleapis dependency)
 // This avoids the google-logging-utils compatibility issue with Deno
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 export interface GmailMessage {
   id: string;

@@ -1,15 +1,15 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Authentication utilities for Claude API v3
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { config } from '../config.ts';
 
 // Test mode flag for using mock clients
 let isTestMode = false;
-let mockClientFactory: (() => unknown) | null = null;
+let mockClientFactory: (() => SupabaseClient<any, "public", any>) | null = null;
 
 // Enable test mode with mock client factory
-export function enableTestMode(mockFactory?: () => unknown) {
+export function enableTestMode(mockFactory?: () => SupabaseClient<any, "public", any>) {
   isTestMode = true;
   mockClientFactory = mockFactory || null;
 }
@@ -21,7 +21,7 @@ export function disableTestMode() {
 }
 
 // Get authenticated Supabase client from request
-export function getAuthenticatedSupabaseClient(request: Request) {
+export function getAuthenticatedSupabaseClient(request: Request): SupabaseClient<any, "public", any> {
   // Get authorization header
   const authHeader = request.headers.get('Authorization');
   

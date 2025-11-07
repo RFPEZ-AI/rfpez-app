@@ -2,7 +2,7 @@
 // Validation test for tool invocation persistence
 
 import { assertEquals, assertExists } from "https://deno.land/std@0.208.0/testing/asserts.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.39.3";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
 import { MockSupabaseClient } from "./test-utils.ts";
 
 // Minimal Supabase client interface used by these tests (narrow surface)

@@ -2,7 +2,7 @@
 // Vendor List Tool Handler for Claude API v3
 // Manages Vendor List artifacts with auto-save functionality
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 interface VendorSelectionVendor {
   id: string;
@@ -30,6 +30,18 @@ interface ManageVendorSelectionParams {
   name?: string;
   description?: string;
   // NOTE: account_id is fetched from session internally, not passed as parameter
+}
+
+// Type for artifact from join query
+interface ArtifactJoinResult {
+  id: string;
+  name: string;
+  description: string;
+  type: string;
+  artifact_role: string;
+  schema: VendorSelectionSchema;
+  updated_at: string;
+  last_saved_at: string;
 }
 
 /**
@@ -273,7 +285,7 @@ async function readVendorSelection(
     };
   }
 
-  const artifact = rfpArtifact.artifacts;
+  const artifact = (Array.isArray(rfpArtifact.artifacts) ? rfpArtifact.artifacts[0] : rfpArtifact.artifacts) as ArtifactJoinResult;
   const schema = artifact.schema as VendorSelectionSchema;
 
   return {
@@ -339,7 +351,7 @@ async function updateVendorSelection(
     };
   }
 
-  const artifact = rfpArtifact.artifacts;
+  const artifact = (Array.isArray(rfpArtifact.artifacts) ? rfpArtifact.artifacts[0] : rfpArtifact.artifacts) as ArtifactJoinResult;
   const currentSchema = artifact.schema as VendorSelectionSchema;
 
   // Update schema with new vendors
@@ -423,7 +435,7 @@ async function addVendors(
     };
   }
 
-  const artifact = rfpArtifact.artifacts;
+  const artifact = (Array.isArray(rfpArtifact.artifacts) ? rfpArtifact.artifacts[0] : rfpArtifact.artifacts) as ArtifactJoinResult;
   const currentSchema = artifact.schema as VendorSelectionSchema;
 
   // Add new vendors (avoid duplicates by ID)
@@ -502,7 +514,7 @@ async function removeVendors(
     };
   }
 
-  const artifact = rfpArtifact.artifacts;
+  const artifact = (Array.isArray(rfpArtifact.artifacts) ? rfpArtifact.artifacts[0] : rfpArtifact.artifacts) as ArtifactJoinResult;
   const currentSchema = artifact.schema as VendorSelectionSchema;
 
   // Remove vendors by ID
@@ -583,7 +595,7 @@ async function toggleVendorSelection(
     };
   }
 
-  const artifact = rfpArtifact.artifacts;
+  const artifact = (Array.isArray(rfpArtifact.artifacts) ? rfpArtifact.artifacts[0] : rfpArtifact.artifacts) as ArtifactJoinResult;
   const currentSchema = artifact.schema as VendorSelectionSchema;
 
   // Toggle selection for specified vendors

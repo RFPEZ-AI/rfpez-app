@@ -32,6 +32,11 @@ export interface ClaudeToolDefinition {
       description: string;
       enum?: string[];
       default?: unknown;
+      items?: {
+        type: string;
+        properties?: Record<string, unknown>;
+      };
+      properties?: Record<string, unknown>;
     }>;
     required?: string[];
   };

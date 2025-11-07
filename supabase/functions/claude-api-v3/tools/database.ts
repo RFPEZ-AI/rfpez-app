@@ -2,6 +2,7 @@
 // Core tools and database operations for Claude API v3
 
 import { mapArtifactRole } from '../utils/mapping.ts';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
 // Type definitions for database operations
 interface Agent {
@@ -23,38 +24,6 @@ interface ConversationMessage {
   agent_id?: string;
   is_system_message?: boolean;
   metadata?: Record<string, unknown>;
-}
-
-interface SupabaseClient {
-  from: (table: string) => {
-    select: (columns?: string) => SupabaseQuery;
-    insert: (data: Record<string, unknown>) => SupabaseQuery;
-    update: (data: Record<string, unknown>) => SupabaseQuery;
-    delete: () => SupabaseQuery;
-    eq: (column: string, value: unknown) => SupabaseQuery;
-    in: (column: string, values: unknown[]) => SupabaseQuery;
-    order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
-    limit: (count: number) => SupabaseQuery;
-    single: () => SupabaseQuery;
-  };
-  auth: {
-    getUser: () => Promise<{ data: { user: Record<string, unknown> } | null; error: unknown }>;
-  };
-}
-
-interface SupabaseQuery {
-  select: (columns?: string) => SupabaseQuery;
-  insert: (data: Record<string, unknown>) => SupabaseQuery;
-  update: (data: Record<string, unknown>) => SupabaseQuery;
-  delete: () => SupabaseQuery;
-  eq: (column: string, value: unknown) => SupabaseQuery;
-  in: (column: string, values: unknown[]) => SupabaseQuery;
-  order: (column: string, options?: Record<string, unknown>) => SupabaseQuery;
-  limit: (count: number) => SupabaseQuery;
-  single: () => SupabaseQuery;
-  textSearch: (column: string, query: string) => SupabaseQuery;
-  ilike: (column: string, pattern: string) => SupabaseQuery;
-  then: <T>(onfulfilled?: (value: { data: T; error: unknown }) => T | PromiseLike<T>) => Promise<T>;
 }
 
 interface FormArtifactData {
@@ -83,20 +52,6 @@ interface MessageData {
   function_arguments?: Record<string, unknown>;
   artifacts?: Record<string, unknown>[];
   metadata?: Record<string, unknown>; // Tool execution metadata (functions_called, model, etc.)
-}
-
-interface DatabaseMessageResult {
-  id: string;
-  role: string;
-  message: string;
-  created_at: string;
-  agent_id?: string;
-  is_system_message?: boolean;
-  metadata?: Record<string, unknown>;
-  agents?: {
-    name: string;
-    role: string;
-  };
 }
 
 interface SessionData {
@@ -288,7 +243,7 @@ function transformToJsonSchema(customForm: Record<string, unknown>): {
 }
 
 // Get the current active RFP for a session
-export async function getCurrentRfp(supabase: SupabaseClient, sessionId: string) {
+export async function getCurrentRfp(supabase: SupabaseClient<any, "public", any>, sessionId: string) {
   console.log('🔍 Getting current RFP for session:', sessionId);
   
   const { data: session, error: sessionError } = await supabase
@@ -345,7 +300,7 @@ export async function getCurrentRfp(supabase: SupabaseClient, sessionId: string)
  * Allows switching between existing RFPs without creating new ones
  */
 export async function setCurrentRfp(
-  supabase: SupabaseClient, 
+  supabase: SupabaseClient<any, "public", any>, 
   sessionId: string, 
   rfpId?: number, 
   rfpName?: string
@@ -431,7 +386,7 @@ export async function setCurrentRfp(
 }
 
 // Create a form artifact in the database
-export async function createFormArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: FormArtifactData) {
+export async function createFormArtifact(supabase: SupabaseClient<any, "public", any>, sessionId: string, userId: string, data: FormArtifactData) {
   const { name, description, content, artifactRole, rfp_id } = data;
   
   // ⚠️ CRITICAL: Validate RFP ID is provided (automatically injected by executeTool)
@@ -662,7 +617,7 @@ export async function createFormArtifact(supabase: SupabaseClient, sessionId: st
 }
 
 // Create a document artifact and store in the database
-export async function createDocumentArtifact(supabase: SupabaseClient, sessionId: string, userId: string, data: {
+export async function createDocumentArtifact(supabase: SupabaseClient<any, "public", any>, sessionId: string, userId: string, data: {
   rfp_id: number; // REQUIRED: RFP ID to associate artifact with
   name: string;
   description?: string;
@@ -923,7 +878,7 @@ export async function createDocumentArtifact(supabase: SupabaseClient, sessionId
 }
 
 // Get conversation history for a session
-export async function getConversationHistory(supabase: SupabaseClient, sessionId: string, limit = 50) {
+export async function getConversationHistory(supabase: SupabaseClient<any, "public", any>, sessionId: string, limit = 50) {
   const { data: messages, error } = await supabase
     .from('messages')
     .select(`
@@ -962,7 +917,7 @@ export async function getConversationHistory(supabase: SupabaseClient, sessionId
 }
 
 // Store a message in the conversation
-export async function storeMessage(supabase: SupabaseClient, data: MessageData) {
+export async function storeMessage(supabase: SupabaseClient<any, "public", any>, data: MessageData) {
   const { sessionId, agentId, userId, sender, content, metadata } = data;
   
   console.log('Storing message:', { 
@@ -988,8 +943,7 @@ export async function storeMessage(supabase: SupabaseClient, data: MessageData) 
     throw new Error(`Account not found for user_id: ${userId}. Cannot store message.`);
   }
 
-  // @ts-expect-error - We know accountUser has an account_id property
-  const accountId = accountUser.account_id;
+  const accountId = (accountUser as { account_id: string }).account_id;
   console.log('✅ Found account_id:', accountId, 'for auth user:', userId);
   
   const { data: message, error } = await supabase
@@ -1020,7 +974,7 @@ export async function storeMessage(supabase: SupabaseClient, data: MessageData) 
 }
 
 // Create a new conversation session
-export async function createSession(supabase: SupabaseClient, data: SessionData) {
+export async function createSession(supabase: SupabaseClient<any, "public", any>, data: SessionData) {
   const { userId, title, agentId } = data;
   
   console.log('🔧 CREATE_SESSION DEBUG START:', { 
@@ -1050,8 +1004,7 @@ export async function createSession(supabase: SupabaseClient, data: SessionData)
     throw new Error(`Account not found for user_id: ${userId}. Error: ${JSON.stringify(accountError)}`);
   }
 
-  // @ts-expect-error - We know accountUser has an account_id property
-  const accountId = accountUser.account_id;
+  const accountId = (accountUser as { account_id: string }).account_id;
   console.log('✅ Found account_id:', accountId, 'for auth user:', userId);
   
   const sessionData = {
@@ -1135,7 +1088,7 @@ export async function createSession(supabase: SupabaseClient, data: SessionData)
 }
 
 // Search messages across conversations
-export async function searchMessages(supabase: SupabaseClient, data: SearchData) {
+export async function searchMessages(supabase: SupabaseClient<any, "public", any>, data: SearchData) {
   const { userId, query, limit = 20 } = data;
   
   console.log('Searching messages:', { userId, query, limit });
@@ -1172,7 +1125,7 @@ export async function searchMessages(supabase: SupabaseClient, data: SearchData)
 }
 
 // Get available agents
-export async function getAvailableAgents(supabase: SupabaseClient, data: AgentData) {
+export async function getAvailableAgents(supabase: SupabaseClient<any, "public", any>, data: AgentData) {
   const { include_restricted = false } = data;
   
   console.log('Getting available agents:', { include_restricted });
@@ -1207,7 +1160,7 @@ export async function getAvailableAgents(supabase: SupabaseClient, data: AgentDa
 }
 
 // Get current agent for a session
-export async function getCurrentAgent(supabase: SupabaseClient, data: AgentData) {
+export async function getCurrentAgent(supabase: SupabaseClient<any, "public", any>, data: AgentData) {
   const { session_id } = data;
   
   console.log('Getting current agent for session:', session_id);
@@ -1254,7 +1207,7 @@ export async function getCurrentAgent(supabase: SupabaseClient, data: AgentData)
 }
 
 // Debug agent switch parameters
-export function debugAgentSwitch(_supabase: SupabaseClient, userId: string, data: SwitchAgentData) {
+export function debugAgentSwitch(_supabase: SupabaseClient<any, "public", any>, userId: string, data: SwitchAgentData) {
   const { user_input, extracted_keywords, confusion_reason } = data;
   
   console.log('🐛 DEBUG AGENT SWITCH:', {
@@ -1315,7 +1268,7 @@ function detectAgentFromMessage(userMessage: string): string | null {
 }
 
 // Switch to a different agent
-export async function switchAgent(supabase: SupabaseClient, userId: string, data: SwitchAgentData, userMessage?: string) {
+export async function switchAgent(supabase: SupabaseClient<any, "public", any>, userId: string, data: SwitchAgentData, userMessage?: string) {
   const { session_id, agent_id, agent_name, reason } = data;
   let targetAgent = agent_id || agent_name; // Prioritize agent_id over agent_name
   
@@ -1515,7 +1468,7 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
 
   if (insertError) {
     console.error('❌ Failed to switch agent:', insertError);
-    throw new Error(`Failed to switch agent: ${(insertError as Error)?.message || 'Unknown error'}`);
+    throw new Error(`Failed to switch agent: ${insertError.message || 'Unknown error'}`);
   }
 
   console.log('✅ Agent switch completed successfully');
@@ -1577,7 +1530,7 @@ export async function switchAgent(supabase: SupabaseClient, userId: string, data
 }
 
 // Fetch conversation history for agent switching context
-export async function fetchConversationHistory(supabase: SupabaseClient, sessionId: string): Promise<ConversationMessage[]> {
+export async function fetchConversationHistory(supabase: SupabaseClient<any, "public", any>, sessionId: string): Promise<ConversationMessage[]> {
   console.log('📚 Fetching conversation history for session:', sessionId);
   
   const { data: messages, error } = await supabase
@@ -1600,26 +1553,43 @@ export async function fetchConversationHistory(supabase: SupabaseClient, session
 
   if (error) {
     console.error('❌ Failed to fetch conversation history:', error);
-    throw new Error(`Failed to fetch conversation history: ${(error as Error).message || 'Unknown error'}`);
+    throw new Error(`Failed to fetch conversation history: ${error.message || 'Unknown error'}`);
   }
 
-  console.log(`📚 Retrieved ${(messages as DatabaseMessageResult[])?.length || 0} messages from conversation history`);
+  // Type for raw query results (agents comes as array from join)
+  type RawMessageWithAgent = {
+    id: string;
+    role: string;
+    message: string;
+    created_at: string;
+    agent_id: string;
+    is_system_message: boolean;
+    metadata: unknown;
+    agents: Array<{ name: string; role: string }> | { name: string; role: string };
+  };
   
-  return ((messages as DatabaseMessageResult[]) || []).map((msg: DatabaseMessageResult) => ({
-    id: msg.id,
-    role: msg.role as 'user' | 'assistant' | 'system',
-    message: msg.message,
-    created_at: msg.created_at,
-    agent_id: msg.agent_id,
-    is_system_message: msg.is_system_message,
-    metadata: msg.metadata,
-    agent_name: msg.agents?.name,
-    agent_role: msg.agents?.role
-  })) as ConversationMessage[];
+  const rawMessages = messages as RawMessageWithAgent[];
+  console.log(`📚 Retrieved ${rawMessages?.length || 0} messages from conversation history`);
+  
+  return (rawMessages || []).map((msg) => {
+    // Handle both array and single object from join
+    const agentData = Array.isArray(msg.agents) ? msg.agents[0] : msg.agents;
+    return {
+      id: msg.id,
+      role: msg.role as 'user' | 'assistant' | 'system',
+      message: msg.message,
+      created_at: msg.created_at,
+      agent_id: msg.agent_id,
+      is_system_message: msg.is_system_message,
+      metadata: msg.metadata,
+      agent_name: agentData?.name,
+      agent_role: agentData?.role
+    };
+  }) as ConversationMessage[];
 }
 
 // Recommend agent for a topic
-export async function recommendAgent(supabase: SupabaseClient, data: { topic: string; conversation_context?: string }) {
+export async function recommendAgent(supabase: SupabaseClient<any, "public", any>, data: { topic: string; conversation_context?: string }) {
   const { topic } = data;
   
   console.log('Recommending agent for topic:', topic);
@@ -1676,7 +1646,7 @@ export async function recommendAgent(supabase: SupabaseClient, data: { topic: st
 }
 
 // List artifacts with optional scope filtering
-export async function listArtifacts(supabase: SupabaseClient, data: {
+export async function listArtifacts(supabase: SupabaseClient<any, "public", any>, data: {
   sessionId?: string;
   allArtifacts?: boolean;
   artifactType?: string;
@@ -1747,7 +1717,7 @@ export async function listArtifacts(supabase: SupabaseClient, data: {
 }
 
 // Get the current artifact ID for a session
-export async function getCurrentArtifactId(supabase: SupabaseClient, data: {
+export async function getCurrentArtifactId(supabase: SupabaseClient<any, "public", any>, data: {
   sessionId?: string;
 }) {
   const { sessionId } = data;
@@ -1809,7 +1779,7 @@ export async function getCurrentArtifactId(supabase: SupabaseClient, data: {
 }
 
 // Select an artifact to be displayed in the artifact window
-export async function selectActiveArtifact(supabase: SupabaseClient, data: {
+export async function selectActiveArtifact(supabase: SupabaseClient<any, "public", any>, data: {
   artifactId: string;
   sessionId?: string;
 }) {
@@ -1896,7 +1866,7 @@ export async function selectActiveArtifact(supabase: SupabaseClient, data: {
 }
 
 // Get form schema to see field names and types before updating
-export async function getFormSchema(supabase: SupabaseClient, _sessionId: string, _userId: string, data: {
+export async function getFormSchema(supabase: SupabaseClient<any, "public", any>, _sessionId: string, _userId: string, data: {
   artifact_id: string;
   session_id: string;
 }) {
@@ -2009,7 +1979,7 @@ export async function getFormSchema(supabase: SupabaseClient, _sessionId: string
 }
 
 // Update form data for an existing form artifact
-export async function updateFormData(supabase: SupabaseClient, _sessionId: string, _userId: string, data: {
+export async function updateFormData(supabase: SupabaseClient<any, "public", any>, _sessionId: string, _userId: string, data: {
   artifact_id: string;
   session_id: string;
   form_data: Record<string, unknown>;
@@ -2256,7 +2226,7 @@ export async function updateFormData(supabase: SupabaseClient, _sessionId: strin
 }
 
 // Update form artifact with new data or schema
-export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: string, _userId: string, data: {
+export async function updateFormArtifact(supabase: SupabaseClient<any, "public", any>, _sessionId: string, _userId: string, data: {
   artifact_id: string;
   updates: {
     title?: string;
@@ -2344,7 +2314,7 @@ export async function updateFormArtifact(supabase: SupabaseClient, _sessionId: s
 // BID SUBMISSION FUNCTIONS
 // =====================================
 
-export async function submitBid(supabase: SupabaseClient, sessionId: string, userId: string, data: {
+export async function submitBid(supabase: SupabaseClient<any, "public", any>, sessionId: string, userId: string, data: {
   rfp_id: number;
   artifact_id?: string;
   supplier_id?: number;
@@ -2715,15 +2685,14 @@ export async function submitBid(supabase: SupabaseClient, sessionId: string, use
   }
 }
 
-export async function getRfpBids(supabase: SupabaseClient, data: {
+export async function getRfpBids(supabase: SupabaseClient<any, "public", any>, data: {
   rfp_id: number;
 }) {
   console.log('📋 Getting RFP bids:', data);
 
   try {
-    // Debug: Log which database we're querying
-    // @ts-expect-error - accessing private property for debugging
-    const clientUrl = String(supabase['supabaseUrl'] || 'unknown');
+    // Debug: Log which database we're querying (use unknown for protected property access)
+    const clientUrl = String((supabase as unknown as { supabaseUrl?: string })['supabaseUrl'] || 'unknown');
     console.log('🔍 Supabase client connected to:', clientUrl);
     
     // 🚨 TEMPORARY TEST: Import service role client to test RLS hypothesis
@@ -2789,7 +2758,7 @@ export async function getRfpBids(supabase: SupabaseClient, data: {
   }
 }
 
-export async function updateBidStatus(supabase: SupabaseClient, data: {
+export async function updateBidStatus(supabase: SupabaseClient<any, "public", any>, data: {
   bid_id: number;
   status: string;
   status_reason?: string;
@@ -2847,7 +2816,7 @@ function generatePlaceholderEmbedding(): number[] {
  * Stores important information about user preferences, decisions, facts, and context
  */
 export async function createMemory(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, "public", any>,
   params: {
     content: string;
     memory_type: 'preference' | 'fact' | 'decision' | 'context' | 'conversation';
@@ -2880,8 +2849,7 @@ export async function createMemory(
       throw new Error(`Account not found for user_id: ${userId}`);
     }
 
-    // @ts-expect-error - We know accountUser has an account_id property
-    const accountId = accountUser.account_id;
+    const accountId = (accountUser as { account_id: string }).account_id;
     console.log('✅ Found account_id:', accountId, 'for auth user:', userId);
 
     // Generate placeholder embedding (will be replaced with real embeddings later)
@@ -2952,7 +2920,7 @@ export async function createMemory(
  * Uses semantic search with vector similarity (currently using placeholder embeddings)
  */
 export async function searchMemories(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, "public", any>,
   params: {
     query: string;
     memory_types?: string; // Comma-separated: "preference,fact"
@@ -2977,8 +2945,7 @@ export async function searchMemories(
       throw new Error(`Account not found for user_id: ${userId}`);
     }
 
-    // @ts-expect-error - We know accountUser has an account_id property
-    const accountId = accountUser.account_id;
+    const accountId = (accountUser as { account_id: string }).account_id;
     console.log('✅ Searching memories for account_id:', accountId, 'auth user:', userId);
 
     // Parse memory types from comma-separated string

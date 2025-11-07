@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Email tool handlers
 
-import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.39.7';
+import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { GmailFetchService } from '../services/gmail-fetch.ts';
 import type { ToolResult } from '../types.ts';
 
@@ -16,7 +16,7 @@ interface GmailHeader {
 /**
  * Helper function to check if an email belongs to a registered user
  */
-async function isRegisteredUser(supabase: SupabaseClient, email: string): Promise<boolean> {
+async function isRegisteredUser(supabase: SupabaseClient<any, "public", any>, email: string): Promise<boolean> {
   try {
     const { data, error } = await supabase
       .from('user_profiles')
@@ -34,7 +34,7 @@ async function isRegisteredUser(supabase: SupabaseClient, email: string): Promis
 /**
  * Helper function to get the sender's email address
  */
-async function getSenderEmail(supabase: SupabaseClient, userId: string): Promise<string | null> {
+async function getSenderEmail(supabase: SupabaseClient<any, "public", any>, userId: string): Promise<string | null> {
   try {
     const { data, error } = await supabase
       .from('user_profiles')
@@ -55,7 +55,7 @@ async function getSenderEmail(supabase: SupabaseClient, userId: string): Promise
 }
 
 export async function sendEmail(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   data: {
     to: string[];
@@ -187,7 +187,7 @@ In development mode, all emails to non-registered users are routed back to you f
 }
 
 export async function searchEmails(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   data: {
     query: string;
@@ -257,7 +257,7 @@ export async function searchEmails(
 }
 
 export async function getEmail(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   data: { message_id: string }
 ): Promise<ToolResult> {
@@ -301,7 +301,7 @@ export async function getEmail(
 }
 
 export async function listRecentEmails(
-  supabase: SupabaseClient,
+  supabase: SupabaseClient<any, "public", any>,
   userId: string,
   data: { max_results?: number; label_ids?: string[] }
 ): Promise<ToolResult> {
