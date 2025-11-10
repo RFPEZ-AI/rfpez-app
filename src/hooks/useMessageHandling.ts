@@ -400,7 +400,8 @@ export const useMessageHandling = (
       name: string;
       type: string;
       content?: string;
-    } | null
+    } | null,
+    messageMetadata?: Record<string, unknown>
   ) => {
     // GUARD: Prevent overlapping calls
     if (isProcessingRef.current) {
@@ -455,7 +456,8 @@ export const useMessageHandling = (
       id: Date.now().toString(),
       content,
       isUser: true,
-      timestamp: new Date()
+      timestamp: new Date(),
+      ...(messageMetadata && { metadata: messageMetadata })
     };
     
     setMessages(prev => [...prev, newMessage]);
@@ -574,7 +576,8 @@ export const useMessageHandling = (
             content, 
             'user',
             currentAgent?.agent_id,
-            currentAgent?.agent_name
+            currentAgent?.agent_name,
+            messageMetadata // Pass metadata to database
           );
           console.log('User message saved:', savedMessage);
           

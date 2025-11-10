@@ -134,7 +134,7 @@ const Home: React.FC = () => {
   } = useAgentManagement(currentSessionId);
 
   // Create a ref to store handleSendMessage so we can use it in handleRfpContextChanged
-  const handleSendMessageRef = useRef<((message: string) => Promise<void>) | null>(null);
+  const handleSendMessageRef = useRef<((message: string, metadata?: Record<string, unknown>) => Promise<void>) | null>(null);
 
   // Callback to handle RFP context change notifications to the agent
   const handleRfpContextChanged = useCallback((prompt: string) => {
@@ -145,7 +145,7 @@ const Home: React.FC = () => {
     if (handleSendMessageRef.current) {
       // Send the notification to Claude with system notification metadata
       // This will be added to the conversation history but hidden from the UI
-      handleSendMessageRef.current(prompt).catch(error => {
+      handleSendMessageRef.current(prompt, { isSystemNotification: true }).catch(error => {
         console.error('Failed to send RFP context notification:', error);
       });
     } else {

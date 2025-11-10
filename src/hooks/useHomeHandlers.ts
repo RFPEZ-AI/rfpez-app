@@ -69,7 +69,8 @@ interface UseHomeHandlersParams {
     loadSessionAgent: (sessionId: string) => Promise<void>,
     onAgentChanged: (agent: SessionActiveAgent) => null,
     loadSessionArtifacts: (sessionId: string) => Promise<Artifact[] | undefined>,
-    selectedArtifact: string | null
+    selectedArtifact: string | null,
+    messageMetadata?: Record<string, unknown>
   ) => Promise<void>;
   sendAutoPrompt: (
     formName: string,
@@ -392,13 +393,14 @@ export const useHomeHandlers = (params: UseHomeHandlersParams) => {
     }
   };
 
-  const onSendMessage = async (content: string) => {
+  const onSendMessage = async (content: string, metadata?: Record<string, unknown>) => {
     // CRITICAL FIX: Use ref for immediate access to current session ID, avoiding stale closures
     const refSessionId = currentSessionIdRef.current;
     
     // Enhanced debugging for session ID issues
     console.log('📤 onSendMessage called with:', {
       content: content.substring(0, 50) + '...',
+      metadata,
       currentSessionId,
       refSessionId,
       isCreatingNewSession,
@@ -487,7 +489,8 @@ export const useHomeHandlers = (params: UseHomeHandlersParams) => {
         return null; // Return null immediately to satisfy the sync interface
       },
       loadSessionArtifacts,
-      selectedArtifact // Add current artifact context
+      selectedArtifact, // Add current artifact context
+      metadata // Pass metadata to handleSendMessage
     );
   };
 
