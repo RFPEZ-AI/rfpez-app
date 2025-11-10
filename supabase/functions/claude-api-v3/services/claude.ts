@@ -1058,17 +1058,33 @@ export class ToolExecutionService {
           // Determine the base URL based on environment
           let baseUrl = '';
           if (includeDomain) {
-            const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-            console.log('🔍 Environment detection - SUPABASE_URL:', supabaseUrl);
+            // Use APP_URL environment variable if set, otherwise fallback to detection
+            const appUrl = Deno.env.get('APP_URL');
             
-            // Check if running locally (127.0.0.1, localhost, or internal kong URL)
-            if (supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost') || supabaseUrl.includes('kong:')) {
-              baseUrl = 'http://localhost:3100';
-              console.log('📍 Detected LOCAL environment');
+            if (appUrl) {
+              baseUrl = appUrl;
+              console.log('📍 Using APP_URL from environment:', baseUrl);
             } else {
-              // Production/remote environment - using browser history routing (no hash)
-              baseUrl = 'https://dev.rfpez.ai';
-              console.log('📍 Detected REMOTE environment');
+              // Fallback: detect from SUPABASE_URL
+              const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+              console.log('🔍 Environment detection - SUPABASE_URL:', supabaseUrl);
+              
+              // Use APP_URL environment variable if available, otherwise auto-detect
+              const appUrl = Deno.env.get('APP_URL');
+              if (appUrl) {
+                baseUrl = appUrl;
+                console.log('📍 Using APP_URL from config:', appUrl);
+              } else {
+                // Fallback: Check if running locally (127.0.0.1, localhost, or internal kong URL)
+                if (supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost') || supabaseUrl.includes('kong:')) {
+                  baseUrl = 'http://localhost:3100';
+                  console.log('📍 Detected LOCAL environment');
+                } else {
+                  // Production/remote environment - using browser history routing (no hash)
+                  baseUrl = 'https://dev.rfpez.ai';
+                  console.log('📍 Detected REMOTE environment');
+                }
+              }
             }
           }
           

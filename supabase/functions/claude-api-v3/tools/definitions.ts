@@ -785,27 +785,31 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   }
 ];
 
-// Define role-based tool restrictions
+// LEGACY: Hardcoded role-based tool restrictions - DEPRECATED
+// ⚠️ DO NOT USE - All tool access should be managed via database agents.access field
+// This is kept for reference only and should be removed after all agents are migrated
+/*
 const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: string[] }> = {
   'sales': {
     // Solutions agent (sales role) can now create forms and documents but should NOT create RFPs directly - must switch to RFP Design for RFP creation
     blocked: ['create_and_set_rfp']
   },
   'design': {
-    // RFP Design has access to all RFP creation tools, bid management tools, and memory tools - REMOVED switch_agent to prevent self-switching loops
-    allowed: ['create_and_set_rfp', 'set_current_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'generate_rfp_bid_url', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'create_memory', 'search_memories']
+    // RFP Design has access to all RFP creation tools, bid management tools, memory tools, and can switch to other agents (e.g., Sourcing)
+    allowed: ['create_and_set_rfp', 'set_current_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'generate_rfp_bid_url', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'switch_agent', 'create_memory', 'search_memories']
   },
   'support': {
     // Support agents don't need RFP creation tools but can create documents
     blocked: ['create_and_set_rfp', 'create_form_artifact']
   }
 };
+*/
 
-// Get tool definitions for Claude API, filtered by agent role
+// Get tool definitions for Claude API, filtered by agent's access list from database
 export function getToolDefinitions(agentRole?: string, allowedTools?: string[]): ClaudeToolDefinition[] {
   console.log(`🔍 getToolDefinitions called with agentRole: '${agentRole}', allowedTools:`, allowedTools);
   
-  // NEW: Database-driven tool access control (preferred method)
+  // Database-driven tool access control (PREFERRED and REQUIRED)
   if (allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0) {
     // CRITICAL FIX: Split comma-separated tool names and flatten into single array
     // Database stores tools like: ["create_memory, search_memories", "switch_agent"]
@@ -828,54 +832,14 @@ export function getToolDefinitions(agentRole?: string, allowedTools?: string[]):
     return filteredTools;
   }
   
-  // FALLBACK: Legacy role-based restrictions (for backward compatibility)
-  console.log(`⚠️ Using legacy role-based restrictions (no database access list found)`);
-  console.log(`🔍 Type of agentRole: ${typeof agentRole}`);
-  console.log(`🔍 ROLE_TOOL_RESTRICTIONS keys:`, Object.keys(ROLE_TOOL_RESTRICTIONS));
+  // ⚠️ NO DATABASE ACCESS LIST: Agent must have 'access' field populated in database
+  // This should only happen for legacy agents that haven't been migrated yet
+  console.error(`❌ CRITICAL: Agent role '${agentRole}' has no access list in database!`);
+  console.error(`❌ Please update the agent's 'access' field in the agents table.`);
+  console.error(`❌ Returning empty tool list for safety.`);
   
-  if (!agentRole) {
-    console.log(`⚠️ No agent role provided, returning ALL ${TOOL_DEFINITIONS.length} tools`);
-    return TOOL_DEFINITIONS; // Return all tools if no role specified
-  }
-
-  const restrictions = ROLE_TOOL_RESTRICTIONS[agentRole];
-  if (!restrictions) {
-    console.log(`⚠️ No restrictions found for role '${agentRole}', returning ALL ${TOOL_DEFINITIONS.length} tools`);
-    return TOOL_DEFINITIONS; // Return all tools if role not found
-  }
-
-  console.log(`🔒 Found restrictions for role '${agentRole}':`, restrictions);
-
-  const filteredTools = TOOL_DEFINITIONS.filter(tool => {
-    console.log(`🧪 FILTERING TOOL: ${tool.name} for role ${agentRole}`);
-    
-    // 🚨 ABSOLUTE BLOCK: Never allow switch_agent for design role
-    if (agentRole === 'design' && tool.name === 'switch_agent') {
-      console.log(`🚨 ABSOLUTE BLOCK: Preventing switch_agent for design role`);
-      return false;
-    }
-    
-    // If there's an allowed list, only include tools in that list
-    if (restrictions.allowed) {
-      const allowed = restrictions.allowed.includes(tool.name);
-      console.log(`✓ Tool '${tool.name}' allowed: ${allowed} (in allowed list)`);
-      return allowed;
-    }
-    
-    // If there's a blocked list, exclude tools in that list
-    if (restrictions.blocked) {
-      const blocked = restrictions.blocked.includes(tool.name);
-      console.log(`❌ Tool '${tool.name}' blocked: ${blocked} (in blocked list)`);
-      return !blocked;
-    }
-    
-    console.log(`✓ Tool '${tool.name}' included (no restrictions)`);
-    return true; // Include tool if no restrictions apply
-  });
-
-  console.log(`🔧 Filtered tools for role '${agentRole}': [${filteredTools.map(t => t.name).join(', ')}]`);
-  console.log(`📊 Tool count: ${filteredTools.length} out of ${TOOL_DEFINITIONS.length} total tools`);
-  return filteredTools;
+  // Return empty array - agents MUST have access field defined
+  return [];
 }
 
 // Validate tool call input against schema

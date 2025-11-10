@@ -1135,10 +1135,11 @@ const Home: React.FC = () => {
       const agentName = isAuthenticated ? 'RFP Design agent' : 'Solutions agent';
       setMessages([{
         id: 'agent-loading',
-        content: `🤖 Activating ${agentName}...`,
+        content: `🤖 Activating ${agentName}...\n\n_Preparing personalized welcome message..._`,
         isUser: false,
         timestamp: new Date(),
-        agentName: 'System'
+        agentName: 'System',
+        isToolProcessing: true // Show as processing indicator
       }]);
       
       console.log('🎭 Loading default agent welcome message (no session creation yet)');

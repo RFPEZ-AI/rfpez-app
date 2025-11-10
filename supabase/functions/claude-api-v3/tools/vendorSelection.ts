@@ -3,6 +3,7 @@
 // Manages Vendor List artifacts with auto-save functionality
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import type { ToolResult } from '../types.ts';
 
 interface VendorSelectionVendor {
   id: string;
@@ -51,7 +52,7 @@ interface ArtifactJoinResult {
 export async function handleManageVendorSelection(
   supabase: SupabaseClient,
   params: ManageVendorSelectionParams
-): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
+): Promise<ToolResult> {
   
   console.log('[VendorSelection] Operation:', params.operation, 'RFP:', params.rfp_id);
 
@@ -97,7 +98,7 @@ export async function handleManageVendorSelection(
 async function createVendorSelection(
   supabase: SupabaseClient,
   params: ManageVendorSelectionParams
-): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
+): Promise<ToolResult> {
   // 🔧 FIX: Parse vendors if it's a JSON string (Claude API serialization issue)
   if (params.vendors && typeof params.vendors === 'string') {
     try {
@@ -246,7 +247,21 @@ async function createVendorSelection(
       vendor_count: initialSchema.vendors.length,
       schema: initialSchema
     },
-    message: 'Vendor selection artifact created successfully'
+    message: `Created vendor selection artifact: ${artifact.name}`,
+    clientCallbacks: [
+      {
+        type: 'ui_refresh',
+        target: 'artifact_panel',
+        payload: {
+          artifact_id: artifact.id,
+          artifact_name: artifact.name,
+          artifact_type: 'vendor_selection',
+          artifact_role: 'vendor_selection_form',
+          message: `Vendor selection artifact "${artifact.name}" has been created successfully with ${initialSchema.vendors.length} suppliers`
+        },
+        priority: 'medium'
+      }
+    ]
   };
 }
 
@@ -256,7 +271,7 @@ async function createVendorSelection(
 async function readVendorSelection(
   supabase: SupabaseClient,
   params: ManageVendorSelectionParams
-): Promise<{ success: boolean; data?: unknown; error?: string }> {
+): Promise<ToolResult> {
   // Find vendor selection artifact for this RFP
   const { data: rfpArtifact, error: findError } = await supabase
     .from('rfp_artifacts')
@@ -311,7 +326,7 @@ async function readVendorSelection(
 async function updateVendorSelection(
   supabase: SupabaseClient,
   params: ManageVendorSelectionParams
-): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
+): Promise<ToolResult> {
   // 🔧 FIX: Parse vendors if it's a JSON string (Claude API serialization issue)
   if (params.vendors && typeof params.vendors === 'string') {
     try {
@@ -395,7 +410,7 @@ async function updateVendorSelection(
 async function addVendors(
   supabase: SupabaseClient,
   params: ManageVendorSelectionParams
-): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
+): Promise<ToolResult> {
   // 🔧 FIX: Parse vendors if it's a JSON string (Claude API serialization issue)
   if (params.vendors && typeof params.vendors === 'string') {
     try {
@@ -488,7 +503,7 @@ async function addVendors(
 async function removeVendors(
   supabase: SupabaseClient,
   params: ManageVendorSelectionParams
-): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
+): Promise<ToolResult> {
   if (!params.vendor_ids || params.vendor_ids.length === 0) {
     return {
       success: false,
@@ -569,7 +584,7 @@ async function removeVendors(
 async function toggleVendorSelection(
   supabase: SupabaseClient,
   params: ManageVendorSelectionParams
-): Promise<{ success: boolean; data?: unknown; error?: string; message?: string }> {
+): Promise<ToolResult> {
   if (!params.vendor_ids || params.vendor_ids.length === 0) {
     return {
       success: false,

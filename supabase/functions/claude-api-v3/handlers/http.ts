@@ -444,11 +444,14 @@ function handleStreamingResponse(
         console.log('🔧 DEBUG: AgentContext role:', agentContext?.role, typeof agentContext?.role);
         console.log('🔧 DEBUG: AgentContext object:', { id: agentContext?.id, name: agentContext?.name, role: agentContext?.role, access: agentContext?.access });
         
-        // 🚫 CRITICAL: Disable tools when processing initial_prompt to prevent unwanted session creation
-        // Initial prompts should ONLY generate welcome text, not execute database operations
-        const tools = processInitialPrompt ? [] : getToolDefinitions(agentContext?.role, agentContext?.access);
+        // � IMPROVED: Allow read-only tools during initial_prompt processing
+        // Initial prompts can search memories and get context, but cannot create sessions/artifacts
+        let tools = getToolDefinitions(agentContext?.role, agentContext?.access);
         if (processInitialPrompt) {
-          console.log('🚫 Initial prompt processing - tools DISABLED to prevent auto-session creation');
+          // Filter to only read-only tools that are safe during welcome message generation
+          const safeTools = ['search_memories', 'get_conversation_history', 'search_messages', 'get_current_rfp', 'get_current_agent'];
+          tools = tools.filter(tool => safeTools.includes(tool.name));
+          console.log('� Initial prompt processing - tools filtered to read-only:', tools.map(t => t.name));
         }
         
         // Use recursive streaming to handle unlimited tool call chains
