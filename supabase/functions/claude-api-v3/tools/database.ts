@@ -986,6 +986,17 @@ export async function createSession(supabase: SupabaseClient<any, "public", any>
     timestamp: new Date().toISOString()
   });
   
+  // 🚨 CRITICAL VALIDATION: Require agentId to prevent orphaned sessions
+  // All sessions MUST have an agent assigned to avoid "No Agent" sessions in UI
+  if (!agentId) {
+    console.error('❌ CREATE_SESSION ERROR: agentId is required to prevent orphaned sessions');
+    return {
+      success: false,
+      error: 'Agent ID is required',
+      message: 'Cannot create session without an assigned agent. Sessions must have an active agent to prevent orphaned sessions. Use createSessionWithAgent instead or provide agentId parameter.'
+    };
+  }
+  
   // Get the user's account_id from account_users
   // userId is auth.users.id - sessions.user_id now directly references auth.users
   const { data: accountUser, error: accountError } = await supabase
@@ -1033,21 +1044,24 @@ export async function createSession(supabase: SupabaseClient<any, "public", any>
     throw error;
   }
 
-  // Link agent to session if provided
-  if (agentId) {
-    const { error: agentError } = await supabase
-      .from('session_agents')
-      .insert({
-        session_id: (session as unknown as { id: string }).id,
-        agent_id: agentId,
-        created_at: new Date().toISOString()
-      });
+  // Link agent to session (REQUIRED - validated above)
+  console.log('🔧 Linking agent to session:', { sessionId: (session as unknown as { id: string }).id, agentId });
+  const { error: agentError } = await supabase
+    .from('session_agents')
+    .insert({
+      session_id: (session as unknown as { id: string }).id,
+      agent_id: agentId,
+      created_at: new Date().toISOString()
+    });
 
-    if (agentError) {
-      console.error('Error linking agent to session:', agentError);
-      // Don't throw here, session creation succeeded
-    }
+  if (agentError) {
+    console.error('❌ Error linking agent to session:', agentError);
+    // Rollback - delete the session since agent assignment failed
+    await supabase.from('sessions').delete().eq('id', (session as unknown as { id: string }).id);
+    throw new Error(`Failed to assign agent to session: ${JSON.stringify(agentError)}`);
   }
+  
+  console.log('✅ Session created successfully with agent:', { sessionId: (session as unknown as { id: string }).id, agentId });
 
   // IMPORTANT: Set this new session as the user's current session
   // This ensures that when the user refreshes, they stay in the new session
