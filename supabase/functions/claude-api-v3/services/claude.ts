@@ -831,7 +831,11 @@ export class ToolExecutionService {
         case 'list_artifacts': {
           const { listArtifacts } = await import('../tools/database.ts');
           return await listArtifacts(this.supabase, {
-            ...input,
+            sessionId: (input.session_id as string | undefined) || sessionId,
+            allArtifacts: input.all_artifacts as boolean | undefined,
+            artifactType: input.artifact_type as string | undefined,
+            limit: input.limit as number | undefined,
+            filterByCurrentRfp: input.filter_by_current_rfp as boolean | undefined,
             userId: this.userId
           });
         }

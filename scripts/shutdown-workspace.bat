@@ -25,6 +25,15 @@ echo ⏹️  Stopping Jest Test Runners...
 taskkill /f /fi "IMAGENAME eq node.exe" /fi "COMMANDLINE eq *jest*" >nul 2>&1
 echo ✅ Jest runners stopped
 
+REM Clean Deno lock files to prevent corruption on restart
+echo 🧹 Cleaning Deno lock files (prevents edge runtime corruption)...
+if exist "supabase\functions" (
+    del /s /q "supabase\functions\deno.lock" >nul 2>&1
+    echo ✅ Deno lock files cleaned (will regenerate on next startup)
+) else (
+    echo ⏸️  Functions directory not found - skipping lock cleanup
+)
+
 REM Stop Supabase local stack
 echo 🛑 Stopping Supabase local stack...
 where supabase >nul 2>&1

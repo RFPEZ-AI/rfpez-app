@@ -73,6 +73,20 @@ else
     echo "⚠️  Docker not found - skipping backup"
 fi
 
+# Clean Deno lock files to prevent corruption on restart
+echo "🧹 Cleaning Deno lock files (prevents edge runtime corruption)..."
+if [ -d "supabase/functions" ]; then
+    find supabase/functions -name "deno.lock" -type f -delete 2>/dev/null
+    LOCK_COUNT=$(find supabase/functions -name "deno.lock" -type f 2>/dev/null | wc -l)
+    if [ "$LOCK_COUNT" -eq 0 ]; then
+        echo "✅ Deno lock files cleaned (will regenerate on next startup)"
+    else
+        echo "⚠️  Some lock files remain: $LOCK_COUNT"
+    fi
+else
+    echo "⏸️  Functions directory not found - skipping lock cleanup"
+fi
+
 # Stop Supabase local stack
 echo "🛑 Stopping Supabase local stack..."
 if command -v supabase >/dev/null 2>&1; then
