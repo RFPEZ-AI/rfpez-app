@@ -313,7 +313,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'list_artifacts',
-    description: 'List artifacts with optional scope filtering. Use all_artifacts=true to get all artifacts for the account, or leave false (default) to get only session artifacts.',
+    description: 'List artifacts with optional scope filtering. Use all_artifacts=true to get all artifacts for the account, or leave false (default) to get only session artifacts. By default, filters to show only artifacts linked to the current RFP.',
     input_schema: {
       type: 'object',
       properties: {
@@ -329,6 +329,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         artifact_type: {
           type: 'string',
           description: 'Optional filter by artifact type (form, document, text, etc.)'
+        },
+        filter_by_current_rfp: {
+          type: 'boolean',
+          description: 'If true (default), only returns artifacts linked to the current RFP via rfp_artifacts table. Set to false to see all session artifacts regardless of RFP.',
+          default: true
         },
         limit: {
           type: 'number',

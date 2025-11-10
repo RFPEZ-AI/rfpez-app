@@ -538,6 +538,21 @@ function handleStreamingResponse(
           }
         }
 
+        // Extract clientCallbacks from tool results
+        const clientCallbacks: unknown[] = [];
+        executedToolResults.forEach((toolResult: unknown) => {
+          if (toolResult && typeof toolResult === 'object' && 'result' in toolResult) {
+            const result = (toolResult as { result?: unknown }).result;
+            if (result && typeof result === 'object' && 'clientCallbacks' in result) {
+              const callbacks = (result as { clientCallbacks?: unknown }).clientCallbacks;
+              if (Array.isArray(callbacks)) {
+                clientCallbacks.push(...callbacks);
+                console.log(`🔔 Extracted ${callbacks.length} clientCallbacks from tool result`);
+              }
+            }
+          }
+        });
+
         // Send completion event with metadata including agent switch detection
         const completeEvent: Record<string, unknown> = {
           type: 'complete',
@@ -547,9 +562,12 @@ function handleStreamingResponse(
           metadata: {
             agent_switch_occurred: agentSwitchOccurred,
             functions_called: toolsUsed,
-            function_results: executedToolResults
+            function_results: executedToolResults,
+            clientCallbacks: clientCallbacks.length > 0 ? clientCallbacks : undefined
           }
         };
+        
+        console.log(`📤 Complete event includes ${clientCallbacks.length} clientCallbacks`);
         
         // Add session creation info if a new session was auto-created
         if (newSessionData) {

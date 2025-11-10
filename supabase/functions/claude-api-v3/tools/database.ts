@@ -1652,12 +1652,26 @@ export async function listArtifacts(supabase: SupabaseClient<any, "public", any>
   artifactType?: string;
   limit?: number;
   userId: string;
+  filterByCurrentRfp?: boolean;
 }) {
-  const { sessionId, allArtifacts = false, artifactType, limit = 50, userId } = data;
+  const { sessionId, allArtifacts = false, artifactType, limit = 50, userId, filterByCurrentRfp = true } = data;
   
-  console.log('📋 Listing artifacts:', { sessionId, allArtifacts, artifactType, limit, userId });
+  console.log('📋 Listing artifacts:', { sessionId, allArtifacts, artifactType, limit, userId, filterByCurrentRfp });
 
   try {
+    // If filtering by current RFP, get the RFP ID first
+    let currentRfpId: number | null = null;
+    if (filterByCurrentRfp && sessionId && !allArtifacts) {
+      const { data: session } = await supabase
+        .from('sessions')
+        .select('current_rfp_id')
+        .eq('id', sessionId)
+        .single() as { data: { current_rfp_id?: number } | null };
+      
+      currentRfpId = session?.current_rfp_id || null;
+      console.log('📋 Current RFP ID for filtering:', currentRfpId);
+    }
+
     let query = supabase
       .from('artifacts')
       .select('id, name, type, description, artifact_role, created_at, updated_at, status, session_id')
@@ -1690,7 +1704,7 @@ export async function listArtifacts(supabase: SupabaseClient<any, "public", any>
       throw error;
     }
 
-    const artifactList = artifacts as unknown as Array<{
+    let artifactList = artifacts as unknown as Array<{
       id: string;
       name: string;
       type: string;
@@ -1702,13 +1716,32 @@ export async function listArtifacts(supabase: SupabaseClient<any, "public", any>
       session_id: string;
     }> || [];
 
+    // Filter by current RFP if requested and RFP is set
+    if (filterByCurrentRfp && currentRfpId && artifactList.length > 0) {
+      console.log('📋 Filtering artifacts by RFP:', currentRfpId);
+      
+      // Get artifact IDs linked to this RFP
+      const { data: rfpArtifacts } = await supabase
+        .from('rfp_artifacts')
+        .select('artifact_id')
+        .eq('rfp_id', currentRfpId);
+      
+      const linkedArtifactIds = new Set(rfpArtifacts?.map((ra: { artifact_id: string }) => ra.artifact_id) || []);
+      console.log('📋 Artifacts linked to RFP:', linkedArtifactIds.size);
+      
+      // Filter to only include artifacts linked to current RFP
+      artifactList = artifactList.filter(a => linkedArtifactIds.has(a.id));
+      console.log('📋 Filtered artifact count:', artifactList.length);
+    }
+
     return {
       success: true,
       artifacts: artifactList,
       count: artifactList.length,
       scope: allArtifacts ? 'account' : 'session',
       session_id: sessionId,
-      filter_type: artifactType
+      filter_type: artifactType,
+      filtered_by_rfp: filterByCurrentRfp && currentRfpId ? currentRfpId : null
     };
   } catch (error) {
     console.error('❌ Exception listing artifacts:', error);

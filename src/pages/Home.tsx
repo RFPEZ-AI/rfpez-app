@@ -809,6 +809,35 @@ const Home: React.FC = () => {
           }
         }
         
+        // Handle artifact_panel refresh (when artifact created/updated)
+        if (event.data.target === 'artifact_panel') {
+          console.log('🎯 ARTIFACT PANEL CALLBACK: Refreshing artifacts from edge function:', {
+            artifact_id: event.data.payload?.artifact_id,
+            artifact_name: event.data.payload?.artifact_name,
+            artifact_type: event.data.payload?.artifact_type,
+            message: event.data.payload?.message
+          });
+          
+          try {
+            if (currentSessionId) {
+              // Reload artifacts to get the new/updated artifact
+              await loadSessionArtifacts(currentSessionId);
+              console.log('✅ Artifacts refreshed from EDGE_FUNCTION_CALLBACK');
+              
+              // Auto-select the artifact if artifact_id provided
+              if (event.data.payload?.artifact_id) {
+                selectArtifact(event.data.payload.artifact_id);
+                artifactWindowState.selectArtifact(event.data.payload.artifact_id);
+                console.log('✅ Auto-selected artifact:', event.data.payload.artifact_id);
+              }
+            } else {
+              console.warn('⚠️ Cannot refresh artifacts: No current session');
+            }
+          } catch (error) {
+            console.error('❌ HOME MESSAGE DEBUG: Failed to refresh artifacts from EDGE_FUNCTION_CALLBACK:', error);
+          }
+        }
+        
         return;
       }
 
