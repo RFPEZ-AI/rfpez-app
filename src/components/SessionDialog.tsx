@@ -65,19 +65,6 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   userId,
   currentRfpId
 }) => {
-  // 🔍 DEBUG: Log messages with file attachments
-  useEffect(() => {
-    const messagesWithFiles = messages.filter(m => m.file_attachments && m.file_attachments.length > 0);
-    if (messagesWithFiles.length > 0) {
-      console.log('📎 SessionDialog received messages with file attachments:', messagesWithFiles.map(m => ({
-        id: m.id,
-        content: m.content.substring(0, 40),
-        file_count: m.file_attachments?.length,
-        files: m.file_attachments?.map(f => f.file_name)
-      })));
-    }
-  }, [messages]);
-
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
