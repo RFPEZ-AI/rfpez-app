@@ -40,6 +40,14 @@ export interface SessionWithStats extends Session {
   agent_name?: string; // Name of the active agent for this session
 }
 
+export interface FileAttachment {
+  memory_id: string; // UUID reference to account_memories
+  file_name: string;
+  file_type: string; // 'document', 'spreadsheet', 'image', 'pdf', etc.
+  file_size: number; // bytes
+  uploaded_at: string; // ISO timestamp
+}
+
 export interface Message {
   id: string; // UUID
   session_id: string; // UUID
@@ -58,6 +66,7 @@ export interface Message {
     temperature?: number;
     [key: string]: unknown;
   };
+  file_attachments?: FileAttachment[]; // Files uploaded with this message
 }
 
 export interface Artifact {

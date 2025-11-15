@@ -4,7 +4,7 @@ import { useRef, useEffect, useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { Message, ArtifactReference, Artifact } from '../types/home';
 import { RFP, FormSpec } from '../types/rfp';
-import { SessionActiveAgent, UserProfile } from '../types/database';
+import { SessionActiveAgent, UserProfile, FileAttachment } from '../types/database';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
 import DatabaseService from '../services/database';
 import { ClaudeService } from '../services/claudeService';
@@ -12,6 +12,8 @@ import { AgentService } from '../services/agentService';
 import { SmartAutoPromptManager } from '../utils/smartAutoPromptManager';
 import { categorizeError } from '../components/APIErrorHandler';
 import { generateSessionTitleFromMessage } from '../utils/sessionTitleUtils';
+import { KnowledgeRetrievalService } from '../services/knowledgeRetrievalService';
+import { supabase } from '../supabaseClient';
 
 // Client update interfaces for edge function communication
 interface ClientAction {
@@ -401,7 +403,8 @@ export const useMessageHandling = (
       type: string;
       content?: string;
     } | null,
-    messageMetadata?: Record<string, unknown>
+    messageMetadata?: Record<string, unknown>,
+    fileAttachments?: FileAttachment[]
   ) => {
     // GUARD: Prevent overlapping calls
     if (isProcessingRef.current) {
@@ -457,7 +460,8 @@ export const useMessageHandling = (
       content,
       isUser: true,
       timestamp: new Date(),
-      ...(messageMetadata && { metadata: messageMetadata })
+      ...(messageMetadata && { metadata: messageMetadata }),
+      ...(fileAttachments && fileAttachments.length > 0 && { file_attachments: fileAttachments })
     };
     
     setMessages(prev => [...prev, newMessage]);
@@ -577,7 +581,11 @@ export const useMessageHandling = (
             'user',
             currentAgent?.agent_id,
             currentAgent?.agent_name,
-            messageMetadata // Pass metadata to database
+            messageMetadata, // Pass metadata to database
+            undefined, // aiMetadata
+            undefined, // artifactRefs
+            false, // hidden
+            fileAttachments // Pass file attachments
           );
           console.log('User message saved:', savedMessage);
           
@@ -1299,8 +1307,60 @@ export const useMessageHandling = (
         console.log('🚨 CRITICAL DEBUG: About to call ClaudeService.generateResponse');
         console.log('🚨 onStreamingChunk callback provided:', typeof onStreamingChunk);
 
+        // 🔍 KNOWLEDGE RETRIEVAL: Search uploaded files for relevant context
+        let knowledgeContext = '';
+        console.log('🔍 Knowledge retrieval check - activeSessionId:', activeSessionId, 'userId:', userId);
+        if (activeSessionId && userId) {
+          try {
+            console.log('🔍 Searching knowledge base for relevant content...');
+            
+            // Get account ID from session
+            const { data: sessionData } = await supabase
+              .from('sessions')
+              .select('account_id')
+              .eq('id', activeSessionId)
+              .single();
+            
+            const accountId = sessionData?.account_id;
+            
+            if (accountId) {
+              // Search for relevant knowledge entries using semantic search
+              const knowledgeResults = await KnowledgeRetrievalService.searchKnowledge(
+                content, // Use user's message as query
+                {
+                  accountId,
+                  limit: 5,
+                  minSimilarity: 0.7
+                }
+              );
+              
+              if (knowledgeResults.length > 0) {
+                console.log(`✅ Found ${knowledgeResults.length} relevant knowledge entries`);
+                
+                // Format knowledge entries for Claude context
+                knowledgeContext = '\n\n## Relevant Knowledge Base Context\n\n' +
+                  knowledgeResults.map((entry, idx) => {
+                    const fileName = entry.fileName ? `[${entry.fileName}]` : '[Knowledge Entry]';
+                    const similarity = entry.similarity ? ` (relevance: ${(entry.similarity * 100).toFixed(0)}%)` : '';
+                    return `${idx + 1}. ${fileName}${similarity}\n${entry.content}\n`;
+                  }).join('\n---\n\n');
+                
+                console.log('📚 Knowledge context added to prompt:', knowledgeContext.substring(0, 200) + '...');
+              } else {
+                console.log('ℹ️ No relevant knowledge found for this query');
+              }
+            }
+          } catch (error) {
+            console.error('⚠️ Error retrieving knowledge context:', error);
+            // Continue without knowledge context rather than failing the request
+          }
+        }
+        
+        // Append knowledge context to user's message if available
+        const enhancedContent = knowledgeContext ? content + knowledgeContext : content;
+
         const claudeResponse = await ClaudeService.generateResponse(
-          content,
+          enhancedContent, // Use enhanced content with knowledge context
           agentForClaude,
           conversationHistory,
           activeSessionId,

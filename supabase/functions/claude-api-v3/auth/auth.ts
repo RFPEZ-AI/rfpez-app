@@ -101,20 +101,27 @@ function hasAuthMethod(obj: unknown): obj is SupabaseAuth {
 
 // Extract user ID from authenticated Supabase client or return anonymous user ID
 export async function getUserId(supabase: unknown, request: Request): Promise<string> {
-  // Check if this is an anonymous request
+  // Check if this is an anonymous request FIRST - before attempting getUser()
   const authHeader = request.headers.get('Authorization');
-  if (authHeader) {
-    const token = authHeader.substring(7);
-    const anonymousKey = config.supabaseAnonKey;
-    
-    if (token === anonymousKey) {
-      // For anonymous users, use the dedicated anonymous user profile
-      // This UUID is seeded in the database specifically for anonymous sessions
-      const anonymousUserId = '00000000-0000-0000-0000-000000000001';
-      console.log(`🔓 Using dedicated anonymous user profile: ${anonymousUserId}`);
-      return anonymousUserId;
-    }
+  const anonymousKey = config.supabaseAnonKey;
+  
+  // Case 1: No auth header - anonymous user
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const anonymousUserId = '00000000-0000-0000-0000-000000000001';
+    console.log(`🔓 No auth header - using anonymous user profile: ${anonymousUserId}`);
+    return anonymousUserId;
   }
+  
+  // Case 2: Auth header contains anonymous key - anonymous user
+  const token = authHeader.substring(7);
+  if (token === anonymousKey) {
+    const anonymousUserId = '00000000-0000-0000-0000-000000000001';
+    console.log(`🔓 Anonymous key detected - using anonymous user profile: ${anonymousUserId}`);
+    return anonymousUserId;
+  }
+  
+  // Case 3: Authenticated user with JWT token
+  console.log('👤 User JWT detected, extracting user ID from token');
   
   // For authenticated users, get the actual user ID
   if (!hasAuthMethod(supabase)) {
@@ -130,6 +137,7 @@ export async function getUserId(supabase: unknown, request: Request): Promise<st
     throw new Error('AUTHENTICATION_REQUIRED: Your session has expired. Please logout and login again to continue.');
   }
   
+  console.log(`✅ Authenticated user ID: ${user.id}`);
   return user.id;
 }
 

@@ -49,6 +49,8 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
           agentName: msg.agent_name,
           // Restore artifact references from metadata
           artifactRefs: (msg.metadata?.artifactRefs as ArtifactReference[]) || [],
+          // Include file attachments if present
+          file_attachments: msg.file_attachments || [],
           // 🔧 CRITICAL FIX: Preserve all metadata including tool calls
           // Merge metadata and ai_metadata to support both structures
           metadata: {

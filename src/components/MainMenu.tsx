@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { IonButton, IonIcon, IonPopover, IonList, IonItem, IonLabel } from '@ionic/react';
-import { menu as menuIcon, documentText, bug } from 'ionicons/icons';
+import { menu as menuIcon, documentText, bug, fileTrayFull } from 'ionicons/icons';
 
 interface MainMenuProps {
   onSelect: (item: string) => void;
@@ -35,6 +35,10 @@ const MainMenu: React.FC<MainMenuProps> = ({ onSelect }) => {
           <IonItem button onClick={() => handleSelect('RFP')}>
             <IonIcon icon={documentText} slot="start" />
             <IonLabel>RFP</IonLabel>
+          </IonItem>
+          <IonItem button onClick={() => handleSelect('Files')}>
+            <IonIcon icon={fileTrayFull} slot="start" />
+            <IonLabel>Knowledge Base Files</IonLabel>
           </IonItem>
           {process.env.NODE_ENV === 'development' && (
             <IonItem button onClick={() => handleSelect('Debug')}>

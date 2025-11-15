@@ -94,8 +94,8 @@ echo "✅ Prerequisites check passed"
 
 # Start Supabase local stack
 echo "🏗️  Starting Supabase local stack..."
-if is_port_in_use 54121; then
-    echo "⚠️  Port 54121 in use - Supabase may already be running"
+if is_port_in_use 54321; then
+    echo "⚠️  Port 54321 in use - Supabase may already be running"
     supabase status || echo "Supabase not responding properly, attempting restart..."
 else
     echo "📦 Starting fresh Supabase instance..."
@@ -149,7 +149,7 @@ start_supabase_with_retries() {
 supabase start
 if [ $? -eq 0 ]; then
     echo "✅ Supabase local stack started successfully"
-    wait_for_service "http://127.0.0.1:54121/health" "Supabase API"
+    wait_for_service "http://127.0.0.1:54321/health" "Supabase API"
 else
     echo "❌ Failed to start Supabase. Performing diagnostics..."
     echo "🔧 Gathering Supabase-related containers and statuses..."
@@ -170,7 +170,7 @@ else
     # Retry start with helper (includes a --debug on final attempt)
     if start_supabase_with_retries; then
         echo "✅ Supabase started after retry"
-        wait_for_service "http://127.0.0.1:54121/health" "Supabase API"
+        wait_for_service "http://127.0.0.1:54321/health" "Supabase API"
     else
         echo "❌ Failed to start Supabase after retries. Attempting targeted cleanup of unhealthy containers..."
         # Only remove containers that belong to this project and show as unhealthy/exited
@@ -216,7 +216,7 @@ echo "   - Test Runner: Use 'Run Tests (Watch Mode)' task"
 # Verify edge functions are ready
 echo "🔧 Verifying edge functions..."
 # Try to POST a lightweight startup payload to the Claude function and report status
-EDGE_TEST_URL="http://127.0.0.1:54121/functions/v1/claude-api-v3"
+EDGE_TEST_URL="http://127.0.0.1:54321/functions/v1/claude-api-v3"
 EDGE_TEST_BODY='{"userMessage":"startup test","sessionId":"startup-test"}'
 EDGE_HTTP_STATUS=0
 
@@ -237,7 +237,7 @@ fi
 echo ""
 echo "📊 Startup Status Summary:"
 if command_exists curl; then
-    if curl -s http://127.0.0.1:54121/health >/dev/null 2>&1; then
+    if curl -s http://127.0.0.1:54321/health >/dev/null 2>&1; then
         echo "   Supabase API: ✅ Running"
     else
         echo "   Supabase API: ❌ Not responding"
@@ -246,9 +246,9 @@ else
     echo "   Supabase API: (curl not available to check)"
 fi
 
-echo "   Supabase Studio: http://127.0.0.1:54123"
+echo "   Supabase Studio: http://127.0.0.1:54323"
 
-if is_port_in_use 54122; then
+if is_port_in_use 54322; then
     echo "   PostgreSQL: ✅ Running"
 else
     echo "   PostgreSQL: ❌ Not running"
@@ -261,6 +261,6 @@ echo "   1. VS Code tasks auto-started:"
 echo "      • Tests (Watch Mode) - already running"
 echo "      • Development Server - running on port 3100"
 echo "   2. Open browser to: http://localhost:3100"
-echo "   3. Supabase Studio: http://localhost:54123"
+echo "   3. Supabase Studio: http://localhost:54323"
 echo ""
 echo "✨ Workspace startup complete! Happy coding! 🎉"

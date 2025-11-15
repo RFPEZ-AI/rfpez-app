@@ -1,27 +1,43 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState, useRef, useEffect } from 'react';
-import { IonButton, IonIcon, IonTextarea } from '@ionic/react';
-import { sendOutline, attachOutline } from 'ionicons/icons';
+import { IonButton, IonIcon, IonTextarea, IonToast, IonSpinner, IonChip, IonLabel } from '@ionic/react';
+import { sendOutline, attachOutline, closeCircle, checkmarkCircle, alertCircle } from 'ionicons/icons';
+import fileProcessingService, { ACCEPT_STRING } from '../services/fileProcessingService';
+import { FileAttachment } from '../types/database';
 
 interface PromptComponentProps {
-  onSendMessage: (message: string) => void;
-  onAttachFile?: (file: File) => void;
+  onSendMessage: (message: string, fileAttachments?: FileAttachment[]) => void;
   isLoading?: boolean;
   placeholder?: string;
   autoFocus?: boolean;
+  accountId?: string;
+  userId?: string;
+  currentRfpId?: number;
 }
 
 const PromptComponent: React.FC<PromptComponentProps> = ({
   onSendMessage,
-  onAttachFile,
   isLoading = false,
   placeholder = "Type your message here...",
-  autoFocus = true
+  autoFocus = true,
+  accountId,
+  userId,
+  currentRfpId
 }) => {
   const [message, setMessage] = useState('');
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [uploadedAttachments, setUploadedAttachments] = useState<FileAttachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<{
+    show: boolean;
+    message: string;
+    type: 'success' | 'error';
+  }>({ show: false, message: '', type: 'success' });
+  
   const textareaRef = useRef<HTMLIonTextareaElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Set initial focus when component mounts
   useEffect(() => {
@@ -94,8 +110,16 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
 
   const handleSend = () => {
     if (message.trim() && !isLoading) {
-      onSendMessage(message.trim());
+      // Pass message and file attachments
+      onSendMessage(message.trim(), uploadedAttachments.length > 0 ? uploadedAttachments : undefined);
       setMessage('');
+      
+      // Clear uploaded attachments and file selection after sending
+      setUploadedAttachments([]);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
       
       // Refocus after sending and ensure prompt stays visible
       setTimeout(() => {
@@ -127,10 +151,87 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
     // If Shift+Enter, allow default behavior (line break)
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file && onAttachFile) {
-      onAttachFile(file);
+    if (!file) return;
+
+    // Validate file
+    const validation = fileProcessingService.validateFile(file);
+    if (!validation.valid) {
+      setUploadStatus({
+        show: true,
+        message: validation.error || 'Invalid file',
+        type: 'error'
+      });
+      return;
+    }
+
+    // Check if we have account and user IDs
+    if (!accountId || !userId) {
+      setUploadStatus({
+        show: true,
+        message: 'Account information not available. Please log in.',
+        type: 'error'
+      });
+      return;
+    }
+
+    // Set uploading state
+    setSelectedFile(file);
+    setIsUploading(true);
+    setUploadStatus({ show: false, message: '', type: 'success' });
+
+    try {
+      // Upload file to knowledge base
+      const result = await fileProcessingService.uploadFile(file, {
+        accountId,
+        userId,
+        rfpId: currentRfpId,
+        importanceScore: 0.8
+      });
+
+      if (result.success && result.memoryId) {
+        // Create file attachment metadata
+        const attachment: FileAttachment = {
+          memory_id: result.memoryId,
+          file_name: file.name,
+          file_type: file.type.startsWith('image/') ? 'image' 
+                    : file.name.endsWith('.pdf') ? 'pdf'
+                    : file.name.endsWith('.xlsx') || file.name.endsWith('.xls') ? 'spreadsheet'
+                    : file.name.endsWith('.docx') || file.name.endsWith('.doc') ? 'document'
+                    : 'text',
+          file_size: file.size,
+          uploaded_at: new Date().toISOString()
+        };
+        
+        // Add to uploaded attachments array
+        setUploadedAttachments(prev => [...prev, attachment]);
+        
+        // Clear selected file since it's now in uploaded attachments
+        setSelectedFile(null);
+        
+        setUploadStatus({
+          show: true,
+          message: `✅ ${file.name} uploaded to knowledge base`,
+          type: 'success'
+        });
+      } else {
+        setUploadStatus({
+          show: true,
+          message: `❌ Upload failed: ${result.error}`,
+          type: 'error'
+        });
+        setSelectedFile(null);
+      }
+    } catch (error) {
+      setUploadStatus({
+        show: true,
+        message: `❌ Upload error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        type: 'error'
+      });
+      setSelectedFile(null);
+    } finally {
+      setIsUploading(false);
     }
   };
 
@@ -220,28 +321,84 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
         border: '3px solid var(--ion-color-light-shade)',
         transition: 'border-color 0.2s ease, box-shadow 0.2s ease'
       }}>
-        {/* File attachment button - HIDDEN: Not yet supported, will be enabled later */}
-        {false && onAttachFile && (
-          <div>
-            <input
-              type="file"
-              id="file-input"
-              style={{ display: 'none' }}
-              onChange={handleFileSelect}
-              accept=".pdf,.doc,.docx,.txt,.md"
-            />
-            <IonButton
-              fill="clear"
-              size="default"
-              onClick={() => {
-                const fileInput = document.getElementById('file-input') as HTMLInputElement;
-                fileInput?.click();
-              }}
-              disabled={isLoading}
-              title="Attach file to session"
-            >
+        {/* File attachment button - Upload files to knowledge base */}
+        <div>
+          <input
+            ref={fileInputRef}
+            type="file"
+            id="file-input"
+            style={{ display: 'none' }}
+            onChange={handleFileSelect}
+            accept={ACCEPT_STRING}
+          />
+          <IonButton
+            fill="clear"
+            size="default"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isLoading || isUploading}
+            title="Upload file to knowledge base (PDF, images, text files, Word, Excel)"
+            data-testid="attach-file-button"
+          >
+            {isUploading ? (
+              <IonSpinner name="crescent" />
+            ) : (
               <IonIcon icon={attachOutline} />
-            </IonButton>
+            )}
+          </IonButton>
+        </div>
+
+        {/* File upload status indicator */}
+        {selectedFile && (
+          <IonChip 
+            color={isUploading ? 'warning' : 'success'}
+            style={{ marginBottom: '4px' }}
+          >
+            <IonLabel style={{ fontSize: '12px' }}>
+              {isUploading ? 'Uploading...' : '✓'} {selectedFile.name.substring(0, 20)}
+              {selectedFile.name.length > 20 ? '...' : ''}
+            </IonLabel>
+            {!isUploading && (
+              <IonIcon 
+                icon={closeCircle} 
+                onClick={() => {
+                  setSelectedFile(null);
+                  if (fileInputRef.current) {
+                    fileInputRef.current.value = '';
+                  }
+                }}
+              />
+            )}
+          </IonChip>
+        )}
+
+        {/* Display uploaded file attachments */}
+        {uploadedAttachments.length > 0 && (
+          <div style={{ 
+            display: 'flex', 
+            flexWrap: 'wrap', 
+            gap: '4px',
+            marginBottom: '4px' 
+          }}>
+            {uploadedAttachments.map((attachment, index) => (
+              <IonChip 
+                key={attachment.memory_id}
+                color="success"
+              >
+                <IonIcon icon={checkmarkCircle} color="success" />
+                <IonLabel style={{ fontSize: '12px' }}>
+                  {attachment.file_name.substring(0, 20)}
+                  {attachment.file_name.length > 20 ? '...' : ''}
+                </IonLabel>
+                <IonIcon 
+                  icon={closeCircle} 
+                  onClick={() => {
+                    setUploadedAttachments(prev => 
+                      prev.filter((_, i) => i !== index)
+                    );
+                  }}
+                />
+              </IonChip>
+            ))}
           </div>
         )}
 
@@ -293,6 +450,17 @@ const PromptComponent: React.FC<PromptComponentProps> = ({
           </IonButton>
         </div>
       </div>
+
+      {/* Upload status toast */}
+      <IonToast
+        isOpen={uploadStatus.show}
+        onDidDismiss={() => setUploadStatus({ ...uploadStatus, show: false })}
+        message={uploadStatus.message}
+        duration={uploadStatus.type === 'success' ? 3000 : 5000}
+        color={uploadStatus.type === 'success' ? 'success' : 'danger'}
+        position="top"
+        icon={uploadStatus.type === 'success' ? checkmarkCircle : alertCircle}
+      />
     </div>
   );
 };

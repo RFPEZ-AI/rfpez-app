@@ -8,7 +8,8 @@ import type {
   Artifact, 
   SessionWithStats,
   UserProfile,
-  UserRole
+  UserRole,
+  FileAttachment
 } from '../types/database';
 import type { ArtifactReference } from '../types/home';
 
@@ -388,7 +389,8 @@ export class DatabaseService {
       metadata?: Record<string, unknown>,
       aiMetadata?: Record<string, unknown>,
       artifactRefs?: ArtifactReference[],
-      hidden?: boolean
+      hidden?: boolean,
+      fileAttachments?: FileAttachment[]
     ): Promise<Message | null> {
     console.log('DatabaseService.addMessage called with:', {
       sessionId,
@@ -445,7 +447,8 @@ export class DatabaseService {
           artifactRefs: artifactRefs || []
         },
         ai_metadata: aiMetadata || {},
-        hidden: hidden === true ? true : false
+        hidden: hidden === true ? true : false,
+        file_attachments: fileAttachments && fileAttachments.length > 0 ? fileAttachments : undefined
       })
       .select()
       .single();

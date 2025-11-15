@@ -1,13 +1,14 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useEffect, useRef, useState, useCallback } from 'react';
-import { IonCard, IonCardContent, IonButton, IonIcon } from '@ionic/react';
-import { chevronDownOutline } from 'ionicons/icons';
+import { IonCard, IonCardContent, IonButton, IonIcon, IonChip, IonLabel } from '@ionic/react';
+import { chevronDownOutline, checkmarkCircle, documentText } from 'ionicons/icons';
 import PromptComponent from './PromptComponent';
 import ArtifactReferenceTag from './ArtifactReferenceTag';
 import ToolExecutionDisplay from './ToolExecutionDisplay';
 import SuggestedPrompt from './SuggestedPrompt';
 import { ArtifactReference } from '../types/home';
+import { FileAttachment } from '../types/database';
 import { ToolInvocationEvent } from '../types/streamingProtocol';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -22,12 +23,13 @@ interface Message {
   isToolProcessing?: boolean; // True if this is a tool processing indicator message
   metadata?: Record<string, unknown>; // Additional metadata including tool invocations
   hidden?: boolean; // True if this message should not be displayed in the UI
+  file_attachments?: FileAttachment[]; // File attachments for this message
 }
 
 interface SessionDialogProps {
   messages: Message[];
   isLoading?: boolean;
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string, fileAttachments?: FileAttachment[]) => void;
   onAttachFile?: (file: File) => void;
   promptPlaceholder?: string;
   onArtifactSelect?: (artifactRef: ArtifactReference) => void; // New prop for artifact selection
@@ -39,13 +41,17 @@ interface SessionDialogProps {
   // Session loading props
   forceScrollToBottom?: boolean; // Force scroll to bottom when session is loaded
   isSessionLoading?: boolean; // Force focus on input when session is loading/refreshing
+  // File upload context
+  accountId?: string;
+  userId?: string;
+  currentRfpId?: number | null;
 }
 
 const SessionDialog: React.FC<SessionDialogProps> = ({ 
   messages, 
   isLoading = false,
   onSendMessage,
-  onAttachFile,
+  // onAttachFile, // Deprecated - file uploads now handled directly in PromptComponent
   promptPlaceholder = "Type your message here...",
   onArtifactSelect,
   currentAgent,
@@ -53,8 +59,25 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
   // Tool execution props
   // Session loading props
   forceScrollToBottom = false,
-  isSessionLoading = false
+  isSessionLoading = false,
+  // File upload context
+  accountId,
+  userId,
+  currentRfpId
 }) => {
+  // 🔍 DEBUG: Log messages with file attachments
+  useEffect(() => {
+    const messagesWithFiles = messages.filter(m => m.file_attachments && m.file_attachments.length > 0);
+    if (messagesWithFiles.length > 0) {
+      console.log('📎 SessionDialog received messages with file attachments:', messagesWithFiles.map(m => ({
+        id: m.id,
+        content: m.content.substring(0, 40),
+        file_count: m.file_attachments?.length,
+        files: m.file_attachments?.map(f => f.file_name)
+      })));
+    }
+  }, [messages]);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const promptRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -268,6 +291,37 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                     }}>▊</span>
                   )}
                 </div>
+
+                {/* Display file attachments if present */}
+                {message.file_attachments && message.file_attachments.length > 0 && (
+                  <div style={{ 
+                    marginTop: '12px',
+                    display: 'flex',
+                    flexWrap: 'wrap',
+                    gap: '6px'
+                  }}>
+                    {message.file_attachments.map((attachment) => (
+                      <IonChip 
+                        key={attachment.memory_id}
+                        color={message.isUser ? "light" : "medium"}
+                        style={{
+                          fontSize: '0.85em',
+                          opacity: 0.9
+                        }}
+                      >
+                        <IonIcon icon={message.isUser ? checkmarkCircle : documentText} />
+                        <IonLabel>
+                          {attachment.file_name}
+                          {attachment.file_size && (
+                            <span style={{ fontSize: '0.9em', opacity: 0.7 }}>
+                              {' '}({(attachment.file_size / 1024).toFixed(1)}KB)
+                            </span>
+                          )}
+                        </IonLabel>
+                      </IonChip>
+                    ))}
+                  </div>
+                )}
                 
                 <style>
                   {`
@@ -442,10 +496,12 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
           <div ref={promptRef}>
             <PromptComponent
               onSendMessage={onSendMessage}
-              onAttachFile={onAttachFile}
               isLoading={isLoading}
               placeholder={promptPlaceholder}
               autoFocus={messages.length === 0 || isSessionLoading} // Auto-focus for new sessions OR when session is loading
+              accountId={accountId}
+              userId={userId}
+              currentRfpId={currentRfpId ?? undefined}
             />
           </div>
         </div>

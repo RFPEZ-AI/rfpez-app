@@ -391,10 +391,85 @@ function handleStreamingResponse(
   newSessionData?: { success: boolean; session_id: string; message: string } | null,
   processInitialPrompt = false
 ): Promise<Response> {
+  // 🔍 AUTOMATIC KNOWLEDGE RETRIEVAL: Search account_memories for relevant context
+  // This runs BEFORE streaming to inject uploaded file content and other knowledge
+  const augmentMessagesWithKnowledge = async (msgs: unknown[]): Promise<unknown[]> => {
+    try {
+      // Get the last user message to use as search query
+      const lastUserMessage = [...msgs]
+        .reverse()
+        .find((msg: unknown) => (msg as Record<string, unknown>).role === 'user');
+      
+      if (!lastUserMessage || !userId) {
+        return msgs; // No user message or userId, return original messages
+      }
+      
+      const userContent = (lastUserMessage as Record<string, unknown>).content as string;
+      console.log('🔍 [STREAMING] Automatic knowledge retrieval - searching for context related to:', userContent.substring(0, 100));
+      
+      // Import searchMemories function
+      const { searchMemories } = await import('../tools/database.ts');
+      
+      // Search for relevant knowledge (documents, facts, preferences)
+      const searchResult = await searchMemories(
+        supabase,
+        {
+          query: userContent,
+          memory_types: 'document,knowledge,fact,preference',
+          limit: 5
+        },
+        userId,
+        agentId || ''
+      );
+      
+      if (searchResult.success && searchResult.memories && searchResult.memories.length > 0) {
+        console.log(`✅ [STREAMING] Found ${searchResult.memories.length} relevant knowledge items`);
+        
+        // Build knowledge context string
+        const knowledgeItems = searchResult.memories.map((mem, idx) => {
+          const typeLabel = mem.memory_type === 'document' ? '📄 Uploaded File' : '💡 Knowledge';
+          return `${typeLabel} ${idx + 1}:\n${mem.content}\n(Relevance: ${(mem.similarity * 100).toFixed(1)}%)`;
+        }).join('\n\n---\n\n');
+        
+        const knowledgeContext = `\n\n<knowledge_context>\nThe following information from the user's knowledge base may be relevant to this request:\n\n${knowledgeItems}\n</knowledge_context>`;
+        
+        console.log('📚 [STREAMING] Knowledge context prepared:', knowledgeContext.substring(0, 200) + '...');
+        
+        // Find last user message index and append knowledge
+        const lastUserMsgIndex = [...msgs]
+          .map((msg, idx) => ({ msg, idx }))
+          .reverse()
+          .find(({ msg }) => (msg as Record<string, unknown>).role === 'user')?.idx;
+        
+        if (lastUserMsgIndex !== undefined) {
+          const augmentedMessages = [...msgs];
+          const lastMsg = augmentedMessages[lastUserMsgIndex] as Record<string, unknown>;
+          const originalContent = lastMsg.content as string;
+          augmentedMessages[lastUserMsgIndex] = {
+            ...lastMsg,
+            content: originalContent + knowledgeContext
+          };
+          console.log('✅ [STREAMING] Knowledge context injected into user message');
+          return augmentedMessages;
+        }
+      } else {
+        console.log('ℹ️ [STREAMING] No relevant knowledge found in account_memories');
+      }
+    } catch (error) {
+      console.error('⚠️ [STREAMING] Error during automatic knowledge retrieval:', error);
+      // Don't fail the request if knowledge retrieval fails
+    }
+    
+    return msgs; // Return original messages if no knowledge found or error occurred
+  };
+  
   // Create readable stream for SSE
   const stream = new ReadableStream({
     async start(controller) {
       try {
+        // Augment messages with knowledge context BEFORE streaming starts
+        const augmentedMessages = await augmentMessagesWithKnowledge(messages);
+        
         const claudeService = new ClaudeAPIService();
         const toolService = new ToolExecutionService(supabase, userId, userMessage);
         
@@ -456,7 +531,7 @@ function handleStreamingResponse(
         
         // Use recursive streaming to handle unlimited tool call chains
         const result = await streamWithRecursiveTools(
-          messages as ClaudeMessage[],
+          augmentedMessages as ClaudeMessage[], // Use augmented messages with knowledge context
           tools,
           systemPrompt,
           claudeService,
@@ -768,6 +843,73 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
           JSON.stringify({ error: 'Message content is required' }),
           { status: 400, headers: corsHeaders }
         );
+      }
+    }
+    
+    // 🔍 AUTOMATIC KNOWLEDGE RETRIEVAL: Search account_memories for relevant context
+    // This runs BEFORE sending to Claude to inject uploaded file content and other knowledge
+    let knowledgeContext = '';
+    try {
+      // Get the last user message to use as search query
+      const lastUserMessage = [...processedMessages]
+        .reverse()
+        .find((msg: unknown) => (msg as Record<string, unknown>).role === 'user');
+      
+      if (lastUserMessage && userId) {
+        const userContent = (lastUserMessage as Record<string, unknown>).content as string;
+        console.log('🔍 Automatic knowledge retrieval - searching for context related to:', userContent.substring(0, 100));
+        
+        // Import searchMemories function
+        const { searchMemories } = await import('../tools/database.ts');
+        
+        // Search for relevant knowledge (documents, facts, preferences)
+        const searchResult = await searchMemories(
+          supabase,
+          {
+            query: userContent,
+            memory_types: 'document,knowledge,fact,preference',
+            limit: 5
+          },
+          userId,
+          effectiveAgentId || ''
+        );
+        
+        if (searchResult.success && searchResult.memories && searchResult.memories.length > 0) {
+          console.log(`✅ Found ${searchResult.memories.length} relevant knowledge items`);
+          
+          // Build knowledge context string
+          const knowledgeItems = searchResult.memories.map((mem, idx) => {
+            const typeLabel = mem.memory_type === 'document' ? '📄 Uploaded File' : '💡 Knowledge';
+            return `${typeLabel} ${idx + 1}:\n${mem.content}\n(Relevance: ${(mem.similarity * 100).toFixed(1)}%)`;
+          }).join('\n\n---\n\n');
+          
+          knowledgeContext = `\n\n<knowledge_context>\nThe following information from the user's knowledge base may be relevant to this request:\n\n${knowledgeItems}\n</knowledge_context>`;
+          
+          console.log('📚 Knowledge context prepared:', knowledgeContext.substring(0, 200) + '...');
+        } else {
+          console.log('ℹ️ No relevant knowledge found in account_memories');
+        }
+      }
+    } catch (error) {
+      console.error('⚠️ Error during automatic knowledge retrieval:', error);
+      // Don't fail the request if knowledge retrieval fails
+    }
+    
+    // If knowledge context was found, append it to the last user message
+    if (knowledgeContext) {
+      const lastUserMsgIndex = [...processedMessages]
+        .map((msg, idx) => ({ msg, idx }))
+        .reverse()
+        .find(({ msg }) => (msg as Record<string, unknown>).role === 'user')?.idx;
+      
+      if (lastUserMsgIndex !== undefined) {
+        const lastMsg = processedMessages[lastUserMsgIndex] as Record<string, unknown>;
+        const originalContent = lastMsg.content as string;
+        processedMessages[lastUserMsgIndex] = {
+          ...lastMsg,
+          content: originalContent + knowledgeContext
+        };
+        console.log('✅ Knowledge context injected into user message');
       }
     }
     
