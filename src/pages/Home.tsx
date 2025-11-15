@@ -8,7 +8,7 @@ import DatabaseService from '../services/database';
 import { ArtifactService } from '../services/artifactService';
 import { RFPService } from '../services/rfpService';
 import { Message, ArtifactReference, Artifact } from '../types/home';
-import { SessionActiveAgent } from '../types/database';
+import { SessionActiveAgent, FileAttachment } from '../types/database';
 import { DocxExporter } from '../utils/docxExporter';
 import type { FormSpec, RFP } from '../types/rfp';
 
@@ -49,6 +49,7 @@ import AgentEditModal from '../components/AgentEditModal';
 import RFPEditModal from '../components/RFPEditModal';
 import RFPPreviewModal from '../components/RFPPreviewModal';
 import AgentSelector from '../components/AgentSelector';
+import FileKnowledgeManager from '../components/FileKnowledgeManager';
 
 const Home: React.FC = () => {
   const { user, session, loading: supabaseLoading, userProfile, supabase } = useSupabase();
@@ -60,6 +61,9 @@ const Home: React.FC = () => {
   // Derived authentication state
   const isAuthenticated = !!session;
   const userId = user?.id;
+  
+  // Account ID for file uploads - will be fetched from current session or account_users
+  const [accountId, setAccountId] = useState<string | undefined>();
   
   // Use our custom hooks
   const {
@@ -134,7 +138,7 @@ const Home: React.FC = () => {
   } = useAgentManagement(currentSessionId);
 
   // Create a ref to store handleSendMessage so we can use it in handleRfpContextChanged
-  const handleSendMessageRef = useRef<((message: string, metadata?: Record<string, unknown>) => Promise<void>) | null>(null);
+  const handleSendMessageRef = useRef<((message: string, fileAttachments?: FileAttachment[]) => Promise<void>) | null>(null);
 
   // Callback to handle RFP context change notifications to the agent
   const handleRfpContextChanged = useCallback((prompt: string) => {
@@ -143,9 +147,8 @@ const Home: React.FC = () => {
     // Call handleSendMessage directly to trigger Claude's response
     // The message will have isSystemNotification metadata and be hidden from UI
     if (handleSendMessageRef.current) {
-      // Send the notification to Claude with system notification metadata
-      // This will be added to the conversation history but hidden from the UI
-      handleSendMessageRef.current(prompt, { isSystemNotification: true }).catch(error => {
+      // Send the notification to Claude without file attachments (system notification)
+      handleSendMessageRef.current(prompt, undefined).catch(error => {
         console.error('Failed to send RFP context notification:', error);
       });
     } else {
@@ -182,6 +185,9 @@ const Home: React.FC = () => {
     handleRfpContextChanged,
     messages.length > 0 // Has messages in current session
   );
+
+  // File Knowledge Manager modal state
+  const [showFileManager, setShowFileManager] = useState(false);
 
   const {
     artifacts,
@@ -277,6 +283,52 @@ const Home: React.FC = () => {
     };
   }, [currentRfp, supabase]);
 
+  // Fetch account ID from current session or account_users table
+  useEffect(() => {
+    const fetchAccountId = async () => {
+      if (!userId || !isAuthenticated) {
+        setAccountId(undefined);
+        return;
+      }
+      
+      try {
+        // First try to get account_id from current session
+        if (currentSessionId) {
+          const { data: sessionData, error: sessionError } = await supabase
+            .from('sessions')
+            .select('account_id')
+            .eq('id', currentSessionId)
+            .single();
+          
+          if (!sessionError && sessionData?.account_id) {
+            setAccountId(sessionData.account_id);
+            return;
+          }
+        }
+        
+        // Fallback: get account_id from account_users table
+        const { data: accountUser, error: accountError } = await supabase
+          .from('account_users')
+          .select('account_id')
+          .eq('user_id', userId)
+          .limit(1)
+          .single();
+        
+        if (!accountError && accountUser?.account_id) {
+          setAccountId(accountUser.account_id);
+        } else {
+          console.warn('Could not fetch account_id:', accountError);
+          setAccountId(undefined);
+        }
+      } catch (error) {
+        console.error('Error fetching account ID:', error);
+        setAccountId(undefined);
+      }
+    };
+    
+    fetchAccountId();
+  }, [userId, isAuthenticated, currentSessionId, supabase]);
+
   // Reload sessions when RFP changes to show only sessions for current RFP
   useEffect(() => {
     if (isAuthenticated && userId) {
@@ -291,6 +343,7 @@ const Home: React.FC = () => {
   const handleMainMenuSelect = (item: string) => {
     if (item === 'Agents') setShowAgentsMenu(true);
     if (item === 'RFP') setShowRFPMenu(true);
+    if (item === 'Files') setShowFileManager(true);
     if (item === 'Debug') history.push('/debug');
   };
 
@@ -1227,7 +1280,7 @@ const Home: React.FC = () => {
     }
   };
 
-  const onSendMessage = async (content: string) => {
+  const onSendMessage = async (content: string, fileAttachments?: FileAttachment[]) => {
     // Check if auth handoff should inject anonymous intent check
     if (authHandoffPendingRef.current) {
       console.log('🔄 Auth handoff pending - injecting anonymous intent check');
@@ -1418,7 +1471,9 @@ const Home: React.FC = () => {
         return null; // Return null immediately to satisfy the sync interface
       },
       loadSessionArtifacts,
-      selectedArtifact // Add current artifact context
+      selectedArtifact, // Add current artifact context
+      undefined, // messageMetadata
+      fileAttachments // Pass file attachments
     );
   };
 
@@ -1785,6 +1840,33 @@ const Home: React.FC = () => {
     }
   };
 
+  // Delete handler for artifacts
+  const handleDeleteArtifact = async (artifactId: string) => {
+    console.log('🗑️ Deleting artifact:', artifactId);
+    
+    try {
+      const success = await DatabaseService.deleteArtifact(artifactId);
+      
+      if (success) {
+        console.log('✅ Artifact deleted successfully');
+        
+        // Reload artifacts for current session
+        if (currentSessionId) {
+          await loadSessionArtifacts(currentSessionId);
+        }
+        
+        // If the deleted artifact was selected, clear selection
+        if (selectedArtifact?.id === artifactId) {
+          artifactWindowState.selectArtifact(null);
+        }
+      } else {
+        console.error('❌ Failed to delete artifact');
+      }
+    } catch (error) {
+      console.error('❌ Error deleting artifact:', error);
+    }
+  };
+
   // Download handler for artifacts
   const handleDownloadArtifact = async (artifact: Artifact) => {
     console.log('Download artifact:', artifact);
@@ -2131,6 +2213,7 @@ const Home: React.FC = () => {
             selectedArtifact={selectedArtifact}
             currentRfpId={currentRfpId ?? null}
             onDownloadArtifact={handleDownloadArtifact}
+            onDeleteArtifact={handleDeleteArtifact}
             onArtifactSelect={handleArtifactSelect}
             onFormSubmit={handleFormSubmissionWithAutoPrompt}
             onFormSave={handleFormSave}
@@ -2143,6 +2226,9 @@ const Home: React.FC = () => {
             forceSessionHistoryCollapsed={forceSessionHistoryCollapsed}
             forceScrollToBottom={forceScrollToBottom}
             isSessionLoading={isSessionLoading}
+            // File upload context
+            accountId={accountId}
+            userId={userId}
             onSessionHistoryToggle={(expanded) => {
               // Reset force collapsed state when user manually expands
               if (expanded) {
@@ -2258,6 +2344,15 @@ const Home: React.FC = () => {
         onClose={handleClosePreview}
         rfp={previewingRFP}
       />
+
+      {/* File Knowledge Manager */}
+      {accountId && (
+        <FileKnowledgeManager
+          isOpen={showFileManager}
+          onClose={() => setShowFileManager(false)}
+          accountId={accountId}
+        />
+      )}
     </IonPage>
   );
 };

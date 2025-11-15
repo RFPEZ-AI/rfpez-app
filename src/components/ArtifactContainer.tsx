@@ -20,7 +20,8 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
   onFormSubmit,
   onFormSave,
   currentRfpId,
-  onArtifactSelect
+  onArtifactSelect,
+  onDeleteArtifact
 }) => {
   // State management - Use consistent detection with useIsMobile hook (768px threshold)
   // Portrait mode = narrow viewport (same as mobile detection)
@@ -366,6 +367,7 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
                   onArtifactSelect(fullArtifact);
                 }
               }}
+              onDeleteArtifact={onDeleteArtifact}
               loading={false}
             />
           </div>

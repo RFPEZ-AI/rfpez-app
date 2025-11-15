@@ -1,6 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useState, useRef, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import { IonIcon, IonButton, IonItem, IonList, IonPopover } from '@ionic/react';
 import { 
   chevronDownOutline, 
@@ -9,7 +10,8 @@ import {
   clipboardOutline,
   listOutline,
   codeSlashOutline,
-  imageOutline
+  imageOutline,
+  trashOutline
 } from 'ionicons/icons';
 
 interface Artifact {
@@ -24,6 +26,7 @@ interface ArtifactDropdownProps {
   artifacts: Artifact[];
   selectedArtifact: Artifact | null;
   onSelectArtifact: (artifact: Artifact) => void;
+  onDeleteArtifact?: (artifactId: string) => void;
   loading?: boolean;
 }
 
@@ -31,10 +34,12 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
   artifacts,
   selectedArtifact,
   onSelectArtifact,
+  onDeleteArtifact,
   loading = false
 }) => {
   const [isOpen, setIsOpen] = useState(false);
   const popoverRef = useRef<HTMLIonPopoverElement>(null);
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; artifact: Artifact } | null>(null);
 
   const getTypeIcon = (type: string) => {
     switch (type) {
@@ -56,6 +61,27 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
   const handleArtifactSelect = (artifact: Artifact) => {
     onSelectArtifact(artifact);
     setIsOpen(false);
+  };
+
+  const handleContextMenu = (e: React.MouseEvent, artifact: Artifact) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      artifact
+    });
+  };
+
+  const handleDeleteArtifact = () => {
+    if (contextMenu && onDeleteArtifact) {
+      onDeleteArtifact(contextMenu.artifact.id);
+      setContextMenu(null);
+    }
+  };
+
+  const closeContextMenu = () => {
+    setContextMenu(null);
   };
 
   const formatDate = (dateString: string) => {
@@ -86,6 +112,15 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
       onSelectArtifact(artifacts[0]);
     }
   }, [selectedArtifact, artifacts, onSelectArtifact]);
+
+  // Close context menu on outside click
+  useEffect(() => {
+    if (contextMenu) {
+      const handleClick = () => closeContextMenu();
+      document.addEventListener('click', handleClick);
+      return () => document.removeEventListener('click', handleClick);
+    }
+  }, [contextMenu]);
 
   return (
     <>
@@ -157,26 +192,7 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
           margin: 0,
           padding: 0
         }}>
-          {(() => {
-            console.log('🔍 ARTIFACT DROPDOWN - Artifacts received:', {
-              total: artifacts.length,
-              artifacts: artifacts.map(a => ({
-                id: a.id,
-                name: a.name,
-                type: a.type,
-                created_at: a.created_at,
-                hasCreatedAt: !!a.created_at
-              }))
-            });
-            
-            const filtered = artifacts.filter(a => a.id);
-            console.log('🔍 ARTIFACT DROPDOWN - After filter(a => a.id):', {
-              total: filtered.length,
-              artifacts: filtered.map(a => ({ id: a.id, name: a.name, created_at: a.created_at }))
-            });
-            
-            return filtered;
-          })().map((artifact) => (
+          {artifacts.filter(a => a.id).map((artifact) => (
             <IonItem
               key={artifact.id}
               button
@@ -187,14 +203,17 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
               }}
               data-testid={`artifact-option-${artifact.id}`}
             >
-              <div style={{ 
-                display: 'flex', 
-                alignItems: 'center', 
-                gap: '12px',
-                width: '100%',
-                minWidth: 'min(500px, 85vw)',
-                padding: '8px 0'
-              }}>
+              <div 
+                style={{ 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '12px',
+                  width: '100%',
+                  minWidth: 'min(500px, 85vw)',
+                  padding: '8px 0'
+                }}
+                onContextMenu={(e) => handleContextMenu(e, artifact)}
+              >
                 <IonIcon 
                   icon={getTypeIcon(artifact.type)} 
                   style={{ 
@@ -246,6 +265,49 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
           ))}
         </IonList>
       </IonPopover>
+
+      {/* Context Menu - Rendered via Portal to escape IonPopover stacking context */}
+      {(() => {
+        if (!contextMenu) return null;
+        
+        // Render context menu at document root to escape popover boundaries
+        return ReactDOM.createPortal(
+          <div
+            style={{
+              position: 'fixed',
+              top: contextMenu.y,
+              left: contextMenu.x,
+              backgroundColor: 'white',
+              border: '1px solid #ccc',
+              borderRadius: '4px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.15)',
+              zIndex: 10000,
+              minWidth: '150px'
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              style={{
+                padding: '8px 12px',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                fontSize: '14px',
+                color: '#d32f2f',
+                transition: 'background-color 0.2s'
+              }}
+              onClick={handleDeleteArtifact}
+              onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#f5f5f5'}
+              onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+            >
+              <IonIcon icon={trashOutline} style={{ fontSize: '16px' }} />
+              Delete Artifact
+            </div>
+          </div>,
+          document.body // Render at document root instead of inside popover
+        );
+      })()}
     </>
   );
 };

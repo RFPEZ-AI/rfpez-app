@@ -32,6 +32,7 @@ interface HomeContentProps {
   onArtifactSelect?: (artifactRef: ArtifactReference) => void;
   onFormSubmit?: (artifact: Artifact, formData: Record<string, unknown>) => void;
   onFormSave?: (artifact: Artifact, formData: Record<string, unknown>) => void;
+  onDeleteArtifact?: (artifactId: string) => Promise<void>;
   
   // Agent and cancel functionality
   currentAgent?: { agent_name: string } | null;
@@ -48,10 +49,12 @@ interface HomeContentProps {
   isToolExecutionActive?: boolean;
   
   // Session loading prop for auto-focus behavior
+  forceScrollToBottom?: boolean;
   isSessionLoading?: boolean;
   
-  // Session loading prop
-  forceScrollToBottom?: boolean;
+  // File upload context
+  accountId?: string;
+  userId?: string;
 }
 
 const HomeContent: React.FC<HomeContentProps> = ({
@@ -71,6 +74,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
   onArtifactSelect,
   onFormSubmit,
   onFormSave,
+  onDeleteArtifact,
   currentAgent,
   onCancelRequest,
   artifactWindowOpen = false,
@@ -80,7 +84,10 @@ const HomeContent: React.FC<HomeContentProps> = ({
   // Tool transparency props
   // Session loading props
   forceScrollToBottom = false,
-  isSessionLoading = false
+  isSessionLoading = false,
+  // File upload context
+  accountId,
+  userId
 }) => {
   const isMobile = useIsMobile();
   // Use selected artifact based on window state if available, otherwise fall back to most recent
@@ -138,6 +145,9 @@ const HomeContent: React.FC<HomeContentProps> = ({
             // toolInvocations and isToolExecutionActive removed (no longer in SessionDialog)
             forceScrollToBottom={forceScrollToBottom}
             isSessionLoading={isSessionLoading}
+            accountId={accountId}
+            userId={userId}
+            currentRfpId={currentRfpId}
           />
         </div>
 
@@ -156,6 +166,7 @@ const HomeContent: React.FC<HomeContentProps> = ({
             onFormSubmit={onFormSubmit}
             onFormSave={onFormSave}
             currentRfpId={currentRfpId}
+            onDeleteArtifact={onDeleteArtifact}
             onArtifactSelect={(artifact) => {
               if (onArtifactSelect) {
                 // Convert Artifact to ArtifactReference

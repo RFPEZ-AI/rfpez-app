@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import { RFP } from './rfp';
-import { SessionActiveAgent } from './database';
+import { SessionActiveAgent, FileAttachment } from './database';
 
 // Local interfaces for UI compatibility
 export interface Message {
@@ -14,6 +14,7 @@ export interface Message {
   metadata?: Record<string, unknown>; // Additional metadata for the message
   isToolProcessing?: boolean; // True if this is a tool processing indicator message
   hidden?: boolean; // True if this message should not be displayed in the UI
+  file_attachments?: FileAttachment[]; // Files uploaded with this message
 }
 
 export interface ArtifactReference {
@@ -33,6 +34,7 @@ export interface SingletonArtifactWindowProps {
   onFormSave?: (artifact: Artifact, formData: Record<string, unknown>) => void; // Save form data without validation
   currentRfpId?: number | null;
   onArtifactSelect?: (artifact: Artifact) => void; // Function to handle artifact selection
+  onDeleteArtifact?: (artifactId: string) => Promise<void>; // Function to delete an artifact
 }
 
 export interface Session {
