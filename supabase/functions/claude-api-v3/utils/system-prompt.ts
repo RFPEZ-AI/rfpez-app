@@ -3,6 +3,8 @@
 // deno-lint-ignore-file no-explicit-any
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
+import { loadAgentWithInheritance, logInheritanceDetails, type MergedAgent } from './agent-inheritance.ts';
+
 // Interface for Supabase client - using unknown for complex API types
 interface SupabaseAuth {
   getUser(): Promise<{ data: { user: Record<string, unknown> | null }; error: unknown }>;
@@ -398,7 +400,8 @@ export interface AgentContextResult {
 }
 
 /**
- * Load agent context from database with enhanced error handling and retry logic
+ * Load agent context from database with inheritance support
+ * This is the main entry point for loading agents - now uses inheritance system
  */
 export async function loadAgentContext(supabase: unknown, sessionId?: string, agentId?: string): Promise<Agent | null> {
   console.log('🔧 loadAgentContext - ENTRY POINT:', { sessionId, agentId });
@@ -416,56 +419,26 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
   }
 
   try {
-    let agent = null;
+    let targetAgentId: string | null = null;
 
     if (agentId) {
       console.log('🎯 Loading specific agent by ID:', agentId);
-      
-      const result = await loadAgentWithRetry(
-        supabase,
-        () => (supabase as any)
-          .from('agents')
-          .select('id, name, instructions, initial_prompt, role, access')
-          .eq('id', agentId)
-          .eq('is_active', true)
-          .single()
-      );
-
-      if (result.error) {
-        console.error('❌ Error loading agent by ID:', {
-          agentId,
-          error: result.error,
-          errorType: result.finalError,
-          timestamp: new Date().toISOString()
-        });
-        
-        // For direct agent ID lookups, don't fallback to default - return null
-        return null;
-      }
-      agent = result.data;
+      targetAgentId = agentId;
       
     } else if (sessionId) {
       console.log('🎯 Loading active agent for session:', sessionId);
       
+      // Get agent ID from session_agents
       const result = await loadAgentWithRetry(
         supabase,
         () => (supabase as any)
           .from('session_agents')
-          .select(`
-            agents!inner (
-              id,
-              name,
-              instructions,
-              initial_prompt,
-              role,
-              access
-            )
-          `)
+          .select('agent_id')
           .eq('session_id', sessionId)
           .eq('is_active', true)
           .order('started_at', { ascending: false })
           .limit(1)
-          .single()
+          .maybeSingle()
       );
 
       if (result.error) {
@@ -476,42 +449,42 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
           timestamp: new Date().toISOString()
         });
         
-        // 🚨 CRITICAL FIX: Get current agent ID to prevent unnecessary fallback
-        let currentAgentId = 'Unknown';
-        try {
-          // Attempt to get the current agent ID from session context
-          const sessionResult = await (supabase as any)
-            .from('session_agents')
-            .select('agent_id')
-            .eq('session_id', sessionId)
-            .eq('is_active', true)
-            .order('started_at', { ascending: false })
-            .limit(1)
-            .maybeSingle();
-          
-          if (sessionResult.data?.agent_id) {
-            currentAgentId = sessionResult.data.agent_id;
-          }
-        } catch (_e) {
-          console.log('⚠️ Could not retrieve current agent ID for fallback prevention');
-        }
-
-        // Only fallback for session-based lookups with enhanced context
+        // Fallback to default agent if session lookup fails
         const fallbackResult = await loadDefaultAgent(
           supabase, 
           `Session agent lookup failed: ${result.finalError}`, 
-          result.error,
-          currentAgentId
+          result.error
         );
         
-        // Store fallback info in a way that the system prompt can access it
         if (fallbackResult.fallbackInfo && fallbackResult.agent) {
           (fallbackResult.agent as any)._fallbackInfo = fallbackResult.fallbackInfo;
         }
         
+        // Load default agent with inheritance
+        if (fallbackResult.agent?.id) {
+          return await loadAgentWithInheritance(supabase as any, fallbackResult.agent.id);
+        }
+        
         return fallbackResult.agent;
       }
-      agent = result.data?.agents;
+      
+      targetAgentId = result.data?.agent_id;
+    }
+
+    if (!targetAgentId) {
+      console.log('⚠️ loadAgentContext - No agent ID determined');
+      return null;
+    }
+
+    // 🔗 NEW: Load agent with inheritance
+    console.log('🔗 INHERITANCE - Starting inheritance loading for agent:', targetAgentId);
+    const agent = await loadAgentWithInheritance(supabase as any, targetAgentId);
+    
+    if (agent && agent._inheritanceChain) {
+      // Log detailed inheritance information
+      logInheritanceDetails(agent);
+    } else if (agent) {
+      console.log('ℹ️ Agent loaded without inheritance:', agent.name);
     }
 
     if (agent) {
@@ -520,14 +493,14 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
         name: agent.name,
         role: agent.role,
         instructionsLength: agent.instructions?.length || 0,
-        loadedVia: agentId ? 'agentId' : 'sessionId',
+        toolsCount: agent.access?.length || 0,
+        hasInheritance: !!(agent as MergedAgent)._inheritanceChain && (agent as MergedAgent)._inheritanceChain!.length > 1,
         timestamp: new Date().toISOString()
       });
-    } else {
-      console.log('⚠️ No agent found but no error occurred');
     }
 
     return agent;
+    
   } catch (error) {
     console.error('🚨 Unexpected error in loadAgentContext:', {
       error,
@@ -540,9 +513,13 @@ export async function loadAgentContext(supabase: unknown, sessionId?: string, ag
     if (sessionId && !agentId) {
       const fallbackResult = await loadDefaultAgent(supabase, 'Unexpected exception during session agent lookup', error);
       
-      // Store fallback info in a way that the system prompt can access it
       if (fallbackResult.fallbackInfo && fallbackResult.agent) {
         (fallbackResult.agent as any)._fallbackInfo = fallbackResult.fallbackInfo;
+      }
+      
+      // Load default agent with inheritance
+      if (fallbackResult.agent?.id) {
+        return await loadAgentWithInheritance(supabase as any, fallbackResult.agent.id);
       }
       
       return fallbackResult.agent;

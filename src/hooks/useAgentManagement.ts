@@ -47,8 +47,22 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
 
   const loadDefaultAgentWithPrompt = useCallback(async (): Promise<Message | null> => {
     console.log('🎯 loadDefaultAgentWithPrompt: Starting...');
+    console.log('🎯 specialtySlug:', specialtySlug);
     try {
-      const defaultAgent = await AgentService.getDefaultAgent();
+      // Get default agent based on specialty site context
+      let defaultAgent: Agent | null = null;
+      
+      if (specialtySlug && specialtySlug !== 'home') {
+        // Load default agent for specialty site
+        console.log('🎯 Loading default agent for specialty site:', specialtySlug);
+        const { SpecialtySiteService } = await import('../services/specialtySiteService');
+        defaultAgent = await SpecialtySiteService.getDefaultAgentForSpecialtySite(specialtySlug);
+      } else {
+        // Load default agent for home page
+        console.log('🎯 Loading default agent for home page');
+        defaultAgent = await AgentService.getDefaultAgent();
+      }
+      
       console.log('🎯 loadDefaultAgentWithPrompt: Default agent fetched:', defaultAgent?.name);
       
       if (defaultAgent) {
@@ -147,7 +161,7 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
     const dynamicWelcome = await ClaudeService.processInitialPrompt(defaultAgent, sessionId, userProfile);
     return { id: 'initial-prompt', content: dynamicWelcome, isUser: false, timestamp: new Date(), agentName: defaultAgent.name };
     */
-  }, [sessionId]); // Only depends on sessionId
+  }, [sessionId, specialtySlug]); // Depends on sessionId AND specialtySlug
 
   const loadSessionAgent = async (sessionId: string) => {
     console.log('🔄 loadSessionAgent called with sessionId:', sessionId);

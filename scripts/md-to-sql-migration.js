@@ -86,6 +86,30 @@ function parseAgentMarkdown(content) {
     }
   }
   
+  // Extract Parent Agent (inheritance)
+  const parentMatch = content.match(/\*\*Parent Agent\*\*:\s*`([^`]+)`/);
+  if (parentMatch && parentMatch[1] !== 'None') {
+    metadata.parent_agent_id = parentMatch[1];
+  }
+  
+  // Extract Is Abstract flag
+  const abstractMatch = content.match(/\*\*Is Abstract\*\*:\s*`(true|false)`/);
+  if (abstractMatch) {
+    metadata.is_abstract = abstractMatch[1] === 'true';
+  }
+  
+  // Extract Access Override flag
+  const overrideMatch = content.match(/\*\*Access Override\*\*:\s*`(true|false)`/);
+  if (overrideMatch) {
+    metadata.access_override = overrideMatch[1] === 'true';
+  }
+  
+  // Extract Specialty
+  const specialtyMatch = content.match(/\*\*Specialty\*\*:\s*`([^`]+)`/);
+  if (specialtyMatch && specialtyMatch[1] !== 'None') {
+    metadata.specialty = specialtyMatch[1];
+  }
+  
   // Full content as instructions
   metadata.instructions = content;
   
@@ -141,6 +165,23 @@ function generateMigration(metadata, agentName) {
     const toolsArray = `ARRAY[${metadata.allowed_tools.map(t => `'${t}'`).join(', ')}]`;
     updateFields.push(`  access = ${toolsArray}::text[]`);
   }
+  
+  // Inheritance fields
+  if (metadata.parent_agent_id !== undefined) {
+    updateFields.push(`  parent_agent_id = ${metadata.parent_agent_id ? `'${metadata.parent_agent_id}'` : 'NULL'}`);
+  }
+  if (metadata.is_abstract !== undefined) {
+    updateFields.push(`  is_abstract = ${metadata.is_abstract}`);
+  }
+  if (metadata.access_override !== undefined) {
+    updateFields.push(`  access_override = ${metadata.access_override}`);
+  }
+  
+  // Specialty field
+  if (metadata.specialty !== undefined) {
+    updateFields.push(`  specialty = ${metadata.specialty ? `'${metadata.specialty}'` : 'NULL'}`);
+  }
+  
   updateFields.push(`  updated_at = NOW()`);
   const sql = `-- Update ${metadata.name} Agent Instructions
 -- Generated on ${new Date().toISOString()}
@@ -224,6 +265,10 @@ function main() {
   if (metadata.allowed_tools) {
     metadata.allowed_tools.forEach(tool => log(`      - ${tool}`, 'blue'));
   }
+  log(`   Parent agent: ${metadata.parent_agent_id || 'None (root agent)'}`);
+  log(`   Is abstract: ${metadata.is_abstract !== undefined ? metadata.is_abstract : 'N/A'}`);
+  log(`   Access override: ${metadata.access_override !== undefined ? metadata.access_override : 'N/A'}`);
+  log(`   Specialty: ${metadata.specialty || 'None (general purpose)'}`);
   
   // Generate migration SQL
   log('\n🔨 Generating SQL migration...', 'blue');
