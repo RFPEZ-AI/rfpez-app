@@ -5,7 +5,7 @@ import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonModal, IonCon
 import { documentTextOutline, personCircle, timeOutline, add, chatbubbleOutline } from 'ionicons/icons';
 import type { User } from '@supabase/supabase-js';
 import { RFP } from '../types/rfp';
-import { Agent, SessionActiveAgent, UserProfile } from '../types/database';
+import { Agent, SessionActiveAgent, UserProfile, SpecialtySite } from '../types/database';
 import MainMenu from './MainMenu';
 import AgentsMenu from './AgentsMenu';
 import GenericMenu from './GenericMenu';
@@ -27,6 +27,9 @@ interface HomeHeaderProps {
   userProfile: UserProfile | null;
   isAuthenticated: boolean;
   user: User | null;
+  
+  // Specialty site props
+  specialtySite?: SpecialtySite | null;
   
   // Session management props
   sessions: Session[];
@@ -71,6 +74,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
   userProfile,
   isAuthenticated,
   user,
+  specialtySite,
   sessions,
   selectedSessionId,
   onNewSession,
@@ -150,7 +154,14 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
           />
           {!isMobile && (
             <div style={{ display: 'flex', alignItems: 'center' }}>
-              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>RFPEZ.AI</span>
+              <span style={{ fontSize: '18px', fontWeight: 'bold' }}>
+                {specialtySite && !specialtySite.is_default ? specialtySite.name : 'RFPEZ.AI'}
+              </span>
+              {specialtySite && !specialtySite.is_default && (
+                <span style={{ fontSize: '11px', marginLeft: '6px', opacity: 0.7 }}>
+                  {specialtySite.slug}
+                </span>
+              )}
             </div>
           )}
           

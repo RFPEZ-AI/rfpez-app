@@ -6,7 +6,7 @@ import { AgentService } from '../services/agentService';
 import { DatabaseService } from '../services/database';
 import { Message } from '../types/home';
 
-export const useAgentManagement = (sessionId: string | null = null) => {
+export const useAgentManagement = (sessionId: string | null = null, specialtySlug?: string) => {
   const [currentAgent, setCurrentAgent] = useState<SessionActiveAgent | null>(null);
   const [showAgentSelector, setShowAgentSelector] = useState(false);
   const [agents, setAgents] = useState<Agent[]>([]);
@@ -14,11 +14,36 @@ export const useAgentManagement = (sessionId: string | null = null) => {
   const [editingAgent, setEditingAgent] = useState<Agent | null>(null);
   const [showAgentsMenu, setShowAgentsMenu] = useState(false);
 
-  // Load agents for menu
+  // Load agents for menu - filtered by specialty site if provided
   useEffect(() => {
     AgentService.debugAgents();
-    AgentService.getActiveAgents().then(setAgents);
-  }, []);
+    
+    const loadAgents = async () => {
+      try {
+        let loadedAgents: Agent[];
+        
+        if (specialtySlug && specialtySlug !== 'home') {
+          // Load agents specific to this specialty site
+          console.log('🎯 Loading agents for specialty site:', specialtySlug);
+          loadedAgents = await AgentService.getAgentsForSpecialtySite(specialtySlug);
+        } else {
+          // Default to all active agents for home page
+          console.log('🎯 Loading all active agents (home page)');
+          loadedAgents = await AgentService.getAgentsForSpecialtySite('home');
+        }
+        
+        console.log('✅ Loaded agents:', loadedAgents.map(a => a.name).join(', '));
+        setAgents(loadedAgents);
+      } catch (error) {
+        console.error('❌ Error loading agents:', error);
+        // Fallback to all active agents
+        const fallbackAgents = await AgentService.getActiveAgents();
+        setAgents(fallbackAgents);
+      }
+    };
+    
+    loadAgents();
+  }, [specialtySlug]);
 
   const loadDefaultAgentWithPrompt = useCallback(async (): Promise<Message | null> => {
     console.log('🎯 loadDefaultAgentWithPrompt: Starting...');

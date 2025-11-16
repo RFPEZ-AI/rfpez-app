@@ -119,6 +119,8 @@ const AppContent: React.FC = () => {
         <Route exact path="/test/agent-management" component={AgentManagementTest} />
         <Route exact path="/mcp-test" component={MCPTestComponent} />
         <Route exact path="/callback" component={Home} />
+        {/* Specialty site routes - must come before root redirect */}
+        <Route exact path="/:specialty" component={Home} />
         <Route exact path="/" render={() => <Redirect to="/home" />} />
       </IonRouterOutlet>
       <OfflineNotification />

@@ -131,6 +131,30 @@ export interface SessionAgent {
   is_active: boolean;
 }
 
+export interface SpecialtySite {
+  id: string; // UUID
+  name: string;
+  slug: string;
+  description?: string;
+  hero_title?: string;
+  hero_subtitle?: string;
+  is_default: boolean;
+  is_active: boolean;
+  sort_order: number;
+  metadata?: Record<string, unknown>;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface SpecialtySiteAgent {
+  id: string; // UUID
+  specialty_site_id: string; // UUID
+  agent_id: string; // UUID
+  is_default_agent: boolean;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface AgentWithActivity extends Agent {
   session_count?: number;
   last_used?: string;
@@ -224,6 +248,25 @@ export interface Database {
           started_at?: string;
         };
         Update: Partial<Omit<SessionAgent, 'id' | 'session_id' | 'agent_id' | 'started_at'>>;
+      };
+      specialty_sites: {
+        Row: SpecialtySite;
+        Insert: Omit<SpecialtySite, 'id' | 'created_at' | 'updated_at'> & {
+          id?: string;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: Partial<Omit<SpecialtySite, 'id' | 'created_at'>> & {
+          updated_at?: string;
+        };
+      };
+      specialty_site_agents: {
+        Row: SpecialtySiteAgent;
+        Insert: Omit<SpecialtySiteAgent, 'id' | 'created_at'> & {
+          id?: string;
+          created_at?: string;
+        };
+        Update: Partial<Omit<SpecialtySiteAgent, 'id' | 'specialty_site_id' | 'agent_id' | 'created_at'>>;
       };
     };
     Functions: {

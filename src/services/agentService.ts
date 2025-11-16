@@ -10,6 +10,7 @@ import type {
   UserRole
 } from '../types/database';
 import { RoleService } from './roleService';
+import { SpecialtySiteService } from './specialtySiteService';
 
 export class AgentService {
   /**
@@ -145,6 +146,27 @@ export class AgentService {
     } catch (err) {
       console.error('Unexpected error in getAgentsByUserRole:', err);
       return [];
+    }
+  }
+
+  /**
+   * Get agents for a specific specialty site
+   * This is the primary method for loading agents in specialty pages
+   */
+  static async getAgentsForSpecialtySite(specialtySlug: string): Promise<Agent[]> {
+    console.log('AgentService.getAgentsForSpecialtySite called with slug:', specialtySlug);
+    
+    try {
+      // Use SpecialtySiteService to get agents for this specialty
+      const agents = await SpecialtySiteService.getAgentsForSpecialtySite(specialtySlug);
+      
+      console.log(`✅ Fetched ${agents.length} agents for specialty site:`, specialtySlug);
+      return agents;
+    } catch (err) {
+      console.error('Unexpected error in getAgentsForSpecialtySite:', err);
+      // Fallback to all active agents if specialty site lookup fails
+      console.warn('⚠️ Falling back to all active agents');
+      return await this.getActiveAgents();
     }
   }
 

@@ -37,6 +37,7 @@ import '../test-claude-functions';
 // Import custom hooks
 import { useDebugMonitoring } from '../hooks/useDebugMonitoring';
 import { useSessionInitialization } from '../hooks/useSessionInitialization';
+import { useSpecialtySite } from '../hooks/useSpecialtySite';
 // import { useHomeHandlers } from '../hooks/useHomeHandlers'; // Unused - commented out to fix lint warning
 
 // Import layout components
@@ -57,6 +58,9 @@ const Home: React.FC = () => {
   
   // Setup debug monitoring
   useDebugMonitoring();
+  
+  // Load specialty site based on route parameter
+  const { currentSpecialtySite, specialtySlug, isLoading: specialtyLoading } = useSpecialtySite();
   
   // Derived authentication state
   const isAuthenticated = !!session;
@@ -135,7 +139,7 @@ const Home: React.FC = () => {
     handleSaveAgent,
     handleCancelAgent,
     handleShowAgentSelector
-  } = useAgentManagement(currentSessionId);
+  } = useAgentManagement(currentSessionId, specialtySlug);
 
   // Create a ref to store handleSendMessage so we can use it in handleRfpContextChanged
   const handleSendMessageRef = useRef<((message: string, fileAttachments?: FileAttachment[]) => Promise<void>) | null>(null);
@@ -2153,6 +2157,7 @@ const Home: React.FC = () => {
         userProfile={userProfile}
         isAuthenticated={isAuthenticated}
         user={user}
+        specialtySite={currentSpecialtySite}
         sessions={sessions}
         selectedSessionId={selectedSessionId}
         onNewSession={handleNewSession}
