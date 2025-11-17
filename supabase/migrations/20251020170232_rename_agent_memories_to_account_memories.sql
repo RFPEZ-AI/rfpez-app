@@ -218,7 +218,7 @@ END;
 $$;
 
 -- Step 10: Drop old function names (if they exist with old signatures)
-DROP FUNCTION IF EXISTS search_agent_memories(UUID, UUID, vector(384), TEXT[], INTEGER, FLOAT);
+DROP FUNCTION IF EXISTS search_agent_memories(UUID, UUID, extensions.vector(384), TEXT[], INTEGER, FLOAT);
 DROP FUNCTION IF EXISTS search_agent_memories_fulltext(UUID, UUID, TEXT, TEXT[], INTEGER);
 
 -- Step 11: Update table comment
