@@ -66,7 +66,7 @@ const Home: React.FC = () => {
   useDebugMonitoring();
   
   // Load specialty site based on route parameter
-  const { currentSpecialtySite, specialtySlug, isLoading: specialtyLoading } = useSpecialtySite();
+  const { currentSpecialtySite, specialtySlug } = useSpecialtySite();
   
   // Derived authentication state
   const isAuthenticated = !!session;

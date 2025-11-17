@@ -1,6 +1,9 @@
 -- Create function for semantic search using vector similarity
 -- This function matches account memories based on embedding similarity
 
+-- Ensure pgvector extension is available
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+
 CREATE OR REPLACE FUNCTION match_account_memories(
   query_embedding extensions.vector(1024),
   match_threshold float DEFAULT 0.7,
@@ -49,10 +52,14 @@ END;
 $$;
 
 -- Create index on embedding column for faster similarity search
--- Using ivfflat index with cosine distance
-CREATE INDEX IF NOT EXISTS idx_account_memories_embedding 
-  ON account_memories 
-  USING ivfflat (embedding vector_cosine_ops)
+-- Drop index if it exists with wrong configuration
+DROP INDEX IF EXISTS idx_account_memories_embedding;
+
+-- Create simple index without specifying operator class
+-- pgvector will use the default operator class for cosine distance (<=>)
+CREATE INDEX idx_account_memories_embedding
+  ON account_memories
+  USING ivfflat (embedding)
   WITH (lists = 100);
 
 -- Add comment to document the function
