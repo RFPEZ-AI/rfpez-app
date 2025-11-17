@@ -46,6 +46,7 @@ interface AgentSelectorProps {
   onAgentChanged: (agent: SessionActiveAgent) => void;
   hasProperAccountSetup?: boolean; // Whether user has access to restricted agents
   isAuthenticated?: boolean; // Whether user is authenticated
+  agents?: Agent[]; // Pre-filtered agents (e.g., by specialty site)
 }
 
 const AgentSelector: React.FC<AgentSelectorProps> = ({
@@ -56,7 +57,8 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
   currentAgent,
   onAgentChanged,
   hasProperAccountSetup = false, // Default to false (restricted agents not available)
-  isAuthenticated = false // Default to false (not authenticated)
+  isAuthenticated = false, // Default to false (not authenticated)
+  agents: providedAgents // Agents provided by parent (pre-filtered by specialty site)
 }) => {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [loading, setLoading] = useState(true);
@@ -68,17 +70,23 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
     if (isOpen) {
       loadAgents();
     }
-  }, [isOpen]);
+  }, [isOpen, providedAgents]);
 
   const loadAgents = async () => {
     try {
       setLoading(true);
       
-      // Load agents based on user authentication and account setup status
-      console.log('🔍 Loading agents with params:', { hasProperAccountSetup, isAuthenticated });
-      const availableAgents = await AgentService.getAvailableAgents(hasProperAccountSetup, isAuthenticated);
-      console.log('🔍 Available agents received:', availableAgents.map(a => ({ name: a.name, is_default: a.is_default, is_free: a.is_free })));
-      setAgents(availableAgents);
+      // Use provided agents if available (pre-filtered by specialty site), otherwise load all
+      if (providedAgents && providedAgents.length > 0) {
+        console.log('🔍 Using provided agents (specialty-filtered):', providedAgents.map(a => a.name));
+        setAgents(providedAgents);
+      } else {
+        // Fallback: Load agents based on user authentication and account setup status
+        console.log('🔍 Loading agents with params:', { hasProperAccountSetup, isAuthenticated });
+        const availableAgents = await AgentService.getAvailableAgents(hasProperAccountSetup, isAuthenticated);
+        console.log('🔍 Available agents received:', availableAgents.map(a => ({ name: a.name, is_default: a.is_default, is_free: a.is_free })));
+        setAgents(availableAgents);
+      }
     } catch (error) {
       console.error('Error loading agents:', error);
       setToastMessage('Failed to load agents');

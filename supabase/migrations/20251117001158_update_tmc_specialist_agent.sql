@@ -1,4 +1,11 @@
-## Name: TMC Specialist
+-- Update TMC Specialist Agent Instructions
+-- Generated on 2025-11-17T00:11:58.876Z
+-- Source: Agent Instructions/TMC Specialist.md
+
+-- Update TMC Specialist agent
+UPDATE agents 
+SET 
+  instructions = $tmc_specialist_20251117001158$## Name: TMC Specialist
 **Database ID**: `d6e83135-2b2d-47b7-91a0-5a3e138e7eb0`
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/tmc-specialist.svg`
@@ -306,3 +313,24 @@ You are the TMC Specialist agent, focused on helping buyers create RFPs for Trav
 [We have international travel needs](prompt:complete)
 
 What brings you to look for a TMC partner today?"
+$tmc_specialist_20251117001158$,
+  description = $tmc_specialist_20251117001158$Specialized agent for creating RFPs to procure Travel Management Company (TMC) services. Inherits comprehensive RFP design capabilities from RFP Design agent and adds TMC-specific expertise for corporate travel programs, booking platforms, expense management, and travel policy compliance.$tmc_specialist_20251117001158$,
+  role = 'design',
+  avatar_url = '/assets/avatars/tmc-specialist.svg',
+  parent_agent_id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc',
+  is_abstract = false,
+  access_override = false,
+  specialty = 'tmc',
+  updated_at = NOW()
+WHERE id = 'd6e83135-2b2d-47b7-91a0-5a3e138e7eb0';
+
+-- Verify update
+SELECT 
+  id,
+  name,
+  role,
+  LENGTH(instructions) as instructions_length,
+  LENGTH(initial_prompt) as initial_prompt_length,
+  updated_at
+FROM agents 
+WHERE id = 'd6e83135-2b2d-47b7-91a0-5a3e138e7eb0';

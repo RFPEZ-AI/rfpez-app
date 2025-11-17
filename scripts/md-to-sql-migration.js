@@ -87,7 +87,7 @@ function parseAgentMarkdown(content) {
   }
   
   // Extract Parent Agent (inheritance)
-  const parentMatch = content.match(/\*\*Parent Agent\*\*:\s*`([^`]+)`/);
+  const parentMatch = content.match(/\*\*Parent Agent(?:\sID)?\*\*:\s*`([^`]+)`/);
   if (parentMatch && parentMatch[1] !== 'None') {
     metadata.parent_agent_id = parentMatch[1];
   }

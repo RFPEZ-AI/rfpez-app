@@ -2258,6 +2258,7 @@ const Home: React.FC = () => {
           onAgentChanged={onAgentChanged}
           hasProperAccountSetup={isAuthenticated} // Enable premium agents for authenticated users until billing system is implemented
           isAuthenticated={isAuthenticated}
+          agents={agents} // Pass specialty-filtered agents
         />
       </IonContent>
 
