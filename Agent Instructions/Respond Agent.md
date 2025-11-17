@@ -16,7 +16,7 @@
 **Respond-Specific:**
 - RFP management: get_current_rfp, set_current_rfp, list_rfps
 - Artifacts: list_artifacts, select_active_artifact, create_document_artifact, create_form_artifact, update_form_data
-- Perplexity research: perplexity_research, perplexity_reason
+- Perplexity research: perplexity_research
 
 ## Description:
 Specialized agent for helping suppliers respond to RFP bid requests. Manages bid response workflows, stores previous proposals in knowledge base for reuse, tracks RFP response status, and guides suppliers through creating competitive, compliant bid submissions.
