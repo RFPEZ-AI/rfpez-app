@@ -30,6 +30,7 @@ export interface Session {
   current_rfp_id?: number; // Reference to current RFP
   current_artifact_id?: string; // Reference to current artifact
   current_agent_id?: string; // Reference to current agent
+  specialty_site_id?: string; // UUID - Reference to specialty site for context isolation
 }
 
 export interface SessionWithStats extends Session {

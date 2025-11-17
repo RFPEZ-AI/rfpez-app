@@ -611,6 +611,34 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
     }
   },
   {
+    name: 'generate_specialty_url',
+    description: 'Generate a URL to a specific specialty site (e.g., /respond, /tmc) with optional query parameters like rfp_id or bid_id. Use this when directing users to specialty agents or features. Automatically detects the correct domain (localhost in development, production domain in live environment).',
+    input_schema: {
+      type: 'object',
+      properties: {
+        specialty: {
+          type: 'string',
+          description: 'The specialty site slug (e.g., "respond", "tmc", "home")',
+          enum: ['home', 'respond', 'tmc']
+        },
+        rfp_id: {
+          type: 'number',
+          description: 'Optional RFP ID to include as query parameter'
+        },
+        bid_id: {
+          type: 'string',
+          description: 'Optional bid ID to include as query parameter'
+        },
+        include_domain: {
+          type: 'boolean',
+          description: 'Whether to include the full domain (default: true)',
+          default: true
+        }
+      },
+      required: ['specialty']
+    }
+  },
+  {
     name: 'perplexity_search',
     description: 'Direct web search using the Perplexity Search API. Returns ranked search results with metadata. Perfect for finding current information, market research, pricing data, vendor information, and industry trends. Use this for fact-finding and research queries.',
     input_schema: {
@@ -801,7 +829,7 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
   },
   'design': {
     // RFP Design has access to all RFP creation tools, bid management tools, memory tools, and can switch to other agents (e.g., Sourcing)
-    allowed: ['create_and_set_rfp', 'set_current_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'generate_rfp_bid_url', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'switch_agent', 'create_memory', 'search_memories']
+    allowed: ['create_and_set_rfp', 'set_current_rfp', 'get_current_rfp', 'create_form_artifact', 'create_document_artifact', 'get_form_schema', 'update_form_data', 'update_form_artifact', 'submit_bid', 'get_rfp_bids', 'update_bid_status', 'generate_rfp_bid_url', 'generate_specialty_url', 'get_available_agents', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'debug_agent_switch', 'recommend_agent', 'switch_agent', 'create_memory', 'search_memories']
   },
   'support': {
     // Support agents don't need RFP creation tools but can create documents

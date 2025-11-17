@@ -36,7 +36,8 @@ interface EnhancedFunctionResult {
 }
 
 export const useMessageHandling = (
-  setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>
+  setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>,
+  specialtySlug?: string // 🎯 SPECIALTY-AWARE: Track specialty for session scoping
 ) => {
   const abortControllerRef = useRef<AbortController | null>(null);
   const isProcessingRef = useRef<boolean>(false); // Add processing guard
@@ -489,9 +490,11 @@ export const useMessageHandling = (
             const sessionMessages = await DatabaseService.getSessionMessages(activeSessionId);
             console.log('✅ Session validation successful - found', sessionMessages.length, 'existing messages');
             
-            // Ensure this session is set as the user's current session for persistence
-            await DatabaseService.setUserCurrentSession(activeSessionId);
-            console.log('✅ Confirmed session as current in user profile:', activeSessionId);
+            // 🎯 SPECIALTY-AWARE: Set as current session for this specialty (not globally)
+            if (specialtySlug) {
+              await DatabaseService.setUserSpecialtySession(specialtySlug, activeSessionId);
+              console.log('✅ Confirmed specialty session:', { specialty: specialtySlug, sessionId: activeSessionId });
+            }
             
             // Update tool invocation session tracking to use the existing session
             loadToolInvocationsForSession(activeSessionId);
@@ -556,12 +559,14 @@ export const useMessageHandling = (
             setSelectedSessionId(newSessionId);
             console.log('New session created with ID:', newSessionId, 'and RFP:', currentRfp?.id);
             
-            // Update user profile with current session ID for database persistence
-            try {
-              await DatabaseService.setUserCurrentSession(newSessionId);
-              console.log('✅ Current session saved to user profile:', newSessionId);
-            } catch (error) {
-              console.warn('⚠️ Failed to save current session to user profile:', error);
+            // 🎯 SPECIALTY-AWARE: Save to specialty-specific session tracking
+            if (specialtySlug) {
+              try {
+                await DatabaseService.setUserSpecialtySession(specialtySlug, newSessionId);
+                console.log('✅ Specialty session saved:', { specialty: specialtySlug, sessionId: newSessionId });
+              } catch (error) {
+                console.warn('⚠️ Failed to save specialty session:', error);
+              }
             }
             
             // Update tool invocation session tracking to use the new session

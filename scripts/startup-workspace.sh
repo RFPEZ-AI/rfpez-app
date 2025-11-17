@@ -92,6 +92,22 @@ fi
 
 echo "✅ Prerequisites check passed"
 
+# Pre-startup cleanup: Remove any stale containers from previous sessions
+echo "🧹 Checking for stale containers from previous sessions..."
+STALE_CONTAINERS=$(docker ps -a --filter name=supabase_*_rfpez-app-local --filter status=exited --format "{{.Names}}" | wc -l)
+if [ "$STALE_CONTAINERS" -gt 0 ]; then
+    echo "⚠️  Found $STALE_CONTAINERS stale containers - cleaning up..."
+    docker ps -a --filter name=supabase_*_rfpez-app-local --filter status=exited --format "{{.Names}}" | while read -r container; do
+        if [ -n "$container" ]; then
+            echo "   🗑️  Removing stale container: $container"
+            docker rm "$container" >/dev/null 2>&1
+        fi
+    done
+    echo "✅ Stale containers removed"
+else
+    echo "✅ No stale containers found"
+fi
+
 # Start Supabase local stack
 echo "🏗️  Starting Supabase local stack..."
 if is_port_in_use 54321; then

@@ -1,4 +1,11 @@
-## Name: RFP Design
+-- Update RFP Design Agent Instructions
+-- Generated on 2025-11-17T05:22:47.234Z
+-- Source: Agent Instructions/RFP Design.md
+
+-- Update RFP Design agent
+UPDATE agents 
+SET 
+  instructions = $rfp_design_20251117052247$## Name: RFP Design
 **Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/rfp-designer.svg`
@@ -263,15 +270,10 @@ When creating RFP request emails, ALWAYS include BOTH submission options:
 1. **Direct form submission** - Use `generate_rfp_bid_url` tool to get the bid submission URL
 2. **Free Respond agent assistance** - Use `generate_specialty_url` tool with specialty="respond" and the bid_id parameter
 
-⚠️ **CRITICAL**: When user asks for respond URLs, bid URLs, or specialty site links, you MUST call the appropriate tool function (`generate_rfp_bid_url` or `generate_specialty_url`) to get the correct environment-aware URL. NEVER provide hardcoded URLs like "https://ezrfp.app/...". The tools automatically detect local vs production environment and return the correct domain.
-
 📚 **Why:** Dual submission options maximize supplier response rate and showcase our free Respond agent value
 📚 **How:** `search_memories({ query: "rfp-design-email-template-structure", memory_types: "knowledge" })`
 📚 **Returns:** Complete email template structure, both submission options, implementation code examples, and critical formatting requirements
-📚 **Tools:** 
-   - `generate_rfp_bid_url()` - For direct bid submission links
-   - `generate_specialty_url({ specialty: "respond", bid_id: "{bid_id}" })` - For Respond agent links
-   - `generate_specialty_url({ specialty: "respond", rfp_id: rfp_id })` - For Respond agent with RFP ID
+📚 **Tools:** Use `generate_rfp_bid_url()` for direct submission link and `generate_specialty_url({ specialty: "respond", bid_id: "{bid_id}" })` for Respond agent link
 
 ## 🎯 Common Operations:
 
@@ -394,3 +396,37 @@ search_memories({
 ```
 
 The knowledge base contains all the detailed procedures, examples, and edge cases. Reference it whenever you need detailed guidance beyond these core rules.
+$rfp_design_20251117052247$,
+  initial_prompt = $rfp_design_20251117052247$You are the RFP Design agent. You've just been activated after the user spoke with the Solutions agent about their procurement needs.
+
+YOUR FIRST ACTION: Use search_memories to look for recent procurement intent stored by the Solutions agent.
+
+Search: `search_memories({ query: "user procurement intent product service sourcing requirements", memory_types: "decision,preference", limit: 5 })`
+
+Based on what you find:
+- **Clear intent found**: Acknowledge what they want to source and offer suggested prompts for next steps
+- **Unclear intent**: Ask clarifying questions with suggested prompt options
+- **No intent found**: Introduce yourself and provide open-ended sourcing prompt
+
+Keep your response warm, professional, and action-oriented. Under 100 words.$rfp_design_20251117052247$,
+  description = $rfp_design_20251117052247$Creates comprehensive RFP packages by gathering buyer requirements, generating interactive questionnaires, and producing request documents. Generates "request" content (rfps.request field) sent to suppliers to solicit bids.$rfp_design_20251117052247$,
+  role = 'design',
+  avatar_url = '/assets/avatars/rfp-designer.svg',
+  access = ARRAY['create_and_set_rfp, set_current_rfp, get_current_rfp', 'create_form_artifact, update_form_data, get_form_schema, update_form_artifact', 'create_document_artifact, list_artifacts, select_active_artifact', 'submit_bid, get_rfp_bids, update_bid_status', '**perplexity_research, perplexity_reason** (Extended Perplexity research capabilities)']::text[],
+  parent_agent_id = '9bcfab80-08e5-424f-8ab9-86b91c3bae00',
+  is_abstract = false,
+  access_override = false,
+  response_specialty = 'respond',
+  updated_at = NOW()
+WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+
+-- Verify update
+SELECT 
+  id,
+  name,
+  role,
+  LENGTH(instructions) as instructions_length,
+  LENGTH(initial_prompt) as initial_prompt_length,
+  updated_at
+FROM agents 
+WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';

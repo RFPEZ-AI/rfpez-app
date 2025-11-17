@@ -127,6 +127,14 @@ lsof -ti:3100 | xargs kill -9             # Kill process on port 3100 (Linux/Mac
 docker restart supabase_edge_runtime_rfpez-app-local
 # Or use VS Code Task: "Restart Edge Runtime"
 
+# Clean Restart After Reboot (if containers fail to start)
+# Use VS Code Task: "Clean Restart Supabase" 
+# Or manually:
+docker ps -a --filter name=supabase_*_rfpez-app-local --format "{{.Names}}" | xargs -r docker stop
+docker ps -a --filter name=supabase_*_rfpez-app-local --format "{{.Names}}" | xargs -r docker rm
+find supabase/functions -name 'deno.lock' -type f -delete
+supabase start
+
 # VS Code Task Issues
 # Ctrl+Shift+P → "Tasks: Terminate Task" → Select task to stop
 # Then restart with "Tasks: Run Task"

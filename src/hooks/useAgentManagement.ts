@@ -45,7 +45,7 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
     loadAgents();
   }, [specialtySlug]);
 
-  const loadDefaultAgentWithPrompt = useCallback(async (urlContext?: { bid_id?: string | null }): Promise<Message | null> => {
+  const loadDefaultAgentWithPrompt = useCallback(async (urlContext?: { bid_id?: string | null; rfp_id?: string | null }): Promise<Message | null> => {
     console.log('🎯 loadDefaultAgentWithPrompt: Starting...');
     console.log('🎯 specialtySlug:', specialtySlug);
     console.log('🎯 urlContext:', urlContext);
@@ -53,14 +53,14 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
       // Get default agent based on specialty site context
       let defaultAgent: Agent | null = null;
       
-      if (specialtySlug && specialtySlug !== 'home') {
-        // Load default agent for specialty site
+      if (specialtySlug) {
+        // Load default agent for specialty site (including 'home')
         console.log('🎯 Loading default agent for specialty site:', specialtySlug);
         const { SpecialtySiteService } = await import('../services/specialtySiteService');
         defaultAgent = await SpecialtySiteService.getDefaultAgentForSpecialtySite(specialtySlug);
       } else {
-        // Load default agent for home page
-        console.log('🎯 Loading default agent for home page');
+        // Fallback to global default agent if no specialty context
+        console.log('🎯 Loading global default agent (no specialty context)');
         defaultAgent = await AgentService.getDefaultAgent();
       }
       

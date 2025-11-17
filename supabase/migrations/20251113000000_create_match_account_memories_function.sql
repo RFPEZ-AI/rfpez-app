@@ -2,7 +2,7 @@
 -- This function matches account memories based on embedding similarity
 
 CREATE OR REPLACE FUNCTION match_account_memories(
-  query_embedding vector(1024),
+  query_embedding extensions.vector(1024),
   match_threshold float DEFAULT 0.7,
   match_count int DEFAULT 5,
   filter_account_id uuid DEFAULT NULL,

@@ -691,6 +691,7 @@ export class ClaudeService {
     },
     urlContext?: {
       bid_id?: string | null;
+      rfp_id?: string | null;
     }
   ): Promise<string> {
     console.log('🎭 Processing initial prompt for agent:', agent.name);
@@ -705,11 +706,19 @@ export class ClaudeService {
       // 🎯 IMPORTANT: processInitialPrompt MUST use streaming because edge function forces streaming
       // when processInitialPrompt=true to enable activation notices and memory search
       
-      // Embed URL context (bid_id) in the initial prompt if available
+      // Embed URL context (bid_id, rfp_id) in the initial prompt if available
       let promptWithContext = agent.initial_prompt || 'Hello! How can I help you today?';
+      const contextParams: string[] = [];
       if (urlContext?.bid_id) {
-        promptWithContext = `[URL Context: bid_id=${urlContext.bid_id}]\n\n${promptWithContext}`;
+        contextParams.push(`bid_id=${urlContext.bid_id}`);
         console.log('🎭 Embedded bid_id in initial prompt:', urlContext.bid_id);
+      }
+      if (urlContext?.rfp_id) {
+        contextParams.push(`rfp_id=${urlContext.rfp_id}`);
+        console.log('🎭 Embedded rfp_id in initial prompt:', urlContext.rfp_id);
+      }
+      if (contextParams.length > 0) {
+        promptWithContext = `[URL Context: ${contextParams.join(', ')}]\n\n${promptWithContext}`;
       }
       
       const response = await this.generateResponseViaEdgeFunction(

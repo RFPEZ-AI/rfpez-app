@@ -24,8 +24,14 @@ export class DatabaseService {
   }
 
   // Session operations
-  static async createSession(supabaseUserId: string, title: string, description?: string, currentRfpId?: number): Promise<Session | null> {
-    console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description, currentRfpId });
+  static async createSession(
+    supabaseUserId: string, 
+    title: string, 
+    description?: string, 
+    currentRfpId?: number,
+    specialtySiteId?: string
+  ): Promise<Session | null> {
+    console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description, currentRfpId, specialtySiteId });
     
     // Get the user's account_id from account_users table
     // supabaseUserId is auth.users.id - sessions.user_id now directly references auth.users
@@ -51,6 +57,12 @@ export class DatabaseService {
       title,
       description
     };
+    
+    // Add specialty site ID if provided
+    if (specialtySiteId) {
+      sessionData.specialty_site_id = specialtySiteId;
+      console.log('Setting session specialty_site_id to:', specialtySiteId);
+    }
     
     // Add current RFP ID if provided
     if (currentRfpId) {
@@ -84,14 +96,15 @@ export class DatabaseService {
     title: string, 
     agentId?: string,
     description?: string,
-    currentRfpId?: number
+    currentRfpId?: number,
+    specialtySiteId?: string
   ): Promise<Session | null> {
     console.log('DatabaseService.createSessionWithAgent called with:', { 
-      supabaseUserId, title, agentId, description, currentRfpId 
+      supabaseUserId, title, agentId, description, currentRfpId, specialtySiteId 
     });
 
     // Create the session first
-    const session = await this.createSession(supabaseUserId, title, description, currentRfpId);
+    const session = await this.createSession(supabaseUserId, title, description, currentRfpId, specialtySiteId);
     if (!session) {
       return null;
     }
@@ -118,8 +131,12 @@ export class DatabaseService {
     return session;
   }
 
-  static async getUserSessions(supabaseUserId: string, rfpId?: number | null): Promise<SessionWithStats[]> {
-    console.log('DatabaseService.getUserSessions called for supabaseUserId:', supabaseUserId, 'rfpId:', rfpId);
+  static async getUserSessions(
+    supabaseUserId: string, 
+    rfpId?: number | null,
+    specialtySiteId?: string | null
+  ): Promise<SessionWithStats[]> {
+    console.log('DatabaseService.getUserSessions called for supabaseUserId:', supabaseUserId, 'rfpId:', rfpId, 'specialtySiteId:', specialtySiteId);
     
     console.log('Fetching sessions directly from sessions table using Supabase user ID...');
     // Sessions table stores Supabase auth user ID directly, not the user_profiles internal ID
@@ -133,9 +150,16 @@ export class DatabaseService {
         created_at,
         updated_at,
         is_archived,
-        current_rfp_id
+        current_rfp_id,
+        specialty_site_id
       `)
       .eq('user_id', supabaseUserId);
+    
+    // Filter by specialty site if provided
+    if (specialtySiteId !== undefined && specialtySiteId !== null) {
+      query = query.eq('specialty_site_id', specialtySiteId);
+      console.log('🎯 Filtering sessions by specialty_site_id:', specialtySiteId);
+    }
     
     // Filter by RFP if provided
     if (rfpId !== undefined) {
@@ -891,46 +915,77 @@ export class DatabaseService {
     return data;
   }
 
-  // Current session management for user profiles
-  static async setUserCurrentSession(sessionId: string | null): Promise<boolean> {
+  // Specialty-aware session management for user profiles
+  static async setUserSpecialtySession(
+    specialtySlug: string,
+    sessionId: string | null
+  ): Promise<boolean> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return false;
 
+    if (sessionId === null) {
+      // Clear the specialty session
+      const { error } = await supabase
+        .rpc('clear_user_specialty_session', {
+          user_uuid: user.id,
+          specialty_slug: specialtySlug
+        });
+
+      if (error) {
+        console.error('Error clearing specialty session:', error);
+        return false;
+      }
+      return true;
+    }
+
     const { error } = await supabase
-      .rpc('set_user_current_session', {
+      .rpc('set_user_specialty_session', {
         user_uuid: user.id,
+        specialty_slug: specialtySlug,
         session_uuid: sessionId
       });
 
     if (error) {
-      console.error('Error setting current session:', error);
+      console.error('Error setting specialty session:', error);
       return false;
     }
     return true;
   }
 
-  static async getUserCurrentSession(): Promise<string | null> {
+  static async getUserSpecialtySession(specialtySlug: string): Promise<string | null> {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return null;
 
     const { data, error } = await supabase
-      .rpc('get_user_current_session', {
-        user_uuid: user.id
+      .rpc('get_user_specialty_session', {
+        user_uuid: user.id,
+        specialty_slug: specialtySlug
       });
 
     if (error) {
-      console.error('Error getting current session:', error);
+      console.error('Error getting specialty session:', error);
       return null;
     }
     
     // RPC returns a single UUID string, not an array
     if (data && typeof data === 'string') {
-      console.log('✅ getUserCurrentSession returning session ID:', data);
+      console.log(`✅ getUserSpecialtySession(${specialtySlug}) returning:`, data);
       return data;
     }
     
-    console.log('ℹ️ getUserCurrentSession: No current session found');
+    console.log(`ℹ️ getUserSpecialtySession(${specialtySlug}): No session found`);
     return null;
+  }
+
+  // Legacy method for backward compatibility - defaults to 'home' specialty
+  static async setUserCurrentSession(sessionId: string | null): Promise<boolean> {
+    console.warn('⚠️ setUserCurrentSession is deprecated. Use setUserSpecialtySession instead.');
+    return this.setUserSpecialtySession('home', sessionId);
+  }
+
+  static async getUserCurrentSession(): Promise<string | null> {
+    console.warn('⚠️ getUserCurrentSession is deprecated. Use getUserSpecialtySession instead.');
+    return this.getUserSpecialtySession('home');
   }
 
   // File storage operations (for artifacts)

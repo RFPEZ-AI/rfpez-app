@@ -110,10 +110,10 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       console.log('Loading default agent for initial app startup (no sessions available to restore)...');
       console.log('🔍 Condition check: isAuthenticated:', isAuthenticated, 'needsSessionRestore:', needsSessionRestore, 'sessions.length:', sessions.length);
       
-      // Show loading message immediately (authenticated users get RFP Design agent)
+      // Show generic loading message while agent loads
       setMessages([{
         id: 'agent-loading',
-        content: '🤖 Activating RFP Design agent...',
+        content: '🤖 Loading agent...',
         isUser: false,
         timestamp: new Date(),
         agentName: 'System'

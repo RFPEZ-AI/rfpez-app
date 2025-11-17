@@ -100,12 +100,26 @@ else
     echo "⚠️  Supabase CLI not found - skipping Supabase shutdown"
 fi
 
-# Clean up any remaining Docker containers
+# Clean up Docker containers (stop AND remove for clean restart)
 echo "🐳 Cleaning up Docker containers..."
 docker ps -a --filter name=supabase_*_rfpez-app-local --format "{{.Names}}" | while read -r container; do
     if [ -n "$container" ]; then
-        echo "⏹️  Stopping Docker container: $container"
+        echo "⏹️  Stopping container: $container"
         docker stop "$container" >/dev/null 2>&1
+        echo "🗑️  Removing container: $container (ensures clean restart)"
+        docker rm "$container" >/dev/null 2>&1
+    fi
+done
+
+# Also clean up any orphaned volumes for this project
+echo "🧹 Cleaning up orphaned Docker volumes..."
+docker volume ls --filter "name=rfpez-app-local" --format "{{.Name}}" | while read -r volume; do
+    if [ -n "$volume" ]; then
+        # Only remove if not in use by any container
+        if ! docker ps -a --filter "volume=$volume" --format "{{.Names}}" | grep -q .; then
+            echo "🗑️  Removing orphaned volume: $volume"
+            docker volume rm "$volume" >/dev/null 2>&1 || echo "   ⚠️  Could not remove volume (may be in use)"
+        fi
     fi
 done
 

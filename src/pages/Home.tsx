@@ -57,9 +57,10 @@ const Home: React.FC = () => {
   const history = useHistory();
   const location = useLocation();
   
-  // Extract URL parameters (e.g., bid_id for /respond specialty)
+  // Extract URL parameters (e.g., bid_id, rfp_id for /respond specialty)
   const urlParams = new URLSearchParams(location.search);
   const bidId = urlParams.get('bid_id');
+  const rfpId = urlParams.get('rfp_id');
   
   // Setup debug monitoring
   useDebugMonitoring();
@@ -75,6 +76,7 @@ const Home: React.FC = () => {
   const [accountId, setAccountId] = useState<string | undefined>();
   
   // Use our custom hooks
+  // 🎯 SPECIALTY-AWARE: Pass specialtySlug for specialty-scoped session restoration
   const {
     isLoading,
     setIsLoading,
@@ -84,9 +86,9 @@ const Home: React.FC = () => {
     setCurrentSessionId,
     needsSessionRestore,
     setNeedsSessionRestore
-  } = useHomeState(user?.id, !!session);
+  } = useHomeState(user?.id, !!session, specialtySlug);
 
-  // Global RFP context that persists across sessions
+  // RFP context - session-scoped (loaded from session's current_rfp_id, NOT from localStorage)
   const {
     currentRfpId: globalCurrentRfpId,
     currentRfp: globalCurrentRfp,
@@ -108,6 +110,7 @@ const Home: React.FC = () => {
     console.log('📌 Session ID ref updated:', currentSessionId);
   }, [currentSessionId]);
 
+  // 🎯 SPECIALTY-AWARE: Pass currentSpecialtySite.id to filter sessions by specialty
   const {
     sessions,
     messages,
@@ -119,7 +122,7 @@ const Home: React.FC = () => {
     createNewSession,
     deleteSession,
     clearUIState
-  } = useSessionState(userId, isAuthenticated);
+  } = useSessionState(userId, isAuthenticated, currentSpecialtySite?.id);
   
   // Keep messages ref synchronized with state (for closure-safe checks)
   useEffect(() => {
@@ -346,7 +349,8 @@ const Home: React.FC = () => {
     }
   }, [currentRfpId, isAuthenticated, userId, loadUserSessions]);
 
-  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, loadToolInvocationsForSession} = useMessageHandling(setGlobalRFPContext);
+  // 🎯 SPECIALTY-AWARE: Pass specialtySlug for session scoping
+  const { handleSendMessage, sendAutoPrompt, cancelRequest, toolInvocations, loadToolInvocationsForSession} = useMessageHandling(setGlobalRFPContext, specialtySlug);
 
   // Main menu handler
   const handleMainMenuSelect = (item: string) => {
@@ -396,18 +400,20 @@ const Home: React.FC = () => {
     console.log('📌 Session ID ref updated via handleSelectSession:', sessionId);
     
     // CRITICAL FIX: Save to localStorage IMMEDIATELY for page refresh persistence
-    localStorage.setItem('rfpez_last_session', sessionId);
-    console.log('💾 Session saved to localStorage for refresh persistence:', sessionId);
+    // 🎯 SPECIALTY-AWARE: Use specialty-namespaced localStorage key
+    const localStorageKey = `rfpez_last_session_${specialtySlug}`;
+    localStorage.setItem(localStorageKey, sessionId);
+    console.log('💾 Session saved to specialty-scoped localStorage:', { specialty: specialtySlug, sessionId });
     
     // Save as last session for persistence (backup via artifactWindowState)
     artifactWindowState.saveLastSession(sessionId);
     
-    // Update user profile with current session ID for database persistence
+    // 🎯 SPECIALTY-AWARE: Save to specialty-specific session tracking in user profile
     try {
-      await DatabaseService.setUserCurrentSession(sessionId);
-      console.log('✅ Current session saved to user profile:', sessionId);
+      await DatabaseService.setUserSpecialtySession(specialtySlug, sessionId);
+      console.log('✅ Current session saved to user specialty_sessions:', { specialty: specialtySlug, sessionId });
     } catch (error) {
-      console.warn('⚠️ Failed to save current session to user profile:', error);
+      console.warn('⚠️ Failed to save specialty session to user profile:', error);
     }
 
     // ⚡ OPTIMIZATION: Load session data in parallel for faster restoration
@@ -1119,7 +1125,7 @@ const Home: React.FC = () => {
       });
       console.log('✨ Loading default agent (no session AND no sessions to restore)...');
       initialAgentLoadedRef.current = true;
-      loadDefaultAgentWithPrompt({ bid_id: bidId }).then(initialMessage => {
+      loadDefaultAgentWithPrompt({ bid_id: bidId, rfp_id: rfpId }).then(initialMessage => {
         if (initialMessage) {
           // CRITICAL FIX 1g: Use REFS instead of closure variables to avoid stale state
           // Refs always have current values, closure variables are frozen at promise creation
@@ -1187,7 +1193,7 @@ const Home: React.FC = () => {
     setIsSessionLoading(true); // Trigger auto-focus on message input
     
     try {
-      // Clear ALL UI state completely (but preserve global RFP context)
+      // 🎯 SPECIALTY-AWARE: Clear ALL UI state including RFP context for new session
       setMessages([]);
       clearArtifacts();
       setSelectedSessionId(undefined);
@@ -1195,11 +1201,18 @@ const Home: React.FC = () => {
       // CRITICAL: Clear ref as well
       currentSessionIdRef.current = undefined;
       console.log('📌 Session ID ref cleared in handleNewSession');
+      
+      // 🎯 CRITICAL: Clear RFP context when starting new session
+      // New sessions should have NO RFP context until user explicitly sets one
+      clearGlobalRFPContext();
+      console.log('✅ RFP context cleared for new session');
+      
       console.log('📊 State after clearing:', {
         currentSessionId: undefined,
         selectedSessionId: undefined,
         refSessionId: currentSessionIdRef.current,
-        messagesCount: 0
+        messagesCount: 0,
+        rfpContext: 'cleared'
       });
       
       // Reset artifact window state completely for new session
@@ -1207,15 +1220,16 @@ const Home: React.FC = () => {
       artifactWindowState.saveLastSession(null);
       // Don't force-collapse session history - let user access session management naturally
       
-      // 🎯 CRITICAL FIX: Clear current session in database AND state to prevent auto-restore
+      // 🎯 CRITICAL FIX: Clear specialty-scoped session to prevent auto-restore
       if (isAuthenticated && userId) {
         try {
-          await DatabaseService.setUserCurrentSession(null);
+          // Clear the specialty-specific session (not globally)
+          await DatabaseService.setUserSpecialtySession(specialtySlug, null);
           // Also clear the needsSessionRestore flag from useHomeState
           setNeedsSessionRestore(null);
-          console.log('✅ Current session cleared in database AND state (prevents auto-restore)');
+          console.log('✅ Specialty session cleared:', { specialty: specialtySlug });
         } catch (error) {
-          console.warn('⚠️ Failed to clear current session in database:', error);
+          console.warn('⚠️ Failed to clear specialty session:', error);
         }
       }
       
@@ -1235,7 +1249,7 @@ const Home: React.FC = () => {
       }]);
       
       console.log('🎭 Loading default agent welcome message (no session creation yet)');
-      const initialMessage = await loadDefaultAgentWithPrompt({ bid_id: bidId });
+      const initialMessage = await loadDefaultAgentWithPrompt({ bid_id: bidId, rfp_id: rfpId });
       if (initialMessage) {
         // Replace activation message with actual welcome message
         setPendingWelcomeMessage(initialMessage);
@@ -1254,7 +1268,7 @@ const Home: React.FC = () => {
     } catch (error) {
       console.error('❌ Error preparing new session:', error);
       // Ensure we still have some UI state even if loading fails
-      const initialMessage = await loadDefaultAgentWithPrompt({ bid_id: bidId });
+      const initialMessage = await loadDefaultAgentWithPrompt({ bid_id: bidId, rfp_id: rfpId });
       if (initialMessage) {
         setPendingWelcomeMessage(initialMessage);
         setMessages([initialMessage]);

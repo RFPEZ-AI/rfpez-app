@@ -5,19 +5,28 @@ import { Message, Session, ArtifactReference } from '../types/home';
 import { SessionActiveAgent } from '../types/database';
 import DatabaseService from '../services/database';
 
-export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
+export const useSessionState = (userId?: string, isAuthenticated?: boolean, specialtySiteId?: string) => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [messages, setMessages] = useState<Message[]>([]);
   const [pendingWelcomeMessage, setPendingWelcomeMessage] = useState<Message | null>(null);
 
   // Define loadUserSessions function (can be called manually or by useEffect)
+  // 🎯 SPECIALTY-AWARE: Now filters sessions by specialty_site_id
   const loadUserSessions = useCallback(async (rfpId?: number | null) => {
     if (!isAuthenticated || !userId) {
       return;
     }
     
+    // 🚨 CRITICAL: Wait for specialty site ID to be available before loading sessions
+    // If specialtySiteId is undefined, we can't filter properly and would load ALL sessions
+    if (specialtySiteId === undefined) {
+      console.log('⏳ Waiting for specialtySiteId to load before fetching sessions...');
+      return;
+    }
+    
     try {
-      const sessionsData = await DatabaseService.getUserSessions(userId, rfpId);
+      // 🎯 Pass specialty_site_id to filter sessions by current specialty
+      const sessionsData = await DatabaseService.getUserSessions(userId, rfpId, specialtySiteId);
       const formattedSessions: Session[] = sessionsData
         .map(session => ({
           id: session.id,
@@ -27,15 +36,16 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
         }))
         .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
       setSessions(formattedSessions);
+      console.log(`🎯 Loaded ${formattedSessions.length} sessions for specialty:`, specialtySiteId);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     }
-  }, [isAuthenticated, userId]);
+  }, [isAuthenticated, userId, specialtySiteId]);
 
-  // Auto-load sessions when authentication state changes
+  // Auto-load sessions when authentication state changes or specialty changes
   useEffect(() => {
     loadUserSessions();
-  }, [isAuthenticated, userId]); // loadUserSessions omitted from deps to avoid infinite loops
+  }, [isAuthenticated, userId, specialtySiteId]); // Added specialtySiteId to trigger reload on specialty change
 
   const loadSessionMessages = async (sessionId: string) => {
     try {
@@ -79,30 +89,29 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean) => {
     try {
       // Use inherited RFP ID if provided, otherwise session will have no RFP context initially
       const rfpIdForSession = inheritedRfpId || undefined;
-      console.log('Attempting to create session in Supabase with current agent:', currentAgent?.agent_id, 'and inherited RFP:', rfpIdForSession);
+      console.log('🎯 Creating specialty-scoped session:', {
+        agentId: currentAgent?.agent_id,
+        rfpId: rfpIdForSession,
+        specialtySiteId
+      });
       
       // Use first user message as title if provided (lazy creation pattern)
       const sessionTitle = firstUserMessage 
         ? firstUserMessage.substring(0, 50) + (firstUserMessage.length > 50 ? '...' : '')
         : 'Chat Session';
       
+      // 🎯 SPECIALTY-AWARE: Pass specialtySiteId to scope session to current specialty
       const session = await DatabaseService.createSessionWithAgent(
         userId, 
         sessionTitle,
         currentAgent?.agent_id,
         undefined, // description
-        rfpIdForSession
+        rfpIdForSession,
+        specialtySiteId // Link session to current specialty site
       );
       if (session) {
-        // CRITICAL FIX: Immediately set this new session as the user's current session
-        // This ensures that when the user refreshes or sends their first message,
-        // they stay in this session instead of creating another one
-        try {
-          await DatabaseService.setUserCurrentSession(session.id);
-        } catch (error) {
-          console.warn('⚠️ Failed to set new session as current:', error);
-        }
-        
+        // CRITICAL: Sessions are now scoped per-specialty, not globally
+        // Reload sessions to show new session in current specialty's list
         await loadUserSessions();
         return session.id;
       }

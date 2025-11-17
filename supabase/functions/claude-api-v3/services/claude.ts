@@ -1109,6 +1109,68 @@ export class ToolExecutionService {
           };
         }
 
+        case 'generate_specialty_url': {
+          const specialty = input.specialty;
+          const rfpId = input.rfp_id;
+          const bidId = input.bid_id;
+          const includeDomain = input.include_domain !== false; // Default to true
+          
+          // Determine the base URL based on environment
+          let baseUrl = '';
+          if (includeDomain) {
+            // Use APP_URL environment variable if set
+            const appUrl = Deno.env.get('APP_URL');
+            
+            if (appUrl) {
+              baseUrl = appUrl;
+              console.log('📍 Using APP_URL from environment:', baseUrl);
+            } else {
+              // Fallback: detect from SUPABASE_URL
+              const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+              console.log('🔍 Environment detection - SUPABASE_URL:', supabaseUrl);
+              
+              // Check if running locally
+              if (supabaseUrl.includes('127.0.0.1') || supabaseUrl.includes('localhost') || supabaseUrl.includes('kong:')) {
+                baseUrl = 'http://localhost:3100';
+                console.log('📍 Detected LOCAL environment');
+              } else {
+                // Production/remote environment
+                baseUrl = 'https://dev.rfpez.ai';
+                console.log('📍 Detected REMOTE environment');
+              }
+            }
+          }
+          
+          // Build the specialty URL
+          let specialtyUrl = `${baseUrl}/${specialty}`;
+          
+          // Add query parameters if provided
+          const queryParams: string[] = [];
+          if (rfpId) queryParams.push(`rfp_id=${rfpId}`);
+          if (bidId) queryParams.push(`bid_id=${bidId}`);
+          
+          if (queryParams.length > 0) {
+            specialtyUrl += `?${queryParams.join('&')}`;
+          }
+          
+          console.log('✅ Generated specialty URL:', specialtyUrl);
+          console.log('   - Base URL:', baseUrl);
+          console.log('   - Specialty:', specialty);
+          console.log('   - RFP ID:', rfpId || 'none');
+          console.log('   - Bid ID:', bidId || 'none');
+          
+          return {
+            success: true,
+            data: {
+              url: specialtyUrl,
+              specialty,
+              rfp_id: rfpId,
+              bid_id: bidId
+            },
+            message: `Specialty URL generated successfully: ${specialtyUrl}`
+          };
+        }
+
         case 'create_memory': {
           // Validate required parameters
           if (!sessionId || !agentId) {
@@ -1289,4 +1351,4 @@ export class ToolExecutionService {
     
     return results;
   }
-}
+}// Deploy trigger 1763358054
