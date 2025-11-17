@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useCallback, useRef } from 'react';
 import { IonContent, IonPage, IonSpinner } from '@ionic/react';
-import { useHistory } from 'react-router-dom';
+import { useHistory, useLocation } from 'react-router-dom';
 import { useSupabase } from '../context/SupabaseContext';
 import DatabaseService from '../services/database';
 import { ArtifactService } from '../services/artifactService';
@@ -55,6 +55,11 @@ import FileKnowledgeManager from '../components/FileKnowledgeManager';
 const Home: React.FC = () => {
   const { user, session, loading: supabaseLoading, userProfile, supabase } = useSupabase();
   const history = useHistory();
+  const location = useLocation();
+  
+  // Extract URL parameters (e.g., bid_id for /respond specialty)
+  const urlParams = new URLSearchParams(location.search);
+  const bidId = urlParams.get('bid_id');
   
   // Setup debug monitoring
   useDebugMonitoring();
@@ -513,6 +518,7 @@ const Home: React.FC = () => {
     currentRfpId,
     artifacts,
     needsSessionRestore,
+    urlContext: { bid_id: bidId }, // Pass bid_id for Respond agent
     setMessages,
     setArtifacts,
     setIsCreatingNewSession,
@@ -1113,7 +1119,7 @@ const Home: React.FC = () => {
       });
       console.log('✨ Loading default agent (no session AND no sessions to restore)...');
       initialAgentLoadedRef.current = true;
-      loadDefaultAgentWithPrompt().then(initialMessage => {
+      loadDefaultAgentWithPrompt({ bid_id: bidId }).then(initialMessage => {
         if (initialMessage) {
           // CRITICAL FIX 1g: Use REFS instead of closure variables to avoid stale state
           // Refs always have current values, closure variables are frozen at promise creation
@@ -1229,7 +1235,7 @@ const Home: React.FC = () => {
       }]);
       
       console.log('🎭 Loading default agent welcome message (no session creation yet)');
-      const initialMessage = await loadDefaultAgentWithPrompt();
+      const initialMessage = await loadDefaultAgentWithPrompt({ bid_id: bidId });
       if (initialMessage) {
         // Replace activation message with actual welcome message
         setPendingWelcomeMessage(initialMessage);
@@ -1248,7 +1254,7 @@ const Home: React.FC = () => {
     } catch (error) {
       console.error('❌ Error preparing new session:', error);
       // Ensure we still have some UI state even if loading fails
-      const initialMessage = await loadDefaultAgentWithPrompt();
+      const initialMessage = await loadDefaultAgentWithPrompt({ bid_id: bidId });
       if (initialMessage) {
         setPendingWelcomeMessage(initialMessage);
         setMessages([initialMessage]);

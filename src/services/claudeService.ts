@@ -688,20 +688,32 @@ export class ClaudeService {
       email?: string;
       full_name?: string;
       role?: string;
+    },
+    urlContext?: {
+      bid_id?: string | null;
     }
   ): Promise<string> {
     console.log('🎭 Processing initial prompt for agent:', agent.name);
     console.log('🎭 Initial prompt preview:', agent.initial_prompt?.substring(0, 100) + '...');
     console.log('🎭 Session ID:', sessionId);
     console.log('🎭 User profile:', userProfile ? 'Present' : 'None');
+    console.log('🎭 URL context:', urlContext);
     
     try {
       // Use the edge function with processInitialPrompt flag
       console.log('🎭 Calling edge function with processInitialPrompt=true');
       // 🎯 IMPORTANT: processInitialPrompt MUST use streaming because edge function forces streaming
       // when processInitialPrompt=true to enable activation notices and memory search
+      
+      // Embed URL context (bid_id) in the initial prompt if available
+      let promptWithContext = agent.initial_prompt || 'Hello! How can I help you today?';
+      if (urlContext?.bid_id) {
+        promptWithContext = `[URL Context: bid_id=${urlContext.bid_id}]\n\n${promptWithContext}`;
+        console.log('🎭 Embedded bid_id in initial prompt:', urlContext.bid_id);
+      }
+      
       const response = await this.generateResponseViaEdgeFunction(
-        agent.initial_prompt || 'Hello! How can I help you today?',
+        promptWithContext,
         agent,
         [], // No conversation history for initial prompts
         sessionId,

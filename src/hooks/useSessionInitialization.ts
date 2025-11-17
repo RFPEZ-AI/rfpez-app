@@ -18,6 +18,7 @@ interface UseSessionInitializationParams {
   currentRfpId: number | null | undefined;
   artifacts: Artifact[];
   needsSessionRestore: string | null | undefined; // Tri-state: undefined = not checked, null = no session, string = session ID
+  urlContext?: { bid_id?: string | null }; // URL context for initial agent prompt
   
   setMessages: (messages: Message[]) => void;
   setArtifacts: (artifacts: Artifact[]) => void;
@@ -27,7 +28,7 @@ interface UseSessionInitializationParams {
   clearUIState: () => void;
   clearArtifacts: () => void;
   loadUserSessions: (() => Promise<void>) | null;
-  loadDefaultAgentWithPrompt: () => Promise<Message | null>;
+  loadDefaultAgentWithPrompt: (urlContext?: { bid_id?: string | null }) => Promise<Message | null>;
   handleSelectSession: (sessionId: string) => Promise<void>;
   handleSetCurrentRfp: (rfpId: number, rfpData?: RFP, setAsGlobal?: boolean) => Promise<void>;
   
@@ -54,6 +55,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
     currentRfpId,
     artifacts,
     needsSessionRestore,
+    urlContext,
     setMessages,
     setArtifacts,
     setIsCreatingNewSession,
@@ -86,7 +88,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       }]);
       
       // Load the default agent and replace loading message with welcome
-      loadDefaultAgentWithPrompt().then((welcomeMessage) => {
+      loadDefaultAgentWithPrompt(urlContext).then((welcomeMessage) => {
         if (welcomeMessage) {
           console.log('✅ Default agent loaded, showing welcome message');
           setMessages([welcomeMessage]);
@@ -118,7 +120,7 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       }]);
       
       // Load the default agent and replace loading message with welcome
-      loadDefaultAgentWithPrompt().then((welcomeMessage) => {
+      loadDefaultAgentWithPrompt(urlContext).then((welcomeMessage) => {
         if (welcomeMessage) {
           console.log('✅ Default agent loaded, showing welcome message');
           setMessages([welcomeMessage]);
