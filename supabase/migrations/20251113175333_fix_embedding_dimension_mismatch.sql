@@ -2,22 +2,25 @@
 -- Voyage AI voyage-2 model generates 1024-dimensional embeddings
 -- This was causing embeddings to fail silently when storing
 
+-- Ensure pgvector extension is available
+CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+
 -- Step 1: Drop the existing index (it references the old column type)
 DROP INDEX IF EXISTS idx_account_memories_embedding;
 
 -- Step 2: Alter the embedding column to use 1024 dimensions
 ALTER TABLE account_memories
-ALTER COLUMN embedding TYPE vector(1024);
+ALTER COLUMN embedding TYPE extensions.vector(1024);
 
 -- Step 3: Recreate the HNSW index with the correct dimension
 CREATE INDEX idx_account_memories_embedding ON account_memories 
 USING hnsw (embedding vector_cosine_ops);
 
 -- Step 4: Update the match_account_memories function to use correct dimension
-DROP FUNCTION IF EXISTS match_account_memories(vector(768), uuid, text, double precision, int);
+DROP FUNCTION IF EXISTS match_account_memories(extensions.vector(768), uuid, text, double precision, int);
 
 CREATE OR REPLACE FUNCTION match_account_memories(
-  query_embedding vector(1024),
+  query_embedding extensions.vector(1024),
   filter_account_id uuid,
   filter_memory_type text,
   match_threshold double precision DEFAULT 0.7,
