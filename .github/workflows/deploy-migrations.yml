@@ -16,8 +16,20 @@ jobs:
     # Secrets configured in GitHub repository settings (Settings → Secrets → Actions)
     # Required secrets:
     #   - SUPABASE_DB_URL: Full database connection string
-    #     Format: postgresql://postgres.[project-ref]:[password]@aws-0-[region].pooler.supabase.com:5432/postgres
+    #     
+    #     TWO OPTIONS (try Session mode pooler first, then Transaction mode if that fails):
+    #     
+    #     OPTION 1 (RECOMMENDED): Session mode pooler - Use port 5432
+    #     Format: postgresql://postgres.jxlutaztoukwbbgtoulc:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres
+    #     
+    #     OPTION 2: Transaction mode pooler - Use port 6543
+    #     Format: postgresql://postgres.jxlutaztoukwbbgtoulc:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
+    #     
     #     Get from: Supabase Dashboard → Settings → Database → Connection string (URI)
+    #     Make sure to:
+    #     1. Replace [YOUR-PASSWORD] with actual database password
+    #     2. Use the correct pooler URL (not direct connection)
+    #     3. Include the project reference in username: postgres.jxlutaztoukwbbgtoulc
     env:
       SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
 
@@ -52,6 +64,26 @@ jobs:
         run: |
           echo "Deploying migrations to production..."
           echo "Using direct database URL connection (bypasses pooler connection issues)"
+          
+          # Debug: Show connection string format (hide password)
+          echo "Connection string format check:"
+          echo "$SUPABASE_DB_URL" | sed 's/:[^@]*@/:***@/g'
+          
+          # Alternative approach: Create supabase config to enable --linked flag
+          # This can be more reliable than --db-url
+          mkdir -p supabase
+          cat > supabase/config.toml << EOF
+          [db]
+          port = 5432
+          
+          [api]
+          enabled = true
+          port = 54321
+          
+          [studio]
+          enabled = true
+          port = 54323
+          EOF
           
           # Use supabase db push with direct database URL
           # This approach is more reliable for CI/CD than using 'supabase link'
