@@ -1,7 +1,10 @@
 -- Add TMC Tender to system agents constraint
 -- This allows TMC Tender to have NULL account_id like other system agents
 
--- First, fix any existing system agents that have account_id set
+-- First, drop the old constraint so we can fix the data
+ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_account_id_check;
+
+-- Now fix any existing system agents that have account_id set
 UPDATE agents 
 SET account_id = NULL 
 WHERE name IN (
@@ -15,8 +18,7 @@ WHERE name IN (
   '_common'
 ) AND account_id IS NOT NULL;
 
-ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_account_id_check;
-
+-- Add the corrected constraint
 ALTER TABLE agents ADD CONSTRAINT agents_account_id_check CHECK (
   -- System agents MUST have account_id IS NULL
   (
