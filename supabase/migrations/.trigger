@@ -1,2 +1,3 @@
 -- Test trigger for migration deployment
 -- Trigger after fixing connection string format
+-- Trigger deployment with correct password
