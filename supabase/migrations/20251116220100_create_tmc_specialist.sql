@@ -6,8 +6,11 @@
 DO $$
 DECLARE
   demo_account_id UUID;
-  rfp_design_id UUID := '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+  rfp_design_id UUID;
 BEGIN
+  -- Get RFP Design agent ID by name
+  SELECT id INTO rfp_design_id FROM agents WHERE name = 'RFP Design';
+  
   -- Try to get an existing account, or use a fixed demo UUID
   SELECT id INTO demo_account_id FROM accounts LIMIT 1;
   
