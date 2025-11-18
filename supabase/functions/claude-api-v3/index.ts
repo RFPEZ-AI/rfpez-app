@@ -80,6 +80,7 @@ if (typeof globalThis.process === 'undefined') {
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { handleOptionsRequest, handlePostRequest } from './handlers/http.ts';
+import { clearAgentCache, getCacheStats, invalidateAgentCache } from './utils/agent-inheritance.ts';
 
 // Main entry point for the edge function
 const handler = async (request: Request): Promise<Response> => {
@@ -93,6 +94,73 @@ const handler = async (request: Request): Promise<Response> => {
     if (request.method === 'OPTIONS') {
       console.log('Handling OPTIONS request for CORS');
       return handleOptionsRequest();
+    }
+    
+    // Handle GET requests - Cache management endpoints
+    if (request.method === 'GET') {
+      const pathname = url.pathname;
+      
+      // Cache stats endpoint
+      if (pathname.endsWith('/cache/stats')) {
+        console.log('📊 Handling cache stats request');
+        const stats = getCacheStats();
+        return new Response(
+          JSON.stringify({
+            success: true,
+            cache: stats,
+            timestamp: new Date().toISOString()
+          }),
+          {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*'
+            }
+          }
+        );
+      }
+      
+      // Cache flush endpoint
+      if (pathname.endsWith('/cache/flush')) {
+        console.log('🗑️ Handling cache flush request');
+        const agentId = url.searchParams.get('agentId');
+        
+        if (agentId) {
+          // Invalidate specific agent cache
+          invalidateAgentCache(agentId);
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: `Cache invalidated for agent: ${agentId}`,
+              timestamp: new Date().toISOString()
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+              }
+            }
+          );
+        } else {
+          // Clear entire agent cache
+          clearAgentCache();
+          return new Response(
+            JSON.stringify({
+              success: true,
+              message: 'All agent caches cleared',
+              timestamp: new Date().toISOString()
+            }),
+            {
+              status: 200,
+              headers: {
+                'Content-Type': 'application/json',
+                'Access-Control-Allow-Origin': '*'
+              }
+            }
+          );
+        }
+      }
     }
     
     // Handle POST requests

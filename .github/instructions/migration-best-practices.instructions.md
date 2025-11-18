@@ -225,6 +225,7 @@ Before committing a migration, verify:
 - [ ] System agent constraints allow NULL for custom agents
 - [ ] NOT EXISTS checks for INSERT statements
 - [ ] Test migration locally with `supabase migration up`
+- [ ] Flush agent cache after applying migration (if updating agent instructions)
 - [ ] Test migration on copy of remote data (if possible)
 
 ## Documentation for Developers
@@ -236,7 +237,34 @@ When creating migrations:
 3. **Wrap in DO Blocks**: For multi-step operations with variables
 4. **Validate Lookups**: Check for NULL and raise exceptions
 5. **Test Locally First**: Apply migration to local DB before pushing
-6. **Handle Idempotency**: Use IF NOT EXISTS, ON CONFLICT, etc.
+6. **Flush Agent Cache**: After updating agent instructions, flush cache to reload immediately
+7. **Handle Idempotency**: Use IF NOT EXISTS, ON CONFLICT, etc.
+
+### Cache Flush After Agent Updates
+
+When migrations update agent instructions, the edge function caches agents for 5 minutes. To force immediate reload:
+
+```bash
+# Local environment
+curl http://127.0.0.1:54321/functions/v1/claude-api-v3/cache/flush
+
+# Production environment
+curl https://jxlutaztoukwbbgtoulc.supabase.co/functions/v1/claude-api-v3/cache/flush
+
+# Flush specific agent only
+curl "http://127.0.0.1:54321/functions/v1/claude-api-v3/cache/flush?agentId=<uuid>"
+
+# Check cache status
+curl http://127.0.0.1:54321/functions/v1/claude-api-v3/cache/stats
+```
+
+**Why This Matters:**
+- Agent instructions are cached for 5 minutes for performance
+- Without flushing, updated instructions won't be visible until cache expires
+- This is especially important during development and testing
+- Always flush after applying migrations that update agents table
+
+See [Cache Management API Documentation](../../DOCUMENTATION/CACHE-MANAGEMENT-API.md) for details.
 
 ## Common Pitfalls
 

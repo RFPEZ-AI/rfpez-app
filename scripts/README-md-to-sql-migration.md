@@ -117,6 +117,11 @@ supabase db push
 
 # Or apply specific migration
 supabase db remote commit
+
+# Flush agent cache to load updated instructions immediately
+curl http://127.0.0.1:54321/functions/v1/claude-api-v3/cache/flush
+# Or for remote:
+# curl https://jxlutaztoukwbbgtoulc.supabase.co/functions/v1/claude-api-v3/cache/flush
 ```
 
 ## Troubleshooting
@@ -158,12 +163,20 @@ node scripts/md-to-sql-migration.js "Agent Instructions/RFP Design Agent.md"
 
 # 3. Test locally
 supabase migration up
-npm start  # Test in browser
 
-# 4. Deploy to remote
+# 4. Flush local cache to reload agent instructions
+curl http://127.0.0.1:54321/functions/v1/claude-api-v3/cache/flush
+
+# 5. Test in browser
+npm start
+
+# 6. Deploy to remote
 supabase db push
 
-# 5. Verify in production
+# 7. Flush remote cache
+curl https://jxlutaztoukwbbgtoulc.supabase.co/functions/v1/claude-api-v3/cache/flush
+
+# 8. Verify in production
 # Check agent behavior in remote environment
 ```
 
@@ -196,11 +209,17 @@ node scripts/md-to-sql-migration.js "$AGENT" && \
 # Step 2: Apply locally
 supabase migration up && \
 
-# Step 3: Test (manual)
+# Step 3: Flush local cache
+curl -s http://127.0.0.1:54321/functions/v1/claude-api-v3/cache/flush && \
+
+# Step 4: Test (manual)
 echo "Test agent in browser, then press Enter to continue..." && read && \
 
-# Step 4: Deploy
-supabase db push
+# Step 5: Deploy to remote
+supabase db push && \
+
+# Step 6: Flush remote cache
+curl -s https://jxlutaztoukwbbgtoulc.supabase.co/functions/v1/claude-api-v3/cache/flush
 ```
 
 ## Output Example

@@ -334,11 +334,13 @@ async function streamWithRecursiveTools(
     }
     
     // Build messages with tool results
+    // 🎯 CRITICAL FIX: Use pendingToolCalls (the actual tool_use blocks) instead of response.toolCalls
+    // toolResults array was already built correctly with matching tool_use_id values
     const messagesWithToolResults = [
       ...messages,
       {
         role: 'assistant' as const,
-        content: response.toolCalls.map((tc: unknown) => ({
+        content: pendingToolCalls.map((tc: unknown) => ({
           type: 'tool_use' as const,
           id: (tc as Record<string, unknown>).id as string,
           name: (tc as Record<string, unknown>).name as string,
@@ -347,11 +349,7 @@ async function streamWithRecursiveTools(
       },
       {
         role: 'user' as const,
-        content: toolResults.map((result: unknown, index: number) => ({
-          type: 'tool_result' as const,
-          tool_use_id: response.toolCalls[index]?.id || `tool_${index}`,
-          content: typeof result === 'string' ? result : JSON.stringify(result)
-        }))
+        content: toolResults  // Use the already-built toolResults array with correct tool_use_id
       }
     ];
     

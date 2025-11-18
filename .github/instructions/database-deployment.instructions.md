@@ -223,6 +223,24 @@ SELECT name,
 FROM agents 
 WHERE name = 'RFP Design'
 ORDER BY updated_at DESC;"
+
+# Expected output shows updated timestamp and instruction length
+```
+
+**4a. Flush Agent Cache (Critical for Remote Deployment)**
+```bash
+# After deploying agent instruction updates to remote, flush the cache to force immediate reload
+# The edge function caches agent instructions for 5 minutes - flush ensures updates are visible
+
+# Option 1: Flush specific agent cache
+curl -X GET "https://jxlutaztoukwbbgtoulc.supabase.co/functions/v1/claude-api-v3/cache/flush?agentId=AGENT_UUID"
+
+# Option 2: Flush all agent caches (if multiple agents updated)
+curl -X GET "https://jxlutaztoukwbbgtoulc.supabase.co/functions/v1/claude-api-v3/cache/flush"
+
+# Verify cache is cleared
+curl -X GET "https://jxlutaztoukwbbgtoulc.supabase.co/functions/v1/claude-api-v3/cache/stats"
+# Expected: {"success":true,"cache":{"size":0,"entries":[]}}
 ```
 
 **5. Deploy to Remote**
