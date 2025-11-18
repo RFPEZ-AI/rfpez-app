@@ -1,1 +1,2 @@
 -- Test trigger for migration deployment
+-- Trigger after fixing connection string format
