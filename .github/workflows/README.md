@@ -209,3 +209,4 @@ Add to main README.md:
 **Last Updated:** October 14, 2025  
 **Maintained By:** Development Team
 # Test trigger for migration deployment
+# Trigger deployment with URL-encoded password
