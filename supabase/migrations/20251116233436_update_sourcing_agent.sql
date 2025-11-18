@@ -2,10 +2,17 @@
 -- Generated on 2025-11-16T23:34:36.950Z
 -- Source: Agent Instructions/Sourcing.md
 
+DO $$
+DECLARE
+  common_agent_id UUID;
+BEGIN
+  -- Get _common agent ID by name
+  SELECT id INTO common_agent_id FROM agents WHERE name = '_common';
+
 -- Update Sourcing agent
 UPDATE agents 
 SET 
-  parent_agent_id = '9bcfab80-08e5-424f-8ab9-86b91c3bae00', -- _common
+  parent_agent_id = common_agent_id,
   instructions = $sourcing_20251116233436$## Name: Sourcing
 **Database ID**: `021c53a9-8f7f-4112-9ad6-bc86003fadf7`
 **Parent Agent ID**: `9bcfab80-08e5-424f-8ab9-86b91c3bae00` (_common)
@@ -739,6 +746,7 @@ Keep your response professional, action-oriented, and under 100 words.$sourcing_
   is_abstract = false,
   updated_at = NOW()
 WHERE id = '021c53a9-8f7f-4112-9ad6-bc86003fadf7';
+END $$;
 
 -- Verify update
 SELECT 

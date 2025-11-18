@@ -2,6 +2,13 @@
 -- Generated on 2025-11-16T22:23:01.985Z
 -- Source: Agent Instructions/RFP Design.md
 
+DO $$
+DECLARE
+  common_agent_id UUID;
+BEGIN
+  -- Get _common agent ID by name
+  SELECT id INTO common_agent_id FROM agents WHERE name = '_common';
+
 -- Update RFP Design agent
 UPDATE agents 
 SET 
@@ -508,11 +515,12 @@ Keep your response warm, professional, and action-oriented. Under 100 words.$rfp
   role = 'design',
   avatar_url = '/assets/avatars/rfp-designer.svg',
   access = ARRAY['create_and_set_rfp, set_current_rfp, get_current_rfp', 'create_form_artifact, update_form_data, get_form_schema, update_form_artifact', 'create_document_artifact, list_artifacts, select_active_artifact', 'submit_bid, get_rfp_bids, update_bid_status', '**perplexity_research, perplexity_reason** (Extended Perplexity research capabilities)']::text[],
-  parent_agent_id = '9bcfab80-08e5-424f-8ab9-86b91c3bae00',
+  parent_agent_id = common_agent_id,
   is_abstract = false,
   access_override = false,
   updated_at = NOW()
 WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+END $$;
 
 -- Verify update
 SELECT 
