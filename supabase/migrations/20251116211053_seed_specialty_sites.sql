@@ -50,11 +50,11 @@ BEGIN
   SELECT id INTO home_site_id FROM public.specialty_sites WHERE slug = 'home';
   SELECT id INTO tmc_site_id FROM public.specialty_sites WHERE slug = 'tmc';
   
-  -- Get agent IDs (using known UUIDs from current database)
-  SELECT id INTO solutions_agent_id FROM public.agents WHERE id = '4fe117af-da1d-410c-bcf4-929012d8a673';
-  SELECT id INTO rfp_design_agent_id FROM public.agents WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
-  SELECT id INTO support_agent_id FROM public.agents WHERE id = 'f47ac10b-58cc-4372-a567-0e02b2c3d479';
-  SELECT id INTO sourcing_agent_id FROM public.agents WHERE id = '021c53a9-8f7f-4112-9ad6-bc86003fadf7';
+  -- Get agent IDs by name (works across different database instances)
+  SELECT id INTO solutions_agent_id FROM public.agents WHERE name = 'Solutions';
+  SELECT id INTO rfp_design_agent_id FROM public.agents WHERE name = 'RFP Design';
+  SELECT id INTO support_agent_id FROM public.agents WHERE name = 'Support';
+  SELECT id INTO sourcing_agent_id FROM public.agents WHERE name = 'Sourcing';
   
   -- Assign agents to HOME specialty site (all current agents)
   INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
