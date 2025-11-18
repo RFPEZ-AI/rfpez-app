@@ -2,6 +2,18 @@
 -- Generated on 2025-11-17T00:35:30.312Z
 -- Source: Agent Instructions/Respond Agent.md
 
+-- Wrap in DO block to get _common agent ID dynamically
+DO $$
+DECLARE
+  common_agent_id UUID;
+BEGIN
+  -- Get the _common agent ID
+  SELECT id INTO common_agent_id FROM agents WHERE name = '_common';
+  
+  IF common_agent_id IS NULL THEN
+    RAISE EXCEPTION '_common agent not found - ensure it is created before inserting Respond agent';
+  END IF;
+
 -- Insert Respond agent (new agent for supplier bid responses)
 INSERT INTO agents (
   id,
@@ -24,7 +36,7 @@ SELECT
   $respond_20251117003530$Specialized agent for helping suppliers respond to RFP bid requests. Manages bid response workflows, stores previous proposals in knowledge base for reuse, tracks RFP response status, and guides suppliers through creating competitive, compliant bid submissions.$respond_20251117003530$,
   $respond_20251117003530$## Name: Respond
 **Database ID**: `e06c2eb5-5da8-4ceb-8843-e8cd4b2e43b2`
-**Parent Agent ID**: `9bcfab80-08e5-424f-8ab9-86b91c3bae00` (_common)
+**Parent Agent ID**: (looked up dynamically from _common)
 **Is Abstract**: `false`
 **Specialty**: `respond`
 **Role**: `respond`
@@ -450,13 +462,15 @@ Welcome! I help suppliers create winning RFP responses.
 ```$respond_20251117003530$,
   '/assets/avatars/respond-agent.svg',
   ARRAY['Memory: create_memory, search_memories', 'Conversation: get_conversation_history, store_message, search_messages', 'Agent switching: get_available_agents, get_current_agent, switch_agent, recommend_agent', 'Perplexity: perplexity_search, perplexity_ask', 'RFP management: get_current_rfp, set_current_rfp, list_rfps', 'Artifacts: list_artifacts, select_active_artifact, create_document_artifact, create_form_artifact, update_form_data', 'Perplexity research: perplexity_research, perplexity_reason']::text[],
-  '9bcfab80-08e5-424f-8ab9-86b91c3bae00'::uuid,
+  common_agent_id,  -- Use dynamically looked up _common agent ID
   false,
   'respond',
   NULL
 WHERE NOT EXISTS (
   SELECT 1 FROM agents WHERE id = 'e06c2eb5-5da8-4ceb-8843-e8cd4b2e43b2'
 );
+
+END $$;
 
 -- Verify insertion
 SELECT 
