@@ -1,9 +1,19 @@
 -- Update TMC Specialist Agent Instructions
 -- Generated on 2025-11-17T00:11:58.876Z
 -- Source: Agent Instructions/TMC Specialist.md
+-- Parent: RFP Design (looked up dynamically)
 
--- Update TMC Specialist agent
-UPDATE agents 
+DO $$
+DECLARE rfp_design_agent_id UUID;
+BEGIN
+  -- Look up RFP Design agent ID dynamically
+  SELECT id INTO rfp_design_agent_id FROM agents WHERE name = 'RFP Design';
+  IF rfp_design_agent_id IS NULL THEN
+    RAISE EXCEPTION 'RFP Design agent not found - ensure it exists before updating TMC Specialist';
+  END IF;
+
+  -- Update TMC Specialist agent
+  UPDATE agents 
 SET 
   instructions = $tmc_specialist_20251117001158$## Name: TMC Specialist
 **Database ID**: `d6e83135-2b2d-47b7-91a0-5a3e138e7eb0`
@@ -317,12 +327,14 @@ $tmc_specialist_20251117001158$,
   description = $tmc_specialist_20251117001158$Specialized agent for creating RFPs to procure Travel Management Company (TMC) services. Inherits comprehensive RFP design capabilities from RFP Design agent and adds TMC-specific expertise for corporate travel programs, booking platforms, expense management, and travel policy compliance.$tmc_specialist_20251117001158$,
   role = 'design',
   avatar_url = '/assets/avatars/tmc-specialist.svg',
-  parent_agent_id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc',
+  parent_agent_id = rfp_design_agent_id,  -- Use dynamically looked up RFP Design agent ID
   is_abstract = false,
   access_override = false,
   specialty = 'tmc',
   updated_at = NOW()
 WHERE id = 'd6e83135-2b2d-47b7-91a0-5a3e138e7eb0';
+
+END $$;
 
 -- Verify update
 SELECT 

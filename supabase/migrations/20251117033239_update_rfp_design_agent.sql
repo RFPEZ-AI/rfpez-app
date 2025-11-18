@@ -1,9 +1,19 @@
 -- Update RFP Design Agent Instructions
 -- Generated on 2025-11-17T03:32:39.067Z
 -- Source: Agent Instructions/RFP Design.md
+-- Parent: _common (looked up dynamically)
 
--- Update RFP Design agent
-UPDATE agents 
+DO $$
+DECLARE common_agent_id UUID;
+BEGIN
+  -- Look up _common agent ID dynamically
+  SELECT id INTO common_agent_id FROM agents WHERE name = '_common';
+  IF common_agent_id IS NULL THEN
+    RAISE EXCEPTION '_common agent not found - ensure it exists before updating RFP Design';
+  END IF;
+
+  -- Update RFP Design agent
+  UPDATE agents 
 SET 
   instructions = $rfp_design_20251117033239$## Name: RFP Design
 **Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
@@ -412,12 +422,14 @@ Keep your response warm, professional, and action-oriented. Under 100 words.$rfp
   role = 'design',
   avatar_url = '/assets/avatars/rfp-designer.svg',
   access = ARRAY['create_and_set_rfp, set_current_rfp, get_current_rfp', 'create_form_artifact, update_form_data, get_form_schema, update_form_artifact', 'create_document_artifact, list_artifacts, select_active_artifact', 'submit_bid, get_rfp_bids, update_bid_status', '**perplexity_research, perplexity_reason** (Extended Perplexity research capabilities)']::text[],
-  parent_agent_id = '9bcfab80-08e5-424f-8ab9-86b91c3bae00',
+  parent_agent_id = common_agent_id,  -- Use dynamically looked up _common agent ID
   is_abstract = false,
   access_override = false,
   response_specialty = 'respond',
   updated_at = NOW()
 WHERE id = '8c5f11cb-1395-4d67-821b-89dd58f0c8dc';
+
+END $$;
 
 -- Verify update
 SELECT 

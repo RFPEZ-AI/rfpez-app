@@ -1,9 +1,19 @@
 -- Update Sourcing Agent Instructions
 -- Generated on 2025-11-17T03:08:16.806Z
 -- Source: Agent Instructions/Sourcing.md
+-- Parent: _common (looked up dynamically)
 
--- Update Sourcing agent
-UPDATE agents 
+DO $$
+DECLARE common_agent_id UUID;
+BEGIN
+  -- Look up _common agent ID dynamically
+  SELECT id INTO common_agent_id FROM agents WHERE name = '_common';
+  IF common_agent_id IS NULL THEN
+    RAISE EXCEPTION '_common agent not found - ensure it exists before updating Sourcing';
+  END IF;
+
+  -- Update Sourcing agent
+  UPDATE agents 
 SET 
   instructions = $sourcing_20251117030816$## Name: Sourcing
 **Database ID**: `021c53a9-8f7f-4112-9ad6-bc86003fadf7`
@@ -904,11 +914,13 @@ Keep your response professional, action-oriented, and under 100 words.$sourcing_
   role = 'sourcing',
   avatar_url = '/assets/avatars/sourcing-agent.svg',
   access = ARRAY['get_current_rfp, set_current_rfp', 'list_artifacts, select_active_artifact', 'create_document_artifact, create_form_artifact, update_form_data', '**manage_vendor_selection** (NEW: Vendor List CRUD operations - ⚠️ **USE THIS, NOT list_artifacts, for vendor selection queries!**)', 'send_email, search_emails, list_recent_emails', '**perplexity_research, perplexity_reason** (Advanced web research for vendor discovery)', 'Memory: create_memory, search_memories', 'Conversation: get_conversation_history, store_message, search_messages', 'Agent switching: get_available_agents, get_current_agent, switch_agent, recommend_agent', 'Perplexity: perplexity_search, perplexity_ask']::text[],
-  parent_agent_id = '9bcfab80-08e5-424f-8ab9-86b91c3bae00',
+  parent_agent_id = common_agent_id,  -- Use dynamically looked up _common agent ID
   is_abstract = false,
   response_specialty = 'respond',
   updated_at = NOW()
 WHERE id = '021c53a9-8f7f-4112-9ad6-bc86003fadf7';
+
+END $$;
 
 -- Verify update
 SELECT 
