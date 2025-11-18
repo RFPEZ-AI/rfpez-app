@@ -18,6 +18,7 @@ WHERE name IN (
 ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_account_id_check;
 
 ALTER TABLE agents ADD CONSTRAINT agents_account_id_check CHECK (
+  -- System agents MUST have account_id IS NULL
   (
     name = ANY (ARRAY[
       'Solutions'::text,
@@ -29,8 +30,10 @@ ALTER TABLE agents ADD CONSTRAINT agents_account_id_check CHECK (
       'TMC Tender'::text,
       '_common'::text
     ])
-  ) AND account_id IS NULL
+    AND account_id IS NULL
+  )
   OR
+  -- Non-system agents can have any account_id value (NULL or NOT NULL)
   (
     name <> ALL (ARRAY[
       'Solutions'::text,
@@ -42,5 +45,5 @@ ALTER TABLE agents ADD CONSTRAINT agents_account_id_check CHECK (
       'TMC Tender'::text,
       '_common'::text
     ])
-  ) AND account_id IS NOT NULL
+  )
 );
