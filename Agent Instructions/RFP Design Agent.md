@@ -1,8 +1,7 @@
 ## Name: RFP Design
-**Database ID**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc`
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/rfp-designer.svg`
-**Parent Agent**: `9bcfab80-08e5-424f-8ab9-86b91c3bae00` (_common)
+**Parent Agent Name**: `_common`
 **Is Abstract**: `false`
 **Access Override**: `false`
 **Response specialty**: `respond`
