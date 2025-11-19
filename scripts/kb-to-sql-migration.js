@@ -4,13 +4,18 @@
 /**
  * CLI Tool: Convert Knowledge Base Markdown to SQL Migration
  * 
- * Usage: node scripts/kb-to-sql-migration.js "scripts/rfp-design-knowledge-base.md" [agent-id]
+ * Usage: node scripts/kb-to-sql-migration.js "scripts/rfp-design-knowledge-base.md" [agent-name]
  * 
  * This tool:
  * 1. Reads a knowledge base markdown file
  * 2. Parses knowledge entries with metadata
  * 3. Generates a SQL migration to insert knowledge memories
  * 4. Saves the migration to supabase/migrations/
+ * 
+ * Agent parameter can be:
+ * - Agent name: "RFP Design" (preferred - will look up UUID)
+ * - Agent UUID: "8c5f11cb-..." (legacy support)
+ * - Omit for global knowledge (no agent association)
  */
 
 const fs = require('fs');
@@ -114,10 +119,18 @@ function escapeSQL(text, delimiter) {
   return `$${delimiter}$${text}$${delimiter}$`;
 }
 
-function generateMigration(entries, kbName, agentId = null) {
+function generateMigration(entries, kbName, agentIdentifier = null) {
   // Generate timestamp in Supabase format
   const timestamp = new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14);
   const kbSlug = kbName.toLowerCase().replace(/\s+/g, '_').replace(/[^a-z0-9_]/g, '');
+  
+  // Determine if agentIdentifier is a UUID or name
+  const isUUID = agentIdentifier && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentIdentifier);
+  const agentLookup = agentIdentifier 
+    ? (isUUID 
+      ? `'${agentIdentifier}'::uuid` 
+      : `(SELECT id FROM agents WHERE name = '${agentIdentifier}' LIMIT 1)`)
+    : null;
   
   // Get unique delimiter for all content
   const allContent = entries.map(e => e.content);
@@ -153,7 +166,7 @@ INSERT INTO account_memories (
   metadata
 )
 SELECT 
-  ${agentId ? `(SELECT id FROM accounts LIMIT 1)` : `(SELECT id FROM accounts LIMIT 1)`},
+  ${agentLookup || `(SELECT id FROM accounts LIMIT 1)`},
   NULL, -- System knowledge (no specific user)
   '${entry.type}',
   ${escapeSQL(entry.content, delimiter)},
@@ -172,6 +185,7 @@ WHERE NOT EXISTS (
 -- Generated on ${new Date().toISOString()}
 -- Source: ${kbName}.md
 -- Entries: ${entries.length}
+${agentIdentifier ? `-- Agent: ${agentIdentifier}${isUUID ? ' (UUID)' : ' (name lookup)'}` : '-- Global knowledge (no agent association)'}
 
 -- Insert knowledge base entries
 ${insertStatements.join('\n\n')}
@@ -212,6 +226,7 @@ function main() {
     log('\n❌ Error: No markdown file specified', 'red');
     log('\nUsage:', 'yellow');
     log('  node scripts/kb-to-sql-migration.js "scripts/rfp-design-knowledge-base.md"', 'yellow');
+    log('  node scripts/kb-to-sql-migration.js "scripts/rfp-design-knowledge-base.md" "RFP Design"', 'yellow');
     log('  node scripts/kb-to-sql-migration.js "scripts/rfp-design-knowledge-base.md" agent-uuid', 'yellow');
     log('\nAvailable knowledge base files:', 'cyan');
     
@@ -225,7 +240,7 @@ function main() {
   }
   
   const mdPath = path.join(__dirname, '..', args[0]);
-  const agentId = args[1] || null;
+  const agentIdentifier = args[1] || null;
   
   if (!fs.existsSync(mdPath)) {
     log(`\n❌ Error: File not found: ${args[0]}`, 'red');
@@ -233,8 +248,11 @@ function main() {
   }
   
   log(`\n📖 Reading: ${args[0]}`, 'blue');
-  if (agentId) {
-    log(`   Agent ID: ${agentId}`, 'blue');
+  if (agentIdentifier) {
+    const isUUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(agentIdentifier);
+    log(`   Agent: ${agentIdentifier} ${isUUID ? '(UUID)' : '(name - will lookup UUID)'}`, 'blue');
+  } else {
+    log(`   Agent: Global knowledge (no agent association)`, 'blue');
   }
   
   // Read and parse the markdown file
@@ -263,7 +281,7 @@ function main() {
   // Generate migration SQL
   log('\n🔨 Generating SQL migration...', 'blue');
   const kbName = path.basename(args[0], '.md');
-  const { sql, timestamp, kbSlug } = generateMigration(entries, kbName, agentId);
+  const { sql, timestamp, kbSlug } = generateMigration(entries, kbName, agentIdentifier);
   
   // Save migration file
   const migrationDir = path.join(__dirname, '..', 'supabase', 'migrations');

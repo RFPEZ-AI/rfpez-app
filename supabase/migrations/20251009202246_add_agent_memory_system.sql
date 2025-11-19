@@ -3,8 +3,8 @@
 -- Provides long-term memory capabilities for RFPEZ agents using pgvector
 -- ============================================================================
 
--- Ensure pgvector extension is available
-CREATE EXTENSION IF NOT EXISTS vector WITH SCHEMA extensions;
+-- Ensure pgvector extension is available (in public schema for local, extensions for remote)
+CREATE EXTENSION IF NOT EXISTS vector;
 
 -- Agent memory entries - stores semantically searchable memory chunks
 CREATE TABLE IF NOT EXISTS public.agent_memories (
@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.agent_memories (
   )),
   
   -- Vector embedding for semantic search
-  embedding extensions.vector(384), -- gte-small model produces 384 dimensions
+  embedding vector(384), -- gte-small model produces 384 dimensions
   
   -- Metadata
   importance_score FLOAT DEFAULT 0.5 CHECK (importance_score >= 0 AND importance_score <= 1),
@@ -177,7 +177,7 @@ CREATE POLICY "System can insert memory access logs"
 CREATE OR REPLACE FUNCTION search_agent_memories(
   p_user_id UUID,
   p_agent_id UUID,
-  p_query_embedding extensions.vector(384),
+  p_query_embedding vector(384),
   p_memory_types TEXT[] DEFAULT NULL,
   p_limit INTEGER DEFAULT 10,
   p_similarity_threshold FLOAT DEFAULT 0.7

@@ -34,13 +34,13 @@ function log(message, color = 'reset') {
 function parseAgentMarkdown(content) {
   const metadata = {};
   
-  // Extract Database ID
+  // Extract Database ID (optional - for reference only, not used in WHERE clause)
   const idMatch = content.match(/\*\*Database ID\*\*:\s*`([^`]+)`/);
   if (idMatch) {
     metadata.id = idMatch[1];
   }
   
-  // Extract Name
+  // Extract Name (REQUIRED - used for WHERE clause)
   const nameMatch = content.match(/##\s*Name:\s*(.+)/);
   if (nameMatch) {
     metadata.name = nameMatch[1].trim();
@@ -86,9 +86,15 @@ function parseAgentMarkdown(content) {
     }
   }
   
-  // Extract Parent Agent (inheritance)
+  // Extract Parent Agent (inheritance) - support both UUID and name
   const parentMatch = content.match(/\*\*Parent Agent(?:\sID)?\*\*:\s*`([^`]+)`/);
-  if (parentMatch && parentMatch[1] !== 'None') {
+  const parentNameMatch = content.match(/\*\*Parent Agent Name\*\*:\s*`([^`]+)`/);
+  
+  if (parentNameMatch && parentNameMatch[1] !== 'None') {
+    // Use parent agent name for lookup
+    metadata.parent_agent_name = parentNameMatch[1];
+  } else if (parentMatch && parentMatch[1] !== 'None') {
+    // Legacy UUID format
     metadata.parent_agent_id = parentMatch[1];
   }
   
@@ -173,7 +179,11 @@ function generateMigration(metadata, agentName) {
   }
   
   // Inheritance fields
-  if (metadata.parent_agent_id !== undefined) {
+  if (metadata.parent_agent_name) {
+    // Use subquery to look up parent agent by name
+    updateFields.push(`  parent_agent_id = (SELECT id FROM agents WHERE name = '${metadata.parent_agent_name}' LIMIT 1)`);
+  } else if (metadata.parent_agent_id !== undefined) {
+    // Legacy: direct UUID reference
     updateFields.push(`  parent_agent_id = ${metadata.parent_agent_id ? `'${metadata.parent_agent_id}'` : 'NULL'}`);
   }
   if (metadata.is_abstract !== undefined) {
@@ -202,7 +212,7 @@ function generateMigration(metadata, agentName) {
 UPDATE agents 
 SET 
 ${updateFields.join(',\n')}
-WHERE id = '${metadata.id}';
+WHERE name = '${metadata.name}';
 
 -- Verify update
 SELECT 
@@ -213,7 +223,7 @@ SELECT
   LENGTH(initial_prompt) as initial_prompt_length,
   updated_at
 FROM agents 
-WHERE id = '${metadata.id}';
+WHERE name = '${metadata.name}';
 `;
   return { sql, timestamp, agentSlug };
 }
@@ -253,12 +263,6 @@ function main() {
   const content = fs.readFileSync(mdPath, 'utf8');
   const metadata = parseAgentMarkdown(content);
   
-  if (!metadata.id) {
-    log('\n❌ Error: Could not find Database ID in markdown file', 'red');
-    log('Expected format: **Database ID**: `uuid-here`', 'yellow');
-    process.exit(1);
-  }
-  
   if (!metadata.name) {
     log('\n❌ Error: Could not find agent name in markdown file', 'red');
     log('Expected format: ## Name: Agent Name', 'yellow');
@@ -267,7 +271,7 @@ function main() {
   
   log('\n✅ Parsed agent metadata:', 'green');
   log(`   Name: ${metadata.name}`, 'bright');
-  log(`   ID: ${metadata.id}`);
+  log(`   ID: ${metadata.id || 'N/A (will use name-based lookup)'}`);
   log(`   Role: ${metadata.role || 'N/A'}`);
   log(`   Description length: ${metadata.description?.length || 0} chars`);
   log(`   Initial prompt length: ${metadata.initial_prompt?.length || 0} chars`);
@@ -276,7 +280,7 @@ function main() {
   if (metadata.allowed_tools) {
     metadata.allowed_tools.forEach(tool => log(`      - ${tool}`, 'blue'));
   }
-  log(`   Parent agent: ${metadata.parent_agent_id || 'None (root agent)'}`);
+  log(`   Parent agent: ${metadata.parent_agent_name || metadata.parent_agent_id || 'None (root agent)'}`);
   log(`   Is abstract: ${metadata.is_abstract !== undefined ? metadata.is_abstract : 'N/A'}`);
   log(`   Access override: ${metadata.access_override !== undefined ? metadata.access_override : 'N/A'}`);
   log(`   Specialty: ${metadata.specialty || 'None (general purpose)'}`);

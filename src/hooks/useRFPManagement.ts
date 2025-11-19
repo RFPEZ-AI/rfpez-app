@@ -195,12 +195,13 @@ export const useRFPManagement = (
           }
         }
 
-        // Notify agent about RFP context change
-        if (onRfpContextChanged && shouldSendRFPContextChangePrompt(hasMessagesInCurrentSession || false, isUserInitiated)) {
-          const notificationPrompt = generateRFPContextChangePrompt(rfp, previousRfp || null, hasMessagesInCurrentSession || false);
-          console.log('📢 Sending RFP context change notification to agent');
-          onRfpContextChanged(notificationPrompt);
-        }
+        // Notify agent about RFP context change - DISABLED
+        // System notification messages appearing as user messages have been removed
+        // if (onRfpContextChanged && shouldSendRFPContextChangePrompt(hasMessagesInCurrentSession || false, isUserInitiated)) {
+        //   const notificationPrompt = generateRFPContextChangePrompt(rfp, previousRfp || null, hasMessagesInCurrentSession || false);
+        //   console.log('📢 Sending RFP context change notification to agent');
+        //   onRfpContextChanged(notificationPrompt);
+        // }
       } else {
         console.log('❌ DEBUG: RFP not found for id:', rfpId, '- RFPService.getById returned null/undefined');
       }
