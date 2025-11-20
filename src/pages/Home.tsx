@@ -193,9 +193,7 @@ const Home: React.FC = () => {
     globalCurrentRfpId ?? null,
     globalCurrentRfp ?? null,
     setGlobalRFPContext,
-    clearGlobalRFPContext,
-    handleRfpContextChanged,
-    messages.length > 0 // Has messages in current session
+    clearGlobalRFPContext
   );
 
   // File Knowledge Manager modal state
