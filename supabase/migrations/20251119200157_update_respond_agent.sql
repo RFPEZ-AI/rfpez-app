@@ -435,7 +435,7 @@ Welcome! I help suppliers create winning RFP responses.
   role = 'respond',
   avatar_url = '/assets/avatars/respond-agent.svg',
   access = ARRAY['Memory: create_memory, search_memories', 'Conversation: get_conversation_history, store_message, search_messages', 'Agent switching: get_available_agents, get_current_agent, switch_agent, recommend_agent', 'Perplexity: perplexity_search, perplexity_ask', 'RFP management: get_current_rfp, set_current_rfp, list_rfps', 'Artifacts: list_artifacts, select_active_artifact, create_document_artifact, create_form_artifact, update_form_data', 'Perplexity research: perplexity_research']::text[],
-  parent_agent_id = '9bcfab80-08e5-424f-8ab9-86b91c3bae00',
+  parent_agent_id = (SELECT id FROM agents WHERE name = '_common' LIMIT 1),
   is_abstract = false,
   specialty = 'respond',
   updated_at = NOW()
