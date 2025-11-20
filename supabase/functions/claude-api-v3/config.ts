@@ -17,7 +17,13 @@ export const config = {
   supabaseUrl: Deno.env.get('SUPABASE_URL') || Deno.env.get('DATABASE_URL')!,
   supabaseServiceKey: Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!,
   anthropicApiKey: Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('CLAUDE_API_KEY'),
-  supabaseAnonKey: Deno.env.get('DATABASE_ANON_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0'
+  supabaseAnonKey: Deno.env.get('DATABASE_ANON_KEY') || Deno.env.get('SUPABASE_ANON_KEY') || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0',
+  // AWS Bedrock configuration
+  useAwsBedrock: Deno.env.get('USE_AWS_BEDROCK') === 'true',
+  awsAccessKeyId: Deno.env.get('AWS_ACCESS_KEY_ID'),
+  awsSecretAccessKey: Deno.env.get('AWS_SECRET_ACCESS_KEY'),
+  awsRegion: Deno.env.get('AWS_REGION') || 'us-east-1',
+  awsBedrockModel: Deno.env.get('AWS_BEDROCK_MODEL') || 'anthropic.claude-3-5-sonnet-20241022-v2:0'
 };
 
 // Validate required environment variables
@@ -29,12 +35,20 @@ if (!config.supabaseServiceKey) {
   throw new Error('Missing DATABASE_SERVICE_ROLE_KEY or SUPABASE_SERVICE_ROLE_KEY environment variable');
 }
 
-if (!config.anthropicApiKey) {
-  throw new Error('Missing ANTHROPIC_API_KEY or CLAUDE_API_KEY environment variable');
-}
-
-if (!config.anthropicApiKey) {
-  throw new Error('Missing ANTHROPIC_API_KEY or CLAUDE_API_KEY environment variable');
+// Validate API credentials based on provider
+if (config.useAwsBedrock) {
+  if (!config.awsAccessKeyId || !config.awsSecretAccessKey) {
+    throw new Error('Missing AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY when USE_AWS_BEDROCK=true');
+  }
+  console.log('✅ Using AWS Bedrock for Claude API:', {
+    region: config.awsRegion,
+    model: config.awsBedrockModel
+  });
+} else {
+  if (!config.anthropicApiKey) {
+    throw new Error('Missing ANTHROPIC_API_KEY or CLAUDE_API_KEY environment variable');
+  }
+  console.log('✅ Using direct Anthropic API for Claude');
 }
 
 // Initialize Supabase client with timeout configurations

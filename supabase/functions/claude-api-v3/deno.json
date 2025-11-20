@@ -20,6 +20,8 @@
   },
   "imports": {
     "std/": "https://deno.land/std@0.168.0/",
-    "supabase": "https://esm.sh/@supabase/supabase-js@2"
+    "supabase": "https://esm.sh/@supabase/supabase-js@2",
+    "@aws-sdk/client-bedrock-runtime": "https://esm.sh/@aws-sdk/client-bedrock-runtime@3.682.0",
+    "@aws-sdk/credential-providers": "https://esm.sh/@aws-sdk/credential-providers@3.682.0"
   }
 }

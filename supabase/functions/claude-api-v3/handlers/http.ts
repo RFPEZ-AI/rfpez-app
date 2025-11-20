@@ -6,6 +6,8 @@
 import { corsHeaders } from '../config.ts';
 import { getAuthenticatedSupabaseClient, getUserId, validateAuthHeader } from '../auth/auth.ts';
 import { ClaudeAPIService, ToolExecutionService } from '../services/claude.ts';
+import { BedrockClaudeAPIService } from '../services/bedrock.ts';
+import { createClaudeService, UnifiedClaudeService } from '../services/factory.ts';
 import { getToolDefinitions } from '../tools/definitions.ts';
 import { buildSystemPrompt, loadAgentContext, loadUserProfile } from '../utils/system-prompt.ts';
 import { ClaudeMessage, ClaudeToolDefinition } from '../types.ts';
@@ -528,7 +530,7 @@ function handleStreamingResponse(
         // Augment messages with knowledge context BEFORE streaming starts
         const augmentedMessages = await augmentMessagesWithKnowledge(messages);
         
-        const claudeService = new ClaudeAPIService();
+        const claudeService = createClaudeService() as any;
         const toolService = new ToolExecutionService(supabase, userId, userMessage);
         
         console.log(`🧩 STREAMING: Agent object received:`, agent);
@@ -1038,7 +1040,7 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
     }
 
     // Initialize services
-    const claudeService = new ClaudeAPIService();
+    const claudeService = createClaudeService() as any;
     const toolService = new ToolExecutionService(supabase, userId, userMessage);
     
     // Get tool definitions filtered by agent role - USE agentContext not agent from request
@@ -1515,7 +1517,7 @@ export async function handleStreamingRequest(request: Request): Promise<Response
     const stream = new ReadableStream({
       async start(controller) {
         try {
-          const claudeService = new ClaudeAPIService();
+          const claudeService = createClaudeService() as any;
           const _toolService = new ToolExecutionService(supabase, userId, undefined);
           
           // 🔍 DEBUG: Log agent role and access for this streaming handler too
