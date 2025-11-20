@@ -5,7 +5,6 @@ import { RFP } from '../types/rfp';
 import { RFPFormValues } from '../components/RFPEditModal';
 import { RFPService } from '../services/rfpService';
 import DatabaseService from '../services/database';
-import { generateRFPContextChangePrompt, shouldSendRFPContextChangePrompt } from '../utils/agentNotifications';
 
 export interface RFPManagementOptions {
   currentSessionId?: string;
@@ -13,8 +12,6 @@ export interface RFPManagementOptions {
   globalCurrentRfp?: RFP | null;
   setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>;
   clearGlobalRFPContext?: () => void;
-  onRfpContextChanged?: (prompt: string) => void; // Callback to send notification to agent
-  hasMessagesInCurrentSession?: boolean; // Track if current session has messages
 }
 
 export const useRFPManagement = (
@@ -22,9 +19,7 @@ export const useRFPManagement = (
   globalCurrentRfpId?: number | null,
   globalCurrentRfp?: RFP | null,
   setGlobalRFPContext?: (rfpId: number, rfpData?: RFP) => Promise<void>,
-  clearGlobalRFPContext?: () => void,
-  onRfpContextChanged?: (prompt: string) => void,
-  hasMessagesInCurrentSession?: boolean
+  clearGlobalRFPContext?: () => void
 ) => {
   const [rfps, setRFPs] = useState<RFP[]>([]);
   const [showRFPMenu, setShowRFPMenu] = useState(false);
@@ -131,9 +126,6 @@ export const useRFPManagement = (
       sessionRfpId,
       globalRfpId: globalCurrentRfpId
     });
-    
-    // Store previous RFP for notification
-    const previousRfp = currentRfp;
     
     try {
       let rfp: RFP | null = null;
