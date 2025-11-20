@@ -149,25 +149,6 @@ const Home: React.FC = () => {
     handleShowAgentSelector
   } = useAgentManagement(currentSessionId, specialtySlug);
 
-  // Create a ref to store handleSendMessage so we can use it in handleRfpContextChanged
-  const handleSendMessageRef = useRef<((message: string, fileAttachments?: FileAttachment[]) => Promise<void>) | null>(null);
-
-  // Callback to handle RFP context change notifications to the agent
-  const handleRfpContextChanged = useCallback((prompt: string) => {
-    console.log('📢 RFP context changed, triggering Claude response:', prompt);
-    
-    // Call handleSendMessage directly to trigger Claude's response
-    // The message will have isSystemNotification metadata and be hidden from UI
-    if (handleSendMessageRef.current) {
-      // Send the notification to Claude without file attachments (system notification)
-      handleSendMessageRef.current(prompt, undefined).catch(error => {
-        console.error('Failed to send RFP context notification:', error);
-      });
-    } else {
-      console.warn('handleSendMessage not yet available, skipping RFP context notification');
-    }
-  }, []);
-
   const {
     rfps,
     showRFPMenu,
@@ -1498,11 +1479,6 @@ const Home: React.FC = () => {
       fileAttachments // Pass file attachments
     );
   };
-
-  // Store onSendMessage in ref so it can be used by handleRfpContextChanged
-  useEffect(() => {
-    handleSendMessageRef.current = onSendMessage;
-  }, [onSendMessage]);
 
   // Helper function to create system messages instead of alert popups
   const addSystemMessage = (content: string, type: 'info' | 'success' | 'warning' | 'error' = 'info') => {
