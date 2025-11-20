@@ -184,7 +184,12 @@ function generateMigration(metadata, agentName) {
     updateFields.push(`  parent_agent_id = (SELECT id FROM agents WHERE name = '${metadata.parent_agent_name}' LIMIT 1)`);
   } else if (metadata.parent_agent_id !== undefined) {
     // Legacy: direct UUID reference
-    updateFields.push(`  parent_agent_id = ${metadata.parent_agent_id ? `'${metadata.parent_agent_id}'` : 'NULL'}`);
+    // Handle NULL string from markdown as SQL NULL
+    if (metadata.parent_agent_id === 'NULL' || metadata.parent_agent_id === null) {
+      updateFields.push(`  parent_agent_id = NULL`);
+    } else {
+      updateFields.push(`  parent_agent_id = '${metadata.parent_agent_id}'`);
+    }
   }
   if (metadata.is_abstract !== undefined) {
     updateFields.push(`  is_abstract = ${metadata.is_abstract}`);

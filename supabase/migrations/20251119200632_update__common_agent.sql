@@ -286,7 +286,7 @@ $_common_20251119200632$,
   description = $_common_20251119200632$Abstract base agent containing common behaviors and capabilities shared across all RFPEZ.AI agents. This agent is not selectable by users but provides foundational functionality through inheritance.$_common_20251119200632$,
   role = 'base',
   access = ARRAY['create_memory', 'search_memories', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'get_available_agents', 'switch_agent', 'recommend_agent', 'perplexity_search', 'perplexity_ask']::text[],
-  parent_agent_id = 'NULL',
+  parent_agent_id = NULL,
   is_abstract = true,
   access_override = false,
   updated_at = NOW()
