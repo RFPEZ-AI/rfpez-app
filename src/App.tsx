@@ -109,6 +109,7 @@ const AppContent: React.FC = () => {
   return (
     <>
       <IonRouterOutlet>
+        {/* Specific routes first - must come before specialty catch-all */}
         <Route exact path="/home" component={Home} />
         <Route path="/bid/submit" component={BidSubmissionPage} />
         <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
@@ -119,9 +120,15 @@ const AppContent: React.FC = () => {
         <Route exact path="/test/agent-management" component={AgentManagementTest} />
         <Route exact path="/mcp-test" component={MCPTestComponent} />
         <Route exact path="/callback" component={Home} />
-        {/* Specialty site routes - must come before root redirect */}
-        <Route exact path="/:specialty" component={Home} />
+        {/* Root path redirect */}
         <Route exact path="/" render={() => <Redirect to="/home" />} />
+        {/* Specialty site routes - must come last as catch-all */}
+        {/* This will match any single-segment path not matched above */}
+        <Route 
+          exact 
+          path="/:specialty" 
+          component={Home}
+        />
       </IonRouterOutlet>
       <OfflineNotification />
       <PWAUpdatePrompt />

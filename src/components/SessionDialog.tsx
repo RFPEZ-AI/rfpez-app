@@ -441,11 +441,64 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
               <IonCardContent>
                 <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div>
-                    {/* Check if we have a partial message being streamed */}
-                    {messages.length > 0 && !messages[messages.length - 1].isUser && messages[messages.length - 1].content.length > 0
-                      ? `${currentAgent?.agent_name || 'AI'} Agent is responding...`
-                      : `${currentAgent?.agent_name || 'AI'} Agent is thinking...`
-                    }
+                    {/* Check for progress message first */}
+                    {(() => {
+                      const lastMessage = messages.length > 0 ? messages[messages.length - 1] : null;
+                      const progressMsg = lastMessage?.metadata?.progress_message as string | undefined;
+                      const progressData = lastMessage?.metadata?.progress_data as {
+                        toolName?: string;
+                        toolNames?: string[];
+                        toolIndex?: number;
+                        totalTools?: number;
+                        toolCount?: number;
+                        recursionDepth?: number;
+                        toolsExecutedSoFar?: number;
+                      } | undefined;
+                      
+                      if (progressMsg) {
+                        return (
+                          <>
+                            <div style={{ fontWeight: 'bold', marginBottom: '4px' }}>
+                              {currentAgent?.agent_name || 'AI'} Agent
+                            </div>
+                            <div style={{ fontSize: '0.95em' }}>
+                              {progressMsg}
+                            </div>
+                            {progressData && (
+                              <div style={{ fontSize: '0.85em', opacity: 0.7, marginTop: '4px' }}>
+                                {/* Show current tool being executed */}
+                                {progressData.toolName && (
+                                  <div>
+                                    Tool: {progressData.toolName}
+                                    {progressData.toolIndex && progressData.totalTools && 
+                                      ` (${progressData.toolIndex}/${progressData.totalTools})`}
+                                  </div>
+                                )}
+                                {/* Show list of tools in current batch */}
+                                {progressData.toolNames && progressData.toolNames.length > 0 && (
+                                  <div style={{ marginTop: '4px' }}>
+                                    Tools: {progressData.toolNames.join(', ')}
+                                  </div>
+                                )}
+                                {/* Show recursion depth */}
+                                {progressData.recursionDepth !== undefined && (
+                                  <div style={{ marginTop: '4px' }}>
+                                    Recursion depth: {progressData.recursionDepth}
+                                    {progressData.toolsExecutedSoFar !== undefined && 
+                                      ` • Total tools: ${progressData.toolsExecutedSoFar}`}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+                          </>
+                        );
+                      }
+                      
+                      // Default loading message
+                      return messages.length > 0 && !messages[messages.length - 1].isUser && messages[messages.length - 1].content.length > 0
+                        ? `${currentAgent?.agent_name || 'AI'} Agent is responding...`
+                        : `${currentAgent?.agent_name || 'AI'} Agent is thinking...`;
+                    })()}
                   </div>
                   {onCancelRequest && (
                     <button 

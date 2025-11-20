@@ -12,10 +12,24 @@ export interface ToolInvocationEvent {
   agentId?: string; // 🎯 CRITICAL: Track which agent executed this tool
 }
 
+export interface ProgressEvent {
+  type: 'progress';
+  message: string;
+  recursionDepth?: number;
+  toolCount?: number;
+  toolName?: string;
+  toolIndex?: number;
+  totalTools?: number;
+  action?: 'agent_switch' | 'tool_execution' | 'loading_agent';
+  agentName?: string;
+  timestamp: string;
+}
+
 export interface StreamingResponse {
-  type: 'text' | 'tool_invocation' | 'completion' | 'error';
+  type: 'text' | 'tool_invocation' | 'completion' | 'error' | 'progress';
   content?: string;
   toolEvent?: ToolInvocationEvent;
+  progressEvent?: ProgressEvent;
   metadata?: {
     tokenCount?: number;
     model?: string;

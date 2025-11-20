@@ -211,33 +211,12 @@ async function createVendorSelection(
     };
   }
 
-  // 🔗 CRITICAL FIX: Link artifact to session via session_artifacts junction table
-  // This is required for the UI to display artifacts in the artifact panel
-  try {
-    console.log('[VendorSelection] Linking artifact to session:', {
-      sessionId: params.session_id,
-      artifactId: artifact.id,
-      accountId
-    });
-    
-    const { error: sessionLinkError } = await supabase
-      .from('session_artifacts')
-      .insert({
-        session_id: params.session_id,
-        artifact_id: artifact.id,
-        account_id: accountId
-      });
-    
-    if (sessionLinkError) {
-      console.error('[VendorSelection] Failed to link artifact to session:', sessionLinkError);
-      // Don't throw - artifact was created successfully, this is just UI linkage
-    } else {
-      console.log('[VendorSelection] Successfully linked artifact to session');
-    }
-  } catch (sessionLinkingError) {
-    console.error('[VendorSelection] Error during session-artifact linking:', sessionLinkingError);
-    // Continue - artifact exists, just UI might not show it immediately
-  }
+  // ✅ Artifact already linked to session via session_id column in artifacts table
+  // No need for redundant session_artifacts junction table insert
+  console.log('[VendorSelection] Vendor selection artifact created and linked:', {
+    artifactId: artifact.id,
+    sessionId: params.session_id
+  });
 
   return {
     success: true,

@@ -516,6 +516,23 @@ export class ClaudeService {
                         // Pass the tool completion event to the UI
                         onChunk('', false, true, eventData.toolEvent);
                       }
+                    } else if (eventData.type === 'progress') {
+                      // 📊 Handle progress events
+                      console.log('📊 Progress event:', eventData.message);
+                      // Pass progress event to UI with special metadata
+                      onChunk('', false, false, undefined, false, {
+                        progress: true,
+                        progress_message: eventData.message,
+                        progress_data: {
+                          recursionDepth: eventData.recursionDepth,
+                          toolCount: eventData.toolCount,
+                          toolName: eventData.toolName,
+                          toolIndex: eventData.toolIndex,
+                          totalTools: eventData.totalTools,
+                          action: eventData.action,
+                          agentName: eventData.agentName
+                        }
+                      });
                     } else if (eventData.type === 'completion' || eventData.type === 'complete') {
                       console.log('✅ Stream completion detected:', eventData.type);
                       

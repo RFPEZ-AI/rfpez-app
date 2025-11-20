@@ -498,30 +498,35 @@ export class ToolExecutionService {
           // 🎯 VALIDATE ARTIFACT_ROLE: Ensure artifactRole is provided and valid
           // Tool definitions use camelCase "artifactRole" - accept that as the primary parameter
           const validDocumentRoles = [
-            'rfp_request_email',         // Primary: RFP vendor request emails (enables upsert)
-            'request_document',          // General request documents
-            'specification_document',    // Technical specifications
-            'analysis_document',         // Analysis reports
-            'report_document',           // General reports
+            'rfp_request_email',         // Primary: RFP vendor request emails (always upserts on exact match)
+            'request_document',          // General request documents (can use suffixes: request_document_X)
+            'specification_document',    // Technical specifications (can use suffixes: specification_document_X)
+            'analysis_document',         // Analysis reports (can use suffixes: analysis_document_vendor_comparison, etc.)
+            'report_document',           // General reports (can use suffixes: report_document_executive_summary, etc.)
             'template'                   // Document templates
           ];
+          
           const providedRole = (input as { artifactRole?: string }).artifactRole;
+          
+          // Allow suffixed roles (e.g., "analysis_document_cost_benefit")
+          const baseRole = validDocumentRoles.find(role => providedRole === role || providedRole?.startsWith(role + '_'));
+          const isValidRole = !!baseRole;
           
           if (!providedRole) {
             console.error('❌ CREATE_DOCUMENT_ARTIFACT ERROR: artifactRole is required');
             return {
               success: false,
               error: 'Missing artifactRole parameter',
-              message: `Document artifacts require an artifactRole parameter (camelCase). Common roles: "rfp_request_email" (for vendor requests), "request_document", "specification_document". Full list: ${validDocumentRoles.join(', ')}. Example: create_document_artifact({ ..., artifactRole: "rfp_request_email" })`
+              message: `Document artifacts require an artifactRole parameter (camelCase). Common roles: "rfp_request_email" (for vendor requests), "request_document", "specification_document". Full list: ${validDocumentRoles.join(', ')}. For multiple documents of same type, use suffixes: "analysis_document_cost_benefit", "report_document_executive_summary". Example: create_document_artifact({ ..., artifactRole: "rfp_request_email" })`
             };
           }
           
-          if (!validDocumentRoles.includes(providedRole)) {
+          if (!isValidRole) {
             console.error(`❌ CREATE_DOCUMENT_ARTIFACT ERROR: Invalid artifactRole "${providedRole}"`);
             return {
               success: false,
               error: `Invalid artifactRole: "${providedRole}"`,
-              message: `Document artifactRole must be one of: ${validDocumentRoles.join(', ')}. You provided: "${providedRole}". Note: Use "rfp_request_email" for RFP vendor request emails (enables intelligent upsert).`
+              message: `Document artifactRole must start with one of: ${validDocumentRoles.join(', ')}. You provided: "${providedRole}". For multiple documents of same type, add descriptive suffixes: "analysis_document_cost_benefit", "report_document_executive_summary". Note: "rfp_request_email" always upserts on exact match.`
             };
           }
           

@@ -395,17 +395,29 @@ export async function createFormArtifact(supabase: SupabaseClient<any, "public",
   }
   
   // Validate RFP exists
+  console.log('🔍 Validating RFP access for rfp_id:', rfp_id);
+  
+  // First check if we have auth context
+  const { data: authCheck } = await supabase.rpc('auth.uid') as { data: string | null };
+  console.log('🔐 Current auth.uid() value:', authCheck);
+  
   const { data: rfp, error: rfpError } = await supabase
     .from('rfps')
-    .select('id, name')
+    .select('id, name, account_id, is_public')
     .eq('id', rfp_id)
-    .single() as { data: { id: number; name: string } | null; error: Error | null };
+    .single() as { data: { id: number; name: string; account_id: string; is_public: boolean } | null; error: Error | null };
   
   if (rfpError || !rfp) {
+    console.error('❌ RFP validation failed:', { rfp_id, error: rfpError, rfp });
     throw new Error(`❌ Invalid RFP ID: ${rfp_id}. The specified RFP does not exist. Use get_current_rfp or create_and_set_rfp to get a valid RFP ID.`);
   }
   
-  console.log('✅ Validated RFP association:', { rfp_id, rfp_name: rfp.name });
+  console.log('✅ Validated RFP association:', { 
+    rfp_id, 
+    rfp_name: rfp.name, 
+    account_id: rfp.account_id,
+    is_public: rfp.is_public 
+  });
   
   // ✅ CRITICAL FIX: Get account_id from session (artifacts table requires it)
   const { data: sessionData, error: sessionError } = await supabase
@@ -512,9 +524,9 @@ export async function createFormArtifact(supabase: SupabaseClient<any, "public",
   // Add explicit wait to ensure database commit completes
   await new Promise(resolve => setTimeout(resolve, 100));
 
-  // ARTIFACT-RFP LINKING: Link form artifact to the provided RFP
+  // ARTIFACT-RFP LINKING: Link form artifact to the provided RFP with UPSERT logic
   try {
-    console.log('🔗 Claude API V3: Linking form artifact to RFP:', {
+    console.log('🔗 Claude API V3: Linking form artifact to RFP (with upsert):', {
       artifactId: (artifact as unknown as { id: string }).id,
       rfpId: rfp_id,
       artifactRole: mappedRole
@@ -530,18 +542,79 @@ export async function createFormArtifact(supabase: SupabaseClient<any, "public",
       rfpRole = 'evaluator';
     }
     
+    // 🎯 UPSERT LOGIC: Check if artifact_role already exists for this RFP
+    // NOTE: This checks for EXACT role match only. Different forms can have suffixes if needed.
+    if (mappedRole) {
+      const { data: existingLink, error: checkError } = await supabase
+        .from('rfp_artifacts')
+        .select('artifact_id, artifact_role, artifacts!inner(id, name)')
+        .eq('rfp_id', rfp_id)
+        .eq('artifact_role', mappedRole)
+        .maybeSingle();
+      
+      if (checkError && checkError.code !== 'PGRST116') { // Ignore "not found" errors
+        console.error('⚠️ Error checking for existing artifact_role:', checkError);
+      } else if (existingLink) {
+        const existingArtifactId = (existingLink as { artifact_id: string }).artifact_id;
+        const existingArtifactName = (existingLink as { artifacts: { name: string } }).artifacts.name;
+        
+        console.log(`🔄 Form with role "${mappedRole}" already exists for RFP ${rfp_id}. Updating existing artifact: ${existingArtifactId}`);
+        
+        // Update the existing artifact with new content
+        const { error: updateError } = await supabase
+          .from('artifacts')
+          .update({
+            name,
+            description,
+            schema,
+            ui_schema,
+            default_values,
+            submit_action,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingArtifactId);
+        
+        if (updateError) {
+          console.error('❌ Failed to update existing form artifact:', updateError);
+          throw new Error(`Failed to update existing form artifact with role "${mappedRole}": ${JSON.stringify(updateError)}`);
+        }
+        
+        console.log(`✅ Successfully updated existing form artifact: "${existingArtifactName}" (${existingArtifactId})`);
+        
+        return {
+          success: true,
+          artifact_id: existingArtifactId,
+          artifact_name: existingArtifactName,
+          message: `Updated existing form with role "${mappedRole}": ${existingArtifactName}`,
+          is_update: true,
+          artifact_role: mappedRole
+        };
+      }
+    }
+    
+    // No existing artifact found - create new link
+    console.log('📝 No existing form with this role found - creating new artifact link');
+    
     // Insert into rfp_artifacts junction table
     const { error: linkError } = await supabase
       .from('rfp_artifacts')
       .insert({
         rfp_id: rfp_id,
         artifact_id: (artifact as unknown as { id: string }).id,
-        role: rfpRole
+        role: rfpRole,
+        artifact_role: mappedRole // Include artifact_role for unique constraint
       });
     
     if (linkError) {
       console.error('⚠️ Claude API V3: Failed to link artifact to RFP:', linkError);
-      throw new Error(`Failed to link artifact to RFP: ${JSON.stringify(linkError)}`);
+      
+      // Enhanced error message for unique constraint violations
+      const errorDetails = linkError as { code?: string; message?: string; details?: string };
+      if (errorDetails.code === '23505' || errorDetails.message?.includes('unique') || errorDetails.message?.includes('duplicate')) {
+        throw new Error(`❌ DUPLICATE ROLE ERROR: An artifact with role "${mappedRole}" was just created by another process for RFP ${rfp_id}. This is a race condition. Please retry your request - the system will update the existing artifact. Database error: ${JSON.stringify(linkError)}`);
+      }
+      
+      throw new Error(`Failed to link form artifact to RFP: ${JSON.stringify(linkError)}`);
     }
     
     console.log('✅ Claude API V3: Successfully linked artifact to RFP');
@@ -550,35 +623,14 @@ export async function createFormArtifact(supabase: SupabaseClient<any, "public",
     throw linkingError;
   }
 
-  // 🔗 CRITICAL FIX: Link artifact to session via session_artifacts junction table
-  // This is required for the UI to display artifacts in the artifact panel
+  // ✅ Artifact already linked to session via session_id column in artifacts table
+  // No need for redundant session_artifacts junction table insert
   const createdArtifactId = (artifact as unknown as { id: string }).id;
-  try {
-    console.log('🔗 Linking form artifact to session:', {
-      sessionId,
-      artifactId: createdArtifactId,
-      accountId
-    });
-    
-    const { error: sessionLinkError } = await supabase
-      .from('session_artifacts')
-      .insert({
-        session_id: sessionId,
-        artifact_id: createdArtifactId,
-        account_id: accountId
-      });
-    
-    if (sessionLinkError) {
-      console.error('⚠️ Failed to link artifact to session:', sessionLinkError);
-      // Don't throw - artifact was created successfully, this is just UI linkage
-      // But log it prominently so we know there's an issue
-    } else {
-      console.log('✅ Successfully linked form artifact to session');
-    }
-  } catch (sessionLinkingError) {
-    console.error('⚠️ Error during session-artifact linking:', sessionLinkingError);
-    // Continue - artifact exists, just UI might not show it immediately
-  }
+  console.log('✅ Form artifact created and linked:', {
+    artifactId: createdArtifactId,
+    sessionId,
+    rfpId: rfp_id
+  });
 
   // Verify the artifact was actually saved by querying it back
   const { data: verification, error: verifyError } = await supabase
@@ -804,9 +856,9 @@ export async function createDocumentArtifact(supabase: SupabaseClient<any, "publ
 
   console.log('✅ Document artifact successfully inserted into database:', (artifact as unknown as { id: string }).id);
 
-  // ARTIFACT-RFP LINKING: Link document artifact to the provided RFP
+  // ARTIFACT-RFP LINKING: Link document artifact to the provided RFP with UPSERT logic
   try {
-    console.log('🔗 Claude API V3: Linking document artifact to RFP:', {
+    console.log('🔗 Claude API V3: Linking document artifact to RFP (with upsert):', {
       artifactId: (artifact as unknown as { id: string }).id,
       rfpId: rfp_id,
       artifactRole: mappedRole
@@ -820,18 +872,96 @@ export async function createDocumentArtifact(supabase: SupabaseClient<any, "publ
       rfpRole = 'evaluator';
     }
     
+    // 🎯 UPSERT LOGIC: Check if artifact_role already exists for this RFP
+    // NOTE: This checks for EXACT role match only. Suffixed roles (e.g., "analysis_document_cost_benefit")
+    // are treated as unique roles, so multiple analysis/report documents can exist per RFP.
+    if (mappedRole) {
+      const { data: existingLink, error: checkError } = await supabase
+        .from('rfp_artifacts')
+        .select('artifact_id, artifact_role, artifacts!inner(id, name)')
+        .eq('rfp_id', rfp_id)
+        .eq('artifact_role', mappedRole)
+        .maybeSingle();
+      
+      if (checkError && checkError.code !== 'PGRST116') { // Ignore "not found" errors
+        console.error('⚠️ Error checking for existing artifact_role:', checkError);
+      } else if (existingLink) {
+        const existingArtifactId = (existingLink as { artifact_id: string }).artifact_id;
+        const existingArtifactName = (existingLink as { artifacts: { name: string } }).artifacts.name;
+        
+        console.log(`🔄 Document with role "${mappedRole}" already exists for RFP ${rfp_id}. Updating existing artifact: ${existingArtifactId}`);
+        
+        // Delete the newly created artifact since we're updating the existing one
+        await supabase
+          .from('artifacts')
+          .delete()
+          .eq('id', (artifact as unknown as { id: string }).id);
+        
+        console.log(`🗑️ Deleted newly created duplicate artifact: ${(artifact as unknown as { id: string }).id}`);
+        
+        // Update the existing artifact with new content
+        const { error: updateError } = await supabase
+          .from('artifacts')
+          .update({
+            name,
+            description,
+            default_values: { content, content_type, tags },
+            processed_content: content,
+            file_size: content.length,
+            mime_type: content_type === 'html' ? 'text/html' : content_type === 'plain' ? 'text/plain' : 'text/markdown',
+            metadata: {
+              type: 'text',
+              content_type,
+              description: description || null,
+              tags: tags || [],
+              user_id: userId,
+              updated_reason: 'Regenerated document with same role'
+            },
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingArtifactId);
+        
+        if (updateError) {
+          console.error('❌ Failed to update existing document artifact:', updateError);
+          throw new Error(`Failed to update existing document artifact with role "${mappedRole}": ${JSON.stringify(updateError)}`);
+        }
+        
+        console.log(`✅ Successfully updated existing document artifact: "${existingArtifactName}" (${existingArtifactId})`);
+        
+        return {
+          success: true,
+          artifact_id: existingArtifactId,
+          artifact_name: existingArtifactName,
+          message: `Updated existing document with role "${mappedRole}": ${existingArtifactName}`,
+          is_update: true,
+          artifact_role: mappedRole
+        };
+      }
+    }
+    
+    // No existing artifact found - create new link
+    console.log('📝 No existing document with this role found - creating new artifact link');
+    
     // Insert into rfp_artifacts junction table
     const { error: linkError } = await supabase
       .from('rfp_artifacts')
       .insert({
         rfp_id: rfp_id,
         artifact_id: (artifact as unknown as { id: string }).id,
-        role: rfpRole
+        role: rfpRole,
+        artifact_role: mappedRole // Include artifact_role for unique constraint
       });
     
     if (linkError) {
       console.error('⚠️ Claude API V3: Failed to link document to RFP:', linkError);
-      throw new Error(`Failed to link document to RFP: ${JSON.stringify(linkError)}`);
+      
+      // Enhanced error message for unique constraint violations
+      const errorDetails = linkError as { code?: string; message?: string; details?: string };
+      if (errorDetails.code === '23505' || errorDetails.message?.includes('unique') || errorDetails.message?.includes('duplicate')) {
+        throw new Error(`❌ DUPLICATE ROLE ERROR: A document with role "${mappedRole}" was just created by another process for RFP ${rfp_id}. This is a race condition. Please retry your request - the system will update the existing document. Database error: ${JSON.stringify(linkError)}`);
+      }
+      
+      throw new Error(`Failed to link document artifact to RFP: ${JSON.stringify(linkError)}`);
     }
     
     console.log('✅ Claude API V3: Successfully linked document to RFP');
@@ -840,34 +970,13 @@ export async function createDocumentArtifact(supabase: SupabaseClient<any, "publ
     throw linkingError;
   }
 
-  // 🔗 CRITICAL FIX: Link artifact to session via session_artifacts junction table
-  // This is required for the UI to display artifacts in the artifact panel
+  // ✅ Artifact already linked to session via session_id column in artifacts table
+  // No need for redundant session_artifacts junction table insert
   const createdArtifactId = (artifact as unknown as { id: string }).id;
-  try {
-    console.log('🔗 Linking document artifact to session:', {
-      sessionId,
-      artifactId: createdArtifactId,
-      accountId
-    });
-    
-    const { error: sessionLinkError } = await supabase
-      .from('session_artifacts')
-      .insert({
-        session_id: sessionId,
-        artifact_id: createdArtifactId,
-        account_id: accountId
-      });
-    
-    if (sessionLinkError) {
-      console.error('⚠️ Failed to link document artifact to session:', sessionLinkError);
-      // Don't throw - artifact was created successfully, this is just UI linkage
-    } else {
-      console.log('✅ Successfully linked document artifact to session');
-    }
-  } catch (sessionLinkingError) {
-    console.error('⚠️ Error during session-artifact linking:', sessionLinkingError);
-    // Continue - artifact exists, just UI might not show it immediately
-  }
+  console.log('✅ Document artifact created and linked:', {
+    artifactId: createdArtifactId,
+    sessionId
+  });
 
   return {
     success: true,

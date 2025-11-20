@@ -73,17 +73,25 @@ export function getAuthenticatedSupabaseClient(request: Request): SupabaseClient
   }
   
   console.log('👤 User token detected, creating RLS-enabled client with JWT context');
-  // CRITICAL: Use anon key with user's JWT token to establish proper RLS context
-  // This allows auth.uid() to return the correct user ID from the JWT payload
+  // CRITICAL: Use anon key with user's JWT token in Authorization header
+  // The JWT will be verified by PostgREST and auth.uid() will be set correctly
   const supabase = createClient(supabaseUrl, config.supabaseAnonKey, {
     global: {
       headers: {
         Authorization: `Bearer ${token}`
       }
+    },
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
     }
   });
   
-  console.log('✅ Created Supabase client with user JWT for RLS context');
+  console.log('✅ Created Supabase client with user JWT for RLS context:', {
+    tokenPreview: token.substring(0, 30) + '...',
+    tokenLength: token.length,
+    anonKeyLength: config.supabaseAnonKey.length
+  });
   return supabase;
 }
 

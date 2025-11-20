@@ -676,7 +676,12 @@ export const useMessageHandling = (
         };
         
         // Add the empty AI message to the UI immediately
-        setMessages(prev => [...prev, aiMessage]);
+        // Also remove any temporary progress messages
+        setMessages(prev => {
+          // Filter out temporary progress messages
+          const filtered = prev.filter(msg => !msg.metadata?.temporary_progress);
+          return [...filtered, aiMessage];
+        });
 
         // Create streaming callback with proper UTF-8 handling and buffering
         let streamingBuffer = '';
@@ -736,6 +741,66 @@ export const useMessageHandling = (
             
             console.log('⏸️ Message complete - waiting for message_start event');
             // Don't actually complete - wait for message_start
+            return;
+          }
+          
+          // 📊 Handle progress events
+          if (metadata?.progress && metadata?.progress_message) {
+            console.log('📊 Progress event received:', {
+              message: metadata.progress_message,
+              aiMessageId,
+              progressData: metadata.progress_data
+            });
+            
+            // Update the loading message to show current progress
+            setMessages(prev => {
+              const lastMsg = prev[prev.length - 1];
+              
+              console.log('📊 Progress update check:', {
+                hasLastMsg: !!lastMsg,
+                lastMsgIsUser: lastMsg?.isUser,
+                lastMsgId: lastMsg?.id,
+                aiMessageId,
+                idsMatch: lastMsg?.id === aiMessageId
+              });
+              
+              // If we have an AI message in progress, update it
+              if (aiMessageId && lastMsg && !lastMsg.isUser) {
+                console.log('📊 Updating AI message with progress');
+                return prev.map(msg =>
+                  msg.id === aiMessageId
+                    ? {
+                        ...msg,
+                        metadata: {
+                          ...msg.metadata,
+                          progress_message: metadata.progress_message,
+                          progress_data: metadata.progress_data
+                        }
+                      }
+                    : msg
+                );
+              }
+              
+              // If no AI message exists yet, create a temporary progress message
+              if (!aiMessageId || (lastMsg && lastMsg.isUser)) {
+                console.log('📊 Creating temporary progress message');
+                const tempProgressMsg: Message = {
+                  id: `progress-${Date.now()}`,
+                  content: '',
+                  isUser: false,
+                  timestamp: new Date(),
+                  metadata: {
+                    progress_message: metadata.progress_message,
+                    progress_data: metadata.progress_data,
+                    temporary_progress: true
+                  }
+                };
+                return [...prev, tempProgressMsg];
+              }
+              
+              console.log('📊 No progress update applied');
+              return prev;
+            });
             return;
           }
           

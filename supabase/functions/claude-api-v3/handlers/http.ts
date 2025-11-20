@@ -56,6 +56,19 @@ async function streamWithRecursiveTools(
     return { fullContent, toolsUsed, executedToolResults };
   }
   
+  // 📊 Send progress update for recursion depth with tool context
+  if (recursionDepth > 0) {
+    const progressEvent = {
+      type: 'progress',
+      message: `Processing recursive tools (depth ${recursionDepth}/${MAX_RECURSION_DEPTH})...`,
+      recursionDepth,
+      toolsExecutedSoFar: toolsUsed.length,
+      timestamp: new Date().toISOString()
+    };
+    const sseData = `data: ${JSON.stringify(progressEvent)}\n\n`;
+    controller.enqueue(new TextEncoder().encode(sseData));
+  }
+  
   const pendingToolCalls: unknown[] = [];
   
   // Stream from Claude API
@@ -131,9 +144,36 @@ async function streamWithRecursiveTools(
   if (pendingToolCalls.length > 0) {
     console.log(`🔧 Executing ${pendingToolCalls.length} tools at depth ${recursionDepth}`);
     
+    // 📊 Send progress update for tool execution
+    const toolProgressEvent = {
+      type: 'progress',
+      message: `Executing ${pendingToolCalls.length} tool${pendingToolCalls.length > 1 ? 's' : ''} at depth ${recursionDepth}...`,
+      toolCount: pendingToolCalls.length,
+      toolNames: pendingToolCalls.map((tc: unknown) => isClaudeToolCall(tc) ? tc.name : 'unknown').filter(Boolean),
+      recursionDepth,
+      timestamp: new Date().toISOString()
+    };
+    const toolProgressSse = `data: ${JSON.stringify(toolProgressEvent)}\n\n`;
+    controller.enqueue(new TextEncoder().encode(toolProgressSse));
+    
     const toolResults = [];
+    let toolIndex = 0;
     for (const toolCall of pendingToolCalls) {
+      toolIndex++;
       if (!isClaudeToolCall(toolCall)) continue;
+      
+      // 📊 Send progress for individual tool
+      const toolStartProgress = {
+        type: 'progress',
+        message: `Executing tool ${toolIndex}/${pendingToolCalls.length}: ${toolCall.name}...`,
+        toolName: toolCall.name,
+        toolIndex,
+        totalTools: pendingToolCalls.length,
+        recursionDepth, // Include recursion depth in tool progress
+        timestamp: new Date().toISOString()
+      };
+      const toolStartSse = `data: ${JSON.stringify(toolStartProgress)}\n\n`;
+      controller.enqueue(new TextEncoder().encode(toolStartSse));
       
       try {
         const result = await toolService.executeTool(toolCall, sessionId, agentId);
@@ -192,6 +232,16 @@ async function streamWithRecursiveTools(
     if (agentSwitchResult && recursionDepth < MAX_RECURSION_DEPTH - 1) {
       console.log('🚀 AGENT SWITCH WITH CONTINUATION DETECTED');
       
+      // 📊 Send progress update for agent switching
+      const agentSwitchProgress = {
+        type: 'progress',
+        message: 'Switching agents...',
+        action: 'agent_switch',
+        timestamp: new Date().toISOString()
+      };
+      const agentSwitchSse = `data: ${JSON.stringify(agentSwitchProgress)}\n\n`;
+      controller.enqueue(new TextEncoder().encode(agentSwitchSse));
+      
       try {
         const switchResult = agentSwitchResult.result as Record<string, unknown>;
         const newAgentData = switchResult.new_agent as Record<string, unknown>;
@@ -243,6 +293,16 @@ async function streamWithRecursiveTools(
         controller.enqueue(
           new TextEncoder().encode(`data: ${JSON.stringify(messageCompleteEvent)}\n\n`)
         );
+        
+        // 📊 Send progress update for loading new agent
+        const loadAgentProgress = {
+          type: 'progress',
+          message: `Loading ${newAgentData?.name || 'new agent'}...`,
+          agentName: newAgentData?.name,
+          timestamp: new Date().toISOString()
+        };
+        const loadAgentSse = `data: ${JSON.stringify(loadAgentProgress)}\n\n`;
+        controller.enqueue(new TextEncoder().encode(loadAgentSse));
         
         // Get new agent context and tools - need to import necessary functions
         const { loadAgentContext } = await import('../utils/system-prompt.ts');
