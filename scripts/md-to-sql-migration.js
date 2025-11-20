@@ -94,8 +94,33 @@ function parseAgentMarkdown(content) {
     // Use parent agent name for lookup
     metadata.parent_agent_name = parentNameMatch[1];
   } else if (parentMatch && parentMatch[1] !== 'None') {
-    // Legacy UUID format
-    metadata.parent_agent_id = parentMatch[1];
+    const parentValue = parentMatch[1];
+    // Check if it's a UUID (format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx)
+    const uuidPattern = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    
+    if (uuidPattern.test(parentValue)) {
+      // It's a UUID - check if it matches known _common agent UUIDs
+      const commonAgentUUIDs = [
+        '9bcfab80-08e5-424f-8ab9-86b91c3bae00', // Remote _common UUID
+        'bd1c0dd4-e74c-4c25-acb6-f38d57473cc3'  // Local _common UUID
+      ];
+      
+      if (commonAgentUUIDs.includes(parentValue.toLowerCase())) {
+        // Use name-based lookup for _common agent to avoid UUID mismatches
+        metadata.parent_agent_name = '_common';
+      } else {
+        // Other UUID - use legacy format
+        metadata.parent_agent_id = parentValue;
+      }
+    } else {
+      // Not a UUID - might be 'NULL' or agent name
+      if (parentValue === 'NULL') {
+        metadata.parent_agent_id = 'NULL';
+      } else {
+        // Treat as agent name
+        metadata.parent_agent_name = parentValue;
+      }
+    }
   }
   
   // Extract Is Abstract flag
