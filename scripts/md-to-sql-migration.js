@@ -176,20 +176,21 @@ function generateMigration(metadata, agentName) {
   const agentSlug = agentName.toLowerCase().replace(/\s+/g, '_');
   // Unique delimiter: agent name + timestamp, sanitized
   const baseDelimiter = `${agentSlug}_${timestamp}`.replace(/[^a-zA-Z0-9_]/g, '');
-  const delimiter = getUniqueDelimiter([
-    metadata.instructions,
-    metadata.initial_prompt,
-    metadata.description
-  ], baseDelimiter);
+  
+  // Generate UNIQUE delimiters for each field to avoid conflicts in same UPDATE statement
+  const instructionsDelimiter = getUniqueDelimiter([metadata.instructions], `${baseDelimiter}_inst`);
+  const promptDelimiter = getUniqueDelimiter([metadata.initial_prompt], `${baseDelimiter}_prompt`);
+  const descDelimiter = getUniqueDelimiter([metadata.description], `${baseDelimiter}_desc`);
+  
   const updateFields = [];
   if (metadata.instructions) {
-    updateFields.push(`  instructions = ${escapeSQL(metadata.instructions, delimiter)}`);
+    updateFields.push(`  instructions = ${escapeSQL(metadata.instructions, instructionsDelimiter)}`);
   }
   if (metadata.initial_prompt) {
-    updateFields.push(`  initial_prompt = ${escapeSQL(metadata.initial_prompt, delimiter)}`);
+    updateFields.push(`  initial_prompt = ${escapeSQL(metadata.initial_prompt, promptDelimiter)}`);
   }
   if (metadata.description) {
-    updateFields.push(`  description = ${escapeSQL(metadata.description, delimiter)}`);
+    updateFields.push(`  description = ${escapeSQL(metadata.description, descDelimiter)}`);
   }
   if (metadata.role) {
     updateFields.push(`  role = '${metadata.role}'`);
@@ -198,8 +199,8 @@ function generateMigration(metadata, agentName) {
     updateFields.push(`  avatar_url = '${metadata.avatar_url}'`);
   }
   if (metadata.allowed_tools && metadata.allowed_tools.length > 0) {
-    // Store as PostgreSQL array
-    const toolsArray = `ARRAY[${metadata.allowed_tools.map(t => `'${t}'`).join(', ')}]`;
+    // Store as PostgreSQL array - properly escape single quotes in tool names
+    const toolsArray = `ARRAY[${metadata.allowed_tools.map(t => `'${t.replace(/'/g, "''")}'`).join(', ')}]`;
     updateFields.push(`  access = ${toolsArray}::text[]`);
   }
   

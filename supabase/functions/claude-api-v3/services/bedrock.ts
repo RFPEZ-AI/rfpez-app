@@ -47,6 +47,10 @@ class AWS4Signer {
     const canonicalUri = encodedPath || url.pathname;
     const canonicalQueryString = url.search.slice(1);
     
+    console.log('🔐 DEBUG: encodedPath parameter:', encodedPath);
+    console.log('🔐 DEBUG: url.pathname:', url.pathname);
+    console.log('🔐 DEBUG: Using canonicalUri:', canonicalUri);
+    
     // Sort headers
     const sortedHeaders = Object.keys(headers).sort().map(key => 
       `${key.toLowerCase()}:${headers[key].trim()}`

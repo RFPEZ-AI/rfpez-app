@@ -166,7 +166,7 @@ INSERT INTO account_memories (
   metadata
 )
 SELECT 
-  ${agentLookup || `(SELECT id FROM accounts LIMIT 1)`},
+  NULL, -- Global knowledge (not account-specific)
   NULL, -- System knowledge (no specific user)
   '${entry.type}',
   ${escapeSQL(entry.content, delimiter)},
