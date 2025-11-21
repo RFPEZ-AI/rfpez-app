@@ -54,10 +54,17 @@ jobs:
           echo "Deploying migrations to production..."
           echo "Using Supabase Management API (bypasses database pooler completely)"
           
-          # Push migrations directly using Management API
-          # No need to link first - db push with --project-ref uses Management API
-          # This completely avoids the connection pooler that was timing out
-          supabase db push --project-ref jxlutaztoukwbbgtoulc
+          # Create minimal config.toml to link the project
+          # This allows db push to work without actually connecting during link
+          mkdir -p .supabase
+          cat > .supabase/config.toml << EOF
+          [project]
+          project_id = "jxlutaztoukwbbgtoulc"
+          EOF
+          
+          # Now push migrations - this will use the Management API
+          # Since we have SUPABASE_ACCESS_TOKEN, it won't try to connect via pooler
+          supabase db push --linked
           
           echo "✅ Migrations deployed successfully!"
 
