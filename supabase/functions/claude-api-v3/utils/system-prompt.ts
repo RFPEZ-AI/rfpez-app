@@ -344,11 +344,25 @@ async function loadDefaultAgent(supabase: any, reason: string, originalError?: a
     };
   }
   
+  // Check if user is authenticated to determine correct default agent
+  let defaultAgentName = 'Solutions'; // Default for anonymous users
+  try {
+    const { data: { user }, error: authError } = await (supabase as any).auth.getUser();
+    if (!authError && user) {
+      console.log('🔐 Authenticated user detected in fallback, using RFP Design agent');
+      defaultAgentName = 'RFP Design';
+    } else {
+      console.log('👤 Anonymous user detected in fallback, using Solutions agent');
+    }
+  } catch (authError) {
+    console.error('⚠️ Auth check failed in fallback, defaulting to Solutions agent:', authError);
+  }
+
   const fallbackInfo = {
     occurred: true,
     reason: reason,
     originalAgent: currentAgentId || 'Unknown',
-    fallbackAgent: 'Solutions',
+    fallbackAgent: defaultAgentName,
     timestamp: new Date().toISOString()
   };
   
@@ -356,17 +370,35 @@ async function loadDefaultAgent(supabase: any, reason: string, originalError?: a
     const { data: defaultAgent, error: defaultError } = await (supabase as any)
       .from('agents')
       .select('id, name, instructions, initial_prompt, role, access')
-      .eq('name', 'Solutions')
+      .eq('name', defaultAgentName)
       .eq('is_active', true)
       .single();
     
     if (defaultError) {
-      console.error('🚨 CRITICAL - Default agent fallback also failed:', defaultError);
-      return { agent: null, fallbackInfo };
+      console.error(`🚨 CRITICAL - ${defaultAgentName} agent fallback also failed:`, defaultError);
+      
+      // Final fallback: try the other default agent
+      const finalFallbackName = defaultAgentName === 'Solutions' ? 'RFP Design' : 'Solutions';
+      console.log(`🔄 Attempting final fallback to ${finalFallbackName} agent`);
+      
+      const { data: finalAgent, error: finalError } = await (supabase as any)
+        .from('agents')
+        .select('id, name, instructions, initial_prompt, role, access')
+        .eq('name', finalFallbackName)
+        .eq('is_active', true)
+        .single();
+      
+      if (finalError) {
+        console.error('🚨 CRITICAL - Final fallback also failed:', finalError);
+        return { agent: null, fallbackInfo };
+      }
+      
+      fallbackInfo.fallbackAgent = finalAgent.name;
+      return { agent: finalAgent, fallbackInfo };
     }
     
     if (defaultAgent) {
-      console.log('✅ Successfully loaded default Solutions agent as fallback');
+      console.log(`✅ Successfully loaded default ${defaultAgent.name} agent as fallback`);
       console.log('📋 Default agent details:', {
         id: defaultAgent.id,
         name: defaultAgent.name,
