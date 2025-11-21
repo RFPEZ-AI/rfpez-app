@@ -50,19 +50,12 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
     console.log('🎯 specialtySlug:', specialtySlug);
     console.log('🎯 urlContext:', urlContext);
     try {
-      // Get default agent based on specialty site context
-      let defaultAgent: Agent | null = null;
-      
-      if (specialtySlug) {
-        // Load default agent for specialty site (including 'home')
-        console.log('🎯 Loading default agent for specialty site:', specialtySlug);
-        const { SpecialtySiteService } = await import('../services/specialtySiteService');
-        defaultAgent = await SpecialtySiteService.getDefaultAgentForSpecialtySite(specialtySlug);
-      } else {
-        // Fallback to global default agent if no specialty context
-        console.log('🎯 Loading global default agent (no specialty context)');
-        defaultAgent = await AgentService.getDefaultAgent();
-      }
+      // Get default agent based on authentication state (ALWAYS check auth first)
+      // AgentService.getDefaultAgent() checks if user is authenticated and returns:
+      // - RFP Design for authenticated users (is_free=true)
+      // - Solutions for anonymous users (is_default=true)
+      console.log('🎯 Loading authentication-aware default agent');
+      const defaultAgent: Agent | null = await AgentService.getDefaultAgent();
       
       console.log('🎯 loadDefaultAgentWithPrompt: Default agent fetched:', defaultAgent?.name);
       
