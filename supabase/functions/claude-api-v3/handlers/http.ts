@@ -786,6 +786,9 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     const agentContext = await loadAgentContext(supabase, sessionId, agentIdForContext);
     const loadedUserProfile = await loadUserProfile(supabase);
     
+    // Define effectiveAgentId early for use in automatic knowledge retrieval
+    const effectiveAgentId = agentId || agent?.id;
+    
     // 🎯 INITIAL PROMPT PROCESSING: If processInitialPrompt flag is set, use initial_prompt instructions to generate welcome
     let effectiveUserMessage = userMessage;
     let effectiveConversationHistory = conversationHistory;
@@ -972,9 +975,6 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
         console.log('✅ Knowledge context injected into user message');
       }
     }
-    
-    // Use agentId from payload, or extract from agent object
-    const effectiveAgentId = agentId || agent?.id;
     
     // 🔍 BROWSER vs API DEBUG: Compare agent sources
     console.log('🔍🔍🔍 AGENT CONTEXT DEBUG 🔍🔍🔍');
