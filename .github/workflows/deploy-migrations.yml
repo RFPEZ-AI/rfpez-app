@@ -15,23 +15,12 @@ jobs:
     
     # Secrets configured in GitHub repository settings (Settings → Secrets → Actions)
     # Required secrets:
-    #   - SUPABASE_DB_URL: Full database connection string
-    #     
-    #     TWO OPTIONS (try Session mode pooler first, then Transaction mode if that fails):
-    #     
-    #     OPTION 1 (RECOMMENDED): Session mode pooler - Use port 5432
-    #     Format: postgresql://postgres.jxlutaztoukwbbgtoulc:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres
-    #     
-    #     OPTION 2: Transaction mode pooler - Use port 6543
-    #     Format: postgresql://postgres.jxlutaztoukwbbgtoulc:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:6543/postgres
-    #     
-    #     Get from: Supabase Dashboard → Settings → Database → Connection string (URI)
-    #     Make sure to:
-    #     1. Replace [YOUR-PASSWORD] with actual database password
-    #     2. Use the correct pooler URL (not direct connection)
-    #     3. Include the project reference in username: postgres.jxlutaztoukwbbgtoulc
+    #   - SUPABASE_ACCESS_TOKEN: Personal access token from Supabase Dashboard
+    #     Get from: https://supabase.com/dashboard/account/tokens
+    #   - SUPABASE_DB_PASSWORD: Database password (optional, for verification only)
     env:
-      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
 
     steps:
       - name: Checkout code
@@ -63,35 +52,16 @@ jobs:
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Using direct database URL connection (bypasses pooler connection issues)"
+          echo "Using Supabase Management API (more reliable than direct DB connection)"
           
-          # Debug: Show connection string format (hide password)
-          echo "Connection string format check:"
-          echo "$SUPABASE_DB_URL" | sed 's/:[^@]*@/:***@/g'
+          # Link to remote project using Management API
+          # This avoids connection pooler timeout issues
+          supabase link --project-ref jxlutaztoukwbbgtoulc
           
-          # Alternative approach: Create supabase config to enable --linked flag
-          # This can be more reliable than --db-url
-          mkdir -p supabase
-          cat > supabase/config.toml << EOF
-          [db]
-          port = 5432
+          # Push migrations using Management API
+          supabase db push --linked
           
-          [api]
-          enabled = true
-          port = 54321
-          
-          [studio]
-          enabled = true
-          port = 54323
-          EOF
-          
-          # Use supabase db push with direct database URL
-          # This approach is more reliable for CI/CD than using 'supabase link'
-          # The --db-url flag accepts a percent-encoded PostgreSQL connection string
-          # --include-all: Push all pending migrations
-          yes | supabase db push --db-url "$SUPABASE_DB_URL" --include-all
-          
-          echo "Migrations deployed successfully!"
+          echo "✅ Migrations deployed successfully!"
 
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
