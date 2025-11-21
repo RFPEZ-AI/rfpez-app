@@ -39,9 +39,12 @@ class AWS4Signer {
     method: string,
     url: URL,
     headers: Record<string, string>,
-    payload: string
+    payload: string,
+    encodedPath?: string
   ): Promise<string> {
-    const canonicalUri = url.pathname;
+    // AWS Signature V4 expects URL-encoded colons (%3A) in the canonical string
+    // Use provided encodedPath if available, otherwise use url.pathname
+    const canonicalUri = encodedPath || url.pathname;
     const canonicalQueryString = url.search.slice(1);
     
     // Sort headers
@@ -102,19 +105,20 @@ class AWS4Signer {
     method: string,
     url: URL,
     headers: Record<string, string>,
-    payload: string
+    payload: string,
+    encodedPath?: string
   ): Promise<Record<string, string>> {
     const timestamp = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
     const dateStamp = timestamp.slice(0, 8);
     
     // Add required headers
-    const signedHeaders = {
+    const signedHeaders: Record<string, string> = {
       ...headers,
       'host': url.host,
       'x-amz-date': timestamp,
     };
     
-    const canonicalRequest = await this.createCanonicalRequest(method, url, signedHeaders, payload);
+    const canonicalRequest = await this.createCanonicalRequest(method, url, signedHeaders, payload, encodedPath);
     const stringToSign = await this.createStringToSign(timestamp, canonicalRequest);
     const signature = await this.calculateSignature(stringToSign, timestamp);
     
@@ -334,11 +338,14 @@ export class BedrockClaudeAPIService {
     const payload = JSON.stringify(requestBody);
 
     // Construct Bedrock streaming endpoint URL
-    const url = new URL(
-      `https://bedrock-runtime.${this.region}.amazonaws.com/model/${this.model}/invoke-with-response-stream`
-    );
+    // AWS Signature V4 requires colons in model IDs to be URL-encoded (%3A) in the canonical string
+    // URL constructor normalizes paths and decodes %3A back to :, so we keep encoded path separate
+    const encodedPath = `/model/${this.model.replace(/:/g, '%3A')}/invoke-with-response-stream`;
+    const host = `bedrock-runtime.${this.region}.amazonaws.com`;
+    // Use unencoded model for URL construction (URL will be used for fetch)
+    const url = new URL(`https://${host}/model/${this.model}/invoke-with-response-stream`);
 
-    // Sign the request
+    // Sign the request with encoded path for canonical string
     const headers = await this.signer.signRequest(
       'POST',
       url,
@@ -346,7 +353,8 @@ export class BedrockClaudeAPIService {
         'Content-Type': 'application/json',
         'Accept': 'application/vnd.amazon.eventstream'
       },
-      payload
+      payload,
+      encodedPath
     );
 
     const response = await fetch(url.toString(), {
