@@ -176,17 +176,22 @@ export class AgentService {
    * For anonymous users: returns Solutions agent (marked as is_default)
    */
   static async getDefaultAgent(): Promise<Agent | null> {
-    console.log('AgentService.getDefaultAgent called');
+    console.log('🎯 AgentService.getDefaultAgent called');
     
     // Check if user is authenticated
-    const { data: { user } } = await supabase.auth.getUser();
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
     const isAuthenticated = !!user;
     
-    console.log('User authentication status:', isAuthenticated ? 'authenticated' : 'anonymous');
+    console.log('🔐 User authentication check:', {
+      isAuthenticated,
+      userId: user?.id,
+      userEmail: user?.email,
+      authError: authError?.message
+    });
     
     // For authenticated users, return RFP Design agent
     if (isAuthenticated) {
-      console.log('Fetching RFP Design agent for authenticated user');
+      console.log('✅ User IS authenticated - fetching RFP Design agent');
       const { data: rfpAgent, error: rfpError } = await supabase
         .from('agents')
         .select('*')
@@ -195,16 +200,22 @@ export class AgentService {
         .single();
       
       if (rfpError) {
-        console.error('Error fetching RFP Design agent:', rfpError);
+        console.error('❌ Error fetching RFP Design agent:', rfpError);
         // Fallback to default agent if RFP Design not found
       } else if (rfpAgent) {
-        console.log('RFP Design agent fetched for authenticated user:', rfpAgent);
+        console.log('✅ RFP Design agent fetched successfully:', {
+          id: rfpAgent.id,
+          name: rfpAgent.name,
+          role: rfpAgent.role
+        });
         return rfpAgent;
       }
+    } else {
+      console.log('👤 User is ANONYMOUS - will fetch Solutions agent');
     }
     
     // For anonymous users or if RFP Design agent not found, return Solutions agent (is_default=true)
-    console.log('Fetching default agent (Solutions) for anonymous user or as fallback');
+    console.log('📋 Fetching default agent (Solutions) for anonymous user or as fallback');
     const { data, error } = await supabase
       .from('agents')
       .select('*')
