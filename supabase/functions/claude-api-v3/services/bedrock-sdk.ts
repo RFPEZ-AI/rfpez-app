@@ -39,13 +39,16 @@ export class BedrockClaudeAPIService {
   ) {
     this.model = model;
     
-    // Initialize AWS SDK client with credentials
+    // Initialize AWS SDK client with explicit credentials
+    // Disable automatic credential chain that tries to read from filesystem
     this.client = new BedrockRuntimeClient({
       region,
       credentials: {
         accessKeyId,
         secretAccessKey,
       },
+      // Use standard defaults mode to prevent filesystem access attempts
+      defaultsMode: 'standard',
     });
   }
 

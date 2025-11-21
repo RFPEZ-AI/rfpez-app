@@ -21,6 +21,11 @@ if (typeof globalThis.process === 'undefined') {
     console.warn('[Init] Could not pre-populate env vars:', e);
   }
   
+  // ⚠️ CRITICAL: Disable AWS SDK credential chain filesystem access
+  // Prevents "fs.readFile is not implemented" errors in Deno edge runtime
+  envObj['AWS_SDK_LOAD_CONFIG'] = '0';  // Disable loading from ~/.aws/config
+  envObj['AWS_PROFILE'] = 'none';  // Prevent profile-based credential loading
+  
   // @ts-ignore: Deno Deploy environment compatibility - process global required for Node.js libraries
   globalThis.process = {
     env: new Proxy(envObj, {
