@@ -52,19 +52,15 @@ jobs:
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Using Supabase Management API (bypasses database pooler completely)"
+          echo "Using direct database connection (bypassing pooler timeout)"
           
-          # Create minimal config.toml to link the project
-          # This allows db push to work without actually connecting during link
-          mkdir -p .supabase
-          cat > .supabase/config.toml << EOF
-          [project]
-          project_id = "jxlutaztoukwbbgtoulc"
-          EOF
+          # Use direct database connection instead of pooler
+          # Format: postgresql://postgres.PROJECT_REF:PASSWORD@db.PROJECT_REF.supabase.co:5432/postgres
+          # This avoids the aws-1-us-east-2.pooler.supabase.com timeout issue
+          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${SUPABASE_DB_PASSWORD}@db.jxlutaztoukwbbgtoulc.supabase.co:5432/postgres"
           
-          # Now push migrations - this will use the Management API
-          # Since we have SUPABASE_ACCESS_TOKEN, it won't try to connect via pooler
-          supabase db push --linked
+          # Push migrations using direct connection
+          supabase db push --db-url "$DB_URL"
           
           echo "✅ Migrations deployed successfully!"
 
