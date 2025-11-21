@@ -52,17 +52,17 @@ jobs:
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Using pooler connection with extended timeout"
+          echo "Using pooler connection with transaction mode"
           
           # URL-encode the password for connection string
           PASSWORD_ENCODED=$(printf '%s' "$SUPABASE_DB_PASSWORD" | jq -sRr @uri)
           
-          # Use pooler with extended timeout settings
-          # connect_timeout=60 (60 seconds instead of default 20)
-          # keepalives=1, keepalives_idle=30 (keep connection alive)
-          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-1-us-east-2.pooler.supabase.com:5432/postgres?connect_timeout=60&keepalives=1&keepalives_idle=30&sslmode=require"
+          # Use pooler in transaction mode (pgbouncer=true) to avoid max clients limit
+          # Transaction mode allows more concurrent connections than session mode
+          # connect_timeout=60, keepalives for stability
+          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-1-us-east-2.pooler.supabase.com:5432/postgres?pgbouncer=true&connect_timeout=60&keepalives=1&keepalives_idle=30"
           
-          # Push migrations using pooler with extended timeout
+          # Push migrations using pooler in transaction mode
           supabase db push --db-url "$DB_URL"
           
           echo "✅ Migrations deployed successfully!"
