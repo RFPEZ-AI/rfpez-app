@@ -52,15 +52,17 @@ jobs:
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Using direct database connection with IPv4-compatible port"
+          echo "Using pooler connection with extended timeout"
           
           # URL-encode the password for connection string
-          # Use port 6543 which provides IPv4 connectivity (port 5432 uses IPv6)
-          # Format: postgresql://postgres.PROJECT_REF:PASSWORD@db.PROJECT_REF.supabase.co:6543/postgres
           PASSWORD_ENCODED=$(printf '%s' "$SUPABASE_DB_PASSWORD" | jq -sRr @uri)
-          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@db.jxlutaztoukwbbgtoulc.supabase.co:6543/postgres"
           
-          # Push migrations using direct connection with IPv4 support
+          # Use pooler with extended timeout settings
+          # connect_timeout=60 (60 seconds instead of default 20)
+          # keepalives=1, keepalives_idle=30 (keep connection alive)
+          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-1-us-east-2.pooler.supabase.com:5432/postgres?connect_timeout=60&keepalives=1&keepalives_idle=30&sslmode=require"
+          
+          # Push migrations using pooler with extended timeout
           supabase db push --db-url "$DB_URL"
           
           echo "✅ Migrations deployed successfully!"
