@@ -52,16 +52,12 @@ jobs:
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Using Supabase Management API (avoids database pooler)"
+          echo "Using Supabase Management API (bypasses database pooler completely)"
           
-          # Link to remote project using Management API
-          # The --password flag is optional and only for display purposes
-          # Actual authentication uses SUPABASE_ACCESS_TOKEN
-          supabase link --project-ref jxlutaztoukwbbgtoulc --password "$SUPABASE_DB_PASSWORD" || true
-          
-          # Push migrations using Management API (bypasses pooler entirely)
-          # This uses the Management API to apply migrations, not direct DB connection
-          supabase db push
+          # Push migrations directly using Management API
+          # No need to link first - db push with --project-ref uses Management API
+          # This completely avoids the connection pooler that was timing out
+          supabase db push --project-ref jxlutaztoukwbbgtoulc
           
           echo "✅ Migrations deployed successfully!"
 
