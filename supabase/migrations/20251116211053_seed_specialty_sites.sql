@@ -56,27 +56,71 @@ BEGIN
   SELECT id INTO support_agent_id FROM public.agents WHERE name = 'Support';
   SELECT id INTO sourcing_agent_id FROM public.agents WHERE name = 'Sourcing';
   
-  -- Assign agents to HOME specialty site (all current agents)
-  INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
-  VALUES
-    (home_site_id, solutions_agent_id, TRUE, 0),      -- Solutions is default for home
-    (home_site_id, rfp_design_agent_id, FALSE, 1),    -- RFP Design
-    (home_site_id, sourcing_agent_id, FALSE, 2),      -- Sourcing
-    (home_site_id, support_agent_id, FALSE, 3)        -- Support
-  ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
-    is_default_agent = EXCLUDED.is_default_agent,
-    sort_order = EXCLUDED.sort_order;
+  -- Assign agents to HOME specialty site (only if agent exists)
+  IF solutions_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (home_site_id, solutions_agent_id, TRUE, 0)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
   
-  -- Assign agents to TMC specialty site (clone of home initially)
-  INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
-  VALUES
-    (tmc_site_id, solutions_agent_id, TRUE, 0),       -- Solutions is default for TMC too
-    (tmc_site_id, rfp_design_agent_id, FALSE, 1),     -- RFP Design
-    (tmc_site_id, sourcing_agent_id, FALSE, 2),       -- Sourcing
-    (tmc_site_id, support_agent_id, FALSE, 3)         -- Support
-  ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
-    is_default_agent = EXCLUDED.is_default_agent,
-    sort_order = EXCLUDED.sort_order;
+  IF rfp_design_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (home_site_id, rfp_design_agent_id, FALSE, 1)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
+  
+  IF sourcing_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (home_site_id, sourcing_agent_id, FALSE, 2)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
+  
+  IF support_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (home_site_id, support_agent_id, FALSE, 3)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
+  
+  -- Assign agents to TMC specialty site (only if agent exists)
+  IF solutions_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (tmc_site_id, solutions_agent_id, TRUE, 0)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
+  
+  IF rfp_design_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (tmc_site_id, rfp_design_agent_id, FALSE, 1)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
+  
+  IF sourcing_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (tmc_site_id, sourcing_agent_id, FALSE, 2)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
+  
+  IF support_agent_id IS NOT NULL THEN
+    INSERT INTO public.specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
+    VALUES (tmc_site_id, support_agent_id, FALSE, 3)
+    ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
+      is_default_agent = EXCLUDED.is_default_agent,
+      sort_order = EXCLUDED.sort_order;
+  END IF;
     
   RAISE NOTICE 'Specialty sites seeded successfully';
   RAISE NOTICE 'Home site ID: %', home_site_id;

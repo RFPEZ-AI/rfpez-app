@@ -34,13 +34,13 @@ class AWS4Signer {
     this.region = region;
   }
 
-  // Create canonical request
+  // Create canonical request - FIXED: Now accepts encodedPath parameter for AWS Signature V4
   private async createCanonicalRequest(
     method: string,
     url: URL,
     headers: Record<string, string>,
     payload: string,
-    encodedPath?: string
+    encodedPath?: string // CRITICAL: Must pass encoded path with %3A for colons
   ): Promise<string> {
     // AWS Signature V4 expects URL-encoded colons (%3A) in the canonical string
     // Use provided encodedPath if available, otherwise use url.pathname
@@ -104,8 +104,19 @@ class AWS4Signer {
     return await this.hmac(signingKey, stringToSign, 'hex');
   }
 
-  // Sign request
+  // Sign request - wrapper for backward compatibility
   async signRequest(
+    method: string,
+    url: URL,
+    headers: Record<string, string>,
+    payload: string,
+    encodedPath?: string
+  ): Promise<Record<string, string>> {
+    return this.signRequestWithPath(method, url, headers, payload, encodedPath);
+  }
+
+  // New method name to bypass Deno cache - explicit encodedPath parameter
+  async signRequestWithPath(
     method: string,
     url: URL,
     headers: Record<string, string>,
@@ -138,8 +149,8 @@ class AWS4Signer {
     return signedHeaders;
   }
 
-  // SHA256 hash
-  private async sha256(data: string): Promise<string> {
+  // SHA256 hash (public for inline signature logic)
+  async sha256(data: string): Promise<string> {
     const encoder = new TextEncoder();
     const hash = await crypto.subtle.digest('SHA-256', encoder.encode(data));
     return Array.from(new Uint8Array(hash))
@@ -147,8 +158,8 @@ class AWS4Signer {
       .join('');
   }
 
-  // HMAC
-  private async hmac(key: string | Uint8Array, data: string, format: 'hex' | 'buffer' = 'buffer'): Promise<any> {
+  // HMAC (public for inline signature logic)
+  async hmac(key: string | Uint8Array, data: string, format: 'hex' | 'buffer' = 'buffer'): Promise<any> {
     const encoder = new TextEncoder();
     const keyData = typeof key === 'string' ? encoder.encode(key) : key;
     
@@ -250,12 +261,14 @@ export class BedrockClaudeAPIService {
     const payload = JSON.stringify(requestBody);
     console.log('Bedrock API request body:', payload);
 
-    // Construct Bedrock endpoint URL
-    const url = new URL(
-      `https://bedrock-runtime.${this.region}.amazonaws.com/model/${this.model}/invoke`
-    );
+    // AWS Signature V4 requires colons in model IDs to be URL-encoded (%3A) in the canonical string
+    // URL constructor normalizes paths and decodes %3A back to :, so we keep encoded path separate
+    const encodedPath = `/model/${this.model.replace(/:/g, '%3A')}/invoke`;
+    const host = `bedrock-runtime.${this.region}.amazonaws.com`;
+    // Use unencoded model for URL construction (URL will be used for fetch)
+    const url = new URL(`https://${host}/model/${this.model}/invoke`);
 
-    // Sign the request
+    // Sign the request with encoded path for canonical string
     const headers = await this.signer.signRequest(
       'POST',
       url,
@@ -263,7 +276,8 @@ export class BedrockClaudeAPIService {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
       },
-      payload
+      payload,
+      encodedPath  // Pass encoded path for signature calculation
     );
 
     console.log('Making signed request to Bedrock...');
@@ -344,22 +358,77 @@ export class BedrockClaudeAPIService {
     // Construct Bedrock streaming endpoint URL
     // AWS Signature V4 requires colons in model IDs to be URL-encoded (%3A) in the canonical string
     // URL constructor normalizes paths and decodes %3A back to :, so we keep encoded path separate
+    // CRITICAL FIX: Inline signature logic to bypass Deno method call cache
     const encodedPath = `/model/${this.model.replace(/:/g, '%3A')}/invoke-with-response-stream`;
     const host = `bedrock-runtime.${this.region}.amazonaws.com`;
-    // Use unencoded model for URL construction (URL will be used for fetch)
     const url = new URL(`https://${host}/model/${this.model}/invoke-with-response-stream`);
 
-    // Sign the request with encoded path for canonical string
-    const headers = await this.signer.signRequest(
+    // === INLINED SIGNATURE LOGIC (bypasses Deno cache) ===
+    const timestamp = new Date().toISOString().replace(/[:-]|\.\d{3}/g, '');
+    const dateStamp = timestamp.slice(0, 8);
+    
+    // Add required headers
+    const reqHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/vnd.amazon.eventstream',
+      'host': url.host,
+      'x-amz-date': timestamp,
+    };
+    
+    // Create canonical request WITH ENCODED PATH
+    const canonicalUri = encodedPath; // USE ENCODED PATH with %3A
+    const sortedHeaders = Object.keys(reqHeaders).sort().map(key => 
+      `${key.toLowerCase()}:${reqHeaders[key].trim()}`
+    ).join('\n');
+    const signedHeaderNames = Object.keys(reqHeaders).sort().map(k => k.toLowerCase()).join(';');
+    const payloadHash = await this.signer.sha256(payload);
+    
+    console.log('🔐 INLINE DEBUG: encodedPath:', encodedPath);
+    console.log('🔐 INLINE DEBUG: canonicalUri:', canonicalUri);
+    
+    const canonicalRequest = [
       'POST',
-      url,
-      {
-        'Content-Type': 'application/json',
-        'Accept': 'application/vnd.amazon.eventstream'
-      },
-      payload,
-      encodedPath
-    );
+      canonicalUri,  // ✅ THIS HAS %3A ENCODING
+      '',  // no query string
+      sortedHeaders,
+      '',
+      signedHeaderNames,
+      payloadHash
+    ].join('\n');
+    
+    // Create string to sign
+    const credentialScope = `${dateStamp}/${this.signer['region']}/bedrock/aws4_request`;
+    const hashedCanonicalRequest = await this.signer.sha256(canonicalRequest);
+    const stringToSign = [
+      'AWS4-HMAC-SHA256',
+      timestamp,
+      credentialScope,
+      hashedCanonicalRequest
+    ].join('\n');
+    
+    console.log('🔐 INLINE: canonicalRequest length:', canonicalRequest.length);
+    console.log('🔐 INLINE: hashedCanonicalRequest:', hashedCanonicalRequest);
+    console.log('🔐 INLINE: stringToSign:', stringToSign);
+    
+    // Calculate signature
+    const secretAccessKey = this.signer['secretAccessKey'];
+    const region = this.signer['region'];
+    const dateKey = await this.signer.hmac(`AWS4${secretAccessKey}`, dateStamp);
+    const dateRegionKey = await this.signer.hmac(dateKey, region);
+    const dateRegionServiceKey = await this.signer.hmac(dateRegionKey, 'bedrock');
+    const signingKey = await this.signer.hmac(dateRegionServiceKey, 'aws4_request');
+    const signature = await this.signer.hmac(signingKey, stringToSign, 'hex');
+    
+    console.log('🔐 INLINE: calculated signature:', signature);
+    
+    reqHeaders['Authorization'] = [
+      `AWS4-HMAC-SHA256 Credential=${this.signer['accessKeyId']}/${credentialScope}`,
+      `SignedHeaders=${signedHeaderNames}`,
+      `Signature=${signature}`
+    ].join(', ');
+    
+    const headers = reqHeaders;
+    // === END INLINED SIGNATURE LOGIC ===
 
     const response = await fetch(url.toString(), {
       method: 'POST',

@@ -5,6 +5,7 @@ import { Agent, SessionActiveAgent } from '../types/database';
 import { AgentService } from '../services/agentService';
 import { DatabaseService } from '../services/database';
 import { Message } from '../types/home';
+import { supabase } from '../supabaseClient';
 
 export const useAgentManagement = (sessionId: string | null = null, specialtySlug?: string) => {
   const [currentAgent, setCurrentAgent] = useState<SessionActiveAgent | null>(null);
@@ -20,6 +21,11 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
     
     const loadAgents = async () => {
       try {
+        // Check authentication status
+        const { data: { user } } = await supabase.auth.getUser();
+        const isAuthenticated = !!user;
+        console.log('🔐 Loading agents, user authenticated:', isAuthenticated);
+        
         let loadedAgents: Agent[];
         
         if (specialtySlug && specialtySlug !== 'home') {
@@ -30,6 +36,12 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
           // Default to all active agents for home page
           console.log('🎯 Loading all active agents (home page)');
           loadedAgents = await AgentService.getAgentsForSpecialtySite('home');
+        }
+        
+        // Filter agents based on authentication status
+        if (!isAuthenticated) {
+          console.log('👤 Anonymous user - filtering to free agents only');
+          loadedAgents = loadedAgents.filter(agent => agent.is_free);
         }
         
         console.log('✅ Loaded agents:', loadedAgents.map(a => a.name).join(', '));
@@ -50,12 +62,38 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
     console.log('🎯 specialtySlug:', specialtySlug);
     console.log('🎯 urlContext:', urlContext);
     try {
-      // Get default agent based on authentication state (ALWAYS check auth first)
-      // AgentService.getDefaultAgent() checks if user is authenticated and returns:
-      // - RFP Design for authenticated users (is_free=true)
-      // - Solutions for anonymous users (is_default=true)
-      console.log('🎯 Loading authentication-aware default agent');
-      const defaultAgent: Agent | null = await AgentService.getDefaultAgent();
+      // Check authentication status
+      const { data: { user } } = await supabase.auth.getUser();
+      const isAuthenticated = !!user;
+      console.log('🔐 User authenticated:', isAuthenticated);
+      
+      // 🎯 SPECIALTY-AWARE: Get default agent for specialty site if specialty is set
+      let defaultAgent: Agent | null = null;
+      
+      if (specialtySlug && specialtySlug !== 'home') {
+        // Load default agent for this specialty site
+        console.log('🎯 Loading default agent for specialty site:', specialtySlug);
+        const { SpecialtySiteService } = await import('../services/specialtySiteService');
+        defaultAgent = await SpecialtySiteService.getDefaultAgentForSpecialtySite(specialtySlug);
+        console.log('🎯 Specialty default agent:', defaultAgent?.name, 'is_free:', defaultAgent?.is_free);
+        
+        // If default agent requires auth but user is not authenticated, find free agent
+        if (defaultAgent && !defaultAgent.is_free && !isAuthenticated) {
+          console.log('🎯 Default agent requires auth but user is anonymous, finding free agent');
+          const agents = await AgentService.getAgentsForSpecialtySite(specialtySlug);
+          const freeAgent = agents.find(a => a.is_free);
+          if (freeAgent) {
+            console.log('🎯 Using free agent for anonymous user:', freeAgent.name);
+            defaultAgent = freeAgent;
+          }
+        }
+      }
+      
+      // Fallback to general default agent if no specialty or specialty has no default
+      if (!defaultAgent) {
+        console.log('🎯 Loading general authentication-aware default agent');
+        defaultAgent = await AgentService.getDefaultAgent();
+      }
       
       console.log('🎯 loadDefaultAgentWithPrompt: Default agent fetched:', defaultAgent?.name);
       

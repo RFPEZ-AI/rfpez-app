@@ -120,9 +120,10 @@ export class SpecialtySiteService {
         is_active: row.is_active,
         is_default: row.is_default,
         sort_order: row.sort_order,
-        // Add other Agent fields with defaults
-        is_restricted: false,
-        is_free: false,
+        // Use actual values from database instead of hardcoding
+        is_restricted: row.is_restricted || false,
+        is_free: row.is_free !== undefined ? row.is_free : false,
+        role: row.role || '',
         metadata: {},
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
