@@ -52,18 +52,14 @@ jobs:
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Using pooler connection with transaction mode"
+          echo "Using Management API (no direct database connection needed)"
           
-          # URL-encode the password for connection string
-          PASSWORD_ENCODED=$(printf '%s' "$SUPABASE_DB_PASSWORD" | jq -sRr @uri)
+          # Link to remote project using access token (Management API)
+          # This approach doesn't require database password and avoids connection pooler issues
+          supabase link --project-ref jxlutaztoukwbbgtoulc
           
-          # Use pooler in transaction mode (pgbouncer=true) to avoid max clients limit
-          # Transaction mode allows more concurrent connections than session mode
-          # connect_timeout=60, keepalives for stability
-          DB_URL="postgresql://postgres.jxlutaztoukwbbgtoulc:${PASSWORD_ENCODED}@aws-1-us-east-2.pooler.supabase.com:5432/postgres?pgbouncer=true&connect_timeout=60&keepalives=1&keepalives_idle=30"
-          
-          # Push migrations using pooler in transaction mode
-          supabase db push --db-url "$DB_URL"
+          # Push migrations via Management API
+          supabase db push
           
           echo "✅ Migrations deployed successfully!"
 
