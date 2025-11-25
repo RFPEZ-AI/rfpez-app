@@ -48,7 +48,7 @@ async function streamWithRecursiveTools(
   userId?: string,
   recursionDepth = 0
 ): Promise<{ fullContent: string; toolsUsed: string[]; executedToolResults: unknown[] }> {
-  const MAX_RECURSION_DEPTH = 5;
+  const MAX_RECURSION_DEPTH = 10;
   let fullContent = '';
   const toolsUsed: string[] = [];
   const executedToolResults: unknown[] = [];

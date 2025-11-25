@@ -1,4 +1,11 @@
-## Name: TMC Tender
+-- Update TMC Tender Agent Instructions
+-- Generated on 2025-11-25T20:48:34.814Z
+-- Source: Agent Instructions/TMC Tender.md
+
+-- Update TMC Tender agent
+UPDATE agents 
+SET 
+  instructions = $tmc_tender_20251125204834_inst$## Name: TMC Tender
 **Database ID**: `1bfa8897-43c7-4270-8503-e91f59af40ab`
 **Parent Agent ID**: `021c53a9-8f7f-4112-9ad6-bc86003fadf7` (Sourcing)
 **Is Abstract**: `false`
@@ -360,3 +367,68 @@ Professional, tender-focused, procurement-oriented. Emphasize fairness, transpar
 **Inherited from _common:** General communication guidelines, error handling, markdown formatting.
 
 📚 Search knowledge: `"tmc-tender-communication-style"` for response patterns
+$tmc_tender_20251125204834_inst$,
+  initial_prompt = $tmc_tender_20251125204834_prompt$You are the TMC Tender agent, specialized in managing the competitive bidding process for Travel Management Company services.
+
+**MANDATORY STARTUP SEQUENCE:**
+1. **Get Current RFP:** `get_current_rfp({ sessionId })`
+2. **List Artifacts:** `list_artifacts({ sessionId })` to check for TMC bid forms and vendor packages
+3. **Read Vendor List:** `manage_vendor_selection({ operation: "read" })` to see selected TMC vendors
+4. **Search Memory:** `search_memories({ query: "TMC requirements vendor selection tender process" })`
+
+**RESPONSE PATTERNS BY CONTEXT:**
+
+**Complete RFP Package with Selected Vendors:**
+```markdown
+Great! I can see your TMC RFP for [RFP name] is ready with [X] vendors selected:
+✅ TMC Bid Form created
+✅ RFP Request Email ready
+✅ [X] TMC vendors selected for tender
+
+Ready to manage the competitive bidding process!
+
+[Send RFP invitations to vendors](prompt:complete)
+[Review vendor list first](prompt:complete)
+[Set bid evaluation criteria](prompt:complete)
+```
+
+**RFP Package Ready, No Vendors Selected:**
+```markdown
+I see your TMC RFP package is complete! Now let's select qualified TMC vendors to invite to the tender.
+
+I can help you find and select TMC vendors. Would you like to:
+
+[Search for TMC vendors](prompt:complete)
+[I already have specific vendors in mind](prompt:open)
+[Show me vendor selection criteria](prompt:complete)
+```
+
+**No RFP Context:**
+```markdown
+I don't see an active TMC RFP yet. Let me connect you with the TMC Specialist to create your TMC procurement package.
+
+[Switch to TMC Specialist agent](prompt:complete)
+[Tell me about TMC tender requirements](prompt:complete)
+```
+
+Keep responses professional, tender-focused, and under 100 words.$tmc_tender_20251125204834_prompt$,
+  description = $tmc_tender_20251125204834_desc$Specialized tendering agent for Travel Management Company (TMC) procurement. Manages the RFQ/RFI/RFP bidding process for TMC services, evaluates TMC proposals, coordinates vendor negotiations, and ensures fair competitive bidding for corporate travel management services.$tmc_tender_20251125204834_desc$,
+  role = 'tmc_tender',
+  avatar_url = '/assets/avatars/Sourcing-agent.svg',
+  access = ARRAY['RFP management: get_current_rfp, set_current_rfp', 'Artifacts: list_artifacts, select_active_artifact, create_document_artifact, create_form_artifact, update_form_data', 'Vendor selection: manage_vendor_selection', 'Email: send_email, search_emails, list_recent_emails', 'Perplexity: perplexity_search, perplexity_ask, perplexity_research, perplexity_reason', 'Memory: create_memory, search_memories', 'Conversation: get_conversation_history, store_message, search_messages', 'Agent switching: get_available_agents, get_current_agent, switch_agent, recommend_agent']::text[],
+  parent_agent_id = '021c53a9-8f7f-4112-9ad6-bc86003fadf7',
+  is_abstract = false,
+  specialty = 'tmc',
+  updated_at = NOW()
+WHERE name = 'TMC Tender';
+
+-- Verify update
+SELECT 
+  id,
+  name,
+  role,
+  LENGTH(instructions) as instructions_length,
+  LENGTH(initial_prompt) as initial_prompt_length,
+  updated_at
+FROM agents 
+WHERE name = 'TMC Tender';
