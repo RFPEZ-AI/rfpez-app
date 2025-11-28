@@ -27,8 +27,7 @@ interface GmailConnectionStatus {
 
 export class GmailAuthService {
   private supabase: SupabaseClient;
-  private clientId: string;
-  private redirectUri: string;
+  private apiBaseUrl: string;
 
   // OAuth scopes required for email operations
   private static readonly OAUTH_SCOPES = [
@@ -41,56 +40,28 @@ export class GmailAuthService {
 
   constructor(supabase: SupabaseClient) {
     this.supabase = supabase;
-    // Reuse existing Google OAuth credentials from authentication setup
-    this.clientId = process.env.REACT_APP_GOOGLE_CLIENT_ID || '';
-    // Redirect URI should point to the Supabase Edge Function, not the React app
-    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || '';
-    this.redirectUri = `${supabaseUrl}/functions/v1/gmail-oauth-callback`;
-
-    if (!this.clientId) {
-      console.warn('GOOGLE_CLIENT_ID not configured - Gmail integration requires Google OAuth credentials');
-    }
+    // API server base URL for OAuth endpoints
+    this.apiBaseUrl = process.env.REACT_APP_API_URL || 'http://localhost:3001';
   }
 
   /**
    * Initiate Gmail OAuth flow
    * 
-   * Constructs OAuth URL with required parameters and redirects user to Google consent screen.
-   * State parameter includes user_id and random nonce for CSRF protection.
+   * Redirects to API endpoint which constructs OAuth URL and redirects to Google consent screen.
+   * This keeps OAuth credentials secure on backend and simplifies frontend configuration.
    * 
    * @param userId - Current user's ID
-   * @throws Error if user is not authenticated or client_id not configured
+   * @throws Error if user is not authenticated
    */
   async initiateAuth(userId: string): Promise<void> {
     if (!userId) {
       throw new Error('User must be authenticated to connect Gmail');
     }
 
-    if (!this.clientId) {
-      throw new Error('Google Client ID not configured');
-    }
-
-    // Create state parameter with user_id and nonce for CSRF protection
-    const state = btoa(JSON.stringify({
-      user_id: userId,
-      nonce: Math.random().toString(36).substring(7),
-      timestamp: Date.now(),
-    }));
-
-    // Construct OAuth authorization URL
-    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
-    authUrl.searchParams.set('client_id', this.clientId);
-    authUrl.searchParams.set('redirect_uri', this.redirectUri);
-    authUrl.searchParams.set('response_type', 'code');
-    authUrl.searchParams.set('scope', GmailAuthService.OAUTH_SCOPES);
-    authUrl.searchParams.set('access_type', 'offline'); // Request refresh token
-    authUrl.searchParams.set('prompt', 'consent'); // Force consent screen to get refresh token
-    authUrl.searchParams.set('state', state);
-
     console.log('Initiating Gmail OAuth flow for user:', userId);
     
-    // Redirect to Google OAuth consent screen
-    window.location.href = authUrl.toString();
+    // Redirect to API endpoint which handles OAuth initiation
+    window.location.href = `${this.apiBaseUrl}/api/gmail-oauth/initiate?user_id=${userId}`;
   }
 
   /**
@@ -143,8 +114,8 @@ export class GmailAuthService {
   /**
    * Check if user has Gmail connected
    * 
-   * Queries database for user's Gmail credentials.
-   * Returns connection status including email, last connected date, and refresh token availability.
+   * Calls API endpoint to check if user has Gmail credentials stored.
+   * Returns connection status including email and last connected date.
    * 
    * @param userId - Current user's ID
    * @returns Connection status object
@@ -158,25 +129,23 @@ export class GmailAuthService {
     }
 
     try {
-      const { data, error } = await this.supabase
-        .from('user_email_credentials')
-        .select('email_address, updated_at, refresh_token')
-        .eq('user_id', userId)
-        .eq('provider', 'gmail')
-        .single();
-
-      if (error || !data) {
+      const response = await fetch(`${this.apiBaseUrl}/api/gmail-oauth/status?user_id=${userId}`);
+      
+      if (!response.ok) {
+        console.error('Gmail status check failed:', response.statusText);
         return {
           isConnected: false,
           hasRefreshToken: false,
         };
       }
 
+      const data = await response.json();
+
       return {
-        isConnected: true,
-        email: data.email_address,
-        lastConnected: new Date(data.updated_at),
-        hasRefreshToken: !!data.refresh_token,
+        isConnected: data.isConnected || false,
+        email: data.email,
+        lastConnected: data.lastConnected ? new Date(data.lastConnected) : undefined,
+        hasRefreshToken: data.isConnected, // If connected, assume we have refresh token
       };
     } catch (error) {
       console.error('Error checking Gmail connection:', error);

@@ -721,7 +721,7 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
   },
   {
     name: 'send_email',
-    description: 'Send an email via Gmail. CRITICAL: User must have authorized Gmail access first (check with list_recent_emails or search_emails first). Use this to send emails to suppliers, customers, or team members about RFPs, bids, or procurement activities. Always include a professional subject line and clear message body.',
+    description: 'Send an email via Gmail. CRITICAL: User must have authorized Gmail access first. If not connected, direct them to: http://localhost:3100/test/gmail-oauth to connect. Use this to send emails to suppliers, customers, or team members about RFPs, bids, or procurement activities. Always include a professional subject line and clear message body.',
     input_schema: {
       type: 'object' as const,
       properties: {

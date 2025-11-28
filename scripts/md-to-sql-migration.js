@@ -144,7 +144,7 @@ function parseAgentMarkdown(content) {
   // Extract Response Specialty
   const responseSpecialtyMatch = content.match(/\*\*Response [Ss]pecialty\*\*:\s*`([^`]+)`/);
   if (responseSpecialtyMatch && responseSpecialtyMatch[1] !== 'None') {
-    metadata.response_specialty = responseSpecialtyMatch[1];
+    metadata.specialty = responseSpecialtyMatch[1];
   }
   
   // Full content as instructions
@@ -224,14 +224,9 @@ function generateMigration(metadata, agentName) {
     updateFields.push(`  access_override = ${metadata.access_override}`);
   }
   
-  // Specialty field
+  // Specialty field (for RFP Design/Sourcing agents)
   if (metadata.specialty !== undefined) {
     updateFields.push(`  specialty = ${metadata.specialty ? `'${metadata.specialty}'` : 'NULL'}`);
-  }
-  
-  // Response Specialty field (for RFP Design/Sourcing agents)
-  if (metadata.response_specialty !== undefined) {
-    updateFields.push(`  response_specialty = ${metadata.response_specialty ? `'${metadata.response_specialty}'` : 'NULL'}`);
   }
   
   updateFields.push(`  updated_at = NOW()`);

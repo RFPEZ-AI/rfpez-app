@@ -180,7 +180,7 @@ In development mode, all emails to non-registered users are routed back to you f
       success: false,
       error: errorMessage,
       message: isAuthError 
-        ? '⚠️ Gmail not connected. User must authorize Gmail access first. Please ask them to connect Gmail in Settings.'
+        ? '⚠️ Gmail not connected. To send emails, you need to authorize Gmail access first. Please open this URL in a new tab: http://localhost:3100/test/gmail-oauth and click "Connect Gmail Account". After authorizing, return here and try sending again.'
         : `❌ Failed to send email: ${errorMessage}`
     };
   }
@@ -250,7 +250,7 @@ export async function searchEmails(
       success: false,
       error: errorMessage,
       message: isAuthError 
-        ? '⚠️ Gmail not connected. User must authorize Gmail access first.'
+        ? '⚠️ Gmail not connected. To search emails, you need to authorize Gmail access first. Please open this URL in a new tab: http://localhost:3100/test/gmail-oauth and click "Connect Gmail Account".'
         : `❌ Failed to search emails: ${errorMessage}`
     };
   }
@@ -353,7 +353,7 @@ export async function listRecentEmails(
       success: false,
       error: errorMessage,
       message: isAuthError 
-        ? '⚠️ Gmail not connected. User must authorize Gmail access first.'
+        ? '⚠️ Gmail not connected. To access your emails, you need to authorize Gmail access first. Please open this URL in a new tab: http://localhost:3100/test/gmail-oauth and click "Connect Gmail Account".'
         : `❌ Failed to list emails: ${errorMessage}`
     };
   }

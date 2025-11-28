@@ -324,6 +324,60 @@ function generateAgentResponse(prompt, context) {
   return response;
 }
 
+// Gmail OAuth Initiation Endpoint
+// Generates OAuth URL and redirects user to Google consent screen
+app.get('/api/gmail-oauth/initiate', async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    // Get OAuth config from environment
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3001/api/gmail-oauth-callback';
+
+    if (!clientId) {
+      return res.status(500).json({ error: 'OAuth not configured - missing GOOGLE_CLIENT_ID' });
+    }
+
+    // OAuth scopes for Gmail operations
+    const scopes = [
+      'https://www.googleapis.com/auth/gmail.send',
+      'https://www.googleapis.com/auth/gmail.readonly',
+      'https://www.googleapis.com/auth/gmail.modify',
+      'https://www.googleapis.com/auth/userinfo.email',
+      'https://www.googleapis.com/auth/userinfo.profile',
+    ].join(' ');
+
+    // Create state parameter with user_id and nonce for CSRF protection
+    const state = Buffer.from(JSON.stringify({
+      user_id,
+      nonce: Math.random().toString(36).substring(7),
+      timestamp: Date.now(),
+    })).toString('base64');
+
+    // Construct OAuth authorization URL
+    const authUrl = new URL('https://accounts.google.com/o/oauth2/v2/auth');
+    authUrl.searchParams.set('client_id', clientId);
+    authUrl.searchParams.set('redirect_uri', redirectUri);
+    authUrl.searchParams.set('response_type', 'code');
+    authUrl.searchParams.set('scope', scopes);
+    authUrl.searchParams.set('access_type', 'offline');
+    authUrl.searchParams.set('prompt', 'consent');
+    authUrl.searchParams.set('state', state);
+
+    console.log(`📧 Gmail OAuth initiated for user: ${user_id}`);
+    
+    // Redirect to Google OAuth consent screen
+    res.redirect(authUrl.toString());
+  } catch (error) {
+    console.error('❌ Gmail OAuth initiation error:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Gmail OAuth Callback Proxy
 // Forwards OAuth callback to Supabase edge function
 app.get('/api/gmail-oauth-callback', async (req, res) => {
@@ -339,75 +393,100 @@ app.get('/api/gmail-oauth-callback', async (req, res) => {
     console.log(`📧 Proxying Gmail OAuth callback to: ${targetUrl}`);
     
     // Forward the request to Supabase edge function
+    // Set redirect: 'manual' to capture the 302 redirect from edge function
     const response = await fetch(targetUrl, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      redirect: 'manual'
     });
     
-    const data = await response.json();
-    
-    if (response.ok) {
-      // Success - redirect to success page or close window
-      res.send(`
-        <!DOCTYPE html>
-        <html>
-        <head>
-          <title>Gmail Connected</title>
-          <style>
-            body {
-              font-family: system-ui, -apple-system, sans-serif;
-              display: flex;
-              align-items: center;
-              justify-content: center;
-              height: 100vh;
-              margin: 0;
-              background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-              color: white;
-            }
-            .success-box {
-              text-align: center;
-              background: rgba(255, 255, 255, 0.1);
-              backdrop-filter: blur(10px);
-              padding: 3rem;
-              border-radius: 20px;
-              box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
-            }
-            h1 { margin: 0 0 1rem 0; font-size: 2.5rem; }
-            p { margin: 0.5rem 0; font-size: 1.2rem; opacity: 0.9; }
-            .close-btn {
-              margin-top: 2rem;
-              padding: 0.75rem 2rem;
-              background: white;
-              color: #667eea;
-              border: none;
-              border-radius: 10px;
-              font-size: 1rem;
-              font-weight: 600;
-              cursor: pointer;
-              transition: transform 0.2s;
-            }
-            .close-btn:hover { transform: scale(1.05); }
-          </style>
-        </head>
-        <body>
-          <div class="success-box">
-            <h1>✅ Gmail Connected!</h1>
-            <p>Your Gmail account has been successfully connected.</p>
-            <p>You can now send and receive emails through agents.</p>
-            <button class="close-btn" onclick="window.close()">Close Window</button>
-          </div>
-          <script>
-            // Auto-close after 3 seconds
-            setTimeout(() => window.close(), 3000);
-          </script>
-        </body>
-        </html>
-      `);
+    // Edge function returns 302 redirect - check Location header
+    if (response.status === 302) {
+      const location = response.headers.get('location');
+      if (!location) {
+        throw new Error('Edge function returned 302 but no Location header');
+      }
+      
+      const redirectUrl = new URL(location);
+      const gmailConnected = redirectUrl.searchParams.get('gmail_connected');
+      const gmailError = redirectUrl.searchParams.get('gmail_error');
+      const email = redirectUrl.searchParams.get('email');
+      
+      // Check if it was successful or error
+      const isSuccess = gmailConnected === 'true' && email;
+      
+      if (isSuccess) {
+        // Success - show success page
+        console.log(`✅ Gmail connected successfully: ${email}`);
+        res.send(`
+          <!DOCTYPE html>
+          <html>
+          <head>
+            <title>Gmail Connected</title>
+            <style>
+              body {
+                font-family: system-ui, -apple-system, sans-serif;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                height: 100vh;
+                margin: 0;
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                color: white;
+              }
+              .success-box {
+                text-align: center;
+                background: rgba(255, 255, 255, 0.1);
+                backdrop-filter: blur(10px);
+                padding: 3rem;
+                border-radius: 20px;
+                box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+              }
+              h1 { margin: 0 0 1rem 0; font-size: 2rem; }
+              p { margin: 0.5rem 0; font-size: 1.1rem; }
+              .close-btn {
+                margin-top: 2rem;
+                padding: 0.75rem 2rem;
+                background: white;
+                color: #667eea;
+                border: none;
+                border-radius: 10px;
+                font-size: 1rem;
+                font-weight: 600;
+                cursor: pointer;
+                transition: transform 0.2s;
+              }
+              .close-btn:hover { transform: scale(1.05); }
+            </style>
+          </head>
+          <body>
+            <div class="success-box">
+              <h1>✅ Gmail Connected!</h1>
+              <p>Your Gmail account has been successfully connected.</p>
+              <p><strong>${email}</strong></p>
+              <p>You can now send and receive emails through agents.</p>
+              <button class="close-btn" onclick="window.close()">Close Window</button>
+            </div>
+            <script>
+              // Auto-close after 3 seconds
+              setTimeout(() => window.close(), 3000);
+            </script>
+          </body>
+          </html>
+        `);
+      } else {
+        // Error from edge function
+        const errorMessage = gmailError ? decodeURIComponent(gmailError) : 'Unknown error';
+        console.error(`❌ Gmail connection error: ${errorMessage}`);
+        throw new Error(errorMessage);
+      }
     } else {
-      // Error from edge function
-      throw new Error(data.error || 'Failed to connect Gmail account');
+      // Unexpected response from edge function
+      const text = await response.text();
+      console.error(`❌ Unexpected response from edge function: ${response.status} - ${text}`);
+      throw new Error(`Edge function returned unexpected status: ${response.status}`);
     }
   } catch (error) {
     console.error('❌ Gmail OAuth callback error:', error);
@@ -457,6 +536,53 @@ app.get('/api/gmail-oauth-callback', async (req, res) => {
       </body>
       </html>
     `);
+  }
+});
+
+// Gmail OAuth Status Check
+// Check if user has Gmail credentials stored
+app.get('/api/gmail-oauth/status', async (req, res) => {
+  try {
+    const { user_id } = req.query;
+
+    if (!user_id) {
+      return res.status(400).json({ error: 'user_id is required' });
+    }
+
+    // Get Supabase credentials
+    const supabaseUrl = process.env.REACT_APP_SUPABASE_URL || 'https://jxlutaztoukwbbgtoulc.supabase.co';
+    const supabaseKey = process.env.REACT_APP_SUPABASE_ANON_KEY;
+
+    if (!supabaseKey) {
+      return res.status(500).json({ error: 'Supabase not configured' });
+    }
+
+    // Query user_email_credentials table
+    const response = await fetch(`${supabaseUrl}/rest/v1/user_email_credentials?user_id=eq.${user_id}&provider=eq.gmail&select=email_address,token_expiry,created_at,updated_at`, {
+      headers: {
+        'apikey': supabaseKey,
+        'Authorization': `Bearer ${supabaseKey}`,
+      }
+    });
+
+    const data = await response.json();
+
+    if (data && data.length > 0) {
+      const credential = data[0];
+      res.json({
+        isConnected: true,
+        email: credential.email_address,
+        lastConnected: credential.updated_at,
+        tokenExpiry: credential.token_expiry,
+      });
+    } else {
+      res.json({
+        isConnected: false,
+      });
+    }
+  } catch (error) {
+    console.error('❌ Gmail status check error:', error);
+    res.status(500).json({ error: error.message });
   }
 });
 
