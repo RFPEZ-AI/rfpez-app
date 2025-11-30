@@ -218,16 +218,49 @@ const SessionDialog: React.FC<SessionDialogProps> = ({
                     <ReactMarkdown 
                       remarkPlugins={[remarkGfm]}
                       urlTransform={(url) => {
-                        // Allow our custom prompt: protocol
-                        if (url.startsWith('prompt:')) {
+                        // Allow our custom prompt: and action: protocols
+                        if (url.startsWith('prompt:') || url.startsWith('action:')) {
                           return url;
                         }
                         // Default behavior for other URLs
                         return url;
                       }}
                       components={{
-                        // Custom link renderer to handle suggested prompts
+                        // Custom link renderer to handle suggested prompts and UI actions
                         a: ({ href, children, ...props }) => {
+                          // Check if this is a UI action link (action:signup, action:login)
+                          if (href?.startsWith('action:')) {
+                            const action = href.replace('action:', '');
+                            const linkText = typeof children === 'string' 
+                              ? children 
+                              : Array.isArray(children) 
+                                ? children.join('') 
+                                : String(children);
+                            
+                            return (
+                              <a
+                                href="#"
+                                onClick={(e) => {
+                                  e.preventDefault();
+                                  console.log('🎯 Triggering action:', action);
+                                  // Dispatch custom event for HomeHeader to handle
+                                  window.dispatchEvent(new CustomEvent('auth-action', { 
+                                    detail: { action } 
+                                  }));
+                                }}
+                                style={{
+                                  color: 'var(--ion-color-primary)',
+                                  textDecoration: 'underline',
+                                  cursor: 'pointer',
+                                  fontWeight: 500
+                                }}
+                                {...props}
+                              >
+                                {linkText}
+                              </a>
+                            );
+                          }
+                          
                           // Check if this is a suggested prompt link
                           if (href?.startsWith('prompt:')) {
                             const isComplete = href === 'prompt:complete';

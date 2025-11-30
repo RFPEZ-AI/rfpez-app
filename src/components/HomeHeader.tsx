@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { IonHeader, IonToolbar, IonButtons, IonButton, IonIcon, IonModal, IonContent, IonList, IonItem, IonLabel } from '@ionic/react';
 import { documentTextOutline, personCircle, timeOutline, add, chatbubbleOutline } from 'ionicons/icons';
 import type { User } from '@supabase/supabase-js';
@@ -10,7 +10,7 @@ import MainMenu from './MainMenu';
 import AgentsMenu from './AgentsMenu';
 import GenericMenu from './GenericMenu';
 import AgentIndicator from './AgentIndicator';
-import AuthButtons from './AuthButtons';
+import AuthButtons, { AuthButtonsRef } from './AuthButtons';
 import { RoleService } from '../services/roleService';
 import { useIsMobile } from '../utils/useMediaQuery';
 import packageJson from '../../package.json';
@@ -106,6 +106,25 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
 }) => {
   const isMobile = useIsMobile();
   const [showSessionModal, setShowSessionModal] = useState(false);
+  const authButtonsRef = useRef<AuthButtonsRef>(null);
+
+  // Set up global event listener for action:signup links
+  useEffect(() => {
+    const handleActionEvent = (event: CustomEvent<{ action: string }>) => {
+      if (event.detail.action === 'signup' && authButtonsRef.current) {
+        console.log('🔐 Opening signup modal from action:signup link');
+        authButtonsRef.current.openAuthModal(true);
+      } else if (event.detail.action === 'login' && authButtonsRef.current) {
+        console.log('🔐 Opening login modal from action:login link');
+        authButtonsRef.current.openAuthModal(false);
+      }
+    };
+
+    window.addEventListener('auth-action' as any, handleActionEvent as EventListener);
+    return () => {
+      window.removeEventListener('auth-action' as any, handleActionEvent as EventListener);
+    };
+  }, []);
   
   // Get version info - use build number if available, otherwise package version
   const buildNumber = process.env.REACT_APP_BUILD_NUMBER;
@@ -353,7 +372,7 @@ const HomeHeader: React.FC<HomeHeaderProps> = ({
                 50% { transform: scale(1.1); opacity: 0.8; }
               }
             `}</style>
-            <AuthButtons />
+            <AuthButtons ref={authButtonsRef} />
           </div>
         </IonButtons>
       </IonToolbar>

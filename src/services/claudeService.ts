@@ -711,6 +711,8 @@ export class ClaudeService {
       rfp_id?: string | null;
     }
   ): Promise<string> {
+    console.error('🚨🚨🚨 processInitialPrompt FUNCTION ENTRY');
+    console.error('🚨🚨🚨 urlContext received:', JSON.stringify(urlContext));
     console.log('🎭 Processing initial prompt for agent:', agent.name);
     console.log('🎭 Initial prompt preview:', agent.initial_prompt?.substring(0, 100) + '...');
     console.log('🎭 Session ID:', sessionId);
@@ -725,9 +727,13 @@ export class ClaudeService {
       
       // Embed URL context (bid_id, rfp_id) in the initial prompt if available
       let promptWithContext = agent.initial_prompt || 'Hello! How can I help you today?';
+      console.error('🚨🚨🚨 BEFORE URL CONTEXT EMBEDDING');
+      console.error('🚨🚨🚨 urlContext?.bid_id:', urlContext?.bid_id);
+      console.error('🚨🚨🚨 agent.initial_prompt length:', agent.initial_prompt?.length);
       const contextParams: string[] = [];
       if (urlContext?.bid_id) {
         contextParams.push(`bid_id=${urlContext.bid_id}`);
+        console.error('🚨🚨🚨 EMBEDDED bid_id in initial prompt:', urlContext.bid_id);
         console.log('🎭 Embedded bid_id in initial prompt:', urlContext.bid_id);
       }
       if (urlContext?.rfp_id) {
@@ -736,6 +742,9 @@ export class ClaudeService {
       }
       if (contextParams.length > 0) {
         promptWithContext = `[URL Context: ${contextParams.join(', ')}]\n\n${promptWithContext}`;
+        console.error('🚨🚨🚨 AFTER EMBEDDING - promptWithContext first 200 chars:', promptWithContext.substring(0, 200));
+      } else {
+        console.error('🚨🚨🚨 NO URL CONTEXT TO EMBED - using plain initial_prompt');
       }
       
       const response = await this.generateResponseViaEdgeFunction(

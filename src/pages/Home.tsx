@@ -62,6 +62,16 @@ const Home: React.FC = () => {
   const bidId = urlParams.get('bid_id');
   const rfpId = urlParams.get('rfp_id');
   
+  // 🐛 DEBUG: Log URL parameter extraction
+  console.log('🔍 URL PARAMETER EXTRACTION:', {
+    fullUrl: window.location.href,
+    pathname: location.pathname,
+    search: location.search,
+    bid_id: bidId,
+    rfp_id: rfpId,
+    urlParams: Array.from(urlParams.entries())
+  });
+  
   // Setup debug monitoring
   useDebugMonitoring();
   

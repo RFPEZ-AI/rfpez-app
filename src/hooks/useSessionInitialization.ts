@@ -88,7 +88,9 @@ export const useSessionInitialization = (params: UseSessionInitializationParams)
       }]);
       
       // Load the default agent and replace loading message with welcome
+      console.log('🔍 DEBUG: About to call loadDefaultAgentWithPrompt with urlContext:', urlContext);
       loadDefaultAgentWithPrompt(urlContext).then((welcomeMessage) => {
+        console.log('🔍 DEBUG: loadDefaultAgentWithPrompt returned:', welcomeMessage?.content?.substring(0, 100));
         if (welcomeMessage) {
           console.log('✅ Default agent loaded, showing welcome message');
           setMessages([welcomeMessage]);

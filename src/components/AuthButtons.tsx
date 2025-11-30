@@ -1,13 +1,17 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
 import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon, IonInput, IonModal, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
 import { useSupabase } from '../context/SupabaseContext';
 import { logOutOutline, chevronDownOutline, logoGoogle, logoGithub } from 'ionicons/icons';
 import { devLog } from '../utils/devLog';
 import { RoleService } from '../services/roleService';
 
-const AuthButtons: React.FC = () => {
+export interface AuthButtonsRef {
+  openAuthModal: (signUpMode?: boolean) => void;
+}
+
+const AuthButtons = forwardRef<AuthButtonsRef>((props, ref) => {
   const { session, user, userProfile, loading, signIn, signUp, signOut, signInWithOAuth } = useSupabase();
   const [showUserMenu, setShowUserMenu] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
@@ -126,6 +130,11 @@ const AuthButtons: React.FC = () => {
     setPassword('');
     setShowAuthModal(true);
   };
+
+  // Expose openAuthModal via ref
+  useImperativeHandle(ref, () => ({
+    openAuthModal
+  }));
 
   return (
     <>
@@ -320,6 +329,6 @@ const AuthButtons: React.FC = () => {
       </IonModal>
     </>
   );
-};
+});
 
 export default AuthButtons;

@@ -58,6 +58,9 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
   }, [specialtySlug]);
 
   const loadDefaultAgentWithPrompt = useCallback(async (urlContext?: { bid_id?: string | null; rfp_id?: string | null }): Promise<Message | null> => {
+    console.error('🚨🚨🚨 loadDefaultAgentWithPrompt CALLED');
+    console.error('🚨🚨🚨 urlContext:', JSON.stringify(urlContext));
+    console.error('🚨🚨🚨 specialtySlug:', specialtySlug);
     console.log('🎯 loadDefaultAgentWithPrompt: Starting...');
     console.log('🎯 specialtySlug:', specialtySlug);
     console.log('🎯 urlContext:', urlContext);
@@ -138,7 +141,9 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
           try {
             // Call edge function with processInitialPrompt=true
             // This triggers the same streaming continuation logic used for agent switches
+            console.error('🚨🚨🚨 ABOUT TO CALL processInitialPrompt with urlContext:', JSON.stringify(urlContext));
             const dynamicWelcome = await ClaudeService.processInitialPrompt(defaultAgent, sessionId || undefined, undefined, urlContext);
+            console.error('🚨🚨🚨 processInitialPrompt RETURNED:', dynamicWelcome?.substring(0, 100));
             console.log('🔍 DEBUG: processInitialPrompt returned:', dynamicWelcome?.substring(0, 100));
             
             const initialMessage: Message = {

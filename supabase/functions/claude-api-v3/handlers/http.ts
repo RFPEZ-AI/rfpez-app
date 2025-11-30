@@ -828,11 +828,21 @@ export async function handlePostRequest(request: Request): Promise<Response> {
         authStatus = 'anonymous';
       }
       
+      // 🎯 CRITICAL FIX: Preserve URL Context from incoming userMessage
+      // Extract URL Context if present at the start of userMessage
+      let urlContext = '';
+      const urlContextMatch = userMessage?.match(/^\[URL Context: ([^\]]+)\]\n\n/);
+      if (urlContextMatch) {
+        urlContext = `\n\n[URL Context: ${urlContextMatch[1]}]\n`;
+        console.log('🔗 PRESERVED URL CONTEXT for initial prompt:', urlContextMatch[1]);
+      }
+      
       // Create a clear, directive meta-prompt with explicit auth information
       // 🔥 CRITICAL: Do NOT include initial_prompt in user message - it's already in system prompt
+      // 🎯 CRITICAL: Preserve URL Context so Claude can act on it
       effectiveUserMessage = `You must generate a welcome message right now. Do not ask for more information.
 
-${authContext}
+${authContext}${urlContext}
 
 Based on your role as ${agentContext?.name || 'the active agent'}, generate an appropriate ${authStatus} user welcome message now. Use your instructions to guide the welcome message content.`;
       
