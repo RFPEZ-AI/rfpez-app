@@ -859,10 +859,15 @@ export function getToolDefinitions(agentRole?: string, allowedTools?: string[]):
   // Database-driven tool access control (PREFERRED and REQUIRED)
   if (allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0) {
     // CRITICAL FIX: Split comma-separated tool names and flatten into single array
-    // Database stores tools like: ["create_memory, search_memories", "switch_agent"]
+    // Database stores tools like: ["Memory: create_memory, search_memories", "Agent switching: switch_agent"]
     // We need: ["create_memory", "search_memories", "switch_agent"]
     const flattenedTools = allowedTools.flatMap(toolStr => 
-      toolStr.split(',').map(t => t.trim())
+      toolStr.split(',').map(t => {
+        const trimmed = t.trim();
+        // Remove category prefix if present (e.g., "RFP management: get_bid" -> "get_bid")
+        const colonIndex = trimmed.indexOf(':');
+        return colonIndex !== -1 ? trimmed.substring(colonIndex + 1).trim() : trimmed;
+      })
     );
     
     console.log(`📋 Raw access array from database:`, allowedTools);

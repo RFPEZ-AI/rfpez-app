@@ -26,8 +26,8 @@ interface SupabaseQueryBuilder {
   then: (callback: (result: { data: unknown; error: unknown }) => unknown) => Promise<unknown>;
 }
 
-const supabaseUrl = Deno.env.get('DATABASE_URL') || Deno.env.get('SUPABASE_URL');
-const supabaseKey = Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || Deno.env.get('DATABASE_URL');
+const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || Deno.env.get('DATABASE_SERVICE_ROLE_KEY');
 
 if (!supabaseUrl || !supabaseKey) {
   throw new Error('Missing required Supabase environment variables');
@@ -348,7 +348,7 @@ export async function getBid(parameters: { bid_id: number | string }, sessionCon
     // Fetch the associated RFP
     const { data: rfp, error: rfpError } = await supabase
       .from('rfps')
-      .select('id, name, description, status, created_at, updated_at, created_by')
+      .select('id, name, description, status, created_at, updated_at, account_id')
       .eq('id', bid.rfp_id)
       .single();
     
