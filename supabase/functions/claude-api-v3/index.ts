@@ -1,7 +1,8 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Claude API v3 Edge Function - Modular Architecture
 // Refactored from 1542-line monolithic structure to maintainable modules
-// Version: 2025-10-05 - Streaming truncation fix deployed
+// Version: 2025-12-01 - bid_id persistence and injection deployed
+// Last cache clear: 2025-12-01 07:45 UTC
 
 // ⚠️ CRITICAL: Polyfill for googleapis compatibility in Deno
 // Must be defined BEFORE any imports that use googleapis
@@ -213,7 +214,8 @@ const handler = async (request: Request): Promise<Response> => {
 };
 
 // Start the server
-console.log('Starting Claude API v3 Edge Function (Modular Architecture)');
+console.log('🚀🚀🚀 Starting Claude API v3 Edge Function - FRESH LOAD AT:', new Date().toISOString());
+console.log('🚀🚀🚀 Cache Clear Timestamp: 2025-12-01 10:35 UTC');
 console.log('Modules loaded: handlers/http.ts');
 
 serve(handler);
