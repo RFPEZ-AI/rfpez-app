@@ -306,12 +306,115 @@ export async function createAndSetRfp(parameters: RFPFormData, sessionContext?: 
     };
     
   } catch (error) {
-    console.error('❌ createAndSetRfp error:', error);
+    console.log('❌ createAndSetRfp error:', error);
     
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Unknown error',
       data: null
+    };
+  }
+}
+
+/**
+ * Get bid details by ID and automatically set the associated RFP as current context
+ * This is used when a supplier visits a bid invitation link with ?bid_id=X
+ */
+export async function getBid(parameters: { bid_id: number | string }, sessionContext?: SessionContext): Promise<ToolResult> {
+  const bidId = typeof parameters.bid_id === 'string' ? parseInt(parameters.bid_id, 10) : parameters.bid_id;
+  
+  console.log('🔍 Getting bid details:', { bidId, sessionId: sessionContext?.sessionId });
+  
+  try {
+    // Fetch bid from database
+    const { data: bid, error: bidError } = await supabase
+      .from('bids')
+      .select('id, rfp_id, supplier_id, status, created_at, updated_at')
+      .eq('id', bidId)
+      .single();
+    
+    if (bidError || !bid) {
+      console.error('❌ Bid lookup error:', bidError);
+      return {
+        success: false,
+        error: `Bid #${bidId} not found`,
+        data: null,
+        message: `I couldn't find bid #${bidId} in the system. Please check the bid ID and try again.`
+      };
+    }
+    
+    console.log('✅ Bid found:', bid);
+    
+    // Fetch the associated RFP
+    const { data: rfp, error: rfpError } = await supabase
+      .from('rfps')
+      .select('id, name, description, status, created_at, updated_at, created_by')
+      .eq('id', bid.rfp_id)
+      .single();
+    
+    if (rfpError || !rfp) {
+      console.error('❌ RFP lookup error:', rfpError);
+      return {
+        success: false,
+        error: `RFP #${bid.rfp_id} not found`,
+        data: { bid },
+        message: `Found bid #${bidId}, but couldn't load the associated RFP #${bid.rfp_id}`
+      };
+    }
+    
+    console.log('✅ RFP found for bid:', rfp);
+    
+    // Update session to set current RFP if sessionId is provided
+    if (sessionContext?.sessionId) {
+      console.log('🔗 Setting current RFP in session:', sessionContext.sessionId);
+      
+      const { error: updateError } = await supabase
+        .from('sessions')
+        .update({ current_rfp_id: rfp.id })
+        .eq('id', sessionContext.sessionId);
+      
+      if (updateError) {
+        console.warn('⚠️ Failed to set current RFP in session:', updateError);
+      } else {
+        console.log('✅ Current RFP set in session');
+      }
+    }
+    
+    // Return success with both bid and RFP information
+    return {
+      success: true,
+      data: {
+        bid,
+        rfp
+      },
+      current_rfp_id: rfp.id,
+      rfp: rfp,
+      message: `✅ Congratulations! You've been invited to bid on "${rfp.name}" (RFP #${rfp.id}). Your bid status is: ${bid.status}.`,
+      clientCallbacks: [
+        {
+          type: 'ui_refresh',
+          target: 'rfp_context',
+          payload: {
+            rfp_id: rfp.id,
+            rfp_name: rfp.name,
+            rfp_data: rfp,
+            bid_id: bid.id,
+            bid_status: bid.status,
+            message: `You've been invited to bid on "${rfp.name}"`
+          },
+          priority: 'high'
+        }
+      ]
+    };
+    
+  } catch (error) {
+    console.error('❌ getBid error:', error);
+    
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      data: null,
+      message: `Error looking up bid #${bidId}: ${error instanceof Error ? error.message : 'Unknown error'}`
     };
   }
 }

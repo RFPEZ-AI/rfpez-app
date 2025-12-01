@@ -29,9 +29,10 @@ export class DatabaseService {
     title: string, 
     description?: string, 
     currentRfpId?: number,
-    specialtySiteId?: string
+    specialtySiteId?: string,
+    bidId?: number | string
   ): Promise<Session | null> {
-    console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description, currentRfpId, specialtySiteId });
+    console.log('DatabaseService.createSession called with:', { supabaseUserId, title, description, currentRfpId, specialtySiteId, bidId });
     
     // Get the user's account_id from account_users table
     // supabaseUserId is auth.users.id - sessions.user_id now directly references auth.users
@@ -70,6 +71,12 @@ export class DatabaseService {
       console.log('Setting session current_rfp_id to:', currentRfpId);
     }
     
+    // Store bid_id in session_metadata if provided
+    if (bidId !== undefined && bidId !== null) {
+      sessionData.session_metadata = { bid_id: typeof bidId === 'string' ? parseInt(bidId, 10) : bidId };
+      console.log('🎯 Storing bid_id in session_metadata:', bidId);
+    }
+    
     const { data, error } = await supabase
       .from('sessions')
       .insert(sessionData)
@@ -97,14 +104,15 @@ export class DatabaseService {
     agentId?: string,
     description?: string,
     currentRfpId?: number,
-    specialtySiteId?: string
+    specialtySiteId?: string,
+    bidId?: number | string
   ): Promise<Session | null> {
     console.log('DatabaseService.createSessionWithAgent called with:', { 
-      supabaseUserId, title, agentId, description, currentRfpId, specialtySiteId 
+      supabaseUserId, title, agentId, description, currentRfpId, specialtySiteId, bidId 
     });
 
     // Create the session first
-    const session = await this.createSession(supabaseUserId, title, description, currentRfpId, specialtySiteId);
+    const session = await this.createSession(supabaseUserId, title, description, currentRfpId, specialtySiteId, bidId);
     if (!session) {
       return null;
     }

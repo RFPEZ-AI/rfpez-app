@@ -80,7 +80,8 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean, spec
   const createNewSession = async (
     currentAgent: SessionActiveAgent | null, 
     inheritedRfpId?: number,
-    firstUserMessage?: string
+    firstUserMessage?: string,
+    urlContext?: { bid_id?: string | null; rfp_id?: string | null }
   ): Promise<string | null> => {
     if (!isAuthenticated || !userId) {
       return null;
@@ -89,10 +90,15 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean, spec
     try {
       // Use inherited RFP ID if provided, otherwise session will have no RFP context initially
       const rfpIdForSession = inheritedRfpId || undefined;
+      
+      // Extract bid_id from urlContext if provided
+      const bidId = urlContext?.bid_id ? (typeof urlContext.bid_id === 'string' ? parseInt(urlContext.bid_id, 10) : undefined) : undefined;
+      
       console.log('🎯 Creating specialty-scoped session:', {
         agentId: currentAgent?.agent_id,
         rfpId: rfpIdForSession,
-        specialtySiteId
+        specialtySiteId,
+        bidId
       });
       
       // Use first user message as title if provided (lazy creation pattern)
@@ -107,7 +113,8 @@ export const useSessionState = (userId?: string, isAuthenticated?: boolean, spec
         currentAgent?.agent_id,
         undefined, // description
         rfpIdForSession,
-        specialtySiteId // Link session to current specialty site
+        specialtySiteId, // Link session to current specialty site
+        bidId // Store bid_id in session_metadata for persistence
       );
       if (session) {
         // CRITICAL: Sessions are now scoped per-specialty, not globally

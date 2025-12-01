@@ -532,16 +532,11 @@ const Home: React.FC = () => {
   // Initialize to undefined so we can detect the first real state
   const prevAuthStateRef = useRef<boolean | undefined>(undefined);
   const authHandoffPendingRef = useRef<boolean>(false);
+  const authProcessedRef = useRef<boolean>(false);
   
   useEffect(() => {
-    // Only proceed if we have a current session and not loading
-    if (supabaseLoading || !currentSessionId || !currentAgent) {
-      return;
-    }
-    
     // Detect transition from anonymous to authenticated
-    // On first render, prevAuthStateRef.current is undefined
-    const wasAnonymous = prevAuthStateRef.current === false; // Explicitly was anonymous before
+    const wasAnonymous = prevAuthStateRef.current === false;
     const isNowAuthenticated = isAuthenticated === true;
     
     console.log('🔍 Auth State Monitoring:', {
@@ -549,25 +544,95 @@ const Home: React.FC = () => {
       currentAuth: isAuthenticated,
       wasAnonymous,
       isNowAuthenticated,
-      sessionId: currentSessionId,
-      messageCount: messages.length
+      supabaseLoading,
+      authProcessed: authProcessedRef.current,
+      sessionsCount: sessions.length
     });
     
-    // Set flag when auth state changes - onSendMessage will handle the actual prompt
-    if (wasAnonymous && isNowAuthenticated && !authHandoffPendingRef.current && messages.length > 0) {
+    // Handle authentication event
+    if (wasAnonymous && isNowAuthenticated && !supabaseLoading && !authProcessedRef.current) {
       console.log('🔄 AUTH STATE CHANGE DETECTED: Anonymous → Authenticated');
-      console.log('📝 Setting flag for anonymous intent check on next message send');
-      console.log('Current session:', currentSessionId);
-      console.log('Current agent:', currentAgent.agent_name);
-      console.log('Messages in session:', messages.length);
+      authProcessedRef.current = true;
       
-      // Set flag - will be checked in onSendMessage
+      // Check if user has session history
+      const handleAuthenticationFlow = async () => {
+        try {
+          if (!userId) {
+            console.warn('⚠️ User authenticated but no userId available');
+            return;
+          }
+          
+          // Load user sessions to check history
+          if (loadUserSessions) {
+            await loadUserSessions();
+          }
+          
+          // Wait a bit for sessions to load
+          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          console.log('📊 Session history check:', {
+            sessionsCount: sessions.length,
+            hasLastSession: !!artifactWindowState.getLastSession()
+          });
+          
+          if (sessions.length > 0) {
+            // User has history - restore last session
+            const lastSessionId = artifactWindowState.getLastSession();
+            if (lastSessionId) {
+              console.log('✅ Restoring last session for authenticated user:', lastSessionId);
+              await handleSelectSession(lastSessionId);
+            } else if (sessions.length > 0) {
+              // Fallback to most recent session
+              const mostRecent = sessions.sort((a, b) => 
+                new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+              )[0];
+              console.log('✅ Restoring most recent session:', mostRecent.id);
+              await handleSelectSession(mostRecent.id);
+            }
+          } else {
+            // First-time authenticated user - trigger Claude to guide next steps
+            console.log('🎯 First-time authenticated user detected - triggering welcome flow');
+            
+            // Clear any existing messages and show loading state
+            setMessages([{
+              id: 'auth-welcome-loading',
+              content: '🤖 Getting ready to help you...',
+              isUser: false,
+              timestamp: new Date(),
+              agentName: 'System'
+            }]);
+            
+            // Trigger Claude to provide personalized guidance based on the agent's role
+            if (onSendMessage) {
+              console.log('📤 Sending auto-prompt to Claude for authenticated user guidance');
+              // This will appear as if the user is asking how to get started
+              await onSendMessage('How can you help me get started?');
+            }
+          }
+        } catch (error) {
+          console.error('❌ Error in authentication flow:', error);
+        }
+      };
+      
+      handleAuthenticationFlow();
+    }
+    
+    // Handle existing session with messages (anonymous intent handoff)
+    if (wasAnonymous && isNowAuthenticated && currentSessionId && currentAgent && messages.length > 0 && !authHandoffPendingRef.current) {
+      console.log('📝 Setting flag for anonymous intent check on next message send');
       authHandoffPendingRef.current = true;
+    }
+    
+    // Reset processed flag when user logs out
+    if (!isNowAuthenticated && prevAuthStateRef.current === true) {
+      console.log('🔄 User logged out - resetting auth processed flag');
+      authProcessedRef.current = false;
+      authHandoffPendingRef.current = false;
     }
     
     // Update previous state
     prevAuthStateRef.current = isAuthenticated;
-  }, [isAuthenticated, supabaseLoading, currentSessionId, currentAgent, messages.length]);
+  }, [isAuthenticated, supabaseLoading, sessions.length, userId, currentSessionId, currentAgent, messages.length, loadUserSessions, handleSelectSession, artifactWindowState]);
 
   // Listen for RFP refresh messages from Claude functions and enhanced client updates
   useEffect(() => {
@@ -1349,7 +1414,8 @@ const Home: React.FC = () => {
           const newSessionId = await createNewSession(
             currentAgent, 
             globalContext.rfpId ?? undefined,
-            content // Pass first user message for title generation
+            content, // Pass first user message for title generation
+            { bid_id: bidId, rfp_id: rfpId } // Pass URL context (bid_id, rfp_id) for persistence
           );
           
           if (newSessionId) {
@@ -1426,7 +1492,7 @@ const Home: React.FC = () => {
       if (createNewSession) {
         try {
           console.log('🆘 Creating emergency session with global RFP context:', globalCurrentRfpId);
-          const emergencySessionId = await createNewSession(currentAgent, globalCurrentRfpId ?? undefined, content);
+          const emergencySessionId = await createNewSession(currentAgent, globalCurrentRfpId ?? undefined, content, { bid_id: bidId, rfp_id: rfpId });
           if (emergencySessionId) {
             console.log('✅ Emergency session created:', emergencySessionId);
             activeSessionId = emergencySessionId;

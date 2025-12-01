@@ -389,6 +389,20 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
     }
   },
   {
+    name: 'get_bid',
+    description: 'Look up bid details by bid ID and automatically set the associated RFP as current context. Use this IMMEDIATELY when you see [URL Context: bid_id=X] to load the bid invitation details and congratulate the user.',
+    input_schema: {
+      type: 'object',
+      properties: {
+        bid_id: {
+          type: ['number', 'string'],
+          description: 'The ID of the bid to look up (can be number or string, will be converted to number)'
+        }
+      },
+      required: ['bid_id']
+    }
+  },
+  {
     name: 'set_current_rfp',
     description: 'Set an existing RFP as the current active RFP for the session. Use this when switching between existing RFPs or when the user mentions working with a specific RFP by name or ID. This allows access to existing RFP artifacts without creating a new RFP.',
     input_schema: {

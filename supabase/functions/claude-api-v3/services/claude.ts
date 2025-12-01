@@ -868,6 +868,14 @@ export class ToolExecutionService {
           return await getCurrentRfp(this.supabase, input.session_id || sessionId || '');
         }
 
+        case 'get_bid': {
+          const { getBid } = await import('../tools/rfp.ts');
+          return await getBid(
+            { bid_id: input.bid_id as number | string },
+            { sessionId: sessionId || '' }
+          );
+        }
+
         case 'set_current_rfp': {
           if (!sessionId) {
             return { 

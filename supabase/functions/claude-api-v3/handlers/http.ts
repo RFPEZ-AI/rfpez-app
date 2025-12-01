@@ -786,6 +786,21 @@ export async function handlePostRequest(request: Request): Promise<Response> {
     const agentContext = await loadAgentContext(supabase, sessionId, agentIdForContext);
     const loadedUserProfile = await loadUserProfile(supabase);
     
+    // 🎯 CRITICAL: Load session metadata to check for bid_id
+    let sessionBidId: number | null = null;
+    if (sessionId) {
+      const { data: session, error: sessionError } = await supabase
+        .from('sessions')
+        .select('session_metadata')
+        .eq('id', sessionId)
+        .single();
+      
+      if (!sessionError && session?.session_metadata?.bid_id) {
+        sessionBidId = session.session_metadata.bid_id;
+        console.log('🎯 Loaded bid_id from session_metadata:', sessionBidId);
+      }
+    }
+    
     // Define effectiveAgentId early for use in automatic knowledge retrieval
     const effectiveAgentId = agentId || agent?.id;
     
@@ -835,6 +850,10 @@ export async function handlePostRequest(request: Request): Promise<Response> {
       if (urlContextMatch) {
         urlContext = `\n\n[URL Context: ${urlContextMatch[1]}]\n`;
         console.log('🔗 PRESERVED URL CONTEXT for initial prompt:', urlContextMatch[1]);
+        console.log('🔗 Full URL Context string:', urlContext);
+      } else {
+        console.log('⚠️ NO URL CONTEXT FOUND in userMessage');
+        console.log('⚠️ userMessage first 200 chars:', userMessage?.substring(0, 200));
       }
       
       // Create a clear, directive meta-prompt with explicit auth information
@@ -872,6 +891,14 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
     // Convert ClaudeService format to messages format
     let processedMessages: unknown[] = [];
     
+    // 🎯 CRITICAL: Inject URL Context from session_metadata if available
+    // This ensures bid_id persists across page refreshes
+    let urlContextInjection = '';
+    if (sessionBidId && !processInitialPrompt) {
+      urlContextInjection = `\n\n[URL Context: bid_id=${sessionBidId}]\n\n`;
+      console.log('🎯 Injecting URL Context from session_metadata:', urlContextInjection);
+    }
+    
     // 🚨 CRITICAL: When processInitialPrompt is true, ALWAYS use effectiveUserMessage (never raw prompt)
     if (processInitialPrompt) {
       processedMessages = [
@@ -879,14 +906,27 @@ Based on your role as ${agentContext?.name || 'the active agent'}, generate an a
         { role: 'user', content: effectiveUserMessage }
       ];
     } else if (messages && Array.isArray(messages)) {
-      // Direct messages format (legacy)
+      // Direct messages format (legacy) - inject URL Context into last user message
+      if (urlContextInjection && messages.length > 0) {
+        const lastMessageIndex = messages.length - 1;
+        const lastMessage = messages[lastMessageIndex] as Record<string, unknown>;
+        if (lastMessage.role === 'user') {
+          messages[lastMessageIndex] = {
+            ...lastMessage,
+            content: urlContextInjection + (lastMessage.content as string)
+          };
+          console.log('🎯 URL Context injected into last user message (legacy format)');
+        }
+      }
       processedMessages = messages;
     } else if (effectiveUserMessage) {
-      // ClaudeService format - convert to messages
+      // ClaudeService format - inject URL Context and convert to messages
+      const messageContent = urlContextInjection + effectiveUserMessage;
       processedMessages = [
         ...effectiveConversationHistory,
-        { role: 'user', content: effectiveUserMessage }
+        { role: 'user', content: messageContent }
       ];
+      console.log('🎯 URL Context injected into effectiveUserMessage');
     } else {
       return new Response(
         JSON.stringify({ error: 'Either messages array or userMessage is required' }),
