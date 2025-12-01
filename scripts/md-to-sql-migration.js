@@ -204,16 +204,20 @@ function generateMigration(metadata, agentName) {
     updateFields.push(`  access = ${toolsArray}::text[]`);
   }
   
-  // Inheritance fields
+  // Inheritance fields - ALWAYS use name-based lookups, never hardcoded UUIDs
   if (metadata.parent_agent_name) {
-    // Use subquery to look up parent agent by name
+    // Use subquery to look up parent agent by name (environment-independent)
     updateFields.push(`  parent_agent_id = (SELECT id FROM agents WHERE name = '${metadata.parent_agent_name}' LIMIT 1)`);
   } else if (metadata.parent_agent_id !== undefined) {
-    // Legacy: direct UUID reference
-    // Handle NULL string from markdown as SQL NULL
+    // Handle NULL parent (root agent)
     if (metadata.parent_agent_id === 'NULL' || metadata.parent_agent_id === null) {
       updateFields.push(`  parent_agent_id = NULL`);
     } else {
+      // WARN: Using UUID directly is discouraged - should use name-based lookup
+      // This code path should not be reached with updated markdown files
+      console.warn(`⚠️  WARNING: Using hardcoded UUID for parent_agent_id: ${metadata.parent_agent_id}`);
+      console.warn(`   This may cause issues between local and remote environments.`);
+      console.warn(`   Please update the markdown file to use Parent Agent Name instead.`);
       updateFields.push(`  parent_agent_id = '${metadata.parent_agent_id}'`);
     }
   }
