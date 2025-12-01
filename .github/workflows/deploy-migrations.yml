@@ -48,29 +48,21 @@ jobs:
             echo "ℹ️ No migration files found"
           fi
 
-      - name: Link to remote project
-        if: success() && steps.check_migrations.outputs.has_pending == 'true'
-        run: |
-          echo "Linking to remote project using Management API..."
-          # Link without database connection - uses Management API only
-          supabase link --project-ref jxlutaztoukwbbgtoulc --password "$SUPABASE_DB_PASSWORD" 2>&1 | grep -v "password" || true
-          echo "✅ Linked to remote project"
-
       - name: Deploy migrations
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "Deploying migrations to production..."
-          echo "Using Management API (no direct database connection needed)"
+          echo "Using Management API (no database connection needed)"
           
-          # Push migrations via Management API - this works without direct DB connection
-          # It uses the SUPABASE_ACCESS_TOKEN for authentication
-          supabase db push --linked 2>&1 | tee deploy.log
+          # Deploy directly using project ref and access token
+          # This bypasses the need for database connection
+          supabase db push --project-ref jxlutaztoukwbbgtoulc 2>&1 | tee deploy.log
           
           # Check if deployment succeeded
           if grep -q "Finished supabase db push" deploy.log; then
             echo "✅ Migrations deployed successfully!"
           else
-            echo "⚠️ Deployment may have completed with warnings"
+            echo "⚠️ Checking deployment status..."
             cat deploy.log
           fi
 
