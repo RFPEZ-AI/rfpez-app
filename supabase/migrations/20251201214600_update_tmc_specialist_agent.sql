@@ -1,11 +1,11 @@
 -- Update TMC Specialist Agent Instructions
--- Generated on 2025-12-01T21:36:15.178Z
+-- Generated on 2025-12-01T21:42:20.587Z
 -- Source: Agent Instructions/TMC Specialist.md
 
 -- Update TMC Specialist agent
 UPDATE agents 
 SET 
-  instructions = $tmc_specialist_20251201213615_inst$## Name: TMC Specialist
+  instructions = $tmc_specialist_20251201214220_inst$## Name: TMC Specialist
 **Database ID**: `d6e83135-2b2d-47b7-91a0-5a3e138e7eb0` (local), `ae9b8b23-1568-4603-b2e0-5452fce6d896` (remote)
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/tmc-specialist.svg`
@@ -410,8 +410,8 @@ Welcome! I'm your TMC Specialist - I help organizations create comprehensive RFP
 Whether you're looking for your first TMC, switching providers, or need better travel technology and reporting, I'll guide you through creating an RFP that attracts the right vendors and gets competitive proposals.
 
 Ready to get started?
-$tmc_specialist_20251201213615_inst$,
-  initial_prompt = $tmc_specialist_20251201213615_prompt$You are the TMC Specialist agent, focused on helping buyers create RFPs for Travel Management Company services.
+$tmc_specialist_20251201214220_inst$,
+  initial_prompt = $tmc_specialist_20251201214220_prompt$You are the TMC Specialist agent, focused on helping buyers create RFPs for Travel Management Company services.
 
 (Inherits artifact checking workflow from RFP Design parent agent)
 
@@ -457,8 +457,8 @@ I specialize in creating RFPs for Travel Management Company services. Let's star
 [We need better travel technology and reporting](prompt:complete)
 ```
 
----$tmc_specialist_20251201213615_prompt$,
-  description = $tmc_specialist_20251201213615_desc$Specialized agent for creating RFPs to procure Travel Management Company (TMC) services for corporations. Inherits comprehensive RFP design capabilities from RFP Design agent and adds TMC-specific expertise for corporate travel programs, booking platforms, expense management, and travel policy compliance.$tmc_specialist_20251201213615_desc$,
+---$tmc_specialist_20251201214220_prompt$,
+  description = $tmc_specialist_20251201214220_desc$Specialized agent for creating RFPs to procure Travel Management Company (TMC) services for corporations. Inherits comprehensive RFP design capabilities from RFP Design agent and adds TMC-specific expertise for corporate travel programs, booking platforms, expense management, and travel policy compliance.$tmc_specialist_20251201214220_desc$,
   role = 'design',
   avatar_url = '/assets/avatars/tmc-specialist.svg',
   parent_agent_id = (SELECT id FROM agents WHERE name = 'RFP Design' LIMIT 1),

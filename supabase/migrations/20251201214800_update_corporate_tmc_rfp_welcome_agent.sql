@@ -1,11 +1,11 @@
 -- Update Corporate TMC RFP Welcome Agent Instructions
--- Generated on 2025-12-01T21:36:26.343Z
+-- Generated on 2025-12-01T21:42:30.625Z
 -- Source: Agent Instructions/Corporate TMC RFP Welcome.md
 
 -- Update Corporate TMC RFP Welcome agent
 UPDATE agents 
 SET 
-  instructions = $corporate_tmc_rfp_welcome_20251201213626_inst$## Name: Corporate TMC RFP Welcome
+  instructions = $corporate_tmc_rfp_welcome_20251201214230_inst$## Name: Corporate TMC RFP Welcome
 **Database ID**: `07d498cc-cbb9-4c4c-8f4d-32a5ea21ea1f` (reference only)
 **Parent Agent Name**: `Solutions`
 **Is Abstract**: `false`
@@ -281,8 +281,8 @@ Professional, procurement-focused, corporate travel industry-oriented. Use termi
 **Inherited from Solutions:** All general communication guidelines, error handling, markdown formatting, suggested prompts syntax.
 
 📚 Search knowledge: `"tmc-welcome-agent"` for TMC-specific response patterns
-$corporate_tmc_rfp_welcome_20251201213626_inst$,
-  initial_prompt = $corporate_tmc_rfp_welcome_20251201213626_prompt$You are the Corporate TMC RFP Welcome agent, specialized in helping corporate travel buyers source Travel Management Company services through competitive RFPs.
+$corporate_tmc_rfp_welcome_20251201214230_inst$,
+  initial_prompt = $corporate_tmc_rfp_welcome_20251201214230_prompt$You are the Corporate TMC RFP Welcome agent, specialized in helping corporate travel buyers source Travel Management Company services through competitive RFPs.
 
 **CRITICAL FIRST STEP:** Search memories for any "anonymous_intent" to check if user had a request before authenticating.
 
@@ -304,8 +304,8 @@ For anonymous users:
 - Offer suggested prompts for next steps
 - Mention they can sign up for a free account to access full TMC sourcing features
 
-Keep your response conversational, professional, TMC-focused, and under 100 words.$corporate_tmc_rfp_welcome_20251201213626_prompt$,
-  description = $corporate_tmc_rfp_welcome_20251201213626_desc$Specialized welcome agent for Corporate Travel Management Company (TMC) RFP site. Provides tailored onboarding experience for corporate travel buyers seeking to source TMC services through competitive bidding. Inherits full Solutions agent capabilities with TMC-focused messaging and workflow.$corporate_tmc_rfp_welcome_20251201213626_desc$,
+Keep your response conversational, professional, TMC-focused, and under 100 words.$corporate_tmc_rfp_welcome_20251201214230_prompt$,
+  description = $corporate_tmc_rfp_welcome_20251201214230_desc$Specialized welcome agent for Corporate Travel Management Company (TMC) RFP site. Provides tailored onboarding experience for corporate travel buyers seeking to source TMC services through competitive bidding. Inherits full Solutions agent capabilities with TMC-focused messaging and workflow.$corporate_tmc_rfp_welcome_20251201214230_desc$,
   role = 'sales',
   avatar_url = '/assets/avatars/solutions-agent.svg',
   access = ARRAY['switch_agent', 'get_available_agents', 'create_memory', 'search_memories', 'get_conversation_history', 'store_message', 'search_messages', 'get_current_agent', 'recommend_agent', 'perplexity_search, perplexity_ask, perplexity_research, perplexity_reason']::text[],

@@ -1,11 +1,11 @@
 -- Update TMC Tender Agent Instructions
--- Generated on 2025-12-01T21:36:15.693Z
+-- Generated on 2025-12-01T21:42:26.028Z
 -- Source: Agent Instructions/TMC Tender.md
 
 -- Update TMC Tender agent
 UPDATE agents 
 SET 
-  instructions = $tmc_tender_20251201213615_inst$## Name: TMC Tender
+  instructions = $tmc_tender_20251201214226_inst$## Name: TMC Tender
 **Database ID**: `1bfa8897-43c7-4270-8503-e91f59af40ab` (reference only)
 **Parent Agent Name**: `Sourcing`
 **Is Abstract**: `false`
@@ -367,8 +367,8 @@ Professional, tender-focused, procurement-oriented. Emphasize fairness, transpar
 **Inherited from _common:** General communication guidelines, error handling, markdown formatting.
 
 📚 Search knowledge: `"tmc-tender-communication-style"` for response patterns
-$tmc_tender_20251201213615_inst$,
-  initial_prompt = $tmc_tender_20251201213615_prompt$You are the TMC Tender agent, specialized in managing the competitive bidding process for Travel Management Company services.
+$tmc_tender_20251201214226_inst$,
+  initial_prompt = $tmc_tender_20251201214226_prompt$You are the TMC Tender agent, specialized in managing the competitive bidding process for Travel Management Company services.
 
 **MANDATORY STARTUP SEQUENCE:**
 1. **Get Current RFP:** `get_current_rfp({ sessionId })`
@@ -411,8 +411,8 @@ I don't see an active TMC RFP yet. Let me connect you with the TMC Specialist to
 [Tell me about TMC tender requirements](prompt:complete)
 ```
 
-Keep responses professional, tender-focused, and under 100 words.$tmc_tender_20251201213615_prompt$,
-  description = $tmc_tender_20251201213615_desc$Specialized tendering agent for Travel Management Company (TMC) procurement. Manages the RFQ/RFI/RFP bidding process for TMC services, evaluates TMC proposals, coordinates vendor negotiations, and ensures fair competitive bidding for corporate travel management services.$tmc_tender_20251201213615_desc$,
+Keep responses professional, tender-focused, and under 100 words.$tmc_tender_20251201214226_prompt$,
+  description = $tmc_tender_20251201214226_desc$Specialized tendering agent for Travel Management Company (TMC) procurement. Manages the RFQ/RFI/RFP bidding process for TMC services, evaluates TMC proposals, coordinates vendor negotiations, and ensures fair competitive bidding for corporate travel management services.$tmc_tender_20251201214226_desc$,
   role = 'sourcing',
   avatar_url = '/assets/avatars/Sourcing-agent.svg',
   access = ARRAY['RFP management: get_current_rfp, set_current_rfp', 'Artifacts: list_artifacts, select_active_artifact, create_document_artifact, create_form_artifact, update_form_data', 'Vendor selection: manage_vendor_selection', 'Email: send_email, search_emails, list_recent_emails', 'Perplexity: perplexity_search, perplexity_ask, perplexity_research, perplexity_reason', 'Memory: create_memory, search_memories', 'Conversation: get_conversation_history, store_message, search_messages', 'Agent switching: get_available_agents, get_current_agent, switch_agent, recommend_agent']::text[],
