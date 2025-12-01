@@ -817,7 +817,6 @@ Keep your response professional, action-oriented, and under 100 words.$sourcing_
   parent_agent_id = (SELECT id FROM agents WHERE name = '_common' LIMIT 1),
   is_abstract = false,
   specialty = 'respond',
-  specialty = 'respond',
   updated_at = NOW()
 WHERE name = 'Sourcing';
 
