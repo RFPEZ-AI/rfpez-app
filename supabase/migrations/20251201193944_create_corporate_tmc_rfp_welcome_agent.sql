@@ -1,7 +1,44 @@
 -- Create Corporate TMC RFP Welcome Agent
 -- This agent inherits from Solutions agent and serves as the default for corporate-tmc-rfp specialty site
 
--- Insert the new agent
+-- STEP 1: Update constraint FIRST to allow this agent name
+ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_account_id_check;
+
+ALTER TABLE agents ADD CONSTRAINT agents_account_id_check CHECK (
+  (
+    (name = ANY (ARRAY[
+      'Solutions'::text,
+      'RFP Design'::text,
+      'Support'::text,
+      'RFP Assistant'::text,
+      'Sourcing'::text,
+      'TMC Specialist'::text,
+      'TMC Tender'::text,
+      'Respond'::text,
+      'Corporate TMC RFP Welcome'::text,
+      '_common'::text
+    ]))
+    AND account_id IS NULL
+  )
+  OR
+  (
+    (name <> ALL (ARRAY[
+      'Solutions'::text,
+      'RFP Design'::text,
+      'Support'::text,
+      'RFP Assistant'::text,
+      'Sourcing'::text,
+      'TMC Specialist'::text,
+      'TMC Tender'::text,
+      'Respond'::text,
+      'Corporate TMC RFP Welcome'::text,
+      '_common'::text
+    ]))
+    AND account_id IS NOT NULL
+  )
+);
+
+-- STEP 2: Insert the new agent
 INSERT INTO agents (
   id,
   name,
