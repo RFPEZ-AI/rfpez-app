@@ -394,17 +394,32 @@ function handleStreamingResponse(messages, supabase, userId, sessionId, agentId,
   // Create readable stream for SSE
   const stream = new ReadableStream({
     async start (controller) {
+      console.log('🚀🚀🚀 STREAM START FUNCTION ENTERED 🚀🚀🚀');
+      console.log('🚀 Messages received:', JSON.stringify(messages, null, 2));
+      console.log('🚀 ProcessInitialPrompt:', processInitialPrompt);
+      console.log('🚀 SessionId:', sessionId);
+      console.log('🚀 AgentId:', agentId);
       try {
+        console.log('🔍 Starting knowledge augmentation...');
         // Augment messages with knowledge context BEFORE streaming starts
         const augmentedMessages = await augmentMessagesWithKnowledge(messages);
+        console.log('✅ Knowledge augmentation completed, messages:', JSON.stringify(augmentedMessages, null, 2));
+        console.log('🔧 Creating Claude service...');
         const claudeService = createClaudeService();
+        console.log('✅ Claude service created');
+        console.log('🔧 Creating Tool service...');
         const toolService = new ToolExecutionService(supabase, userId, userMessage);
+        console.log('✅ Tool service created');
         console.log(`🧩 STREAMING: Agent object received:`, agent);
         console.log(`🧩 STREAMING: Agent role:`, agent?.role);
         console.log(`🧩 STREAMING: Agent type:`, typeof agent);
         // Load agent context and user profile, then build system prompt
+        console.log('🔍 Loading agent context for agentId:', agentId, 'sessionId:', sessionId);
         const agentContext = await loadAgentContext(supabase, sessionId, agentId);
+        console.log('✅ Agent context loaded:', agentContext?.name);
+        console.log('🔍 Loading user profile...');
         const userProfile = await loadUserProfile(supabase);
+        console.log('✅ User profile loaded:', userProfile?.email || 'anonymous');
         // 🎭 Send activation notice if processing initial_prompt (agent activation/welcome)
         if (processInitialPrompt && agentContext) {
           const activationNotice = {
@@ -420,12 +435,15 @@ function handleStreamingResponse(messages, supabase, userId, sessionId, agentId,
         // Extract user message for agent switch context detection
         const lastUserMessage = messages && messages.length > 0 ? messages[messages.length - 1] : null;
         const userMessageText = lastUserMessage && typeof lastUserMessage === 'object' && 'content' in lastUserMessage ? String(lastUserMessage.content) : undefined;
+        console.log('🔍 Building system prompt...');
         const systemPrompt = buildSystemPrompt({
           agent: agentContext || undefined,
           userProfile: userProfile || undefined,
           sessionId: sessionId,
           isAnonymous: !userProfile
         }, userMessageText);
+        console.log('✅ System prompt built:', systemPrompt ? 'Yes' : 'No');
+        console.log('✅ System prompt length:', systemPrompt?.length || 0);
         console.log('🎯 STREAMING: System prompt built:', systemPrompt ? 'Yes' : 'No');
         console.log('🎭 STREAMING: Using initial_prompt as system:', processInitialPrompt);
         console.log('🔄 STREAMING: Agent switch context detection:', userMessageText?.includes('User context from previous agent:') || false);
@@ -555,6 +573,11 @@ function handleStreamingResponse(messages, supabase, userId, sessionId, agentId,
         controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(completeEvent)}\n\n`));
         controller.close();
       } catch (error) {
+        console.error('❌❌❌ STREAMING ERROR CAUGHT ❌❌❌');
+        console.error('Error type:', typeof error);
+        console.error('Error instanceof Error:', error instanceof Error);
+        console.error('Error object:', error);
+        console.error('Error stack:', error instanceof Error ? error.stack : 'No stack');
         console.error('Streaming error:', error);
         const errorMessage = error instanceof Error ? error.message : 'Unknown streaming error';
         const errorEvent = JSON.stringify({
