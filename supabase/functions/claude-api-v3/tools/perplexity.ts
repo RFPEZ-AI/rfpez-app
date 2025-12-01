@@ -1,48 +1,11 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Perplexity AI integration for web search and research capabilities
-
 const PERPLEXITY_API_KEY = Deno.env.get('PERPLEXITY_API_KEY');
 const PERPLEXITY_TIMEOUT_MS = parseInt(Deno.env.get('PERPLEXITY_TIMEOUT_MS') || '300000'); // 5 minutes default
-
-interface PerplexitySearchParams {
-  query: string;
-  recency_filter?: 'day' | 'week' | 'month' | 'year';
-  return_images?: boolean;
-  return_related_questions?: boolean;
-}
-
-interface PerplexityAskParams {
-  query: string;
-  search_recency_filter?: 'day' | 'week' | 'month' | 'year';
-}
-
-interface PerplexityResearchParams {
-  query: string;
-  search_recency_filter?: 'day' | 'week' | 'month' | 'year';
-}
-
-interface PerplexityReasonParams {
-  query: string;
-}
-
-interface PerplexityResponse {
-  choices?: Array<{
-    message?: {
-      content?: string;
-      role?: string;
-    };
-  }>;
-  citations?: string[];
-  related_questions?: string[];
-  images?: string[];
-  error?: string;
-}
-
 /**
  * Execute Perplexity Search API call
  * Direct web search using the Perplexity Search API
- */
-async function executePerplexitySearch(params: PerplexitySearchParams): Promise<unknown> {
+ */ async function executePerplexitySearch(params) {
   if (!PERPLEXITY_API_KEY) {
     return {
       success: false,
@@ -50,13 +13,10 @@ async function executePerplexitySearch(params: PerplexitySearchParams): Promise<
       message: 'Perplexity API key is required for search functionality'
     };
   }
-
   try {
     console.log('🔍 Executing Perplexity Search:', params.query);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_TIMEOUT_MS);
-
+    const timeoutId = setTimeout(()=>controller.abort(), PERPLEXITY_TIMEOUT_MS);
     const response = await fetch('https://api.perplexity.ai/search', {
       method: 'POST',
       headers: {
@@ -71,9 +31,7 @@ async function executePerplexitySearch(params: PerplexitySearchParams): Promise<
       }),
       signal: controller.signal
     });
-
     clearTimeout(timeoutId);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Perplexity Search API error:', response.status, errorText);
@@ -83,10 +41,8 @@ async function executePerplexitySearch(params: PerplexitySearchParams): Promise<
         message: errorText
       };
     }
-
-    const data: PerplexityResponse = await response.json();
+    const data = await response.json();
     console.log('✅ Perplexity Search completed successfully');
-
     return {
       success: true,
       results: data.choices?.[0]?.message?.content || '',
@@ -94,7 +50,6 @@ async function executePerplexitySearch(params: PerplexitySearchParams): Promise<
       related_questions: data.related_questions || [],
       images: data.images || []
     };
-
   } catch (error) {
     console.error('❌ Perplexity Search execution error:', error);
     return {
@@ -104,12 +59,10 @@ async function executePerplexitySearch(params: PerplexitySearchParams): Promise<
     };
   }
 }
-
 /**
  * Execute Perplexity Ask - conversational AI with real-time web search
  * Uses the sonar-pro model for quick questions and everyday searches
- */
-async function executePerplexityAsk(params: PerplexityAskParams): Promise<unknown> {
+ */ async function executePerplexityAsk(params) {
   if (!PERPLEXITY_API_KEY) {
     return {
       success: false,
@@ -117,13 +70,10 @@ async function executePerplexityAsk(params: PerplexityAskParams): Promise<unknow
       message: 'Perplexity API key is required for ask functionality'
     };
   }
-
   try {
     console.log('💬 Executing Perplexity Ask:', params.query);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_TIMEOUT_MS);
-
+    const timeoutId = setTimeout(()=>controller.abort(), PERPLEXITY_TIMEOUT_MS);
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -142,9 +92,7 @@ async function executePerplexityAsk(params: PerplexityAskParams): Promise<unknow
       }),
       signal: controller.signal
     });
-
     clearTimeout(timeoutId);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Perplexity Ask API error:', response.status, errorText);
@@ -154,16 +102,13 @@ async function executePerplexityAsk(params: PerplexityAskParams): Promise<unknow
         message: errorText
       };
     }
-
-    const data: PerplexityResponse = await response.json();
+    const data = await response.json();
     console.log('✅ Perplexity Ask completed successfully');
-
     return {
       success: true,
       answer: data.choices?.[0]?.message?.content || '',
       citations: data.citations || []
     };
-
   } catch (error) {
     console.error('❌ Perplexity Ask execution error:', error);
     return {
@@ -173,12 +118,10 @@ async function executePerplexityAsk(params: PerplexityAskParams): Promise<unknow
     };
   }
 }
-
 /**
  * Execute Perplexity Research - deep comprehensive research
  * Uses the sonar-deep-research model for thorough analysis and detailed reports
- */
-async function executePerplexityResearch(params: PerplexityResearchParams): Promise<unknown> {
+ */ async function executePerplexityResearch(params) {
   if (!PERPLEXITY_API_KEY) {
     return {
       success: false,
@@ -186,13 +129,10 @@ async function executePerplexityResearch(params: PerplexityResearchParams): Prom
       message: 'Perplexity API key is required for research functionality'
     };
   }
-
   try {
     console.log('📚 Executing Perplexity Research:', params.query);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_TIMEOUT_MS);
-
+    const timeoutId = setTimeout(()=>controller.abort(), PERPLEXITY_TIMEOUT_MS);
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -211,9 +151,7 @@ async function executePerplexityResearch(params: PerplexityResearchParams): Prom
       }),
       signal: controller.signal
     });
-
     clearTimeout(timeoutId);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Perplexity Research API error:', response.status, errorText);
@@ -223,16 +161,13 @@ async function executePerplexityResearch(params: PerplexityResearchParams): Prom
         message: errorText
       };
     }
-
-    const data: PerplexityResponse = await response.json();
+    const data = await response.json();
     console.log('✅ Perplexity Research completed successfully');
-
     return {
       success: true,
       research_report: data.choices?.[0]?.message?.content || '',
       citations: data.citations || []
     };
-
   } catch (error) {
     console.error('❌ Perplexity Research execution error:', error);
     return {
@@ -242,12 +177,10 @@ async function executePerplexityResearch(params: PerplexityResearchParams): Prom
     };
   }
 }
-
 /**
  * Execute Perplexity Reason - advanced reasoning and problem-solving
  * Uses the sonar-reasoning-pro model for complex analytical tasks
- */
-async function executePerplexityReason(params: PerplexityReasonParams): Promise<unknown> {
+ */ async function executePerplexityReason(params) {
   if (!PERPLEXITY_API_KEY) {
     return {
       success: false,
@@ -255,13 +188,10 @@ async function executePerplexityReason(params: PerplexityReasonParams): Promise<
       message: 'Perplexity API key is required for reasoning functionality'
     };
   }
-
   try {
     console.log('🧠 Executing Perplexity Reason:', params.query);
-    
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), PERPLEXITY_TIMEOUT_MS);
-
+    const timeoutId = setTimeout(()=>controller.abort(), PERPLEXITY_TIMEOUT_MS);
     const response = await fetch('https://api.perplexity.ai/chat/completions', {
       method: 'POST',
       headers: {
@@ -279,9 +209,7 @@ async function executePerplexityReason(params: PerplexityReasonParams): Promise<
       }),
       signal: controller.signal
     });
-
     clearTimeout(timeoutId);
-
     if (!response.ok) {
       const errorText = await response.text();
       console.error('❌ Perplexity Reason API error:', response.status, errorText);
@@ -291,16 +219,13 @@ async function executePerplexityReason(params: PerplexityReasonParams): Promise<
         message: errorText
       };
     }
-
-    const data: PerplexityResponse = await response.json();
+    const data = await response.json();
     console.log('✅ Perplexity Reason completed successfully');
-
     return {
       success: true,
       reasoning: data.choices?.[0]?.message?.content || '',
       citations: data.citations || []
     };
-
   } catch (error) {
     console.error('❌ Perplexity Reason execution error:', error);
     return {
@@ -310,14 +235,4 @@ async function executePerplexityReason(params: PerplexityReasonParams): Promise<
     };
   }
 }
-
-export {
-  executePerplexitySearch,
-  executePerplexityAsk,
-  executePerplexityResearch,
-  executePerplexityReason,
-  type PerplexitySearchParams,
-  type PerplexityAskParams,
-  type PerplexityResearchParams,
-  type PerplexityReasonParams
-};
+export { executePerplexitySearch, executePerplexityAsk, executePerplexityResearch, executePerplexityReason };

@@ -1,14 +1,11 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // Tool definitions for Claude API integration
-
-import { ClaudeToolDefinition } from '../types.ts';
-
-export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
+export const TOOL_DEFINITIONS = [
   {
     name: 'create_and_set_rfp',
     description: 'Create a new RFP and set it as the current active RFP for the session. CRITICAL: You MUST extract the procurement subject from the user message and create a descriptive name. For "industrial use alcohol" create "Industrial Use Alcohol RFP". For "floor tiles" create "Floor Tiles RFP". NEVER use generic names like "New RFP".',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         name: {
           type: 'string',
@@ -27,7 +24,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional due date in YYYY-MM-DD format'
         }
       },
-      required: ['name']
+      required: [
+        'name'
+      ]
     }
   },
   {
@@ -59,7 +58,12 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           ]
         }
       },
-      required: ['name', 'description', 'content', 'artifactRole']
+      required: [
+        'name',
+        'description',
+        'content',
+        'artifactRole'
+      ]
     }
   },
   {
@@ -83,14 +87,18 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         content_type: {
           type: 'string',
           description: 'Content type of the document',
-          enum: ['markdown', 'plain', 'html'],
+          enum: [
+            'markdown',
+            'plain',
+            'html'
+          ],
           default: 'markdown'
         },
         artifactRole: {
           type: 'string',
           description: 'Role/type of the document artifact. Use rfp_request_email for RFP vendor request emails.',
           enum: [
-            'rfp_request_email',  // Specific for RFP request emails to vendors
+            'rfp_request_email',
             'request_document',
             'rfp_document',
             'proposal_document',
@@ -106,7 +114,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional tags for categorizing the document'
         }
       },
-      required: ['name', 'content', 'artifactRole']
+      required: [
+        'name',
+        'content',
+        'artifactRole'
+      ]
     }
   },
   {
@@ -117,7 +129,14 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       properties: {
         operation: {
           type: 'string',
-          enum: ['create', 'read', 'update', 'add_vendors', 'remove_vendors', 'toggle_selection'],
+          enum: [
+            'create',
+            'read',
+            'update',
+            'add_vendors',
+            'remove_vendors',
+            'toggle_selection'
+          ],
           description: 'Operation: create (new Vendor List), read (get current state), update (replace all vendors), add_vendors (add to list), remove_vendors (remove from list), toggle_selection (toggle selected status)'
         },
         rfp_id: {
@@ -141,7 +160,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Description of Vendor List (optional)'
         }
       },
-      required: ['operation', 'rfp_id']
+      required: [
+        'operation',
+        'rfp_id'
+      ]
     }
   },
   {
@@ -179,7 +201,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         sender: {
           type: 'string',
           description: 'Message sender',
-          enum: ['user', 'assistant']
+          enum: [
+            'user',
+            'assistant'
+          ]
         },
         content: {
           type: 'string',
@@ -190,7 +215,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional metadata for tool execution tracking (functions_called, agent_id, model, etc.)'
         }
       },
-      required: ['sender', 'content']
+      required: [
+        'sender',
+        'content'
+      ]
     }
   },
   {
@@ -209,7 +237,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           default: 20
         }
       },
-      required: ['query']
+      required: [
+        'query'
+      ]
     }
   },
   {
@@ -237,7 +267,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'The UUID of the session to get the current agent for'
         }
       },
-      required: ['session_id']
+      required: [
+        'session_id'
+      ]
     }
   },
   {
@@ -253,7 +285,13 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         agent_name: {
           type: 'string',
           description: 'The name of the agent to switch to. Use "RFP Design" for RFP creation, "Solutions" for sales questions, "Support" for help.',
-          enum: ['RFP Design', 'Solutions', 'Support', 'Technical Support', 'RFP Assistant']
+          enum: [
+            'RFP Design',
+            'Solutions',
+            'Support',
+            'Technical Support',
+            'RFP Assistant'
+          ]
         },
         agent_id: {
           type: 'string',
@@ -268,7 +306,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional reason for switching agents'
         }
       },
-      required: ['session_id', 'agent_name']
+      required: [
+        'session_id',
+        'agent_name'
+      ]
     }
   },
   {
@@ -290,7 +331,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Why you cannot determine the target agent'
         }
       },
-      required: ['user_input', 'extracted_keywords', 'confusion_reason']
+      required: [
+        'user_input',
+        'extracted_keywords',
+        'confusion_reason'
+      ]
     }
   },
   {
@@ -308,7 +353,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional context from the current conversation'
         }
       },
-      required: ['topic']
+      required: [
+        'topic'
+      ]
     }
   },
   {
@@ -371,7 +418,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Session ID to set the artifact for (optional, uses current session if not provided)'
         }
       },
-      required: ['artifact_id']
+      required: [
+        'artifact_id'
+      ]
     }
   },
   {
@@ -385,7 +434,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Session ID to check for current RFP'
         }
       },
-      required: ['session_id']
+      required: [
+        'session_id'
+      ]
     }
   },
   {
@@ -395,11 +446,16 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
       type: 'object',
       properties: {
         bid_id: {
-          type: ['number', 'string'],
+          type: [
+            'number',
+            'string'
+          ],
           description: 'The ID of the bid to look up (can be number or string, will be converted to number)'
         }
       },
-      required: ['bid_id']
+      required: [
+        'bid_id'
+      ]
     }
   },
   {
@@ -421,7 +477,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional: Name of the RFP to set as current (alternative to rfp_id). System will search for RFP by name.'
         }
       },
-      required: ['session_id']
+      required: [
+        'session_id'
+      ]
     }
   },
   {
@@ -439,7 +497,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Current session ID for context'
         }
       },
-      required: ['artifact_id', 'session_id']
+      required: [
+        'artifact_id',
+        'session_id'
+      ]
     }
   },
   {
@@ -461,7 +522,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Complete form data object with field names EXACTLY matching the form schema properties (from get_form_schema). For enum fields, use EXACT enum values from schema. This will replace the current default_values completely.'
         }
       },
-      required: ['artifact_id', 'session_id', 'form_data']
+      required: [
+        'artifact_id',
+        'session_id',
+        'form_data'
+      ]
     }
   },
   {
@@ -479,7 +544,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Updates to apply to the artifact. For default_values, field names must EXACTLY match the schema properties. This is a nested object containing form updates.'
         }
       },
-      required: ['artifact_id', 'updates']
+      required: [
+        'artifact_id',
+        'updates'
+      ]
     }
   },
   {
@@ -550,7 +618,10 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional: Score for the bid (0-100)'
         }
       },
-      required: ['bid_id', 'status']
+      required: [
+        'bid_id',
+        'status'
+      ]
     }
   },
   {
@@ -580,7 +651,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional: UUID of the related entity (RFP ID, bid ID, etc.)'
         }
       },
-      required: ['content', 'memory_type', 'importance_score']
+      required: [
+        'content',
+        'memory_type',
+        'importance_score'
+      ]
     }
   },
   {
@@ -602,7 +677,9 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Maximum number of memories to return (default 10, max 20)'
         }
       },
-      required: ['query']
+      required: [
+        'query'
+      ]
     }
   },
   {
@@ -633,7 +710,11 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         specialty: {
           type: 'string',
           description: 'The specialty site slug (e.g., "respond", "tmc", "home")',
-          enum: ['home', 'respond', 'tmc']
+          enum: [
+            'home',
+            'respond',
+            'tmc'
+          ]
         },
         rfp_id: {
           type: 'number',
@@ -649,14 +730,16 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           default: true
         }
       },
-      required: ['specialty']
+      required: [
+        'specialty'
+      ]
     }
   },
   {
     name: 'perplexity_search',
     description: 'Direct web search using the Perplexity Search API. Returns ranked search results with metadata. Perfect for finding current information, market research, pricing data, vendor information, and industry trends. Use this for fact-finding and research queries.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         query: {
           type: 'string',
@@ -665,7 +748,12 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         recency_filter: {
           type: 'string',
           description: 'Filter results by recency',
-          enum: ['day', 'week', 'month', 'year']
+          enum: [
+            'day',
+            'week',
+            'month',
+            'year'
+          ]
         },
         return_images: {
           type: 'boolean',
@@ -678,14 +766,16 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           default: true
         }
       },
-      required: ['query']
+      required: [
+        'query'
+      ]
     }
   },
   {
     name: 'perplexity_ask',
     description: 'Conversational AI with real-time web search using the sonar-pro model. Great for quick questions and everyday searches. Use this for getting concise answers to specific questions about current events, product information, or general knowledge.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         query: {
           type: 'string',
@@ -694,17 +784,24 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         search_recency_filter: {
           type: 'string',
           description: 'Filter search results by recency',
-          enum: ['day', 'week', 'month', 'year']
+          enum: [
+            'day',
+            'week',
+            'month',
+            'year'
+          ]
         }
       },
-      required: ['query']
+      required: [
+        'query'
+      ]
     }
   },
   {
     name: 'perplexity_research',
     description: 'Deep, comprehensive research using the sonar-deep-research model. Ideal for thorough analysis and detailed reports. Use this for in-depth market analysis, competitive research, technical specifications research, or when you need a comprehensive understanding of a complex topic.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         query: {
           type: 'string',
@@ -713,45 +810,60 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         search_recency_filter: {
           type: 'string',
           description: 'Filter search results by recency',
-          enum: ['day', 'week', 'month', 'year']
+          enum: [
+            'day',
+            'week',
+            'month',
+            'year'
+          ]
         }
       },
-      required: ['query']
+      required: [
+        'query'
+      ]
     }
   },
   {
     name: 'perplexity_reason',
     description: 'Advanced reasoning and problem-solving using the sonar-reasoning-pro model. Perfect for complex analytical tasks, comparing options, evaluating trade-offs, making recommendations, or solving multi-step problems. Use this when you need to analyze and reason about information rather than just retrieve it.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         query: {
           type: 'string',
           description: 'Problem or analytical question requiring advanced reasoning'
         }
       },
-      required: ['query']
+      required: [
+        'query'
+      ]
     }
   },
   {
     name: 'send_email',
     description: 'Send an email via Gmail. CRITICAL: User must have authorized Gmail access first. If not connected, direct them to: http://localhost:3100/test/gmail-oauth to connect. Use this to send emails to suppliers, customers, or team members about RFPs, bids, or procurement activities. Always include a professional subject line and clear message body.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         to: {
           type: 'array',
-          items: { type: 'string' },
+          items: {
+            type: 'string'
+          },
           description: 'Array of recipient email addresses (e.g., ["supplier@company.com"])'
         },
         cc: {
           type: 'array',
-          items: { type: 'string' },
+          items: {
+            type: 'string'
+          },
           description: 'Optional CC recipients'
         },
         bcc: {
           type: 'array',
-          items: { type: 'string' },
+          items: {
+            type: 'string'
+          },
           description: 'Optional BCC recipients'
         },
         subject: {
@@ -767,14 +879,18 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Optional HTML email body (if provided, will be used alongside body_text for rich formatting)'
         }
       },
-      required: ['to', 'subject', 'body_text']
+      required: [
+        'to',
+        'subject',
+        'body_text'
+      ]
     }
   },
   {
     name: 'search_emails',
     description: 'Search for emails in Gmail inbox related to current RFP, session, or specific query. Use this to find previous communications about a procurement topic, supplier responses, or specific email threads. Returns up to 20 emails with metadata.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         query: {
           type: 'string',
@@ -794,28 +910,32 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
           description: 'Only emails before this date (YYYY-MM-DD format)'
         }
       },
-      required: ['query']
+      required: [
+        'query'
+      ]
     }
   },
   {
     name: 'get_email',
     description: 'Retrieve a specific email by its Gmail message ID. Use this to read the full content of an email found via search_emails or list_recent_emails. Returns complete email details including headers, body, and metadata.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         message_id: {
           type: 'string',
           description: 'Gmail message ID (obtained from search_emails or list_recent_emails)'
         }
       },
-      required: ['message_id']
+      required: [
+        'message_id'
+      ]
     }
   },
   {
     name: 'list_recent_emails',
     description: 'List recent emails from Gmail inbox (last 50 by default). Use this to check what communications have come in recently, see unread messages, or verify Gmail connection. Good for checking if user has Gmail connected before attempting other email operations.',
     input_schema: {
-      type: 'object' as const,
+      type: 'object',
       properties: {
         max_results: {
           type: 'number',
@@ -824,14 +944,15 @@ export const TOOL_DEFINITIONS: ClaudeToolDefinition[] = [
         },
         label_ids: {
           type: 'array',
-          items: { type: 'string' },
+          items: {
+            type: 'string'
+          },
           description: 'Optional Gmail label IDs to filter by (default: ["INBOX"]). Common labels: "INBOX", "SENT", "UNREAD", "STARRED"'
         }
       }
     }
   }
 ];
-
 // LEGACY: Hardcoded role-based tool restrictions - DEPRECATED
 // ⚠️ DO NOT USE - All tool access should be managed via database agents.access field
 // This is kept for reference only and should be removed after all agents are migrated
@@ -850,65 +971,52 @@ const ROLE_TOOL_RESTRICTIONS: Record<string, { allowed?: string[]; blocked?: str
     blocked: ['create_and_set_rfp', 'create_form_artifact']
   }
 };
-*/
-
-// Get tool definitions for Claude API, filtered by agent's access list from database
-export function getToolDefinitions(agentRole?: string, allowedTools?: string[]): ClaudeToolDefinition[] {
+*/ // Get tool definitions for Claude API, filtered by agent's access list from database
+export function getToolDefinitions(agentRole, allowedTools) {
   console.log(`🔍 getToolDefinitions called with agentRole: '${agentRole}', allowedTools:`, allowedTools);
-  
   // Database-driven tool access control (PREFERRED and REQUIRED)
   if (allowedTools && Array.isArray(allowedTools) && allowedTools.length > 0) {
     // CRITICAL FIX: Split comma-separated tool names and flatten into single array
     // Database stores tools like: ["Memory: create_memory, search_memories", "Agent switching: switch_agent"]
     // We need: ["create_memory", "search_memories", "switch_agent"]
-    const flattenedTools = allowedTools.flatMap(toolStr => 
-      toolStr.split(',').map(t => {
+    const flattenedTools = allowedTools.flatMap((toolStr)=>toolStr.split(',').map((t)=>{
         const trimmed = t.trim();
         // Remove category prefix if present (e.g., "RFP management: get_bid" -> "get_bid")
         const colonIndex = trimmed.indexOf(':');
         return colonIndex !== -1 ? trimmed.substring(colonIndex + 1).trim() : trimmed;
-      })
-    );
-    
+      }));
     console.log(`📋 Raw access array from database:`, allowedTools);
     console.log(`✅ Flattened tool names (${flattenedTools.length} tools):`, flattenedTools);
-    
-    const filteredTools = TOOL_DEFINITIONS.filter(tool => {
+    const filteredTools = TOOL_DEFINITIONS.filter((tool)=>{
       const allowed = flattenedTools.includes(tool.name);
       console.log(`🧪 Tool '${tool.name}': ${allowed ? '✅ ALLOWED' : '❌ BLOCKED'} (database access list)`);
       return allowed;
     });
-    
-    console.log(`🔧 Filtered tools from database access list: [${filteredTools.map(t => t.name).join(', ')}]`);
+    console.log(`🔧 Filtered tools from database access list: [${filteredTools.map((t)=>t.name).join(', ')}]`);
     console.log(`📊 Tool count: ${filteredTools.length} out of ${TOOL_DEFINITIONS.length} total tools`);
     return filteredTools;
   }
-  
   // ⚠️ NO DATABASE ACCESS LIST: Agent must have 'access' field populated in database
   // This should only happen for legacy agents that haven't been migrated yet
   console.error(`❌ CRITICAL: Agent role '${agentRole}' has no access list in database!`);
   console.error(`❌ Please update the agent's 'access' field in the agents table.`);
   console.error(`❌ Returning empty tool list for safety.`);
-  
   // Return empty array - agents MUST have access field defined
   return [];
 }
-
 // Validate tool call input against schema
-export function validateToolInput(toolName: string, input: Record<string, unknown>): boolean {
-  const toolDef = TOOL_DEFINITIONS.find(tool => tool.name === toolName);
+export function validateToolInput(toolName, input) {
+  const toolDef = TOOL_DEFINITIONS.find((tool)=>tool.name === toolName);
   if (!toolDef) {
     return false;
   }
-  
   // Basic validation - check required fields
   const required = toolDef.input_schema.required || [];
-  for (const field of required) {
+  for (const field of required){
     if (!(field in input)) {
       console.error(`Missing required field '${field}' for tool '${toolName}'`);
       return false;
     }
   }
-  
   return true;
 }
