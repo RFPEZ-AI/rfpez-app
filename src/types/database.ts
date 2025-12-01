@@ -121,6 +121,9 @@ export interface Agent {
   created_at: string;
   updated_at: string;
   metadata?: Record<string, unknown>;
+  specialty?: string | null; // Specialty site identifier (e.g., 'corporate-tmc-rfp', 'respond')
+  parent_agent_id?: string | null; // UUID reference to parent agent for inheritance
+  is_abstract?: boolean; // If true, agent is abstract and not directly selectable
 }
 
 export interface SessionAgent {

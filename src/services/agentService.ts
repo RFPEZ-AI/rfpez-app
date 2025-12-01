@@ -46,9 +46,16 @@ export class AgentService {
   /**
    * Get agents available to user (returns ALL agents, UI handles greying out locked ones)
    * Note: Filtering is now handled in the UI layer to show locked agents in greyed-out state
+   * @param hasProperAccountSetup - Whether user has billing setup
+   * @param isAuthenticated - Whether user is authenticated
+   * @param specialty - Optional specialty site filter (e.g., 'corporate-tmc-rfp', 'respond')
    */
-  static async getAvailableAgents(hasProperAccountSetup = false, isAuthenticated = false): Promise<Agent[]> {
-    console.log('AgentService.getAvailableAgents called with hasProperAccountSetup:', hasProperAccountSetup, 'isAuthenticated:', isAuthenticated);
+  static async getAvailableAgents(
+    hasProperAccountSetup = false, 
+    isAuthenticated = false,
+    specialty?: string | null
+  ): Promise<Agent[]> {
+    console.log('AgentService.getAvailableAgents called with hasProperAccountSetup:', hasProperAccountSetup, 'isAuthenticated:', isAuthenticated, 'specialty:', specialty);
     
     const { data, error } = await supabase
       .from('agents')
@@ -78,6 +85,43 @@ export class AgentService {
       filtered = filtered.filter(a => !a.is_restricted || a.is_free || a.is_default);
     } else {
       filtered = allAgents.slice(); // return all for users with proper account setup
+    }
+
+    // Filter by specialty site if provided
+    if (specialty) {
+      console.log('Filtering agents for specialty site:', specialty);
+      filtered = filtered.filter(agent => {
+        // Exclude abstract agents (parent agents that aren't meant to be used directly)
+        if (agent.is_abstract) {
+          console.log(`Excluding abstract agent: ${agent.name}`);
+          return false;
+        }
+        
+        // If agent has no specialty, it's global and available on all sites
+        if (!agent.specialty) {
+          console.log(`Including global agent: ${agent.name}`);
+          return true;
+        }
+        
+        // If agent has a specialty, it must match the requested specialty
+        const matches = agent.specialty === specialty;
+        console.log(`Agent ${agent.name} specialty '${agent.specialty}' ${matches ? 'matches' : 'does not match'} requested '${specialty}'`);
+        return matches;
+      });
+    } else {
+      // If no specialty specified, exclude agents with specialties (they're site-specific)
+      // and exclude abstract agents
+      filtered = filtered.filter(agent => {
+        if (agent.is_abstract) {
+          console.log(`Excluding abstract agent: ${agent.name}`);
+          return false;
+        }
+        if (agent.specialty) {
+          console.log(`Excluding specialty-specific agent: ${agent.name} (${agent.specialty})`);
+          return false;
+        }
+        return true;
+      });
     }
 
     console.log('Returning filtered agents for display:', filtered.map(a => a.name));

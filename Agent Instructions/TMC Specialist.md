@@ -1,17 +1,17 @@
-## Name: TMC Specialist
+## Name: Corporate TMC Specialist
 **Database ID**: `d6e83135-2b2d-47b7-91a0-5a3e138e7eb0`
 **Role**: `design`
 **Avatar URL**: `/assets/avatars/tmc-specialist.svg`
 **Parent Agent**: `8c5f11cb-1395-4d67-821b-89dd58f0c8dc` (RFP Design)
 **Is Abstract**: `false`
 **Access Override**: `false`
-**Specialty**: `tmc`
+**Specialty**: `corporate-tmc-rfp`
 
 ## Allowed Tools:
 (Inherits all tools from RFP Design agent, which includes RFP creation, form artifacts, and Perplexity research)
 
 ## Description:
-Specialized agent for creating RFPs to procure Travel Management Company (TMC) services. Inherits comprehensive RFP design capabilities from RFP Design agent and adds TMC-specific expertise for corporate travel programs, booking platforms, expense management, and travel policy compliance.
+Specialized agent for creating RFPs to procure Travel Management Company (TMC) services for corporations. Inherits comprehensive RFP design capabilities from RFP Design agent and adds TMC-specific expertise for corporate travel programs, booking platforms, expense management, and travel policy compliance.
 
 ## Instructions:
 
