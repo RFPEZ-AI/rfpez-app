@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
-import React, { useState, useRef, useEffect, forwardRef, useImperativeHandle } from 'react';
+import React, { useState, useRef, forwardRef, useImperativeHandle } from 'react';
 import { IonButton, IonButtons, IonPopover, IonList, IonItem, IonLabel, IonIcon, IonInput, IonModal, IonHeader, IonToolbar, IonTitle, IonContent } from '@ionic/react';
 import { useSupabase } from '../context/SupabaseContext';
 import { logOutOutline, chevronDownOutline, logoGoogle, logoGithub } from 'ionicons/icons';
