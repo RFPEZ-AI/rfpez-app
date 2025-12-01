@@ -51,13 +51,15 @@ ON CONFLICT (slug) DO UPDATE SET
   is_active = EXCLUDED.is_active;
 
 -- Link Respond agent to respond specialty site as the default agent
+-- Use a subquery to get the actual specialty_site_id from the slug
 INSERT INTO specialty_site_agents (specialty_site_id, agent_id, is_default_agent, sort_order)
-VALUES (
-  '055cf2ec-b289-4fab-84c4-b3e44e8d75db'::uuid,
+SELECT 
+  ss.id,
   'e06c2eb5-5da8-4ceb-8843-e8cd4b2e43b2'::uuid,
   true,
   0
-)
+FROM specialty_sites ss
+WHERE ss.slug = 'respond'
 ON CONFLICT (specialty_site_id, agent_id) DO UPDATE SET
   is_default_agent = EXCLUDED.is_default_agent,
   sort_order = EXCLUDED.sort_order;
