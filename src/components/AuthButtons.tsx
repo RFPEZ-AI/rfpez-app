@@ -331,4 +331,6 @@ const AuthButtons = forwardRef<AuthButtonsRef>((props, ref) => {
   );
 });
 
+AuthButtons.displayName = 'AuthButtons';
+
 export default AuthButtons;
