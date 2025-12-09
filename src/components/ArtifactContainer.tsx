@@ -351,8 +351,8 @@ const ArtifactContainer: React.FC<SingletonArtifactWindowProps> = ({
                 id: a.id,
                 name: a.name,
                 type: a.type,
-                description: a.size || '', // Use size as description fallback
-                created_at: a.created_at || new Date().toISOString() // Preserve database timestamp
+                description: a.size || '',
+                created_at: a.created_at || new Date().toISOString()
               }))}
               selectedArtifact={artifact ? {
                 id: artifact.id,

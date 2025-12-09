@@ -39,12 +39,15 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
         }
         
         // Filter agents based on authentication status
+        console.log('🔍 Before filtering - agents:', loadedAgents.map(a => `${a.name} (free:${a.is_free})`).join(', '));
         if (!isAuthenticated) {
           console.log('👤 Anonymous user - filtering to free agents only');
           loadedAgents = loadedAgents.filter(agent => agent.is_free);
+        } else {
+          console.log('🔐 Authenticated user - showing all agents');
         }
         
-        console.log('✅ Loaded agents:', loadedAgents.map(a => a.name).join(', '));
+        console.log('✅ After filtering - agents:', loadedAgents.map(a => `${a.name} (free:${a.is_free})`).join(', '));
         setAgents(loadedAgents);
       } catch (error) {
         console.error('❌ Error loading agents:', error);
@@ -57,148 +60,220 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
     loadAgents();
   }, [specialtySlug]);
 
-  const loadDefaultAgentWithPrompt = useCallback(async (urlContext?: { bid_id?: string | null; rfp_id?: string | null }): Promise<Message | null> => {
-    console.error('🚨🚨🚨 loadDefaultAgentWithPrompt CALLED');
-    console.error('🚨🚨🚨 urlContext:', JSON.stringify(urlContext));
-    console.error('🚨🚨🚨 specialtySlug:', specialtySlug);
-    console.log('🎯 loadDefaultAgentWithPrompt: Starting...');
-    console.log('🎯 specialtySlug:', specialtySlug);
-    console.log('🎯 urlContext:', urlContext);
-    try {
-      // Check authentication status
-      const { data: { user } } = await supabase.auth.getUser();
-      const isAuthenticated = !!user;
-      console.log('🔐 User authenticated:', isAuthenticated);
-      
-      // 🎯 SPECIALTY-AWARE: Get default agent for specialty site if specialty is set
-      let defaultAgent: Agent | null = null;
-      
-      if (specialtySlug && specialtySlug !== 'home') {
-        // Load default agent for this specialty site
-        console.log('🎯 Loading default agent for specialty site:', specialtySlug);
-        const { SpecialtySiteService } = await import('../services/specialtySiteService');
-        defaultAgent = await SpecialtySiteService.getDefaultAgentForSpecialtySite(specialtySlug);
-        console.log('🎯 Specialty default agent:', defaultAgent?.name, 'is_free:', defaultAgent?.is_free);
+  // 🔐 Watch for authentication changes and switch to appropriate default agent
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('🔐 Auth state changed in useAgentManagement:', event);
         
-        // If default agent requires auth but user is not authenticated, find free agent
-        if (defaultAgent && !defaultAgent.is_free && !isAuthenticated) {
-          console.log('🎯 Default agent requires auth but user is anonymous, finding free agent');
-          const agents = await AgentService.getAgentsForSpecialtySite(specialtySlug);
-          const freeAgent = agents.find(a => a.is_free);
-          if (freeAgent) {
-            console.log('🎯 Using free agent for anonymous user:', freeAgent.name);
-            defaultAgent = freeAgent;
+        // Only handle SIGNED_IN event for specialty sites
+        if (event === 'SIGNED_IN' && specialtySlug && specialtySlug !== 'home') {
+          console.log('🎯 User signed in on specialty site:', specialtySlug);
+          
+          // For corporate-tmc-rfp, switch from Welcome to TMC Specialist
+          if (specialtySlug === 'corporate-tmc-rfp' && currentAgent?.agent_name === 'Corporate TMC RFP Welcome') {
+            console.log('🔄 Switching from Corporate TMC RFP Welcome to TMC Specialist after login');
+            
+            // Get TMC Specialist agent
+            const tmcSpecialist = agents.find(a => a.name === 'TMC Specialist');
+            if (!tmcSpecialist) {
+              // Reload agents to ensure we have all agents including non-free ones
+              console.log('🔄 TMC Specialist not in current agents list, reloading...');
+              const allAgents = await AgentService.getAgentsForSpecialtySite(specialtySlug);
+              const specialist = allAgents.find(a => a.name === 'TMC Specialist');
+              if (specialist) {
+                console.log('✅ Found TMC Specialist, switching agent...');
+                const sessionActiveAgent: SessionActiveAgent = {
+                  agent_id: specialist.id,
+                  agent_name: specialist.name,
+                  agent_instructions: specialist.instructions,
+                  agent_initial_prompt: specialist.initial_prompt,
+                  agent_avatar_url: specialist.avatar_url
+                };
+                setCurrentAgent(sessionActiveAgent);
+                
+                // Update session context if we have a session
+                if (sessionId) {
+                  await DatabaseService.updateSessionContext(sessionId, {
+                    current_agent_id: specialist.id
+                  });
+                }
+              }
+            } else {
+              console.log('✅ TMC Specialist found in agents list, switching...');
+              const sessionActiveAgent: SessionActiveAgent = {
+                agent_id: tmcSpecialist.id,
+                agent_name: tmcSpecialist.name,
+                agent_instructions: tmcSpecialist.instructions,
+                agent_initial_prompt: tmcSpecialist.initial_prompt,
+                agent_avatar_url: tmcSpecialist.avatar_url
+              };
+              setCurrentAgent(sessionActiveAgent);
+              
+              // Update session context if we have a session
+              if (sessionId) {
+                await DatabaseService.updateSessionContext(sessionId, {
+                  current_agent_id: tmcSpecialist.id
+                });
+              }
+            }
+          }
+          
+          // Reload agents list to include non-free agents
+          console.log('🔄 Reloading agents list after authentication...');
+          const loadedAgents = await AgentService.getAgentsForSpecialtySite(specialtySlug);
+          console.log('✅ Reloaded agents:', loadedAgents.map(a => a.name).join(', '));
+          setAgents(loadedAgents);
+        }
+      }
+    );
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [specialtySlug, currentAgent, agents, sessionId]);
+
+  const loadDefaultAgentWithPrompt = useCallback(
+    async (urlContext?: { bid_id?: string | null; rfp_id?: string | null }): Promise<Message | null> => {
+      console.log('🎯 loadDefaultAgentWithPrompt: Starting...');
+      console.log('🎯 specialtySlug:', specialtySlug);
+      console.log('🎯 urlContext:', urlContext);
+      try {
+        // Check authentication status
+        const { data: { user } } = await supabase.auth.getUser();
+        const isAuthenticated = !!user;
+        console.log('🔐 User authenticated:', isAuthenticated);
+        
+        // 🎯 SPECIALTY-AWARE: Get default agent for specialty site if specialty is set
+        let defaultAgent: Agent | null = null;
+        
+        if (specialtySlug && specialtySlug !== 'home') {
+          // Load default agent for this specialty site
+          console.log('🎯 Loading default agent for specialty site:', specialtySlug);
+          const { SpecialtySiteService } = await import('../services/specialtySiteService');
+          defaultAgent = await SpecialtySiteService.getDefaultAgentForSpecialtySite(specialtySlug);
+          console.log('🎯 Specialty default agent:', defaultAgent?.name, 'is_free:', defaultAgent?.is_free);
+          
+          // If default agent requires auth but user is not authenticated, find free agent
+          if (defaultAgent && !defaultAgent.is_free && !isAuthenticated) {
+            console.log('🎯 Default agent requires auth but user is anonymous, finding free agent');
+            const agents = await AgentService.getAgentsForSpecialtySite(specialtySlug);
+            const freeAgent = agents.find(a => a.is_free);
+            if (freeAgent) {
+              console.log('🎯 Using free agent for anonymous user:', freeAgent.name);
+              defaultAgent = freeAgent;
+            }
           }
         }
-      }
-      
-      // Fallback to general default agent if no specialty or specialty has no default
-      if (!defaultAgent) {
-        console.log('🎯 Loading general authentication-aware default agent');
-        defaultAgent = await AgentService.getDefaultAgent();
-      }
-      
-      console.log('🎯 loadDefaultAgentWithPrompt: Default agent fetched:', defaultAgent?.name);
-      
-      if (defaultAgent) {
-        const sessionActiveAgent: SessionActiveAgent = {
-          agent_id: defaultAgent.id,
-          agent_name: defaultAgent.name,
-          agent_instructions: defaultAgent.instructions,
-          agent_initial_prompt: defaultAgent.initial_prompt,
-          agent_avatar_url: defaultAgent.avatar_url
-        };
         
-        console.log('🎯 loadDefaultAgentWithPrompt: Setting currentAgent state to:', sessionActiveAgent.agent_name);
-        setCurrentAgent(sessionActiveAgent);
-        console.log('🎯 loadDefaultAgentWithPrompt: currentAgent state set successfully');
-        
-        // 🚨 CRITICAL: Only persist agent to database if we have a VALID session
-        // During new session creation, sessionId may contain stale OLD session ID
-        // We skip the database update to prevent restoring old session state
-        if (sessionId) {
-          console.log('⚠️ Skipping database session context update during new session preparation');
-          console.log('📌 Session ID would have been:', sessionId, '(likely stale from closure)');
-          // await DatabaseService.updateSessionContext(sessionId, {
-          //   current_agent_id: defaultAgent.id
-          // });
+        // Fallback to general default agent if no specialty or specialty has no default
+        if (!defaultAgent) {
+          console.log('🎯 Loading general authentication-aware default agent');
+          defaultAgent = await AgentService.getDefaultAgent();
         }
         
-        console.log('Loaded default agent with prompt:', sessionActiveAgent);
-        console.log('🔍 DEBUG: defaultAgent.initial_prompt exists?', !!defaultAgent.initial_prompt);
-        console.log('🔍 DEBUG: sessionId:', sessionId);
+        console.log('🎯 loadDefaultAgentWithPrompt: Default agent fetched:', defaultAgent?.name);
+        
+        if (defaultAgent) {
+          const sessionActiveAgent: SessionActiveAgent = {
+            agent_id: defaultAgent.id,
+            agent_name: defaultAgent.name,
+            agent_instructions: defaultAgent.instructions,
+            agent_initial_prompt: defaultAgent.initial_prompt,
+            agent_avatar_url: defaultAgent.avatar_url
+          };
+          
+          console.log('🎯 loadDefaultAgentWithPrompt: Setting currentAgent state to:', sessionActiveAgent.agent_name);
+          setCurrentAgent(sessionActiveAgent);
+          console.log('🎯 loadDefaultAgentWithPrompt: currentAgent state set successfully');
+          
+          // 🚨 CRITICAL: Only persist agent to database if we have a VALID session
+          // During new session creation, sessionId may contain stale OLD session ID
+          // We skip the database update to prevent restoring old session state
+          if (sessionId) {
+            console.log('⚠️ Skipping database session context update during new session preparation');
+            console.log('📌 Session ID would have been:', sessionId, '(likely stale from closure)');
+            // await DatabaseService.updateSessionContext(sessionId, {
+            //   current_agent_id: defaultAgent.id
+            // });
+          }
+          
+          console.log('Loaded default agent with prompt:', sessionActiveAgent);
+          console.log('🔍 DEBUG: defaultAgent.initial_prompt exists?', !!defaultAgent.initial_prompt);
+          console.log('🔍 DEBUG: sessionId:', sessionId);
 
-        // 🎭 DYNAMIC WELCOME: Process initial_prompt through edge function with streaming
-        // This allows the agent to search memory across sessions and personalize the welcome
-        if (defaultAgent.initial_prompt) {
-          console.log('🌊 Processing initial_prompt with streaming agent continuation...');
-          console.log('🔍 DEBUG: About to import ClaudeService...');
-          
-          // Import ClaudeService to trigger initial prompt processing
-          const { ClaudeService } = await import('../services/claudeService');
-          console.log('🔍 DEBUG: ClaudeService imported, calling processInitialPrompt...');
-          
-          try {
-            // Call edge function with processInitialPrompt=true
-            // This triggers the same streaming continuation logic used for agent switches
-            console.error('🚨🚨🚨 ABOUT TO CALL processInitialPrompt with urlContext:', JSON.stringify(urlContext));
-            const dynamicWelcome = await ClaudeService.processInitialPrompt(defaultAgent, sessionId || undefined, undefined, urlContext);
-            console.error('🚨🚨🚨 processInitialPrompt RETURNED:', dynamicWelcome?.substring(0, 100));
-            console.log('🔍 DEBUG: processInitialPrompt returned:', dynamicWelcome?.substring(0, 100));
+          // 🎭 DYNAMIC WELCOME: Process initial_prompt through edge function with streaming
+          // This allows the agent to search memory across sessions and personalize the welcome
+          if (defaultAgent.initial_prompt) {
+            console.log('🌊 Processing initial_prompt with streaming agent continuation...');
+            console.log('🔍 DEBUG: About to import ClaudeService...');
+            
+            // Import ClaudeService to trigger initial prompt processing
+            const { ClaudeService } = await import('../services/claudeService');
+            console.log('🔍 DEBUG: ClaudeService imported, calling processInitialPrompt...');
+            
+            try {
+              // Call edge function with processInitialPrompt=true
+              // This triggers the same streaming continuation logic used for agent switches
+              console.log('🔍 ABOUT TO CALL processInitialPrompt with urlContext:', urlContext);
+              const dynamicWelcome = await ClaudeService.processInitialPrompt(defaultAgent, sessionId || undefined, undefined, urlContext);
+              console.log('🔍 processInitialPrompt RETURNED:', dynamicWelcome?.substring(0, 100));
+              console.log('🔍 DEBUG: processInitialPrompt returned:', dynamicWelcome?.substring(0, 100));
+              
+              const initialMessage: Message = {
+                id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
+                content: dynamicWelcome,
+                isUser: false,
+                timestamp: new Date(),
+                agentName: defaultAgent.name
+              };
+              
+              console.log('✅ Created dynamic agent greeting from initial_prompt');
+              return initialMessage;
+            } catch (error) {
+              console.error('❌ Failed to process initial_prompt, using simple fallback:', error);
+              // Fallback to simple welcome if processing fails
+              const simpleWelcome = `Welcome! I'm your ${defaultAgent.name}, here to help with procurement and sourcing.`;
+              return {
+                id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
+                content: simpleWelcome,
+                isUser: false,
+                timestamp: new Date(),
+                agentName: defaultAgent.name
+              };
+            }
+          } else {
+            // No initial_prompt defined, use simple static welcome
+            const simpleWelcome = `Welcome to **EZRFP.APP**! 👋\n\nI'm your ${defaultAgent.name}, here to help you streamline your procurement process.`;
             
             const initialMessage: Message = {
-              id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
-              content: dynamicWelcome,
-              isUser: false,
-              timestamp: new Date(),
-              agentName: defaultAgent.name
-            };
-            
-            console.log('✅ Created dynamic agent greeting from initial_prompt');
-            return initialMessage;
-          } catch (error) {
-            console.error('❌ Failed to process initial_prompt, using simple fallback:', error);
-            // Fallback to simple welcome if processing fails
-            const simpleWelcome = `Welcome! I'm your ${defaultAgent.name}, here to help with procurement and sourcing.`;
-            return {
               id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
               content: simpleWelcome,
               isUser: false,
               timestamp: new Date(),
               agentName: defaultAgent.name
             };
+            
+            console.log('Created simple agent greeting (no initial_prompt)');
+            return initialMessage;
           }
         } else {
-          // No initial_prompt defined, use simple static welcome
-          const simpleWelcome = `Welcome to **EZRFP.APP**! 👋\n\nI'm your ${defaultAgent.name}, here to help you streamline your procurement process.`;
-          
-          const initialMessage: Message = {
-            id: `agent-greeting-${defaultAgent.id}-${Date.now()}`,
-            content: simpleWelcome,
-            isUser: false,
-            timestamp: new Date(),
-            agentName: defaultAgent.name
-          };
-          
-          console.log('Created simple agent greeting (no initial_prompt)');
-          return initialMessage;
+          console.error('❌ loadDefaultAgentWithPrompt: No default agent found from AgentService.getDefaultAgent()');
         }
-      } else {
-        console.error('❌ loadDefaultAgentWithPrompt: No default agent found from AgentService.getDefaultAgent()');
+      } catch (error) {
+        console.error('❌ loadDefaultAgentWithPrompt: Exception caught:', error);
       }
-    } catch (error) {
-      console.error('❌ loadDefaultAgentWithPrompt: Exception caught:', error);
-    }
-    
-    console.log('🎯 loadDefaultAgentWithPrompt: Returning null (no agent loaded)');
-    return null;
+      
+      console.log('🎯 loadDefaultAgentWithPrompt: Returning null (no agent loaded)');
+      return null;
     
     /* OLD APPROACH - Commented out, now handled by edge function agent continuation
     const { ClaudeService} = await import('../services/claudeService');
     const dynamicWelcome = await ClaudeService.processInitialPrompt(defaultAgent, sessionId, userProfile);
     return { id: 'initial-prompt', content: dynamicWelcome, isUser: false, timestamp: new Date(), agentName: defaultAgent.name };
     */
-  }, [sessionId, specialtySlug]); // Depends on sessionId AND specialtySlug
+  },
+  [sessionId, specialtySlug]); // Depends on sessionId AND specialtySlug
 
   const loadSessionAgent = async (sessionId: string) => {
     console.log('🔄 loadSessionAgent called with sessionId:', sessionId);

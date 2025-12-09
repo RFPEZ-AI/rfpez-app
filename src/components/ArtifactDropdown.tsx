@@ -192,7 +192,14 @@ const ArtifactDropdown: React.FC<ArtifactDropdownProps> = ({
           margin: 0,
           padding: 0
         }}>
-          {artifacts.filter(a => a.id).map((artifact) => (
+          {(() => {
+            console.log('🎨 ARTIFACT DROPDOWN DEBUG:', {
+              totalArtifacts: artifacts.length,
+              artifactsWithIds: artifacts.filter(a => a.id).length,
+              artifacts: artifacts.map(a => ({ id: a.id, name: a.name, hasId: !!a.id }))
+            });
+            return artifacts.filter(a => a.id);
+          })().map((artifact) => (
             <IonItem
               key={artifact.id}
               button

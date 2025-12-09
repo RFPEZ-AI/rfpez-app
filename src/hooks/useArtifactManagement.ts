@@ -175,8 +175,10 @@ export const useArtifactManagement = (
     console.log('🔍 Current RFP State:', {
       hasRfp: !!currentRfp,
       rfpId: currentRfp?.id,
-      rfpName: currentRfp?.name
+      rfpName: currentRfp?.name,
+      rfpObject: currentRfp
     });
+    console.log('🔍 useEffect dependency currentRfp?.id:', currentRfp?.id);
     
     // CRITICAL: Clear ALL artifacts when RFP changes to prevent contamination
     console.log('🧹 Clearing all artifacts on RFP change');
@@ -184,10 +186,11 @@ export const useArtifactManagement = (
     setSelectedArtifactId(null);
     
     if (currentRfp && currentRfp.id) {
-      console.log('Loading artifacts for RFP:', currentRfp.id, currentRfp.name);
+      console.log('✅ RFP CONDITION MET - Loading artifacts for RFP:', currentRfp.id, currentRfp.name);
       
       // Load RFP artifacts directly in the effect
       const loadArtifacts = async () => {
+        console.log('🚀 EXECUTING loadArtifacts function...');
         try {
           console.log('📋 Loading RFP-associated artifacts for RFP:', currentRfp.id, currentRfp.name);
           console.log('📋 RFP details:', {
@@ -196,40 +199,14 @@ export const useArtifactManagement = (
             title: (currentRfp as unknown as { title?: string }).title
           });
           
+          console.log('🔍 Calling DatabaseService.getRFPArtifacts with rfpId:', parseInt(currentRfp.id.toString()));
           const artifactsData = await DatabaseService.getRFPArtifacts(parseInt(currentRfp.id.toString()));
           console.log('📋 Database returned', artifactsData.length, 'artifacts for RFP', currentRfp.id);
+          console.log('📋 Raw artifacts data:', artifactsData);
           
-          // Map RPC result structure (artifact_id, artifact_name, etc.) to DatabaseArtifact structure (id, name, etc.)
-          const formattedArtifacts: Artifact[] = (artifactsData as Array<{
-            artifact_id: string;
-            artifact_name: string;
-            artifact_type: string;
-            artifact_role: string;
-            schema?: Record<string, unknown>;
-            ui_schema?: Record<string, unknown>;
-            default_values?: Record<string, unknown>;
-            submit_action?: Record<string, unknown>;
-            processed_content?: string;
-            session_id?: string;
-            created_at: string;
-          }>).map(rpcResult => {
-            // Convert RPC result to DatabaseArtifact-like structure
-            const artifact: DatabaseArtifact = {
-              id: rpcResult.artifact_id,
-              name: rpcResult.artifact_name,
-              type: rpcResult.artifact_type,
-              artifact_role: rpcResult.artifact_role,
-              schema: rpcResult.schema,
-              ui_schema: rpcResult.ui_schema,
-              default_values: rpcResult.default_values,
-              submit_action: rpcResult.submit_action,
-              processed_content: rpcResult.processed_content,
-              session_id: rpcResult.session_id,
-              created_at: rpcResult.created_at
-            };
-            
-            return artifact;
-          }).map(artifact => {
+          // DatabaseService.getRFPArtifacts already maps artifact_id→id, artifact_name→name, etc.
+          // So we can use the data directly as DatabaseArtifact[]
+          const formattedArtifacts: Artifact[] = (artifactsData as DatabaseArtifact[]).map(artifact => {
             let content: string | undefined;
             
             // For form artifacts, handle schema and processed_content
@@ -428,6 +405,12 @@ export const useArtifactManagement = (
         rfpName: currentRfp?.name
       });
       
+      // CRITICAL: Clear artifacts FIRST to prevent stale data from previous session
+      // This must happen before any conditional logic
+      console.log('🧹 Clearing artifacts before loading session artifacts');
+      setArtifacts([]);
+      setSelectedArtifactId(null);
+      
       // If RFP context is active, use RFP artifacts instead of session artifacts
       // This prevents loading artifacts from other RFPs in the same session
       if (currentRfp && currentRfp.id) {
@@ -437,16 +420,6 @@ export const useArtifactManagement = (
       
       // No RFP context - load all session artifacts
       const artifactsData: DatabaseArtifact[] = await DatabaseService.getSessionArtifacts(sessionId);
-      console.log('📦 Retrieved session artifacts from database:', {
-        count: artifactsData.length,
-        artifacts: artifactsData.map(a => ({
-          id: a.id,
-          name: a.name,
-          type: a.type,
-          hasDefaultValues: !!a.default_values,
-          defaultValuesKeys: a.default_values ? Object.keys(a.default_values) : []
-        }))
-      });
       const formattedArtifacts: Artifact[] = artifactsData.map(artifact => {
         let content: string | undefined;
         
@@ -533,16 +506,6 @@ export const useArtifactManagement = (
       
       // Replace ALL artifacts with only session-specific artifacts
       // This ensures that switching sessions shows ONLY artifacts for that session
-      console.log(`📋 Loading ${formattedArtifacts.length} artifacts for session:`, sessionId);
-      console.log(`📋 Previous artifact count: ${artifacts.length}`);
-      console.log(`📋 Artifacts with default_values:`, formattedArtifacts.map(a => ({
-        id: a.id,
-        name: a.name,
-        hasDefaultValues: !!a.default_values,
-        defaultValuesCount: a.default_values ? Object.keys(a.default_values).length : 0
-      })));
-      
-      // Force React to detect state change by creating completely new array
       setArtifacts([...formattedArtifacts]);
 
       // Return the artifacts so the caller can handle selection

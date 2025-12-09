@@ -474,20 +474,6 @@ const Home: React.FC = () => {
       setSelectedArtifactFromState(artifactToSelect);
       console.log('Selected artifact:', artifactToSelect);
     }
-    
-    // If we have artifacts, ensure the window is shown (auto-show behavior)
-    if (sessionArtifacts && sessionArtifacts.length > 0) {
-      if (!artifactWindowState.isOpen) {
-        artifactWindowState.openWindow();
-      }
-    }
-    
-    // Auto-hide if no artifacts exist
-    if (!sessionArtifacts || sessionArtifacts.length === 0) {
-      if (artifactWindowState.isOpen) {
-        artifactWindowState.closeWindow();
-      }
-    }
   }, [
     setSelectedSessionId,
     setCurrentSessionId,
@@ -498,6 +484,24 @@ const Home: React.FC = () => {
     loadSessionArtifacts,
     setSelectedArtifactFromState
   ]);
+
+  // Auto-show/hide artifact window based on artifacts availability
+  useEffect(() => {
+    // Skip if still loading initial session
+    if (!currentSessionId) return;
+    
+    if (artifacts && artifacts.length > 0) {
+      if (!artifactWindowState.isOpen) {
+        console.log('📂 Auto-opening artifact window - artifacts available:', artifacts.length);
+        artifactWindowState.openWindow();
+      }
+    } else {
+      if (artifactWindowState.isOpen) {
+        console.log('📂 Auto-closing artifact window - no artifacts');
+        artifactWindowState.closeWindow();
+      }
+    }
+  }, [artifacts.length, currentSessionId, artifactWindowState]);
 
   // Session initialization and lifecycle management (extracted to hook)
   useSessionInitialization({

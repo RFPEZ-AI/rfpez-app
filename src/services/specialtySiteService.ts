@@ -139,6 +139,8 @@ export class SpecialtySiteService {
 
   /**
    * Get the default agent for a specialty site
+   * For authenticated users on corporate-tmc-rfp: returns TMC Specialist
+   * For anonymous users on corporate-tmc-rfp: returns Corporate TMC RFP Welcome
    */
   static async getDefaultAgentForSpecialtySite(siteSlug: string): Promise<Agent | null> {
     console.log('SpecialtySiteService.getDefaultAgentForSpecialtySite called with slug:', siteSlug);
@@ -154,7 +156,32 @@ export class SpecialtySiteService {
       // Get agents for the site
       const agents = await this.getAgentsForSpecialtySite(siteSlug);
       
-      // Find the default agent
+      // Check authentication status
+      const { data: { user } } = await supabase.auth.getUser();
+      const isAuthenticated = !!user;
+      
+      console.log('🔐 Getting default agent - authenticated:', isAuthenticated);
+      
+      // 🎯 SPECIALTY SITE LOGIC: For corporate-tmc-rfp site
+      if (siteSlug === 'corporate-tmc-rfp') {
+        if (isAuthenticated) {
+          // Authenticated users get TMC Specialist as default
+          const tmcSpecialist = agents.find(agent => agent.name === 'TMC Specialist');
+          if (tmcSpecialist) {
+            console.log('✅ Authenticated user - default agent: TMC Specialist');
+            return tmcSpecialist;
+          }
+        } else {
+          // Anonymous users get Corporate TMC RFP Welcome as default
+          const welcomeAgent = agents.find(agent => agent.name === 'Corporate TMC RFP Welcome');
+          if (welcomeAgent) {
+            console.log('✅ Anonymous user - default agent: Corporate TMC RFP Welcome');
+            return welcomeAgent;
+          }
+        }
+      }
+      
+      // Fallback to agent marked as is_default in database
       const defaultAgent = agents.find(agent => agent.is_default);
       
       if (!defaultAgent && agents.length > 0) {

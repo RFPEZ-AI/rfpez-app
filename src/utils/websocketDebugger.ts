@@ -76,7 +76,7 @@ class WebSocketDebugger {
       // Filter out embedding generator initialization errors (expected - using server-side fallback)
       if (
         message.includes('Error initializing embedding generator') ||
-        (message.includes('Unexpected token') && message.includes('is not valid JSON') && args.some((arg: any) => arg?.stack?.includes('getModelJSON')))
+        (message.includes('Unexpected token') && message.includes('is not valid JSON') && args.some((arg: any) => arg && typeof arg === 'object' && arg.stack && arg.stack.includes('getModelJSON')))
       ) {
         // Only show the first occurrence, then suppress
         if (!this.suppressedConnections.has('embedding-generator')) {
