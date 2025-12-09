@@ -63,7 +63,7 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
   // 🔐 Watch for authentication changes and switch to appropriate default agent
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (event) => {
         console.log('🔐 Auth state changed in useAgentManagement:', event);
         
         // Only handle SIGNED_IN event for specialty sites
