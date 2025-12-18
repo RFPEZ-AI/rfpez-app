@@ -26,7 +26,7 @@ export const isBetaTestMode = (): boolean => {
  */
 export const hasFullAccess = (
   isAuthenticated: boolean,
-  hasBillingSetup: boolean = false
+  hasBillingSetup = false
 ): boolean => {
   if (!isAuthenticated) {
     return false; // Anonymous users never have full access
@@ -49,7 +49,7 @@ export const hasFullAccess = (
  */
 export const getUserAccessLevel = (
   isAuthenticated: boolean,
-  hasBillingSetup: boolean = false
+  hasBillingSetup = false
 ): 'anonymous' | 'basic' | 'premium' => {
   if (!isAuthenticated) {
     return 'anonymous';
