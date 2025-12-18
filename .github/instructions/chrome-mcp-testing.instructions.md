@@ -128,6 +128,213 @@ chrome_keyboard({
 });
 ```
 
+## 🔧 Chrome MCP for Live Debugging
+
+### When to Use Chrome MCP for Debugging
+- Reproducing user-reported issues in controlled environment
+- Inspecting network traffic for API call failures
+- Capturing visual state at exact moment of error
+- Verifying UI behavior after code changes
+- Debugging authentication or session management issues
+- Analyzing page content and DOM structure
+
+### General Debugging Workflow
+
+**Step 1: Navigate to Problem Area**
+```javascript
+// Start at the page where issue occurs
+chrome_navigate({ 
+  url: 'http://localhost:3100/path/to/problem',
+  width: 1920,
+  height: 1080
+});
+
+// Take baseline screenshot
+chrome_screenshot({ 
+  name: '01-initial-state',
+  fullPage: true 
+});
+```
+
+**Step 2: Start Network Monitoring**
+```javascript
+// Capture all API calls and network activity
+chrome_network_capture_start({
+  maxCaptureTime: 60000,      // 60 seconds max
+  inactivityTimeout: 5000,    // Stop after 5s inactivity
+  includeStatic: false        // Exclude CSS/images/fonts
+});
+```
+
+**Step 3: Reproduce the Issue**
+```javascript
+// Perform actions that trigger the bug
+chrome_click_element({ selector: '[data-testid="trigger-button"]' });
+
+// Capture state at error point
+chrome_screenshot({ 
+  name: '02-error-state',
+  fullPage: true,
+  storeBase64: true  // Get base64 for inline viewing
+});
+
+// Extract error messages or content
+const errorContent = chrome_get_web_content({ 
+  selector: '.error-message',
+  format: 'text'
+});
+```
+
+**Step 4: Analyze Network Activity**
+```javascript
+// Stop capture and review API calls
+const networkData = chrome_network_capture_stop();
+
+// Network data includes:
+// - capturedRequests: Array of all HTTP requests
+// - Each request has: url, method, statusCode, requestHeaders, responseHeaders
+// - Look for failed API calls (statusCode >= 400)
+// - Check response times for performance issues
+```
+
+**Step 5: Inspect Page State**
+```javascript
+// Get interactive elements to verify UI structure
+const elements = chrome_get_interactive_elements();
+
+// Search for specific content issues
+const searchResults = search_tabs_content({
+  query: 'error message keywords'
+});
+
+// Get full page HTML for detailed inspection
+const pageHTML = chrome_get_web_content({ 
+  format: 'html' 
+});
+```
+
+### Common Debugging Scenarios
+
+**Scenario 1: Message Not Submitting**
+```javascript
+// Navigate and monitor
+chrome_navigate({ url: 'http://localhost:3100' });
+chrome_network_capture_start({ maxCaptureTime: 30000 });
+
+// Attempt message submission
+chrome_fill_or_select({ 
+  selector: '[data-testid="message-input"]', 
+  value: 'Test message' 
+});
+chrome_keyboard({ keys: 'Enter' });
+
+// Capture state
+chrome_screenshot({ name: 'message-submit-issue' });
+const networkData = chrome_network_capture_stop();
+
+// Check for API call to /api/messages
+// Look for errors in network responses
+```
+
+**Scenario 2: Authentication Issues**
+```javascript
+// Monitor authentication flow
+chrome_network_debugger_start();  // Includes response bodies
+
+chrome_navigate({ url: 'http://localhost:3100' });
+chrome_click_element({ selector: '[data-testid="login-button"]' });
+chrome_fill_or_select({ selector: 'input[type="email"]', value: 'test@example.com' });
+chrome_fill_or_select({ selector: 'input[type="password"]', value: 'password' });
+chrome_keyboard({ keys: 'Enter' });
+
+// Stop and analyze
+const debugData = chrome_network_debugger_stop();
+// Review authentication API responses, check for 401/403 errors
+```
+
+**Scenario 3: RFP Context Not Updating**
+```javascript
+// Create RFP and verify context footer
+chrome_click_element({ selector: '[data-testid="new-session-button"]' });
+chrome_fill_or_select({ 
+  selector: '[data-testid="message-input"]', 
+  value: 'Create RFP for testing' 
+});
+chrome_keyboard({ keys: 'Enter' });
+
+// Wait and check footer
+chrome_screenshot({ name: 'after-rfp-creation' });
+
+const footerContent = chrome_get_web_content({ 
+  selector: '[data-testid="rfp-context-footer"]',
+  format: 'text'
+});
+// Verify footerContent contains expected RFP name
+```
+
+**Scenario 4: Agent Switching Problems**
+```javascript
+// Monitor agent switching
+chrome_network_capture_start({ maxCaptureTime: 20000 });
+
+chrome_click_element({ selector: '[data-testid="agent-selector"]' });
+chrome_screenshot({ name: 'agent-menu-open' });
+
+chrome_click_element({ selector: '[data-testid="select-agent-button"]' });
+chrome_screenshot({ name: 'after-agent-switch' });
+
+const networkData = chrome_network_capture_stop();
+// Check for updates to session_agents table
+```
+
+### Performance Debugging
+
+```javascript
+// Start performance trace
+chrome_navigate({ url: 'http://localhost:3100' });
+// Note: Performance tracing requires mcp_chrome-devtoo_performance_start_trace (not yet available)
+
+// For now, use network timing analysis
+chrome_network_capture_start({ maxCaptureTime: 30000 });
+
+// Perform slow operation
+chrome_click_element({ selector: '[data-testid="slow-operation"]' });
+
+const networkData = chrome_network_capture_stop();
+// Analyze request timing in capturedRequests
+// Look for slow API calls or excessive requests
+```
+
+### Multi-Tab Debugging
+
+```javascript
+// Open multiple related pages
+chrome_navigate({ url: 'http://localhost:3100/session/1' });
+chrome_navigate({ url: 'http://localhost:3100/session/2', newWindow: false });
+
+// List all open tabs
+const windows = get_windows_and_tabs();
+
+// Search across all tabs for specific content
+const results = search_tabs_content({
+  query: 'error or warning message'
+});
+
+// Switch to specific tab for inspection
+chrome_switch_tab({ tabId: results[0].tabId });
+chrome_screenshot({ name: 'tab-with-error' });
+```
+
+### Debugging Checklist
+
+Before reporting a bug, capture:
+- ✅ Screenshot of initial state
+- ✅ Screenshot at moment of error
+- ✅ Network capture showing API calls
+- ✅ Console logs (if available via browser DevTools)
+- ✅ Relevant page content (error messages, unexpected text)
+- ✅ Steps to reproduce (documented with Chrome MCP commands)
+
 ## 🎯 RFPEZ.AI Testing Workflows
 
 ### Standard Login & Authentication Flow

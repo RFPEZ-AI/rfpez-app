@@ -162,30 +162,25 @@ export class SpecialtySiteService {
       
       console.log('🔐 Getting default agent - authenticated:', isAuthenticated);
       
-      // 🎯 SPECIALTY SITE LOGIC: For corporate-tmc-rfp site
-      if (siteSlug === 'corporate-tmc-rfp') {
-        if (isAuthenticated) {
-          // Authenticated users get TMC Specialist as default
-          const tmcSpecialist = agents.find(agent => agent.name === 'TMC Specialist');
-          if (tmcSpecialist) {
-            console.log('✅ Authenticated user - default agent: TMC Specialist');
-            return tmcSpecialist;
-          }
-        } else {
-          // Anonymous users get Corporate TMC RFP Welcome as default
-          const welcomeAgent = agents.find(agent => agent.name === 'Corporate TMC RFP Welcome');
-          if (welcomeAgent) {
-            console.log('✅ Anonymous user - default agent: Corporate TMC RFP Welcome');
-            return welcomeAgent;
-          }
+      // 🎯 NEW: Use is_anonymous_default and is_default columns for all specialty sites
+      let defaultAgent: Agent | null = null;
+      
+      if (isAuthenticated) {
+        // Authenticated users get agent marked as is_default
+        defaultAgent = agents.find(agent => agent.is_default) || null;
+        if (defaultAgent) {
+          console.log('✅ Authenticated user - default agent:', defaultAgent.name);
+        }
+      } else {
+        // Anonymous users get agent marked as is_anonymous_default
+        defaultAgent = agents.find(agent => agent.is_anonymous_default) || null;
+        if (defaultAgent) {
+          console.log('✅ Anonymous user - default agent:', defaultAgent.name);
         }
       }
       
-      // Fallback to agent marked as is_default in database
-      const defaultAgent = agents.find(agent => agent.is_default);
-      
+      // Fallback to first available agent if no default set
       if (!defaultAgent && agents.length > 0) {
-        // Fallback to first agent if no default set
         console.warn('⚠️ No default agent set for specialty site, using first agent');
         return agents[0];
       }

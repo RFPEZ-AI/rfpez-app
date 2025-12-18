@@ -107,17 +107,18 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
 
     if (!isAuthenticated) {
       // ✅ Anonymous users can ONLY access:
-      // 1. Default agent (auto-assigned)
-      // 2. Support agents (for help without login)
+      // 1. Anonymous default agent (is_anonymous_default = true)
+      // 2. Free agents (is_free = true)
+      // 3. Support agents (for help without login)
       const isSupport = agent.name?.toLowerCase().includes('support') || 
                        agent.name?.toLowerCase().includes('help') ||
                        agent.role === 'support' ||
                        (agent.description && agent.description.toLowerCase().includes('support'));
       
-      canAccess = (agent.is_default === true) || (isSupport === true);
+      canAccess = (agent.is_anonymous_default === true) || (agent.is_free === true) || (isSupport === true);
       accessMessage = isSupport 
         ? '' // Support agent is allowed
-        : 'Please sign in to access this agent. The Support agent is available without login if you need help.';
+        : 'Please sign in to access this agent. Free agents are available to authenticated users, while premium agents require billing setup.';
     } else {
       // Authenticated users can access:
       // 1. Default agents (always available)
@@ -253,15 +254,16 @@ const AgentSelector: React.FC<AgentSelectorProps> = ({
                     let isLocked = false; // New: Track if agent is locked for this user
                     
                     if (!isAuthenticated) {
-                      // ✅ Anonymous users can ONLY access:
-                      // 1. Default agent (auto-assigned)
-                      // 2. Support agents (for help without login)
+                      // ✅ Anonymous users can access:
+                      // 1. Anonymous default agents (is_anonymous_default = true)
+                      // 2. Free agents (is_free = true)
+                      // 3. Support agents (for help without login)
                       const isSupport = agent.name?.toLowerCase().includes('support') || 
                                        agent.name?.toLowerCase().includes('help') ||
                                        agent.role === 'support' ||
                                        (agent.description && agent.description.toLowerCase().includes('support'));
                       
-                      canAccess = (agent.is_default === true) || (isSupport === true);
+                      canAccess = (agent.is_anonymous_default === true) || (agent.is_free === true) || (isSupport === true);
                       isLocked = !canAccess; // Lock all other agents
                     } else {
                       // Authenticated users can access:

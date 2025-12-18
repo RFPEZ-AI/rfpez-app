@@ -215,12 +215,13 @@ export class AgentService {
   }
 
   /**
-   * Get the default agent
-   * For authenticated users: returns RFP Design agent
-   * For anonymous users: returns Solutions agent (marked as is_default)
+   * Get default agent based on authentication status and site context
+   * Uses data-driven approach querying specialty_site_agents table
+   * @param siteSlug - Site slug to query agents for (e.g., 'home', 'corporate-tmc-rfp')
+   * @returns Default agent for the site based on authentication status, or null
    */
-  static async getDefaultAgent(): Promise<Agent | null> {
-    console.log('🎯 AgentService.getDefaultAgent called');
+  static async getDefaultAgent(siteSlug?: string): Promise<Agent | null> {
+    console.log('🎯 AgentService.getDefaultAgent called with siteSlug:', siteSlug);
     
     // Check if user is authenticated
     const { data: { user }, error: authError } = await supabase.auth.getUser();
@@ -233,57 +234,89 @@ export class AgentService {
       authError: authError?.message
     });
     
-    // For authenticated users, return RFP Design agent
-    if (isAuthenticated) {
-      console.log('✅ User IS authenticated - fetching RFP Design agent');
-      const { data: rfpAgent, error: rfpError } = await supabase
-        .from('agents')
-        .select('*')
-        .eq('is_active', true)
-        .eq('name', 'RFP Design')
-        .single();
+    // If siteSlug provided, query specialty_site_agents for site-specific default
+    if (siteSlug) {
+      console.log(`🎯 Querying default agent for site: ${siteSlug}, authenticated: ${isAuthenticated}`);
       
-      if (rfpError) {
-        console.error('❌ Error fetching RFP Design agent:', rfpError);
-        // Fallback to default agent if RFP Design not found
-      } else if (rfpAgent) {
-        console.log('✅ RFP Design agent fetched successfully:', {
-          id: rfpAgent.id,
-          name: rfpAgent.name,
-          role: rfpAgent.role
-        });
-        return rfpAgent;
+      // Use the RPC function to get agents for the site
+      const { data: siteAgents, error: rpcError } = await supabase
+        .rpc('get_specialty_site_agents', { site_slug: siteSlug });
+
+      if (rpcError) {
+        console.error('❌ Error calling get_specialty_site_agents RPC:', rpcError);
+      } else if (siteAgents && siteAgents.length > 0) {
+        // Filter by is_anonymous_default for anonymous users, is_default for authenticated
+        // Note: RPC function returns is_default (not is_default_agent)
+        const defaultField = isAuthenticated ? 'is_default' : 'is_anonymous_default';
+        const defaultSiteAgent = siteAgents.find((row: any) => row[defaultField] === true);
+        
+        if (defaultSiteAgent) {
+          // Convert the RPC result to Agent type
+          const agent: Agent = {
+            id: defaultSiteAgent.agent_id,
+            name: defaultSiteAgent.agent_name,
+            description: defaultSiteAgent.agent_description,
+            instructions: defaultSiteAgent.agent_instructions,
+            initial_prompt: defaultSiteAgent.agent_initial_prompt,
+            avatar_url: defaultSiteAgent.agent_avatar_url,
+            is_active: defaultSiteAgent.is_active,
+            is_default: defaultSiteAgent.is_default,
+            is_restricted: defaultSiteAgent.is_restricted || false,
+            is_free: defaultSiteAgent.is_free !== undefined ? defaultSiteAgent.is_free : false,
+            role: defaultSiteAgent.role || '',
+            sort_order: defaultSiteAgent.sort_order,
+            metadata: {},
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          };
+          console.log(`✅ Site default agent found: ${agent.name} (${defaultField}=true)`);
+          return agent;
+        } else {
+          console.log(`⚠️ No ${defaultField} agent found for site: ${siteSlug}`);
+        }
       }
-    } else {
-      console.log('👤 User is ANONYMOUS - will fetch Solutions agent');
     }
     
-    // For anonymous users or if RFP Design agent not found, return Solutions agent (is_default=true)
-    console.log('📋 Fetching default agent (Solutions) for anonymous user or as fallback');
-    const { data, error } = await supabase
+    // Fallback: Query agents table for global default
+    console.log('🔄 Fallback to global default agent query');
+    const { data: defaultAgent, error: defaultError } = await supabase
       .from('agents')
       .select('*')
       .eq('is_active', true)
-      .eq('is_default', true);
+      .eq('is_default', true)
+      .order('name')
+      .limit(1)
+      .single();
 
-    if (error) {
-      console.error('Error fetching default agent:', error);
-      // Fallback to first active agent if no default is set
-      const agents = await this.getActiveAgents();
-      return agents.length > 0 ? agents[0] : null;
-    }
-
-    // Handle multiple results by taking the first one
-    if (data && data.length > 0) {
-      if (data.length > 1) {
-        console.warn('Multiple default agents found, taking first one');
+    if (defaultError || !defaultAgent) {
+      console.error('❌ Error fetching global default agent:', defaultError);
+      
+      // Last resort: first active free agent
+      const { data: freeAgents, error: freeError } = await supabase
+        .from('agents')
+        .select('*')
+        .eq('is_active', true)
+        .eq('is_free', true)
+        .limit(1);
+      
+      if (!freeError && freeAgents && freeAgents.length > 0) {
+        console.log('🔄 Fallback to first free agent:', freeAgents[0].name);
+        return freeAgents[0];
       }
-      console.log('Default agent fetched:', data[0]);
-      return data[0];
+      
+      // Absolute last resort: first active agent
+      const agents = await this.getActiveAgents();
+      if (agents.length > 0) {
+        console.log('🔄 Absolute fallback to first active agent:', agents[0].name);
+        return agents[0];
+      }
+      
+      console.log('❌ No default agent found');
+      return null;
     }
-    
-    console.log('No default agent found');
-    return null;
+
+    console.log('✅ Global default agent found:', defaultAgent.name);
+    return defaultAgent;
   }
 
   /**

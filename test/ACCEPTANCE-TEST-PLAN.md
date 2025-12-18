@@ -194,6 +194,205 @@ await mcp_browser_click({ text: 'RFP Document' }); // or similar
 await mcp_browser_click({ text: 'Bid Form' }); // or similar
 ```
 
+### Test Case 6: RFP Request Email Generation
+
+**Objective**: Generate the email template to send to potential suppliers
+
+**Steps**:
+1. After supplier bid form is created, agent should offer to generate RFP request email
+2. Click "Generate RFP request email now" or similar button
+3. Wait for email template generation
+4. Verify email contains:
+   - Professional greeting and introduction
+   - Project overview and requirements summary
+   - Link or instructions for accessing bid form
+   - Submission deadline
+   - Contact information
+
+**Expected Results**:
+- Email template is generated with all required elements
+- Content is professional and comprehensive
+- Includes clear call-to-action for suppliers
+- Email is ready to be sent to vendors
+
+**Navigation Prompts for Claude**:
+```javascript
+// Click to generate email
+await mcp_browser_click({ text: 'Generate RFP request email now' });
+
+// Wait for generation
+await sleep(20000);
+
+// Verify email artifact
+await mcp_browser_get_text(); // Look for email content
+await mcp_browser_screenshot({ name: 'rfp-request-email' });
+```
+
+### Test Case 7: Generate Demonstration Bids
+
+**Objective**: Create sample bids to test the bid evaluation workflow
+
+**Steps**:
+1. Request agent to generate demonstration/sample bids
+2. Ask for 3-5 sample bids with varying pricing and features
+3. Verify sample bids are created with realistic data
+4. Check that bids appear in the bid management system
+
+**Sample Prompt**:
+```
+"Can you generate 3-4 demonstration bids from different vendors so I can test the bid evaluation process? Include varied pricing from $90-$160 per lamp with different features."
+```
+
+**Expected Results**:
+- Multiple sample bids are generated (3-5 bids)
+- Each bid has unique vendor information
+- Pricing varies realistically within budget range
+- Technical specifications differ across bids
+- Bids are accessible in bid management interface
+
+### Test Case 8: View and Evaluate Bid List
+
+**Objective**: Access bid management interface and review submitted bids
+
+**Steps**:
+1. Navigate to "Bids" section or click "View Bids" button
+2. Verify bid list displays all demonstration bids
+3. Check that each bid shows key information:
+   - Vendor name
+   - Price per unit
+   - Total bid amount
+   - Key features summary
+   - Submission date
+4. Test sorting/filtering capabilities if available
+5. Click on individual bids to view full details
+
+**Navigation Prompts for Claude**:
+```javascript
+// Click Bids button
+await mcp_browser_click({ selector: '[data-testid="bids-button"]' });
+// or
+await mcp_browser_click({ text: 'Bids' });
+
+// Take screenshot of bid list
+await mcp_browser_screenshot({ name: 'bid-list-view' });
+
+// Click on individual bid to view details
+await mcp_browser_click({ text: 'Vendor Name' }); // or bid item
+await mcp_browser_screenshot({ name: 'bid-detail-view' });
+```
+
+**Expected Results**:
+- Bid list interface loads successfully
+- All demonstration bids are visible
+- Bid information is clearly displayed
+- Can navigate to individual bid details
+- UI is intuitive and functional
+
+### Test Case 9: Switch to Sourcing Agent
+
+**Objective**: Change to RFP Sourcing Agent for vendor discovery and outreach
+
+**Steps**:
+1. Click on agent selector/indicator
+2. Look for "Sourcing" or "RFP Sourcing" agent in list
+3. Select the Sourcing Agent
+4. Verify agent switch is successful
+5. Confirm new agent context is active
+
+**Expected Results**:
+- Agent selector shows available agents
+- Sourcing Agent is available in the list
+- Successfully switches to Sourcing Agent
+- UI updates to reflect sourcing-focused context
+- Agent indicator shows "Sourcing Agent" as active
+
+**Navigation Prompts for Claude**:
+```javascript
+// Click agent selector
+await mcp_browser_click({ selector: '[data-testid="agent-selector"]' });
+
+// Select Sourcing Agent
+await mcp_browser_click({ text: 'Sourcing' }); // or 'RFP Sourcing'
+
+// Verify agent switch
+await mcp_browser_get_text(); // Look for "Sourcing" in agent indicator
+await mcp_browser_screenshot({ name: 'sourcing-agent-active' });
+```
+
+### Test Case 10: Find Suitable Vendors
+
+**Objective**: Use Sourcing Agent to discover potential suppliers for the RFP
+
+**Steps**:
+1. In chat with Sourcing Agent, request vendor recommendations
+2. Provide RFP context (LED desk lamps, 50 units, specifications)
+3. Review suggested vendors
+4. Verify vendor information includes:
+   - Company name
+   - Specialization/capabilities
+   - Contact information
+   - Relevant experience or certifications
+
+**Sample Prompts**:
+```
+"I need to find vendors who can supply high-quality LED desk lamps. We need 50 units with adjustable brightness and USB charging. Can you recommend some suitable suppliers?"
+
+"Show me vendors who specialize in office lighting equipment and can handle bulk orders."
+```
+
+**Expected Results**:
+- Sourcing Agent provides relevant vendor recommendations
+- Vendors match the RFP requirements
+- Contact information is included
+- Recommendations are actionable
+- Agent can provide additional vendor details on request
+
+### Test Case 11: Send Email to Vendor
+
+**Objective**: Compose and prepare to send RFP email to a selected vendor
+
+**Steps**:
+1. Select one vendor from recommendations
+2. Request to send RFP email to that vendor
+3. Verify email includes:
+   - Vendor-specific greeting
+   - RFP project details
+   - Link to bid form or instructions
+   - Deadline information
+   - Contact details
+4. Confirm email is ready to send or has been sent
+
+**Sample Prompts**:
+```
+"I'd like to send the RFP email to [Vendor Name]. Can you prepare that email for me?"
+
+"Send the LED desk lamp RFP to [Vendor Name] at [vendor@email.com]"
+```
+
+**Navigation Prompts for Claude**:
+```javascript
+// Send message to request email
+await mcp_browser_form_input_fill({ 
+  selector: '[data-testid="message-input"]',
+  value: 'Send the RFP to BrightOffice Solutions'
+});
+await mcp_browser_click({ selector: '[data-testid="submit-button"]' });
+
+// Wait for email generation
+await sleep(15000);
+
+// Verify email content
+await mcp_browser_get_text(); // Look for email with vendor name
+await mcp_browser_screenshot({ name: 'vendor-email-prepared' });
+```
+
+**Expected Results**:
+- Email is generated with vendor-specific details
+- All RFP information is included
+- Email is professional and complete
+- System confirms email preparation/sending
+- Vendor receives appropriate information to submit bid
+
 ## Validation Checkpoints
 
 ### Functional Validation
@@ -205,6 +404,12 @@ await mcp_browser_click({ text: 'Bid Form' }); // or similar
 - [ ] Form submission processes successfully
 - [ ] Supplier artifacts generate automatically
 - [ ] Generated content is relevant and complete
+- [ ] RFP request email is generated successfully
+- [ ] Demonstration bids can be created
+- [ ] Bid list displays correctly
+- [ ] Can switch to Sourcing Agent
+- [ ] Vendor recommendations are relevant
+- [ ] Vendor email can be composed and sent
 
 ### Technical Validation
 - [ ] No console errors during workflow

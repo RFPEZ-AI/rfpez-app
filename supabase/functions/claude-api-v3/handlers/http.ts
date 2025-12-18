@@ -1,6 +1,6 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 // HTTP request handlers for Claude API v3
-/* eslint-disable @typescript-eslint/no-explicit-any */ /* eslint-disable @typescript-eslint/no-unused-vars */ import { corsHeaders } from '../config.ts';
+/* eslint-disable @typescript-eslint/no-explicit-any */ /* eslint-disable @typescript-eslint/no-unused-vars */ import { config, corsHeaders, defaultClaudeParams } from '../config.ts';
 import { getAuthenticatedSupabaseClient, getUserId, validateAuthHeader } from '../auth/auth.ts';
 import { ToolExecutionService } from '../services/claude.ts';
 import { createClaudeService } from '../services/factory.ts';
@@ -1144,11 +1144,22 @@ Do NOT wait for a new user message - generate your introduction and welcome mess
       }
     }
     // Prepare metadata in format expected by client
+    const resolvedProvider = (config.llmProvider || '').toLowerCase() === 'openai'
+      ? 'openai'
+      : (config.useAwsBedrock ? 'bedrock' : 'anthropic');
+
+    const resolvedModel = claudeResponse.model || (resolvedProvider === 'openai'
+      ? config.openaiModel
+      : (resolvedProvider === 'bedrock'
+        ? config.awsBedrockModel
+        : defaultClaudeParams.model));
+
     const metadata = {
-      model: 'claude-sonnet-4-5-20250929',
+      provider: resolvedProvider,
+      model: resolvedModel,
       response_time: 0,
       temperature: 0.3,
-      tokens_used: claudeResponse.usage?.output_tokens || 0,
+      tokens_used: claudeResponse.usage?.output_tokens || claudeResponse.usage?.completion_tokens || 0,
       functions_called: claudeResponse.toolCalls?.map((call)=>call.name) || [],
       function_results: toolResults,
       is_streaming: false,

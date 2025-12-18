@@ -10,6 +10,7 @@ import { mcpClient } from './mcpClient';
 import { RFPService } from './rfpService';
 import { v4 as uuidv4 } from 'uuid';
 import type { Tool } from '@anthropic-ai/sdk/resources/messages.mjs';
+import { hasFullAccess, getUserAccessLevel } from '../config/betaConfig';
 // Agent type import removed as it's not used in this file
 
 // TypeScript interfaces for request generation
@@ -1381,12 +1382,13 @@ export class ClaudeAPIFunctionHandler {
       if (profileError) {
         console.error('Error fetching user profile:', profileError);
         // Still allow access for authenticated users even if profile is missing
-        hasProperAccountSetup = true;
         isAuthenticated = true;
+        hasProperAccountSetup = hasFullAccess(isAuthenticated);
       } else {
         console.log('User profile result:', userProfile);
-        hasProperAccountSetup = true; // All authenticated users have access to all agents
         isAuthenticated = true;
+        // Use centralized beta test configuration
+        hasProperAccountSetup = hasFullAccess(isAuthenticated);
       }
     }
     
@@ -1412,7 +1414,7 @@ export class ClaudeAPIFunctionHandler {
     return {
       success: true,
       agents: agentList,
-      user_access_level: hasProperAccountSetup ? 'premium' : 'anonymous',
+      user_access_level: getUserAccessLevel(isAuthenticated),
       total_available: agents.length,
       user_type: userId === 'anonymous' ? 'anonymous' : 'authenticated',
       message: `Found ${agents.length} available agents with their IDs:`,
@@ -1595,8 +1597,8 @@ export class ClaudeAPIFunctionHandler {
     
     console.log('User profile found:', userProfile);
     
-    // For agent switching, any authenticated user with a valid role can access any agent
-    const hasProperAccountSetup = true; // All authenticated users have access
+    // Use centralized beta test configuration for authenticated users
+    const hasProperAccountSetup = hasFullAccess(true); // true = authenticated
     
     console.log('Agent access check:', {
       agent_id: agent.id,
@@ -1761,8 +1763,9 @@ export class ClaudeAPIFunctionHandler {
         }
       }
       
-      hasProperAccountSetup = true; // All authenticated users have access to all agents
       isAuthenticated = true;
+      // Use centralized beta test configuration
+      hasProperAccountSetup = hasFullAccess(isAuthenticated);
     }
     
     const availableAgents = await AgentService.getAvailableAgents(
@@ -1876,7 +1879,7 @@ export class ClaudeAPIFunctionHandler {
       conversation_context,
       recommendations: topRecommendations,
       total_agents_considered: availableAgents.length,
-      user_access_level: hasProperAccountSetup ? 'premium' : 'basic',
+      user_access_level: getUserAccessLevel(isAuthenticated),
       message: topRecommendations.length > 0 
         ? `Found ${topRecommendations.length} agent recommendations for: "${topic}"`
         : 'No specific agent recommendations found, consider using the default agent'

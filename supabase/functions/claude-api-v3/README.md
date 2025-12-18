@@ -118,6 +118,37 @@ The original `index.ts` file remains unchanged and functional.
 ### New (Modular)
 To use the modular version, rename `index-modular.ts` to `index.ts` or update the import structure in the main `index.ts` file.
 
+## LLM Provider Configuration
+
+This edge function can route requests to different LLM providers at runtime using environment configuration.
+
+### Provider Switch
+
+- `LLM_PROVIDER`:
+	- `anthropic` (default)
+	- `bedrock` (AWS Bedrock)
+	- `openai`
+
+If `LLM_PROVIDER` is not set, the function remains backward compatible with the legacy `USE_AWS_BEDROCK` toggle.
+
+### OpenAI Settings
+
+When `LLM_PROVIDER=openai`, set:
+
+- `OPENAI_API_KEY` (required)
+- `OPENAI_MODEL` (optional, default: `gpt-5.2`)
+- `OPENAI_BASE_URL` (optional, default: `https://api.openai.com/v1`)
+
+### Anthropic Settings
+
+When using `anthropic` (default), set:
+
+- `ANTHROPIC_API_KEY` (or `CLAUDE_API_KEY` if your config uses that alias)
+
+### AWS Bedrock Settings
+
+When `LLM_PROVIDER=bedrock` (or legacy `USE_AWS_BEDROCK=true`), set the AWS credentials/region variables required by the Bedrock integration.
+
 ## Testing
 
 ### Test Suite Overview

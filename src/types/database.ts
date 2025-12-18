@@ -114,7 +114,8 @@ export interface Agent {
   initial_prompt: string; // Initial greeting/prompt for users
   avatar_url?: string;
   is_active: boolean;
-  is_default: boolean; // Identifies the default agent
+  is_default: boolean; // Default agent for authenticated users
+  is_anonymous_default?: boolean; // Default agent for anonymous users (specialty sites)
   is_restricted: boolean; // Requires proper account setup to use
   is_free: boolean; // Available to authenticated users without billing
   sort_order: number;

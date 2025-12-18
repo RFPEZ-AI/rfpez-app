@@ -135,6 +135,24 @@ function parseAgentMarkdown(content) {
     metadata.access_override = overrideMatch[1] === 'true';
   }
   
+  // Extract Is Default flag
+  const defaultMatch = content.match(/\*\*Is Default\*\*:\s*`(true|false)`/);
+  if (defaultMatch) {
+    metadata.is_default = defaultMatch[1] === 'true';
+  }
+  
+  // Extract Is Restricted flag
+  const restrictedMatch = content.match(/\*\*Is Restricted\*\*:\s*`(true|false)`/);
+  if (restrictedMatch) {
+    metadata.is_restricted = restrictedMatch[1] === 'true';
+  }
+  
+  // Extract Is Free flag
+  const freeMatch = content.match(/\*\*Is Free\*\*:\s*`(true|false)`/);
+  if (freeMatch) {
+    metadata.is_free = freeMatch[1] === 'true';
+  }
+  
   // Extract Specialty
   const specialtyMatch = content.match(/\*\*Specialty\*\*:\s*`([^`]+)`/);
   if (specialtyMatch && specialtyMatch[1] !== 'None') {
@@ -227,6 +245,15 @@ function generateMigration(metadata, agentName) {
   if (metadata.access_override !== undefined) {
     updateFields.push(`  access_override = ${metadata.access_override}`);
   }
+  if (metadata.is_default !== undefined) {
+    updateFields.push(`  is_default = ${metadata.is_default}`);
+  }
+  if (metadata.is_restricted !== undefined) {
+    updateFields.push(`  is_restricted = ${metadata.is_restricted}`);
+  }
+  if (metadata.is_free !== undefined) {
+    updateFields.push(`  is_free = ${metadata.is_free}`);
+  }
   
   // Specialty field (for RFP Design/Sourcing agents)
   if (metadata.specialty !== undefined) {
@@ -313,6 +340,9 @@ function main() {
   log(`   Parent agent: ${metadata.parent_agent_name || metadata.parent_agent_id || 'None (root agent)'}`);
   log(`   Is abstract: ${metadata.is_abstract !== undefined ? metadata.is_abstract : 'N/A'}`);
   log(`   Access override: ${metadata.access_override !== undefined ? metadata.access_override : 'N/A'}`);
+  log(`   Is default: ${metadata.is_default !== undefined ? metadata.is_default : 'N/A'}`);
+  log(`   Is restricted: ${metadata.is_restricted !== undefined ? metadata.is_restricted : 'N/A'}`);
+  log(`   Is free: ${metadata.is_free !== undefined ? metadata.is_free : 'N/A'}`);
   log(`   Specialty: ${metadata.specialty || 'None (general purpose)'}`);
   
   // Generate migration SQL

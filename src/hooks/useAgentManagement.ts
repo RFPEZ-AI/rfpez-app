@@ -38,16 +38,15 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
           loadedAgents = await AgentService.getAgentsForSpecialtySite('home');
         }
         
-        // Filter agents based on authentication status
-        console.log('🔍 Before filtering - agents:', loadedAgents.map(a => `${a.name} (free:${a.is_free})`).join(', '));
+        // 🎯 NEW: Show ALL agents regardless of auth status
+        // The AgentSelector component will handle locking restricted agents
+        console.log('🔍 Loaded agents:', loadedAgents.map(a => `${a.name} (free:${a.is_free}, restricted:${a.is_restricted})`).join(', '));
         if (!isAuthenticated) {
-          console.log('👤 Anonymous user - filtering to free agents only');
-          loadedAgents = loadedAgents.filter(agent => agent.is_free);
+          console.log('👤 Anonymous user - showing all agents (restricted ones will be locked in UI)');
         } else {
           console.log('🔐 Authenticated user - showing all agents');
         }
         
-        console.log('✅ After filtering - agents:', loadedAgents.map(a => `${a.name} (free:${a.is_free})`).join(', '));
         setAgents(loadedAgents);
       } catch (error) {
         console.error('❌ Error loading agents:', error);
@@ -169,7 +168,9 @@ export const useAgentManagement = (sessionId: string | null = null, specialtySlu
         // Fallback to general default agent if no specialty or specialty has no default
         if (!defaultAgent) {
           console.log('🎯 Loading general authentication-aware default agent');
-          defaultAgent = await AgentService.getDefaultAgent();
+          // Pass specialtySlug or 'home' to get site-specific default
+          const siteSlug = specialtySlug || 'home';
+          defaultAgent = await AgentService.getDefaultAgent(siteSlug);
         }
         
         console.log('🎯 loadDefaultAgentWithPrompt: Default agent fetched:', defaultAgent?.name);

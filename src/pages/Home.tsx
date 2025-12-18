@@ -51,6 +51,7 @@ import RFPEditModal from '../components/RFPEditModal';
 import RFPPreviewModal from '../components/RFPPreviewModal';
 import AgentSelector from '../components/AgentSelector';
 import FileKnowledgeManager from '../components/FileKnowledgeManager';
+import { hasFullAccess } from '../config/betaConfig';
 
 const Home: React.FC = () => {
   const { user, session, loading: supabaseLoading, userProfile, supabase } = useSupabase();
@@ -2330,7 +2331,7 @@ const Home: React.FC = () => {
           supabaseUserId={userId || ''}
           currentAgent={currentAgent}
           onAgentChanged={onAgentChanged}
-          hasProperAccountSetup={isAuthenticated} // Enable premium agents for authenticated users until billing system is implemented
+          hasProperAccountSetup={hasFullAccess(isAuthenticated)}
           isAuthenticated={isAuthenticated}
           agents={agents} // Pass specialty-filtered agents
         />

@@ -6,11 +6,13 @@ import { config } from '../config.ts';
 export class ClaudeAPIService {
   apiKey;
   baseUrl = 'https://api.anthropic.com/v1/messages';
-  constructor(){
+  modelOverride;
+  constructor(modelOverride){
     if (!config.anthropicApiKey) {
       throw new Error('ANTHROPIC_API_KEY is required');
     }
     this.apiKey = config.anthropicApiKey;
+    this.modelOverride = modelOverride;
   }
   // Send message to Claude API with tool definitions
   async sendMessage(messages, tools, maxTokens = 4000, systemPrompt) {
@@ -23,7 +25,7 @@ export class ClaudeAPIService {
     // Convert messages to Claude format
     const formattedMessages = messages.map(mapMessageToClaudeFormat);
     const requestBody = {
-      model: 'claude-sonnet-4-5-20250929',
+      model: this.modelOverride || 'claude-sonnet-4-5-20250929',
       max_tokens: maxTokens,
       temperature: 0.3,
       messages: formattedMessages,
@@ -57,7 +59,8 @@ export class ClaudeAPIService {
       textResponse: extractTextFromClaudeResponse(data.content),
       toolCalls: extractToolCallsFromClaudeResponse(data.content),
       usage: data.usage,
-      rawResponse: data
+      rawResponse: data,
+      model: data.model || requestBody.model
     };
   }
   // Stream message to Claude API with real streaming support
@@ -70,7 +73,7 @@ export class ClaudeAPIService {
     // Convert messages to Claude format
     const formattedMessages = messages.map(mapMessageToClaudeFormat);
     const requestBody = {
-      model: 'claude-sonnet-4-5-20250929',
+      model: this.modelOverride || 'claude-sonnet-4-5-20250929',
       max_tokens: 8000,
       temperature: 0.3,
       messages: formattedMessages,
@@ -230,7 +233,8 @@ export class ClaudeAPIService {
         input_tokens: 0,
         output_tokens: 0
       },
-      rawResponse: null
+      rawResponse: null,
+      model: requestBody.model
     };
   }
 }

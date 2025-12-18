@@ -108,6 +108,41 @@ else
     echo "✅ No stale containers found"
 fi
 
+    # Load local provider configuration from repo-root .env (source of truth)
+    # NOTE: We intentionally do NOT print any secret values.
+    dotenv_export_var() {
+        local key="$1"
+        local file="${2:-.env}"
+        if [ ! -f "$file" ]; then
+            return 1
+        fi
+
+        # Get last occurrence to allow overrides later in file
+        local raw
+        raw=$(grep -E "^${key}=" "$file" 2>/dev/null | tail -n 1 | cut -d= -f2- | tr -d '\r')
+        if [ -z "$raw" ]; then
+            return 1
+        fi
+
+        # Strip matching surrounding quotes
+        if [[ "$raw" == \"*\" ]]; then
+            raw="${raw#\"}"
+            raw="${raw%\"}"
+        elif [[ "$raw" == \'.*\' ]]; then
+            raw="${raw#\'}"
+            raw="${raw%\'}"
+        fi
+
+        export "$key=$raw"
+        return 0
+    }
+
+    echo "🧩 Loading provider config from .env (no secrets printed)..."
+    dotenv_export_var "LLM_PROVIDER" ".env" && echo "   - LLM_PROVIDER=loaded" || echo "   - LLM_PROVIDER=not set"
+    dotenv_export_var "OPENAI_MODEL" ".env" && echo "   - OPENAI_MODEL=loaded" || echo "   - OPENAI_MODEL=not set"
+    dotenv_export_var "OPENAI_BASE_URL" ".env" && echo "   - OPENAI_BASE_URL=loaded" || echo "   - OPENAI_BASE_URL=not set"
+    dotenv_export_var "OPENAI_API_KEY" ".env" && echo "   - OPENAI_API_KEY=loaded" || echo "   - OPENAI_API_KEY=not set"
+
 # Start Supabase local stack
 echo "🏗️  Starting Supabase local stack..."
 if is_port_in_use 54321; then
@@ -145,7 +180,9 @@ start_supabase_with_retries() {
         echo "📦 Starting Supabase (attempt $attempt/$max_attempts)..."
         # Use --debug on the last attempt to provide more troubleshooting info
         if [ $attempt -eq $max_attempts ]; then
-            supabase start --debug
+            # Allow starting even if a non-critical service is unhealthy.
+            # This improves local reliability (and lets edge functions run) while still surfacing issues.
+            supabase start --debug --ignore-health-check
         else
             supabase start
         fi
@@ -162,8 +199,7 @@ start_supabase_with_retries() {
     return 1
 }
 
-supabase start
-if [ $? -eq 0 ]; then
+if start_supabase_with_retries; then
     echo "✅ Supabase local stack started successfully"
     wait_for_service "http://127.0.0.1:54321/health" "Supabase API"
 else
