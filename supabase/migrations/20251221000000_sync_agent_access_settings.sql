@@ -93,21 +93,29 @@ BEGIN
     RAISE NOTICE 'Verified specialty_site_agents relationships for corporate-tmc-rfp';
     
     -- =====================================================
-    -- UPDATE SPECIALTY SITE ANONYMOUS DEFAULT
+    -- UPDATE SPECIALTY SITE ANONYMOUS DEFAULT (if column exists)
     -- =====================================================
     -- Set Corporate TMC RFP Welcome as the anonymous default
     
-    WITH site_info AS (
-        SELECT id as site_id FROM specialty_sites WHERE slug = 'corporate-tmc-rfp'
-    ),
-    welcome_agent AS (
-        SELECT id as agent_id FROM agents WHERE name = 'Corporate TMC RFP Welcome'
-    )
-    UPDATE specialty_sites
-    SET anonymous_default_agent_id = (SELECT agent_id FROM welcome_agent)
-    WHERE id = (SELECT site_id FROM site_info);
-    
-    RAISE NOTICE 'Set Corporate TMC RFP Welcome as anonymous_default_agent for corporate-tmc-rfp site';
+    IF EXISTS (
+        SELECT 1 FROM information_schema.columns 
+        WHERE table_name = 'specialty_sites' 
+        AND column_name = 'anonymous_default_agent_id'
+    ) THEN
+        WITH site_info AS (
+            SELECT id as site_id FROM specialty_sites WHERE slug = 'corporate-tmc-rfp'
+        ),
+        welcome_agent AS (
+            SELECT id as agent_id FROM agents WHERE name = 'Corporate TMC RFP Welcome'
+        )
+        UPDATE specialty_sites
+        SET anonymous_default_agent_id = (SELECT agent_id FROM welcome_agent)
+        WHERE id = (SELECT site_id FROM site_info);
+        
+        RAISE NOTICE 'Set Corporate TMC RFP Welcome as anonymous_default_agent for corporate-tmc-rfp site';
+    ELSE
+        RAISE NOTICE 'Skipped anonymous_default_agent_id update (column does not exist on remote)';
+    END IF;
     
 END $$;
 
