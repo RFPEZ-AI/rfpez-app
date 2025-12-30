@@ -74,15 +74,23 @@ BEGIN
         NOW(),
         NOW()
     )
-    ON CONFLICT (id) DO UPDATE
-    SET 
-        parent_agent_id = v_rfp_design_id,
-        specialty = 'corporate-tmc-rfp',
-        is_abstract = false,
+    ON CONFLICT (name) DO UPDATE
+    SET
+        role = EXCLUDED.role,
+        description = EXCLUDED.description,
+        instructions = EXCLUDED.instructions,
+        initial_prompt = EXCLUDED.initial_prompt,
+        avatar_url = EXCLUDED.avatar_url,
+        parent_agent_id = EXCLUDED.parent_agent_id,
+        is_abstract = EXCLUDED.is_abstract,
+        is_default = EXCLUDED.is_default,
+        is_free = EXCLUDED.is_free,
+        specialty = EXCLUDED.specialty,
+        access = EXCLUDED.access,
+        account_id = NULL,
         is_active = true,
-        updated_at = NOW();
-    
-    v_tmc_specialist_id := 'd6e83135-2b2d-47b7-91a0-5a3e138e7eb0';
+        updated_at = NOW()
+    RETURNING id INTO v_tmc_specialist_id;
     RAISE NOTICE 'TMC Specialist agent created/updated';
 
     -- ============================================
@@ -126,11 +134,20 @@ BEGIN
         NOW(),
         NOW()
     )
-    ON CONFLICT (id) DO UPDATE
-    SET 
-        parent_agent_id = v_sourcing_id,
-        specialty = 'corporate-tmc-rfp',
-        is_abstract = false,
+    ON CONFLICT (name) DO UPDATE
+    SET
+        role = EXCLUDED.role,
+        description = EXCLUDED.description,
+        instructions = EXCLUDED.instructions,
+        initial_prompt = EXCLUDED.initial_prompt,
+        avatar_url = EXCLUDED.avatar_url,
+        parent_agent_id = EXCLUDED.parent_agent_id,
+        is_abstract = EXCLUDED.is_abstract,
+        is_default = EXCLUDED.is_default,
+        is_free = EXCLUDED.is_free,
+        specialty = EXCLUDED.specialty,
+        access = EXCLUDED.access,
+        account_id = NULL,
         is_active = true,
         updated_at = NOW()
     RETURNING id INTO v_tmc_tender_id;
