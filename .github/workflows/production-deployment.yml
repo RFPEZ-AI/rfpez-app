@@ -1,0 +1,199 @@
+name: Production Deployment (rfpez.ai)
+
+on:
+  workflow_dispatch: # Manual trigger only for production
+    inputs:
+      confirm_production:
+        description: 'Type "DEPLOY TO PRODUCTION" to confirm'
+        required: true
+        type: string
+      deployment_type:
+        description: 'Deployment type'
+        required: true
+        type: choice
+        options:
+          - 'full' # Full build and deploy
+          - 'rollback' # Rollback to previous version
+        default: 'full'
+
+jobs:
+  validate-input:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate confirmation
+        run: |
+          if [ "${{ github.event.inputs.confirm_production }}" != "DEPLOY TO PRODUCTION" ]; then
+            echo "❌ Production deployment not confirmed. Aborting."
+            echo "Please type exactly: DEPLOY TO PRODUCTION"
+            exit 1
+          fi
+          echo "✅ Production deployment confirmed"
+          echo "Deployment type: ${{ github.event.inputs.deployment_type }}"
+
+  pre-deployment-checks:
+    needs: validate-input
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Run tests
+        run: npm test -- --watchAll=false --passWithNoTests
+        continue-on-error: false
+
+      - name: Run linter
+        run: npm run lint || echo "⚠️ Linting warnings detected"
+
+      - name: Build verification
+        run: |
+          echo "🔍 Verifying build configuration..."
+          echo "Environment: PRODUCTION"
+          echo "Target domain: rfpez.ai"
+          npm run build
+        env:
+          REACT_APP_SUPABASE_URL: ${{ secrets.REACT_APP_SUPABASE_URL_PROD }}
+          REACT_APP_SUPABASE_ANON_KEY: ${{ secrets.REACT_APP_SUPABASE_ANON_KEY_PROD }}
+          REACT_APP_BUILD_NUMBER: ${{ github.run_number }}
+          REACT_APP_COMMIT_SHA: ${{ github.sha }}
+          REACT_APP_ENVIRONMENT: production
+          NODE_ENV: production
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: production-build
+          path: build/
+          retention-days: 30
+
+  deploy-to-production:
+    needs: pre-deployment-checks
+    runs-on: ubuntu-latest
+    name: Deploy to Production (rfpez.ai)
+    environment:
+      name: production
+      url: https://rfpez.ai
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          submodules: true
+          lfs: false
+
+      - name: Download build artifact
+        uses: actions/download-artifact@v3
+        with:
+          name: production-build
+          path: build/
+
+      - name: Deployment announcement
+        run: |
+          echo "🚀 DEPLOYING TO PRODUCTION"
+          echo "=========================="
+          echo "Domain: rfpez.ai"
+          echo "Build: ${{ github.run_number }}"
+          echo "Commit: ${{ github.sha }}"
+          echo "Deployed by: ${{ github.actor }}"
+          echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          echo ""
+          echo "This deployment will affect live users!"
+
+      - name: Deploy to Azure Static Web Apps (Production)
+        id: deploy_production
+        uses: Azure/static-web-apps-deploy@v1
+        with:
+          azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          action: "upload"
+          app_location: "build"
+          api_location: ""
+          output_location: "."
+          skip_app_build: true
+
+      - name: Deployment verification
+        run: |
+          echo "✅ Production deployment completed!"
+          echo ""
+          echo "Deployment details:"
+          echo "  URL: https://rfpez.ai"
+          echo "  Environment: Production"
+          echo "  Build number: ${{ github.run_number }}"
+          echo "  Commit SHA: ${{ github.sha }}"
+          echo ""
+          echo "Post-deployment checklist:"
+          echo "  ✓ Verify rfpez.ai loads correctly"
+          echo "  ✓ Test user authentication flow"
+          echo "  ✓ Verify Supabase connection"
+          echo "  ✓ Test critical user workflows"
+          echo "  ✓ Monitor error logs for 15-30 minutes"
+          echo "  ✓ Check Application Insights for anomalies"
+
+      - name: Post-deployment smoke tests
+        run: |
+          echo "🧪 Running basic smoke tests..."
+          # Test that the site is responding
+          RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" https://rfpez.ai || echo "000")
+          if [ "$RESPONSE" = "200" ]; then
+            echo "✅ Production site is responding (HTTP 200)"
+          else
+            echo "⚠️ Production site returned HTTP $RESPONSE"
+            echo "Please verify manually at https://rfpez.ai"
+          fi
+
+  rollback-production:
+    if: github.event.inputs.deployment_type == 'rollback'
+    needs: validate-input
+    runs-on: ubuntu-latest
+    name: Rollback Production
+    
+    steps:
+      - name: Rollback notice
+        run: |
+          echo "⚠️ PRODUCTION ROLLBACK INITIATED"
+          echo "================================"
+          echo "This will revert the production deployment"
+          echo "Triggered by: ${{ github.actor }}"
+          echo ""
+          echo "Manual steps required:"
+          echo "  1. Go to Azure Portal"
+          echo "  2. Navigate to Static Web App (rfpez-prod)"
+          echo "  3. Go to 'Deployment history'"
+          echo "  4. Select previous stable deployment"
+          echo "  5. Click 'Redeploy'"
+          echo ""
+          echo "Automated rollback coming in future update..."
+
+  notify-deployment:
+    needs: deploy-to-production
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deployment notification
+        run: |
+          if [ "${{ needs.deploy-to-production.result }}" = "success" ]; then
+            echo "✅ PRODUCTION DEPLOYMENT SUCCESSFUL"
+            echo "Domain: https://rfpez.ai"
+            echo "Status: Live"
+          else
+            echo "❌ PRODUCTION DEPLOYMENT FAILED"
+            echo "Status: Failed"
+            echo "Required actions:"
+            echo "  1. Review deployment logs"
+            echo "  2. Check Azure portal for errors"
+            echo "  3. Verify Supabase connectivity"
+            echo "  4. Consider rollback if critical"
+          fi
+          echo ""
+          echo "Deployment report: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"

@@ -23,6 +23,10 @@
 !/.vscode/extensions.json
 .idea
 
+# Production secrets (never commit these!)
+github-secrets-production.txt
+.env.production.local
+
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
