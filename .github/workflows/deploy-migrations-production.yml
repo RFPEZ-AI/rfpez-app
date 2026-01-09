@@ -97,7 +97,8 @@ jobs:
           echo "Project Ref: ${{ env.SUPABASE_PROJECT_REF }}"
           echo ""
           
-          supabase db push 2>&1 | tee deploy.log
+          # Auto-confirm with 'yes' piped to supabase db push
+          yes | supabase db push 2>&1 | tee deploy.log
           
           if grep -q "Finished supabase db push" deploy.log; then
             echo "✅ Migrations deployed successfully to PRODUCTION!"
