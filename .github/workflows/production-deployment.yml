@@ -117,9 +117,9 @@ jobs:
           azure_static_web_apps_api_token: ${{ secrets.AZURE_STATIC_WEB_APPS_API_TOKEN_PROD }}
           repo_token: ${{ secrets.GITHUB_TOKEN }}
           action: "upload"
-          app_location: "build"
+          app_location: "/" # Root since we're pointing to the build folder
           api_location: ""
-          output_location: "."
+          output_location: "build" # Pre-built files location
           skip_app_build: true
 
       - name: Deployment verification
