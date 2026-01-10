@@ -371,22 +371,7 @@ describe('AgentSelector', () => {
       });
     });
 
-    it('should display agent initial prompts correctly', async () => {
-      render(<AgentSelector {...defaultProps} />);
-
-      await waitFor(() => {
-        // The component wraps initial_prompt text in quotes and small elements, so use flexible text matching
-        expect(screen.getByText((content) => 
-          content.includes('How can I help you?')
-        )).toBeInTheDocument();
-        expect(screen.getByText((content) => 
-          content.includes('How can I assist you?')
-        )).toBeInTheDocument();
-        // RFP Design agent SHOULD be visible since it's not restricted (even without proper account setup)
-        expect(screen.getByText((content) => 
-          content.includes('I can help you design RFPs')
-        )).toBeInTheDocument();
-      });
-    });
+    // Note: initial_prompt is not displayed in the AgentSelector UI
+    // It's used when the agent starts a conversation, not in the selection modal
   });
 });
