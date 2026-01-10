@@ -23,10 +23,10 @@ echo Select: RFPEZ-PROD project
 echo Navigate to: Settings - General
 echo.
 
-set /p PROD_PROJECT_REF="fyvudrxvbwywazswrgpm"
-set /p PROD_API_URL="https://fyvudrxvbwywazswrgpm.supabase.co"
-set /p PROD_ANON_KEY="sb_publishable_p9cdx5pJP5cHBWCVUfFtGw_VQgDhGKy"
-set /p PROD_DB_PASSWORD="cN3ff5xRK%tbY9f"
+set /p PROD_PROJECT_REF="Enter Project Reference ID: " 
+set /p PROD_API_URL="Enter API URL: "
+set /p PROD_ANON_KEY="Enter Anon Key: "
+set /p PROD_DB_PASSWORD="Enter Database Password: "
 
 REM Step 2: Generate access token
 echo.
@@ -36,7 +36,7 @@ echo Go to: https://supabase.com/dashboard/account/tokens
 echo Click: Generate New Token
 echo Name: RFPEZ-PROD GitHub Actions
 echo.
-set /p PROD_ACCESS_TOKEN="sbp_cf69df7dbb985af1811bf17b1ef555bae1f5b449"
+set /p PROD_ACCESS_TOKEN="Enter Access Token: "
 
 REM Step 3: Verify credentials
 echo.
@@ -109,23 +109,31 @@ echo [SUCCESS] Created github-secrets-production.txt
 echo [WARNING] Keep this file secure and do not commit it!
 echo.
 
-REM Step 6: Test connection
-echo [Step 6] Test Supabase Connection
+REM Step 6: Verify Supabase CLI
+echo [Step 6] Verify Supabase CLI
 echo ---
-echo Testing connection to production Supabase...
+echo Verifying Supabase CLI installation and credentials...
 echo.
 
 where supabase >nul 2>nul
 if %errorlevel% equ 0 (
-    echo Attempting to link to production project...
-    supabase link --project-ref %PROD_PROJECT_REF% --password %PROD_DB_PASSWORD%
+    echo [SUCCESS] Supabase CLI found
+    supabase --version
     
     echo.
-    echo Your Supabase projects:
+    echo Verifying access token by listing projects:
+    set SUPABASE_ACCESS_TOKEN=%PROD_ACCESS_TOKEN%
     supabase projects list
+    set SUPABASE_ACCESS_TOKEN=
 ) else (
     echo [WARNING] Supabase CLI not found. Install with: npm install -g supabase
+    echo CLI is required for manual deployments (optional for GitHub Actions)
 )
+echo.
+echo [WARNING] IMPORTANT: Keep Local and Production Separate
+echo Do NOT link your local Docker Supabase instance to production!
+echo Local development should stay linked to: rfpez-app-local
+echo Production deployments use GitHub Actions with --project-ref flags
 echo.
 
 REM Step 7: Update .gitignore

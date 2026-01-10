@@ -47,7 +47,7 @@ echo "---"
 
 RESOURCE_GROUP="rfpez-production"
 STATIC_WEB_APP_NAME="rfpez-prod"
-LOCATION="eastus"
+LOCATION="eastus2"  # Available locations: westus2, centralus, eastus2, westeurope, eastasia
 SKU="Standard"
 GITHUB_REPO="https://github.com/markesphere/rfpez-app"
 
@@ -104,17 +104,17 @@ fi
 
 # Create if doesn't exist or was deleted
 if ! az staticwebapp show --name $STATIC_WEB_APP_NAME --resource-group $RESOURCE_GROUP &> /dev/null; then
+    echo "Creating Static Web App without GitHub integration..."
+    echo "(GitHub Actions workflow will handle deployments)"
+    
     az staticwebapp create \
         --name $STATIC_WEB_APP_NAME \
         --resource-group $RESOURCE_GROUP \
         --location $LOCATION \
-        --sku $SKU \
-        --source $GITHUB_REPO \
-        --branch master \
-        --app-location "/" \
-        --output-location "build"
+        --sku $SKU
     
     echo -e "${GREEN}✅ Static Web App created${NC}"
+    echo -e "${YELLOW}ℹ️  GitHub integration will be handled by GitHub Actions workflow${NC}"
 fi
 echo ""
 
