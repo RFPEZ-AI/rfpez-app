@@ -210,7 +210,7 @@ describe('AgentService', () => {
 
   describe('getDefaultAgent', () => {
     it('should return RFP Design agent for authenticated users', async () => {
-      const rfpDesignAgent = mockAgents.find(agent => agent.name === 'RFP Design');
+      const defaultAgent = mockAgents.find(agent => agent.is_default);
       
       // Mock authenticated user
       mockSupabase.auth.getUser = jest.fn().mockResolvedValue({
@@ -218,14 +218,18 @@ describe('AgentService', () => {
         error: null
       });
       
-      // Mock RFP Design agent fetch
+      // Mock default agent fetch with proper .order() chain
       mockSupabase.from.mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({
-                data: rfpDesignAgent,
-                error: null
+              order: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  single: jest.fn().mockResolvedValue({
+                    data: defaultAgent,
+                    error: null
+                  })
+                })
               })
             })
           })
@@ -234,8 +238,8 @@ describe('AgentService', () => {
 
       const result = await AgentService.getDefaultAgent();
 
-      expect(result).toEqual(rfpDesignAgent);
-      expect(result?.name).toBe('RFP Design');
+      expect(result).toEqual(defaultAgent);
+      expect(result?.is_default).toBe(true);
     });
 
     it('should return Solutions agent (default) for anonymous users', async () => {
@@ -247,13 +251,19 @@ describe('AgentService', () => {
         error: null
       });
       
-      // Mock default agent fetch
+      // Mock default agent fetch with proper .order() chain
       mockSupabase.from.mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
-            eq: jest.fn().mockResolvedValue({
-              data: [defaultAgent],
-              error: null
+            eq: jest.fn().mockReturnValue({
+              order: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  single: jest.fn().mockResolvedValue({
+                    data: defaultAgent,
+                    error: null
+                  })
+                })
+              })
             })
           })
         })
@@ -275,27 +285,19 @@ describe('AgentService', () => {
         error: null
       });
       
-      // Mock RFP Design agent fetch failure
-      mockSupabase.from.mockReturnValueOnce({
+      // Mock default agent fetch with proper .order() chain
+      mockSupabase.from.mockReturnValue({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
             eq: jest.fn().mockReturnValue({
-              single: jest.fn().mockResolvedValue({
-                data: null,
-                error: { message: 'RFP Design agent not found' }
+              order: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  single: jest.fn().mockResolvedValue({
+                    data: defaultAgent,
+                    error: null
+                  })
+                })
               })
-            })
-          })
-        })
-      } as any);
-
-      // Mock default agent fetch as fallback
-      mockSupabase.from.mockReturnValueOnce({
-        select: jest.fn().mockReturnValue({
-          eq: jest.fn().mockReturnValue({
-            eq: jest.fn().mockResolvedValue({
-              data: [defaultAgent],
-              error: null
             })
           })
         })
@@ -314,19 +316,39 @@ describe('AgentService', () => {
         error: null
       });
       
-      // Mock no default agent found - return error to trigger fallback
+      // Mock 1: no default agent found - return error to trigger fallback
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
-            eq: jest.fn().mockResolvedValue({
-              data: null,
-              error: { message: 'No default agent' }
+            eq: jest.fn().mockReturnValue({
+              order: jest.fn().mockReturnValue({
+                limit: jest.fn().mockReturnValue({
+                  single: jest.fn().mockResolvedValue({
+                    data: null,
+                    error: { message: 'No default agent' }
+                  })
+                })
+              })
             })
           })
         })
       } as any);
 
-      // Mock getActiveAgents call that is triggered by the fallback
+      // Mock 2: free agents query (first fallback) - also returns nothing
+      mockSupabase.from.mockReturnValueOnce({
+        select: jest.fn().mockReturnValue({
+          eq: jest.fn().mockReturnValue({
+            eq: jest.fn().mockReturnValue({
+              limit: jest.fn().mockResolvedValue({
+                data: [],
+                error: null
+              })
+            })
+          })
+        })
+      } as any);
+
+      // Mock 3: getActiveAgents call (final fallback)
       mockSupabase.from.mockReturnValueOnce({
         select: jest.fn().mockReturnValue({
           eq: jest.fn().mockReturnValue({
