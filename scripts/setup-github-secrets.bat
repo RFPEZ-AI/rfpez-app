@@ -12,15 +12,15 @@ echo ============================================================
 echo.
 
 REM Check if gh CLI is installed
-where gh >nul 2>&1
-if %ERRORLEVEL% NEQ 0 (
-    echo ❌ GitHub CLI (gh) is not installed.
-    echo.
-    echo Install it:
-    echo   winget install GitHub.cli
-    echo.
-    exit /b 1
-)
+REM where gh >nul 2>&1
+REM if %ERRORLEVEL% NEQ 0 (
+REM     echo ❌ GitHub CLI (gh) is not installed.
+REM     echo.
+REM     echo Install it:
+REM     echo   winget install GitHub.cli
+REM     echo.
+REM     exit /b 1
+REM )
 
 REM Check if authenticated
 gh auth status >nul 2>&1
