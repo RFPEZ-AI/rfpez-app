@@ -87,15 +87,9 @@ jobs:
       - name: Configure Supabase project (skip database verification)
         run: |
           echo "[CONFIG] Configuring Supabase project..."
-          # Create config directory
           mkdir -p .supabase
-          
-          # Create config.toml with project ref
-          cat > .supabase/config.toml << EOF
-[project]
-project_id = "${{ env.SUPABASE_PROJECT_REF }}"
-EOF
-          
+          echo '[project]' > .supabase/config.toml
+          echo "project_id = \"${{ env.SUPABASE_PROJECT_REF }}\"" >> .supabase/config.toml
           echo "[SUCCESS] Project configured (using Management API only)"
 
       - name: Deploy migrations to production

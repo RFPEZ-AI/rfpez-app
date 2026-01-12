@@ -51,15 +51,9 @@ jobs:
       - name: Configure Supabase project
         run: |
           echo "Configuring Supabase project..."
-          # Create config directory
           mkdir -p .supabase
-          
-          # Create config.toml with project ref
-          cat > .supabase/config.toml << EOF
-[project]
-project_id = "jxlutaztoukwbbgtoulc"
-EOF
-          
+          echo '[project]' > .supabase/config.toml
+          echo 'project_id = "jxlutaztoukwbbgtoulc"' >> .supabase/config.toml
           echo "Project configured successfully"
 
       - name: Deploy migrations
