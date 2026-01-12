@@ -2,7 +2,43 @@
 -- Generated on 2025-11-30T20:02:15.827Z
 -- Source: Agent Instructions/Respond.md
 
--- First, try to delete existing Respond agent if it exists (to handle reruns)
+-- First, update the agents_account_id_check constraint to include 'Respond' in system agents
+-- This must happen before inserting the Respond agent
+ALTER TABLE agents DROP CONSTRAINT IF EXISTS agents_account_id_check;
+ALTER TABLE agents ADD CONSTRAINT agents_account_id_check 
+CHECK (
+  (
+    (name = ANY (ARRAY[
+      'Solutions'::text, 
+      'RFP Design'::text, 
+      'Support'::text, 
+      'RFP Assistant'::text, 
+      'Sourcing'::text, 
+      'TMC Specialist'::text, 
+      'TMC Tender'::text, 
+      'Respond'::text, 
+      '_common'::text
+    ])) 
+    AND (account_id IS NULL)
+  ) 
+  OR 
+  (
+    (name <> ALL (ARRAY[
+      'Solutions'::text, 
+      'RFP Design'::text, 
+      'Support'::text, 
+      'RFP Assistant'::text, 
+      'Sourcing'::text, 
+      'TMC Specialist'::text, 
+      'TMC Tender'::text, 
+      'Respond'::text, 
+      '_common'::text
+    ])) 
+    AND (account_id IS NOT NULL)
+  )
+);
+
+-- Delete existing Respond agent if it exists (to handle reruns)
 DELETE FROM agents WHERE id = 'e06c2eb5-5da8-4ceb-8843-e8cd4b2e43b2';
 
 -- Insert Respond agent with all fields
