@@ -24,11 +24,13 @@ BEGIN
 
   -- Check if both records exist
   IF home_site_id IS NULL THEN
-    RAISE EXCEPTION 'Home specialty site not found (slug = home)';
+    RAISE NOTICE 'Home specialty site not found - skipping migration';
+    RETURN;
   END IF;
 
   IF sourcing_agent_id IS NULL THEN
-    RAISE EXCEPTION 'Sourcing agent not found (name = Sourcing)';
+    RAISE NOTICE 'Sourcing agent not found - skipping migration (may be created in later migration)';
+    RETURN;
   END IF;
 
   -- Insert into specialty_site_agents if not already present
