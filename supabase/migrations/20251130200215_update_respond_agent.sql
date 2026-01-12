@@ -20,6 +20,7 @@ INSERT INTO agents (
   is_free,
   specialty,
   access,
+  account_id,
   created_at,
   updated_at
 )
@@ -571,6 +572,7 @@ Welcome! I help suppliers create winning RFP responses.
   true, -- is_free (Respond agent is free)
   'respond',
   ARRAY['Memory: create_memory, search_memories', 'Conversation: get_conversation_history, store_message, search_messages', 'Agent switching: get_available_agents, get_current_agent, switch_agent, recommend_agent', 'Perplexity: perplexity_search, perplexity_ask', 'RFP management: get_current_rfp, set_current_rfp, list_rfps', 'Artifacts: list_artifacts, select_active_artifact, create_document_artifact, create_form_artifact, update_form_data', 'Perplexity research: perplexity_research']::text[],
+  NULL, -- account_id (system agent, must be NULL)
   NOW(),
   NOW()
 );
