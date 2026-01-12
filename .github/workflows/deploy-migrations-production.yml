@@ -84,21 +84,17 @@ jobs:
           echo "Proceeding in 10 seconds..."
           sleep 10
 
-      - name: Link to production project
-        run: |
-          echo "🔗 Linking to production Supabase project..."
-          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }} --password "${{ env.SUPABASE_DB_PASSWORD }}"
-          echo "✅ Linked to production project"
-
       - name: Deploy migrations to production
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "🚀 Deploying migrations to PRODUCTION..."
           echo "Project Ref: ${{ env.SUPABASE_PROJECT_REF }}"
+          echo "Using Management API (no database password needed)"
           echo ""
           
-          # Auto-confirm with 'yes' piped to supabase db push
-          yes | supabase db push 2>&1 | tee deploy.log
+          # Deploy directly using project ref and access token
+          # This uses Management API and bypasses database connection issues
+          supabase db push --project-ref ${{ env.SUPABASE_PROJECT_REF }} 2>&1 | tee deploy.log
           
           if grep -q "Finished supabase db push" deploy.log; then
             echo "✅ Migrations deployed successfully to PRODUCTION!"

@@ -1,13 +1,19 @@
-name: Azure Static Web Apps CI/CD
+name: Azure Static Web Apps CI/CD (DISABLED)
+
+# DISABLED: This workflow is disabled to prevent conflicts with Supabase hosting
+# To re-enable, uncomment the 'on:' section below and add the build step
+
+# on:
+#   push:
+#     branches:
+#       - master
+#   pull_request:
+#     types: [opened, synchronize, reopened, closed]
+#     branches:
+#       - master
 
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    types: [opened, synchronize, reopened, closed]
-    branches:
-      - master
+  workflow_dispatch: # Manual trigger only
 
 jobs:
   build_and_deploy_job:
