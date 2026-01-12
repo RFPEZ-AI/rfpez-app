@@ -41,16 +41,16 @@ jobs:
           MIGRATION_COUNT=$(ls -1 supabase/migrations/*.sql 2>/dev/null | wc -l)
           if [ "$MIGRATION_COUNT" -gt 0 ]; then
             echo "has_pending=true" >> $GITHUB_OUTPUT
-            echo "✅ Found $MIGRATION_COUNT migration file(s) to deploy"
+            echo "Found $MIGRATION_COUNT migration file(s) to deploy"
             ls -la supabase/migrations/*.sql
           else
             echo "has_pending=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No migration files found"
+            echo "[INFO] No migration files found"
           fi
 
       - name: Configure Supabase project
         run: |
-          echo "⚙️ Configuring Supabase project..."
+          echo "Configuring Supabase project..."
           # Create config directory
           mkdir -p .supabase
           
@@ -60,7 +60,7 @@ jobs:
 project_id = "jxlutaztoukwbbgtoulc"
 EOF
           
-          echo "✅ Project configured"
+          echo "Project configured successfully"
 
       - name: Deploy migrations
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
@@ -73,7 +73,7 @@ EOF
           
           # Check if deployment succeeded
           if grep -q "Finished supabase db push" deploy.log; then
-            echo "✅ Migrations deployed successfully!"
+            echo "SUCCESS: Migrations deployed successfully!"
           else
             echo "⚠️ Checking deployment status..."
             cat deploy.log
@@ -82,7 +82,7 @@ EOF
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
-          echo "✅ Migration deployment completed!"
+          echo "Migration deployment completed!"
           echo "Check Supabase dashboard to verify"
           echo ""
           echo "Deployed migration files:"

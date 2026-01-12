@@ -15,11 +15,11 @@ jobs:
       - name: Validate confirmation
         run: |
           if [ "${{ github.event.inputs.confirm_production }}" != "DEPLOY TO PRODUCTION" ]; then
-            echo "❌ Production deployment not confirmed. Aborting."
+            echo "[ERROR] Production deployment not confirmed. Aborting."
             echo "Please type exactly: DEPLOY TO PRODUCTION"
             exit 1
           fi
-          echo "✅ Production deployment confirmed"
+          echo "[SUCCESS] Production deployment confirmed"
 
   deploy-migrations:
     needs: validate-input
@@ -45,14 +45,14 @@ jobs:
         run: |
           echo "🔍 Verifying production Supabase credentials..."
           if [ -z "$SUPABASE_ACCESS_TOKEN" ]; then
-            echo "❌ SUPABASE_PROD_ACCESS_TOKEN not set"
+            echo "[ERROR] SUPABASE_PROD_ACCESS_TOKEN not set"
             exit 1
           fi
           if [ -z "$SUPABASE_PROJECT_REF" ]; then
-            echo "❌ SUPABASE_PROD_PROJECT_REF not set"
+            echo "[ERROR] SUPABASE_PROD_PROJECT_REF not set"
             exit 1
           fi
-          echo "✅ Credentials verified"
+          echo "[SUCCESS] Credentials verified"
 
       - name: List pending migrations
         id: check_migrations
@@ -61,18 +61,18 @@ jobs:
           MIGRATION_COUNT=$(ls -1 supabase/migrations/*.sql 2>/dev/null | wc -l)
           if [ "$MIGRATION_COUNT" -gt 0 ]; then
             echo "has_pending=true" >> $GITHUB_OUTPUT
-            echo "✅ Found $MIGRATION_COUNT migration file(s) to deploy"
+            echo "[SUCCESS] Found $MIGRATION_COUNT migration file(s) to deploy"
             echo ""
             echo "Migration files to deploy:"
             ls -la supabase/migrations/*.sql
           else
             echo "has_pending=false" >> $GITHUB_OUTPUT
-            echo "ℹ️ No migration files found"
+            echo "[INFO] No migration files found"
           fi
 
       - name: Backup reminder
         run: |
-          echo "⚠️  PRODUCTION DEPLOYMENT REMINDER"
+          echo "[WARNING]  PRODUCTION DEPLOYMENT REMINDER"
           echo "=================================="
           echo "This will deploy migrations to PRODUCTION database"
           echo "Ensure you have:"
@@ -86,7 +86,7 @@ jobs:
 
       - name: Configure Supabase project (skip database verification)
         run: |
-          echo "⚙️ Configuring Supabase project..."
+          echo "[CONFIG] Configuring Supabase project..."
           # Create config directory
           mkdir -p .supabase
           
@@ -96,7 +96,7 @@ jobs:
 project_id = "${{ env.SUPABASE_PROJECT_REF }}"
 EOF
           
-          echo "✅ Project configured (using Management API only)"
+          echo "[SUCCESS] Project configured (using Management API only)"
 
       - name: Deploy migrations to production
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
@@ -111,9 +111,9 @@ EOF
           supabase db push 2>&1 | tee deploy.log
           
           if grep -q "Finished supabase db push" deploy.log; then
-            echo "✅ Migrations deployed successfully to PRODUCTION!"
+            echo "[SUCCESS] Migrations deployed successfully to PRODUCTION!"
           else
-            echo "⚠️ Checking deployment status..."
+            echo "[WARNING] Checking deployment status..."
             cat deploy.log
             exit 1
           fi
@@ -121,7 +121,7 @@ EOF
       - name: Verify deployment
         if: steps.check_migrations.outputs.has_pending == 'true'
         run: |
-          echo "✅ PRODUCTION migration deployment completed!"
+          echo "[SUCCESS] PRODUCTION migration deployment completed!"
           echo ""
           echo "Deployed migration files:"
           ls -la supabase/migrations/*.sql
@@ -136,9 +136,9 @@ EOF
           echo "Environment: PRODUCTION (rfpez.ai)"
           echo "Project Ref: ${{ env.SUPABASE_PROJECT_REF }}"
           if [ "${{ steps.check_migrations.outputs.has_pending }}" == "true" ]; then
-            echo "Status: ✅ Migrations deployed successfully"
+            echo "Status: [SUCCESS] Migrations deployed successfully"
           else
-            echo "Status: ℹ️ No migrations to deploy"
+            echo "Status: [INFO] No migrations to deploy"
           fi
           echo "Deployed at: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
           echo "Deployed by: ${{ github.actor }}"
@@ -152,7 +152,7 @@ EOF
       - name: Notify on failure
         if: failure()
         run: |
-          echo "❌ PRODUCTION migration deployment failed!"
+          echo "[ERROR] PRODUCTION migration deployment failed!"
           echo ""
           echo "Required actions:"
           echo "  1. Review error logs above"
