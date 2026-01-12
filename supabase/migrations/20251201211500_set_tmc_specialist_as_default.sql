@@ -27,13 +27,14 @@ BEGIN
 
   RAISE NOTICE 'Found corporate-tmc-rfp site: %', v_site_id;
 
-  -- Find TMC Specialist agent
+  -- Find TMC Specialist agent (may not exist yet - created in later migration)
   SELECT id INTO v_tmc_specialist_id
   FROM agents
   WHERE name = 'TMC Specialist';
 
   IF v_tmc_specialist_id IS NULL THEN
-    RAISE EXCEPTION 'TMC Specialist agent not found';
+    RAISE NOTICE 'TMC Specialist agent not found - skipping migration (agent created in later migration)';
+    RETURN;
   END IF;
 
   RAISE NOTICE 'Found TMC Specialist agent: %', v_tmc_specialist_id;
@@ -44,7 +45,8 @@ BEGIN
   WHERE name = 'Corporate TMC RFP Welcome';
 
   IF v_welcome_agent_id IS NULL THEN
-    RAISE EXCEPTION 'Corporate TMC RFP Welcome agent not found';
+    RAISE NOTICE 'Corporate TMC RFP Welcome agent not found - skipping migration';
+    RETURN;
   END IF;
 
   RAISE NOTICE 'Found Corporate TMC RFP Welcome agent: %', v_welcome_agent_id;
