@@ -84,25 +84,31 @@ jobs:
           echo "Proceeding in 10 seconds..."
           sleep 10
 
-      - name: Link to production project (using Management API)
+      - name: Configure Supabase project (skip database verification)
         run: |
-          echo "🔗 Linking to production Supabase project..."
-          echo "Using Management API (access token authentication)"
-          # Link using access token from environment (SUPABASE_ACCESS_TOKEN)
-          # This avoids password authentication issues
-          supabase link --project-ref ${{ env.SUPABASE_PROJECT_REF }}
-          echo "✅ Linked to production project"
+          echo "⚙️ Configuring Supabase project..."
+          # Create config directory
+          mkdir -p .supabase
+          
+          # Create config.toml with project ref
+          cat > .supabase/config.toml << EOF
+[project]
+project_id = "${{ env.SUPABASE_PROJECT_REF }}"
+EOF
+          
+          echo "✅ Project configured (using Management API only)"
 
       - name: Deploy migrations to production
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
           echo "🚀 Deploying migrations to PRODUCTION..."
           echo "Project Ref: ${{ env.SUPABASE_PROJECT_REF }}"
-          echo "Using linked project with Management API"
+          echo "Using Management API (no database connection needed)"
           echo ""
           
-          # Deploy to linked project using Management API
-          supabase db push --linked 2>&1 | tee deploy.log
+          # Deploy using Management API only
+          # The SUPABASE_ACCESS_TOKEN environment variable is used automatically
+          supabase db push 2>&1 | tee deploy.log
           
           if grep -q "Finished supabase db push" deploy.log; then
             echo "✅ Migrations deployed successfully to PRODUCTION!"

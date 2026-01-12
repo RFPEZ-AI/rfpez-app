@@ -48,23 +48,28 @@ jobs:
             echo "ℹ️ No migration files found"
           fi
 
-      - name: Link to project (using Management API)
+      - name: Configure Supabase project
         run: |
-          echo "🔗 Linking to Supabase project..."
-          echo "Using Management API (access token authentication)"
-          # Link using access token from environment (SUPABASE_ACCESS_TOKEN)
-          # Project ref: jxlutaztoukwbbgtoulc
-          supabase link --project-ref jxlutaztoukwbbgtoulc
-          echo "✅ Linked to project"
+          echo "⚙️ Configuring Supabase project..."
+          # Create config directory
+          mkdir -p .supabase
+          
+          # Create config.toml with project ref
+          cat > .supabase/config.toml << EOF
+[project]
+project_id = "jxlutaztoukwbbgtoulc"
+EOF
+          
+          echo "✅ Project configured"
 
       - name: Deploy migrations
         if: success() && steps.check_migrations.outputs.has_pending == 'true'
         run: |
-          echo "Deploying migrations to dev/production..."
-          echo "Using linked project with Management API"
+          echo "Deploying migrations..."
+          echo "Using Management API (SUPABASE_ACCESS_TOKEN)"
           
-          # Deploy to linked project using Management API
-          supabase db push --linked 2>&1 | tee deploy.log
+          # Deploy using Management API
+          supabase db push 2>&1 | tee deploy.log
           
           # Check if deployment succeeded
           if grep -q "Finished supabase db push" deploy.log; then
