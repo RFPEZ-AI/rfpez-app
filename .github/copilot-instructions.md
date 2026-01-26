@@ -61,7 +61,7 @@ The current goal is to get the product demo ready following the instructions in 
 ```bash
 # Environment Status Check
 echo "Current Supabase Config:" && grep -E "REACT_APP_SUPABASE_URL|REACT_APP_SUPABASE_ANON_KEY" .env.local
-# Local: 127.0.0.1:54321 | Remote: jxlutaztoukwbbgtoulc.supabase.co
+# Local: 127.0.0.1:55321 | Remote: jxlutaztoukwbbgtoulc.supabase.co
 
 # Server Management (Use VS Code Tasks ONLY)
 # Ctrl+Shift+P → "Tasks: Run Task" → Select:
@@ -112,10 +112,10 @@ echo "API Server:" && curl -s http://localhost:3001/health >/dev/null && echo "�
 - **3100**: React Development Server (VS Code Task)
 - **3001**: API Server (VS Code Task)
 - **3000**: Supabase MCP Server
-- **54321**: Local Supabase API (changed to 54321 from 54121 to avoid Windows reserved ports)
-- **54322**: Local PostgreSQL Database (changed to 54322 from 54122 to avoid Windows reserved ports)
-- **54323**: Local Supabase Studio (changed to 54323 from 54123 to avoid Windows reserved ports)
-- **54324**: Local Mailpit (email testing)
+- **55321**: Local Supabase API (moved to 55xxx to avoid Windows reserved ports 54234-54333)
+- **55322**: Local PostgreSQL Database
+- **55323**: Local Supabase Studio
+- **55324**: Local Mailpit (email testing)
 
 ### Troubleshooting Quick Fixes
 ```bash
@@ -175,7 +175,7 @@ SELECT id, name FROM agents WHERE name IN ('Solutions', 'RFP Design', 'Support')
 ```bash
 # 1. Start Local Supabase Stack (if not already running)
 supabase start
-# This starts: DB (54322), API (54321), Studio (54323)
+# This starts: DB (55322), API (55321), Studio (55323)
 
 # 2. Switch to Local Configuration
 # Use scripts: ./scripts/supabase-local.bat (Windows) or ./scripts/supabase-local.sh (Linux/Mac)
@@ -194,11 +194,11 @@ use VS Code task "Start Development Server" (Ctrl+Shift+P → Tasks: Run Task)
 # Or manually: docker start supabase_edge_runtime_rfpez-app-local
 
 # 2. Develop & Test Functions Locally
-supabase functions serve claude-api-v3  # Serves locally on port 54321
-# Test against local function endpoint: http://127.0.0.1:54321/functions/v1/claude-api-v3
+supabase functions serve claude-api-v3  # Serves locally on port 55321
+# Test against local function endpoint: http://127.0.0.1:55321/functions/v1/claude-api-v3
 
 # 3. Local Function Testing
-curl -X POST http://127.0.0.1:54321/functions/v1/claude-api-v3 \
+curl -X POST http://127.0.0.1:55321/functions/v1/claude-api-v3 \
   -H "Content-Type: application/json" \
   -d '{"test": "data"}'
 
@@ -233,7 +233,7 @@ supabase migration up  # Apply only pending migrations
 
 # 3. Test Changes Locally
 # - Run React app against local DB
-# - Execute test queries in local Studio (localhost:54323)
+# - Execute test queries in local Studio (localhost:55323)
 # - Validate RLS policies and permissions
 # - Verify existing data is preserved and migrations work incrementally
 
@@ -261,9 +261,9 @@ supabase migration repair  # If needed to sync migration state
 
 # Manual Configuration Check
 # LOCAL URLs:
-# - API: http://127.0.0.1:54321
-# - Studio: http://127.0.0.1:54323
-# - Database: localhost:54322
+# - API: http://127.0.0.1:55321
+# - Studio: http://127.0.0.1:55323
+# - Database: localhost:55322
 
 # REMOTE URLs:
 # - API: https://jxlutaztoukwbbgtoulc.supabase.co
@@ -275,7 +275,7 @@ supabase migration repair  # If needed to sync migration state
 # Sync Remote Data to Local (for testing with real data)
 supabase db pull  # Pull schema from remote
 supabase db dump --data-only > data.sql  # Export remote data
-psql -h 127.0.0.1 -p 54322 -U postgres -d postgres < data.sql  # Import to local
+psql -h 127.0.0.1 -p 55322 -U postgres -d postgres < data.sql  # Import to local
 
 # Sync Local Schema to Remote (after local development)
 supabase db push  # Push schema changes
@@ -1577,7 +1577,7 @@ chrome_screenshot({ name: '05-final-state', fullPage: true, storeBase64: true })
 - **Dev server: Port 3100** - Managed by VS Code task "Start Development Server"
 - **API server: Port 3001** - Managed by VS Code task "Start API"
 - **Supabase MCP: Port 3000** - MCP protocol server
-- **Supabase Local: Port 54321** - Local Supabase stack
+- **Supabase Local: Port 55321** - Local Supabase stack
 
 **⚡ Task Management Rules:**
 - Use VS Code tasks (Ctrl+Shift+P → Tasks: Run Task) for all server operations

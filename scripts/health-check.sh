@@ -46,13 +46,13 @@ check_port() {
 # Check core services
 echo ""
 echo "📊 Core Services:"
-check_url "http://127.0.0.1:54321/health" "Supabase API"
-check_url "http://127.0.0.1:54323" "Supabase Studio"  
-check_port "54322" "PostgreSQL"
+check_url "http://127.0.0.1:55321/health" "Supabase API"
+check_url "http://127.0.0.1:55323" "Supabase Studio"  
+check_port "55322" "PostgreSQL"
 
 echo ""
 echo "🔧 Edge Functions:"
-if curl -s -X POST "http://127.0.0.1:54321/functions/v1/claude-api-v3" \
+if curl -s -X POST "http://127.0.0.1:55321/functions/v1/claude-api-v3" \
    -H "Content-Type: application/json" \
    -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" \
    -d '{"userMessage": "health check", "sessionId": "health-check"}' \
@@ -95,8 +95,8 @@ echo ""
 echo "🔗 Quick Links:"
 echo "   React App: http://localhost:3100"
 echo "   API Server: http://localhost:3001"  
-echo "   Supabase Studio: http://localhost:54323"
-echo "   Supabase API: http://127.0.0.1:54321"
+echo "   Supabase Studio: http://localhost:55323"
+echo "   Supabase API: http://127.0.0.1:55321"
 
 echo ""
 echo "========================================="
