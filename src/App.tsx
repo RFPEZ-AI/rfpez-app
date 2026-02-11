@@ -1,7 +1,7 @@
 // Copyright Mark Skiba, 2025 All rights reserved
 
 import React, { useEffect, useState } from 'react';
-import { Route, Redirect, useParams } from 'react-router-dom';
+import { Route, Redirect, useParams, Switch } from 'react-router-dom';
 import { IonApp, IonRouterOutlet, setupIonicReact } from '@ionic/react';
 import { IonReactRouter } from '@ionic/react-router';
 import Home from './pages/Home';
@@ -109,26 +109,34 @@ const AppContent: React.FC = () => {
   return (
     <>
       <IonRouterOutlet>
-        {/* Specific routes first - must come before specialty catch-all */}
-        <Route exact path="/home" component={Home} />
-        <Route path="/bid/submit" component={BidSubmissionPage} />
-        <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
-        <Route exact path="/test/rjsf" component={RjsfTestPage} />
-        <Route exact path="/test/gmail-oauth" component={GmailOAuth} />
-        <Route exact path="/debug" component={DebugPage} />
-        <Route exact path="/debug/avatars" component={AgentAvatarDemo} />
-        <Route exact path="/test/agent-management" component={AgentManagementTest} />
-        <Route exact path="/mcp-test" component={MCPTestComponent} />
-        <Route exact path="/callback" component={Home} />
-        {/* Root path redirect */}
-        <Route exact path="/" render={() => <Redirect to="/home" />} />
-        {/* Specialty site routes - must come last as catch-all */}
-        {/* This will match any single-segment path not matched above */}
-        <Route 
-          exact 
-          path="/:specialty" 
-          component={Home}
-        />
+        <Switch>
+          {/* Root path redirect - must be first */}
+          <Route exact path="/" render={() => <Redirect to="/home" />} />
+          
+          {/* Specific routes - must come before specialty catch-all */}
+          <Route exact path="/home" component={Home} />
+          <Route exact path="/debug" component={DebugPage} />
+          <Route exact path="/debug/avatars" component={AgentAvatarDemo} />
+          <Route exact path="/mcp-test" component={MCPTestComponent} />
+          <Route exact path="/callback" component={Home} />
+          
+          {/* Test routes */}
+          <Route exact path="/test/rjsf" component={RjsfTestPage} />
+          <Route exact path="/test/gmail-oauth" component={GmailOAuth} />
+          <Route exact path="/test/agent-management" component={AgentManagementTest} />
+          
+          {/* Bid submission routes */}
+          <Route path="/bid/submit" component={BidSubmissionPage} />
+          <Route exact path="/rfp/:id/bid" component={RfpBidRedirect} />
+          
+          {/* Specialty site routes - MUST come last as catch-all */}
+          {/* This will match any single-segment path not matched above */}
+          <Route 
+            exact 
+            path="/:specialty" 
+            component={Home}
+          />
+        </Switch>
       </IonRouterOutlet>
       <OfflineNotification />
       <PWAUpdatePrompt />
