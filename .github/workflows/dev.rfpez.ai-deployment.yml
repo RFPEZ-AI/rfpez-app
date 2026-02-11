@@ -28,6 +28,7 @@ jobs:
           cache-dependency-path: package-lock.json
       
       - name: Auto-increment version
+        if: github.actor != 'dependabot[bot]'
         run: |
           git config --local user.email "action@github.com"
           git config --local user.name "GitHub Action"
@@ -50,6 +51,7 @@ jobs:
           REACT_APP_COMMIT_SHA: ${{ github.sha }}
       
       - name: Deploy to Azure Static Web Apps
+        if: github.actor != 'dependabot[bot]'
         id: builddeploy
         uses: Azure/static-web-apps-deploy@v1
         with:
