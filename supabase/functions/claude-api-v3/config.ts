@@ -11,7 +11,7 @@ console.log('🔍 DEBUG: USE_AWS_BEDROCK === "true"?', USE_AWS_BEDROCK_RAW === '
 export const config = {
   supabaseUrl: Deno.env.get('SUPABASE_URL') || Deno.env.get('DATABASE_URL'),
   supabaseServiceKey: Deno.env.get('DATABASE_SERVICE_ROLE_KEY') || Deno.env.get('SUPABASE_SERVICE_ROLE_KEY'),
-  anthropicApiKey: Deno.env.get('ANTHROPIC_API_KEY') || Deno.env.get('CLAUDE_API_KEY'),
+  claudeApiKey: Deno.env.get('CLAUDE_API_KEY'),
   openaiApiKey: Deno.env.get('OPENAI_API_KEY'),
   openaiBaseUrl: Deno.env.get('OPENAI_BASE_URL') || 'https://api.openai.com/v1',
   openaiModel: Deno.env.get('OPENAI_MODEL') || 'gpt-5.2',
@@ -56,8 +56,8 @@ if (resolvedProvider === 'bedrock') {
     model: config.openaiModel
   });
 } else {
-  if (!config.anthropicApiKey) {
-    throw new Error('Missing ANTHROPIC_API_KEY or CLAUDE_API_KEY environment variable');
+  if (!config.claudeApiKey) {
+    throw new Error('Missing CLAUDE_API_KEY environment variable');
   }
   console.log('✅ Using direct Anthropic API for Claude');
 }

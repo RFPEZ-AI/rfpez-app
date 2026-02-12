@@ -4,3 +4,7 @@ services:
     environment:
       # Ensure PostgREST validates the JWT 'aud' claim from GoTrue (authenticated)
       PGRST_JWT_AUD: "authenticated"
+  
+  edge_runtime:
+    env_file:
+      - .env.local

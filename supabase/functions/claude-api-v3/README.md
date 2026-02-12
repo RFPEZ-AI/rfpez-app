@@ -143,7 +143,7 @@ When `LLM_PROVIDER=openai`, set:
 
 When using `anthropic` (default), set:
 
-- `ANTHROPIC_API_KEY` (or `CLAUDE_API_KEY` if your config uses that alias)
+- `CLAUDE_API_KEY` (required)
 
 ### AWS Bedrock Settings
 

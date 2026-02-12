@@ -8,10 +8,10 @@ export class ClaudeAPIService {
   baseUrl = 'https://api.anthropic.com/v1/messages';
   modelOverride;
   constructor(modelOverride){
-    if (!config.anthropicApiKey) {
-      throw new Error('ANTHROPIC_API_KEY is required');
+    if (!config.claudeApiKey) {
+      throw new Error('CLAUDE_API_KEY is required');
     }
-    this.apiKey = config.anthropicApiKey;
+    this.apiKey = config.claudeApiKey;
     this.modelOverride = modelOverride;
   }
   // Send message to Claude API with tool definitions
