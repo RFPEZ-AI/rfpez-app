@@ -33,10 +33,6 @@ if [ -z "${SUPABASE_SERVICE_ROLE_KEY}" ]; then
 	fi
 fi
 
-# Ensure ANTHROPIC_API_KEY is set for tests (use test value if not provided)
-if [ -z "${ANTHROPIC_API_KEY}" ] && [ -z "${CLAUDE_API_KEY}" ]; then
-	export ANTHROPIC_API_KEY="test-api-key"
-fi
 
 # Run tests with Deno (ignoring resource leaks in test environment)
 echo "📋 Running all tests..."

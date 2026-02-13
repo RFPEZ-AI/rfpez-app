@@ -33,11 +33,10 @@ import { useSupabase } from '../context/SupabaseContext';
 import { RoleService } from '../services/roleService';
 import { testClaudeMCPAvailability, MCPTestResult } from '../utils/mcpTestUtils';
 import { MCPMonitor, MCP_TEST_PROMPT, MCP_SIMPLE_TEST_PROMPT, MCP_CONVERSATION_TEST_PROMPT } from '../utils/claudeMCPTest';
-import Phase1TestButton from '../components/Phase1TestButton';
-import Phase2TestButton from '../components/Phase2TestButton';
 import StreamManagementTest from '../components/StreamManagementTest';
 import TokenBatchTest from '../components/TokenBatchTest';
-import SuggestedPromptTest from '../components/SuggestedPromptTest';
+import PerplexityTestComponent from '../components/PerplexityTestComponent';
+import VoyageTestComponent from '../components/VoyageTestComponent';
 // DISABLED: Performance monitoring components cause memory pressure
 // import PerformanceMonitoringDashboard from '../components/PerformanceMonitoringDashboard';
 // import MemoryStressTest from '../components/MemoryStressTest';
@@ -162,14 +161,11 @@ const DebugPage: React.FC = () => {
         {/* Viewport Diagnostics - Remote Testing Support */}
         <ViewportDiagnostics />
         
-        {/* Phase 1 Test Button - Edge Function Integration */}
-        <Phase1TestButton />
+        {/* Perplexity AI API Test */}
+        <PerplexityTestComponent />
         
-        {/* Phase 2 Test Button - Streaming Integration */}
-        <Phase2TestButton />
-        
-        {/* Suggested Prompts Test - UI Component Testing */}
-        <SuggestedPromptTest />
+        {/* Voyage AI Embeddings API Test */}
+        <VoyageTestComponent />
         
         {/* Stream Management Test - Advanced Streaming Features */}
         <StreamManagementTest />

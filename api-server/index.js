@@ -4,6 +4,16 @@ const { v4: uuidv4 } = require('uuid');
 const path = require('path');
 const fs = require('fs');
 
+// Polyfill fetch for Node.js versions < 18
+let fetch;
+if (typeof globalThis.fetch === 'function') {
+  // Node.js 18+ has native fetch
+  fetch = globalThis.fetch;
+} else {
+  // Use node-fetch for older versions
+  fetch = require('node-fetch');
+}
+
 // Load environment variables from .env.local
 const envPath = path.join(__dirname, '..', '.env.local');
 if (fs.existsSync(envPath)) {
@@ -12,7 +22,9 @@ if (fs.existsSync(envPath)) {
 }
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+// Use API_PORT if set, otherwise default to 3001
+// This avoids conflict with PORT=3100 used by React dev server
+const PORT = process.env.API_PORT || 3001;
 
 // Middleware
 app.use(cors());
@@ -586,6 +598,125 @@ app.get('/api/gmail-oauth/status', async (req, res) => {
   }
 });
 
+// Perplexity API test endpoint
+app.post('/api/test-perplexity', async (req, res) => {
+  const { query } = req.body;
+
+  if (!query) {
+    return res.status(400).json({
+      error: 'Query is required',
+      message: 'Please provide a query to test Perplexity API'
+    });
+  }
+
+  try {
+    const apiKey = process.env.PERPLEXITY_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        error: 'PERPLEXITY_API_KEY not configured',
+        message: 'Perplexity API key is required for search functionality'
+      });
+    }
+
+    const response = await fetch('https://api.perplexity.ai/search', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: query,
+        max_results: 5
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        error: `Perplexity API error: ${response.status}`,
+        message: errorText
+      });
+    }
+
+    const data = await response.json();
+    res.status(200).json({
+      success: true,
+      results: data.results || [],
+      message: 'Perplexity API test successful'
+    });
+  } catch (error) {
+    console.error('❌ Perplexity API test error:', error);
+    res.status(500).json({
+      error: 'Perplexity API test failed',
+      message: error.message
+    });
+  }
+});
+
+// Voyage API test endpoint
+app.post('/api/test-voyage', async (req, res) => {
+  const { text } = req.body;
+
+  if (!text) {
+    return res.status(400).json({
+      error: 'Text is required',
+      message: 'Please provide text to test Voyage AI embeddings API'
+    });
+  }
+
+  try {
+    const apiKey = process.env.VOYAGE_API_KEY;
+    if (!apiKey) {
+      return res.status(500).json({
+        error: 'VOYAGE_API_KEY not configured',
+        message: 'Voyage API key is required for embeddings functionality'
+      });
+    }
+
+    const response = await fetch('https://api.voyageai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        input: [text],
+        model: 'voyage-2'
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      return res.status(response.status).json({
+        error: `Voyage API error: ${response.status}`,
+        message: errorText
+      });
+    }
+
+    const data = await response.json();
+    
+    if (!data.data || !data.data[0] || !data.data[0].embedding) {
+      return res.status(500).json({
+        error: 'Invalid response from Voyage API',
+        message: 'Expected embedding data not found in response'
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      embedding: data.data[0].embedding,
+      model: 'voyage-2',
+      message: 'Voyage AI embeddings test successful'
+    });
+  } catch (error) {
+    console.error('❌ Voyage API test error:', error);
+    res.status(500).json({
+      error: 'Voyage API test failed',
+      message: error.message
+    });
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error('Server error:', err);
@@ -603,7 +734,9 @@ app.use('*', (req, res) => {
       'GET /health',
       'POST /api/agent/prompt',
       'GET /api/agent/capabilities',
-      'POST /api/agent/session'
+      'POST /api/agent/session',
+      'POST /api/test-perplexity',
+      'POST /api/test-voyage'
     ]
   });
 });
