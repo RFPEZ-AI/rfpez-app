@@ -34,7 +34,7 @@
     "uuid": "^9.0.1",
     "web-vitals": "^0.2.4",
     "workbox-background-sync": "^5.1.4",
-    "workbox-broadcast-update": "^5.1.4",
+    "workbox-broadcast-update": "^7.4.0",
     "workbox-cacheable-response": "^5.1.4",
     "workbox-core": "^5.1.4",
     "workbox-expiration": "^5.1.4",
