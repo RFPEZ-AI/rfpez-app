@@ -12,6 +12,7 @@ import GmailOAuth from './pages/GmailOAuth';
 import MCPTestComponent from './components/MCPTestComponent';
 import AgentManagementTest from './components/AgentManagementTest';
 import AgentAvatarDemo from './pages/AgentAvatarDemo';
+import SpecialtyRouteHandler from './pages/SpecialtyRouteHandler';
 import { SupabaseProvider, useSupabase } from './context/SupabaseContext';
 import OfflineNotification from './components/OfflineNotification';
 import PWAUpdatePrompt from './components/PWAUpdatePrompt';
@@ -131,10 +132,11 @@ const AppContent: React.FC = () => {
           
           {/* Specialty site routes - MUST come last as catch-all */}
           {/* This will match any single-segment path not matched above */}
+          {/* Validates specialty site exists, shows SiteIndexPage if not found */}
           <Route 
             exact 
             path="/:specialty" 
-            component={Home}
+            component={SpecialtyRouteHandler}
           />
         </Switch>
       </IonRouterOutlet>

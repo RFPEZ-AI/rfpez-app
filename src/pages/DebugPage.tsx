@@ -37,6 +37,7 @@ import StreamManagementTest from '../components/StreamManagementTest';
 import TokenBatchTest from '../components/TokenBatchTest';
 import PerplexityTestComponent from '../components/PerplexityTestComponent';
 import VoyageTestComponent from '../components/VoyageTestComponent';
+import EmailAPITestComponent from '../components/EmailAPITestComponent';
 // DISABLED: Performance monitoring components cause memory pressure
 // import PerformanceMonitoringDashboard from '../components/PerformanceMonitoringDashboard';
 // import MemoryStressTest from '../components/MemoryStressTest';
@@ -160,6 +161,9 @@ const DebugPage: React.FC = () => {
       <IonContent className="ion-padding">
         {/* Viewport Diagnostics - Remote Testing Support */}
         <ViewportDiagnostics />
+        
+        {/* Email API Test */}
+        <EmailAPITestComponent />
         
         {/* Perplexity AI API Test */}
         <PerplexityTestComponent />
