@@ -75,13 +75,19 @@ jobs:
               const matchingChecks = checks.check_runs
                 .filter((checkRun) => checkRun.name === unitTestCheckName)
                 .sort((a, b) => {
-                  const aTime = Date.parse(a.started_at || a.created_at || "");
-                  const bTime = Date.parse(b.started_at || b.created_at || "");
+                  const aTime = Date.parse(a.started_at || a.created_at || "") || 0;
+                  const bTime = Date.parse(b.started_at || b.created_at || "") || 0;
                   return bTime - aTime;
                 });
 
               const latestCheck = matchingChecks[0];
-              const isPending = !latestCheck || latestCheck.status !== "completed";
+
+              if (!latestCheck) {
+                core.info(`Skipping ${prLabel}: no "${unitTestCheckName}" check found on head SHA.`);
+                continue;
+              }
+
+              const isPending = latestCheck.status !== "completed";
 
               if (!isPending) {
                 core.info(
@@ -90,12 +96,15 @@ jobs:
                 continue;
               }
 
-              await github.rest.actions.createWorkflowDispatch({
-                owner,
-                repo,
-                workflow_id: workflowFile,
-                ref: branch
-              });
-
-              core.info(`Triggered CI for ${prLabel} (pending "${unitTestCheckName}" check).`);
+              try {
+                await github.rest.actions.createWorkflowDispatch({
+                  owner,
+                  repo,
+                  workflow_id: workflowFile,
+                  ref: branch
+                });
+                core.info(`Triggered CI for ${prLabel} (pending "${unitTestCheckName}" check).`);
+              } catch (error) {
+                core.warning(`Failed to trigger CI for ${prLabel}: ${error.message}`);
+              }
             }
