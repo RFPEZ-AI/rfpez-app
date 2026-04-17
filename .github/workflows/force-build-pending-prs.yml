@@ -1,0 +1,101 @@
+name: Force Build Pending PR Unit Tests
+
+on:
+  schedule:
+    - cron: "*/30 * * * *"
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  checks: read
+  contents: read
+  pull-requests: read
+
+jobs:
+  force-build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger CI for pending PR checks
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const workflowFile = "ci.yml";
+            const unitTestCheckName = "Unit Tests & Type Check";
+            const failedConclusions = new Set([
+              "action_required",
+              "cancelled",
+              "failure",
+              "startup_failure",
+              "stale",
+              "timed_out"
+            ]);
+
+            const pullRequests = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: "open",
+              per_page: 100
+            });
+
+            core.info(`Found ${pullRequests.length} open pull request(s).`);
+
+            for (const pr of pullRequests) {
+              const branch = pr.head.ref;
+              const sha = pr.head.sha;
+              const prLabel = `PR #${pr.number} (${branch})`;
+
+              const workflowRuns = await github.paginate(github.rest.actions.listWorkflowRuns, {
+                owner,
+                repo,
+                workflow_id: workflowFile,
+                branch,
+                event: "pull_request",
+                status: "completed",
+                per_page: 100
+              });
+
+              const hasFailedBuild = workflowRuns.some((run) =>
+                failedConclusions.has(run.conclusion || "")
+              );
+
+              if (hasFailedBuild) {
+                core.info(`Skipping ${prLabel}: branch has previous failed CI run.`);
+                continue;
+              }
+
+              const { data: checks } = await github.rest.checks.listForRef({
+                owner,
+                repo,
+                ref: sha,
+                per_page: 100
+              });
+
+              const matchingChecks = checks.check_runs
+                .filter((checkRun) => checkRun.name === unitTestCheckName)
+                .sort((a, b) => {
+                  const aTime = Date.parse(a.started_at || a.created_at || "");
+                  const bTime = Date.parse(b.started_at || b.created_at || "");
+                  return bTime - aTime;
+                });
+
+              const latestCheck = matchingChecks[0];
+              const isPending = !latestCheck || latestCheck.status !== "completed";
+
+              if (!isPending) {
+                core.info(
+                  `Skipping ${prLabel}: latest "${unitTestCheckName}" check is completed (${latestCheck.conclusion}).`
+                );
+                continue;
+              }
+
+              await github.rest.actions.createWorkflowDispatch({
+                owner,
+                repo,
+                workflow_id: workflowFile,
+                ref: branch
+              });
+
+              core.info(`Triggered CI for ${prLabel} (pending "${unitTestCheckName}" check).`);
+            }
