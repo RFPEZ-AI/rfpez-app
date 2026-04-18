@@ -15,10 +15,6 @@ export const IonicFieldTemplate: React.FC<FieldTemplateProps> = ({
   hidden,
   label,
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onDropPropertyClick,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  onKeyChange,
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   readonly,
   required,
   rawErrors = [],

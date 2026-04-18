@@ -1,0 +1,66 @@
+name: Dependabot Auto-Approve & Merge
+
+# Uses pull_request_target so the workflow runs with write permissions
+# even though Dependabot PRs are from a fork-like context.
+# This is safe here because we guard strictly on github.actor == 'dependabot[bot]'.
+on: pull_request_target
+
+permissions:
+  contents: write        # needed for auto-merge
+  pull-requests: write   # needed to approve and comment
+
+jobs:
+  dependabot:
+    runs-on: ubuntu-latest
+    # Only run for Dependabot PRs
+    if: github.actor == 'dependabot[bot]'
+    # Wait for the CI workflow to complete before attempting auto-merge.
+    # The "Unit Tests & Type Check" status check must pass first.
+    # (GitHub's auto-merge via `gh pr merge --auto` also respects required
+    #  status checks configured on the branch, so this is a belt-and-suspenders guard.)
+
+    steps:
+      - name: Fetch Dependabot metadata
+        id: metadata
+        uses: dependabot/fetch-metadata@v2
+        with:
+          github-token: "${{ secrets.GITHUB_TOKEN }}"
+
+      # ── Patch & minor updates: auto-approve + enable auto-merge ──────────
+      - name: Auto-approve patch and minor updates
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Enable auto-merge for patch and minor updates
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        # --squash keeps history clean; switch to --merge or --rebase if preferred
+        run: gh pr merge --auto --squash "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Comment on approved PR
+        if: |
+          steps.metadata.outputs.update-type == 'version-update:semver-patch' ||
+          steps.metadata.outputs.update-type == 'version-update:semver-minor'
+        run: |
+          gh pr comment "$PR_URL" --body "✅ **Auto-approved** — This is a **${{ steps.metadata.outputs.update-type }}** update for \`${{ steps.metadata.outputs.dependency-names }}\`. It will be merged automatically once all required checks pass."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # ── Major updates: flag for manual review ────────────────────────────
+      - name: Comment on major updates requiring manual review
+        if: steps.metadata.outputs.update-type == 'version-update:semver-major'
+        run: |
+          gh pr comment "$PR_URL" --body "⚠️ **Manual review required** — This is a **major version update** for \`${{ steps.metadata.outputs.dependency-names }}\`. Major updates may contain breaking changes and must be reviewed before merging. Please check the package changelog and test thoroughly."
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

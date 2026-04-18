@@ -46,13 +46,13 @@ check_port() {
 # Check core services
 echo ""
 echo "📊 Core Services:"
-check_url "http://127.0.0.1:55321/health" "Supabase API"
-check_url "http://127.0.0.1:55323" "Supabase Studio"  
-check_port "55322" "PostgreSQL"
+check_url "http://127.0.0.1:54321/health" "Supabase API"
+check_url "http://127.0.0.1:54323" "Supabase Studio"
+check_port "54322" "PostgreSQL"
 
 echo ""
 echo "🔧 Edge Functions:"
-if curl -s -X POST "http://127.0.0.1:55321/functions/v1/claude-api-v3" \
+if curl -s -X POST "http://127.0.0.1:54321/functions/v1/claude-api-v3" \
    -H "Content-Type: application/json" \
    -H "Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0" \
    -d '{"userMessage": "health check", "sessionId": "health-check"}' \
@@ -80,9 +80,9 @@ echo "🐳 Docker Status:"
 if command -v docker >/dev/null 2>&1; then
     if docker info >/dev/null 2>&1; then
         echo "✅ Docker: Running"
-        
-        # Check Supabase containers
-        local running_containers=$(docker ps --filter name=supabase_*_rfpez-app-local --format "{{.Names}}" | wc -l)
+
+        # Check Supabase containers (container names are supabase_*_rfpez-app, without -local suffix)
+        running_containers=$(docker ps --filter "name=supabase_" --filter "name=rfpez-app" --format "{{.Names}}" | grep -c "rfpez-app" || true)
         echo "📦 Supabase Containers: $running_containers running"
     else
         echo "❌ Docker: Not responding"
@@ -94,9 +94,10 @@ fi
 echo ""
 echo "🔗 Quick Links:"
 echo "   React App: http://localhost:3100"
-echo "   API Server: http://localhost:3001"  
-echo "   Supabase Studio: http://localhost:55323"
-echo "   Supabase API: http://127.0.0.1:55321"
+echo "   API Server: http://localhost:3001"
+echo "   Supabase Studio: http://localhost:54323"
+echo "   Supabase API: http://127.0.0.1:54321"
+echo "   Mailpit (email): http://localhost:54324"
 
 echo ""
 echo "========================================="
