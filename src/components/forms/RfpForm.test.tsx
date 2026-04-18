@@ -49,9 +49,9 @@ jest.mock('@rjsf/core', () => {
       </form>
     );
   };
-});
+}, { virtual: true });
 
-jest.mock('@rjsf/validator-ajv8', () => ({}));
+jest.mock('@rjsf/validator-ajv8', () => ({}), { virtual: true });
 
 const mockFormSpec: FormSpec = {
   version: 'rfpez-form@1',
