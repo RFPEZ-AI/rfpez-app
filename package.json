@@ -5,7 +5,7 @@
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
     "@aws-sdk/client-bedrock": "^3.1001.0",
-    "@aws-sdk/client-bedrock-runtime": "^3.1001.0",
+    "@aws-sdk/client-bedrock-runtime": "^3.1032.0",
     "@ionic/react": "^7.8.6",
     "@ionic/react-router": "^7.8.6",
     "@rjsf/core": "^6.3.1",
